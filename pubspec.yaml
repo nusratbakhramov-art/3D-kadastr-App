@@ -1,0 +1,66 @@
+name: kadastr
+description: "Kadastr — Flutter starter."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_svg: ^2.0.10+1
+  flutter_native_splash: ^2.4.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/branding/
+    - assets/images/
+
+  fonts:
+    - family: MTSCompact
+      fonts:
+        - asset: assets/fonts/MTSCompact-Regular.ttf
+        - asset: assets/fonts/MTSCompact-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/MTSCompact-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/MTSCompact-Black.ttf
+          weight: 900
+    - family: MTSText
+      fonts:
+        - asset: assets/fonts/MTSText-Regular.ttf
+        - asset: assets/fonts/MTSText-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/MTSText-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/MTSText-Black.ttf
+          weight: 900
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/branding/appicon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#034112"
+  adaptive_icon_foreground: "assets/branding/appicon.png"
+
+flutter_native_splash:
+  color: "#00E135"
+  image: "assets/branding/appicon.png"
+  android_12:
+    color: "#00E135"
+    image: "assets/branding/appicon.png"
+  android: true
+  ios: true
+  web: false
