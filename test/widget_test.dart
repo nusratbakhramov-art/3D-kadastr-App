@@ -62,7 +62,7 @@ void main() {
     expect(find.text('3D kadastr'), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 2900));
-    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 700));
     expect(completed, isTrue);
   });
 
@@ -86,11 +86,13 @@ void main() {
 
     await tester.tap(find.text('Davom etish'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
     expect(find.text('AI BAHOLASH'), findsOneWidget);
     expect(find.text('Ortga'), findsOneWidget);
 
     await tester.tap(find.text('Davom etish'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
     expect(find.text('MARKET VA KALKULYATOR'), findsOneWidget);
 
     await tester.tap(find.text('Davom etish'));
@@ -103,10 +105,12 @@ void main() {
 
     await tester.tap(find.text('Davom etish'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
     expect(find.text('AI BAHOLASH'), findsOneWidget);
 
     await tester.tap(find.text('Ortga'));
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
     expect(find.text('3D KADASTR XIZMATI'), findsOneWidget);
     expect(find.text('Ortga'), findsNothing);
   });
@@ -147,6 +151,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 120));
     await tester.pump(const Duration(milliseconds: 120));
     await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 700));
 
     expect(find.text('MARKET VA KALKULYATOR'), findsOneWidget);
     expect(finished, isFalse);

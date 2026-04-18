@@ -25,13 +25,32 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final AnimationController _progress = AnimationController(
     vsync: this,
     duration: widget.segmentDuration,
   );
+  late final AnimationController _textReveal = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+  );
+  late final AnimationController _pageTransition = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 520),
+    value: 1.0,
+  );
+  late final Animation<double> _titleReveal = CurvedAnimation(
+    parent: _textReveal,
+    curve: const Interval(0.0, 0.75, curve: Cubic(0.2, 0.8, 0.2, 1.0)),
+  );
+  late final Animation<double> _descReveal = CurvedAnimation(
+    parent: _textReveal,
+    curve: const Interval(0.18, 1.0, curve: Cubic(0.2, 0.8, 0.2, 1.0)),
+  );
 
   int _index = 0;
+  int? _prevIndex;
+  bool _isForward = true;
   late Locale _locale = widget.initialLocale;
   bool _paused = false;
 
@@ -39,9 +58,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   void initState() {
     super.initState();
     _progress.addStatusListener(_onProgressStatus);
+    _pageTransition.addStatusListener(_onPageTransitionStatus);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _progress.forward();
+      if (mounted) {
+        _progress.forward();
+        _textReveal.forward();
+      }
     });
+  }
+
+  void _onPageTransitionStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed && _prevIndex != null) {
+      setState(() => _prevIndex = null);
+    }
   }
 
   void _onProgressStatus(AnimationStatus status) {
@@ -52,8 +81,16 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _goToPage(int index) {
-    setState(() => _index = index);
+    if (index == _index) return;
+    setState(() {
+      _prevIndex = _index;
+      _isForward = index > _index;
+      _index = index;
+    });
     _progress
+      ..reset()
+      ..forward();
+    _pageTransition
       ..reset()
       ..forward();
   }
@@ -88,15 +125,122 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   @override
   void dispose() {
     _progress.removeStatusListener(_onProgressStatus);
+    _pageTransition.removeStatusListener(_onPageTransitionStatus);
     _progress.dispose();
+    _textReveal.dispose();
+    _pageTransition.dispose();
     super.dispose();
+  }
+
+  Widget _revealed({required Animation<double> anim, required Widget child}) {
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (context, c) {
+        return Opacity(
+          opacity: anim.value,
+          child: Transform.translate(
+            offset: Offset(0, (1 - anim.value) * 8),
+            child: c,
+          ),
+        );
+      },
+      child: child,
+    );
+  }
+
+  Widget _buildTitle(OnboardingPageData page) {
+    return _revealed(
+      anim: _titleReveal,
+      child: Text(
+        page.title(_locale),
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.visible,
+        style: const TextStyle(
+          fontFamily: 'MTSCompact',
+          fontWeight: FontWeight.w700,
+          fontSize: 26,
+          height: 1.3,
+          color: AppColors.textBlack,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDescription(OnboardingPageData page) {
+    return _revealed(
+      anim: _descReveal,
+      child: Text(
+        page.description(_locale),
+        textAlign: TextAlign.center,
+        maxLines: 3,
+        overflow: TextOverflow.visible,
+        style: TextStyle(
+          fontFamily: 'MTSCompact',
+          fontWeight: FontWeight.w400,
+          fontSize: 16,
+          height: 1.3,
+          color: AppColors.textBlack.withValues(alpha: 0.78),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavRow(int idx) {
+    final isFirst = idx == 0;
+    return _NavRow(
+      showBack: !isFirst,
+      continueLabel: AppLocale.continueLabel(_locale),
+      backLabel: AppLocale.backLabel(_locale),
+      onContinue: _onContinue,
+      onBack: _rewind,
+    );
+  }
+
+  Widget _slideSwap({
+    required Widget Function(int index) builder,
+    double begin = 0.0,
+    double end = 1.0,
+  }) {
+    return AnimatedBuilder(
+      animation: _pageTransition,
+      builder: (context, _) {
+        final raw = _pageTransition.value;
+        if (_prevIndex == null || raw >= 1.0) return builder(_index);
+        final span = end - begin;
+        final t = ((raw - begin) / span).clamp(0.0, 1.0);
+        final v = const Cubic(0.2, 0.8, 0.2, 1.0).transform(t);
+        const dist = 16.0;
+        final dir = _isForward ? 1.0 : -1.0;
+        return Stack(
+          alignment: Alignment.center,
+          fit: StackFit.passthrough,
+          children: [
+            IgnorePointer(
+              ignoring: true,
+              child: Opacity(
+                opacity: 1 - v,
+                child: Transform.translate(
+                  offset: Offset(-dir * v * dist, 0),
+                  child: builder(_prevIndex!),
+                ),
+              ),
+            ),
+            Opacity(
+              opacity: v,
+              child: Transform.translate(
+                offset: Offset(dir * (1 - v) * dist, 0),
+                child: builder(_index),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final page = onboardingPages[_index];
-    final isFirst = _index == 0;
-
     return Scaffold(
       backgroundColor: AppColors.greenBlack,
       body: Listener(
@@ -152,7 +296,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           ).createShader(rect),
                           blendMode: BlendMode.dstIn,
                           child: Image.asset(
-                            page.mockupAsset,
+                            onboardingPages[_index].mockupAsset,
                             fit: BoxFit.cover,
                             alignment: Alignment.topCenter,
                           ),
@@ -171,18 +315,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           height: 36,
                           child: Align(
                             alignment: Alignment.topCenter,
-                            child: Text(
-                              page.title(_locale),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.visible,
-                              style: const TextStyle(
-                                fontFamily: 'MTSCompact',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 26,
-                                height: 1.3,
-                                color: AppColors.textBlack,
-                              ),
+                            child: _slideSwap(
+                              begin: 0.0,
+                              end: 0.65,
+                              builder: (idx) =>
+                                  _buildTitle(onboardingPages[idx]),
                             ),
                           ),
                         ),
@@ -190,20 +327,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         Expanded(
                           child: Align(
                             alignment: Alignment.topCenter,
-                            child: Text(
-                              page.description(_locale),
-                              textAlign: TextAlign.center,
-                              maxLines: 3,
-                              overflow: TextOverflow.visible,
-                              style: TextStyle(
-                                fontFamily: 'MTSCompact',
-                                fontWeight: FontWeight.w400,
-                                fontSize: 16,
-                                height: 1.3,
-                                color: AppColors.textBlack.withValues(
-                                  alpha: 0.78,
-                                ),
-                              ),
+                            child: _slideSwap(
+                              begin: 0.15,
+                              end: 0.80,
+                              builder: (idx) =>
+                                  _buildDescription(onboardingPages[idx]),
                             ),
                           ),
                         ),
@@ -211,12 +339,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _NavRow(
-                    showBack: !isFirst,
-                    continueLabel: AppLocale.continueLabel(_locale),
-                    backLabel: AppLocale.backLabel(_locale),
-                    onContinue: _onContinue,
-                    onBack: _rewind,
+                  _slideSwap(
+                    begin: 0.30,
+                    end: 1.0,
+                    builder: (idx) => _buildNavRow(idx),
                   ),
                 ],
               ),
@@ -230,6 +356,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
 class _NavRow extends StatelessWidget {
   const _NavRow({
+    super.key,
     required this.showBack,
     required this.continueLabel,
     required this.backLabel,
