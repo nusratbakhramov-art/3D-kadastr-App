@@ -120,16 +120,16 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
               _logoEndScale,
               _scaleT.value,
             )!;
+            // The splash SVG has a built-in rotate(-15) on its rounded
+            // container, so at no additional rotation the logo already reads
+            // as tilted. To level it out, we rotate it back to +15° over the
+            // course of the SETTLE beat.
             final tilt = lerpDouble(
-              _logoStartTiltDeg * math.pi / 180,
               0,
+              _logoStartTiltDeg * math.pi / 180,
               _rotationT.value,
             )!;
-            final logoDx = lerpDouble(
-              0.0,
-              _logoEndOffsetX,
-              _logoSlideT.value,
-            )!;
+            final logoDx = lerpDouble(0.0, _logoEndOffsetX, _logoSlideT.value)!;
             final textDx = lerpDouble(
               _textStartOffsetX,
               _textEndOffsetX,
