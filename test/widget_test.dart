@@ -166,14 +166,15 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: MainShell()));
     await tester.pump();
 
-    // Home tab active by default.
+    // Home tab active by default; Xizmatlar appears once (nav label only).
     expect(find.text('3D kadastr'), findsOneWidget);
+    expect(find.text('Xizmatlar'), findsOneWidget);
 
     await tester.tap(find.text('Xizmatlar'));
-    await tester.pump();
+    await tester.pumpAndSettle();
 
-    // Home content no longer visible (offstage inside IndexedStack).
-    expect(find.text('3D kadastr'), findsNothing);
+    // After slide, Xizmatlar appears twice (nav label + placeholder title).
+    expect(find.text('Xizmatlar'), findsNWidgets(2));
   });
 
   testWidgets('onboarding: continue button advances through all pages', (

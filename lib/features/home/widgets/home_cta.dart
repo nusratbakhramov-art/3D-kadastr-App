@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeCta extends StatelessWidget {
   const HomeCta({
@@ -39,8 +38,8 @@ class HomeCta extends StatelessWidget {
               right: -8,
               top: 0,
               bottom: 0,
-              child: SvgPicture.asset(
-                'assets/images/home/cta-icon.svg',
+              child: Image.asset(
+                'assets/images/home/cta-icon.png',
                 height: 148,
                 fit: BoxFit.fitHeight,
               ),

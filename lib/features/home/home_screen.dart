@@ -8,10 +8,16 @@ import 'widgets/home_cta.dart';
 import 'widgets/home_header.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, this.locale = AppLocale.uz, this.today});
+  const HomeScreen({
+    super.key,
+    this.locale = AppLocale.uz,
+    this.today,
+    this.onLoginTap,
+  });
 
   final Locale locale;
   final DateTime? today;
+  final VoidCallback? onLoginTap;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +42,7 @@ class HomeScreen extends StatelessWidget {
                         unreadCount: unread,
                         locale: locale,
                         today: date,
+                        onLoginTap: onLoginTap,
                       );
                     },
                   );
@@ -47,7 +54,11 @@ class HomeScreen extends StatelessWidget {
               ValueListenableBuilder<UserProfile?>(
                 valueListenable: userProfileNotifier,
                 builder: (context, profile, _) {
-                  return HomeCta(isGuest: profile == null, locale: locale);
+                  return HomeCta(
+                    isGuest: profile == null,
+                    locale: locale,
+                    onLoginTap: onLoginTap,
+                  );
                 },
               ),
             ],

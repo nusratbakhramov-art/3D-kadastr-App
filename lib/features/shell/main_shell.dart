@@ -1,15 +1,22 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../auth/auth_flow_screen.dart';
+import '../auth/auth_storage.dart';
 import '../home/home_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
 import 'app_bottom_nav.dart';
 import 'placeholder_screen.dart';
 
 class MainShell extends StatefulWidget {
-  const MainShell({super.key, this.locale = AppLocale.uz});
+  const MainShell({
+    super.key,
+    this.locale = AppLocale.uz,
+    this.authStorage = const AuthStorage(),
+  });
 
   final Locale locale;
+  final AuthStorage authStorage;
 
   @override
   State<MainShell> createState() => _MainShellState();
@@ -17,6 +24,59 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _onTabChanged(int i) {
+    if (i == _index) return;
+    final delta = (i - _index).abs();
+    setState(() => _index = i);
+    if (delta > 1) {
+      _pageController.jumpToPage(i);
+    } else {
+      _pageController.animateToPage(
+        i,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    }
+  }
+
+  Future<void> _openAuth() async {
+    await Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 320),
+        reverseTransitionDuration: const Duration(milliseconds: 260),
+        opaque: true,
+        fullscreenDialog: true,
+        pageBuilder: (_, _, _) => AuthFlowScreen(
+          storage: widget.authStorage,
+          onAuthenticated: () => Navigator.of(context).pop(),
+          onSkip: () => Navigator.of(context).pop(),
+        ),
+        transitionsBuilder: (_, animation, _, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          );
+        },
+      ),
+    );
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,10 +84,14 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       backgroundColor: AppColors.greenBlack,
-      body: IndexedStack(
-        index: _index,
+      body: PageView(
+        controller: _pageController,
+        physics: const NeverScrollableScrollPhysics(),
+        onPageChanged: (i) {
+          if (i != _index) setState(() => _index = i);
+        },
         children: [
-          HomeScreen(locale: widget.locale),
+          HomeScreen(locale: widget.locale, onLoginTap: _openAuth),
           PlaceholderScreen(title: items[1].label),
           PlaceholderScreen(title: items[2].label),
           PlaceholderScreen(title: items[3].label),
@@ -37,7 +101,7 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: AppBottomNav(
         currentIndex: _index,
         items: items,
-        onChanged: (i) => setState(() => _index = i),
+        onChanged: _onTabChanged,
       ),
     );
   }
