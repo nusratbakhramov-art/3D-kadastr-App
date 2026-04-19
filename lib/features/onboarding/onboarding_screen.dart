@@ -213,7 +213,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         const dist = 16.0;
         final dir = _isForward ? 1.0 : -1.0;
         return Stack(
-          alignment: Alignment.center,
+          alignment: Alignment.topCenter,
           fit: StackFit.passthrough,
           children: [
             IgnorePointer(
