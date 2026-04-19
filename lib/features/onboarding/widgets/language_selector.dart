@@ -136,8 +136,7 @@ class _LanguagePickerSheetState extends State<_LanguagePickerSheet> {
                       selected:
                           AppLocale.all[i].languageCode ==
                           widget.initial.languageCode,
-                      onTap: () =>
-                          Navigator.of(context).pop(AppLocale.all[i]),
+                      onTap: () => Navigator.of(context).pop(AppLocale.all[i]),
                     ),
                     if (i < AppLocale.all.length - 1) const _Divider(),
                   ],
