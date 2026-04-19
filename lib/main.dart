@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
+import 'features/auth/auth_storage.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
 import 'features/shell/main_shell.dart';
@@ -19,9 +20,11 @@ class KadastrApp extends StatelessWidget {
   const KadastrApp({
     super.key,
     this.onboardingStorage = const OnboardingStorage(),
+    this.authStorage = const AuthStorage(),
   });
 
   final OnboardingStorage onboardingStorage;
+  final AuthStorage authStorage;
 
   @override
   Widget build(BuildContext context) {
@@ -30,15 +33,19 @@ class KadastrApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
-      home: _AppRoot(onboardingStorage: onboardingStorage),
+      home: _AppRoot(
+        onboardingStorage: onboardingStorage,
+        authStorage: authStorage,
+      ),
     );
   }
 }
 
 class _AppRoot extends StatefulWidget {
-  const _AppRoot({required this.onboardingStorage});
+  const _AppRoot({required this.onboardingStorage, required this.authStorage});
 
   final OnboardingStorage onboardingStorage;
+  final AuthStorage authStorage;
 
   @override
   State<_AppRoot> createState() => _AppRootState();
@@ -53,7 +60,7 @@ class _AppRootState extends State<_AppRoot> {
   @override
   void initState() {
     super.initState();
-    _loadOnboardingFlag();
+    _bootstrap();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FlutterNativeSplash.remove();
       SystemChrome.setSystemUIOverlayStyle(
@@ -66,7 +73,7 @@ class _AppRootState extends State<_AppRoot> {
     });
   }
 
-  Future<void> _loadOnboardingFlag() async {
+  Future<void> _bootstrap() async {
     final done = await widget.onboardingStorage.hasCompleted();
     if (!mounted) return;
     setState(() => _onboardingDone = done);
@@ -101,7 +108,10 @@ class _AppRootState extends State<_AppRoot> {
           key: const ValueKey('onboarding'),
           onFinished: _handleOnboardingFinished,
         ),
-        _Stage.home => const MainShell(key: ValueKey('home')),
+        _Stage.home => MainShell(
+          key: const ValueKey('home'),
+          authStorage: widget.authStorage,
+        ),
       },
     );
   }
