@@ -27,6 +27,7 @@ flutter:
     - assets/branding/
     - assets/images/
     - assets/images/flags/
+    - assets/images/home/
 
   fonts:
     - family: MTSCompact

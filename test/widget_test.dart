@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:kadastr/features/home/home_screen.dart';
+import 'package:kadastr/features/home/user_profile.dart';
 import 'package:kadastr/features/onboarding/onboarding_screen.dart';
 import 'package:kadastr/features/onboarding/onboarding_storage.dart';
 import 'package:kadastr/features/splash/animated_splash_screen.dart';
@@ -26,6 +28,8 @@ class _FakeOnboardingStorage implements OnboardingStorage {
     initiallyCompleted = false;
   }
 }
+
+final DateTime _fixedDate = DateTime(2026, 4, 14);
 
 Future<void> _settleSplash(WidgetTester tester) async {
   await tester.pump();
@@ -67,11 +71,54 @@ void main() {
   });
 
   testWidgets('returning user: splash → home', (tester) async {
+    userProfileNotifier.value = const UserProfile(name: 'Odiljon');
+    notificationUnreadNotifier.value = 0;
     final storage = _FakeOnboardingStorage(initiallyCompleted: true);
     await tester.pumpWidget(KadastrApp(onboardingStorage: storage));
 
     await _settleSplash(tester);
-    expect(find.text('Добро пожаловать'), findsOneWidget);
+    expect(find.text('3D kadastr'), findsOneWidget);
+  });
+
+  testWidgets('home: logged-in shows greeting with name and all four cards', (
+    tester,
+  ) async {
+    userProfileNotifier.value = const UserProfile(name: 'Odiljon');
+    notificationUnreadNotifier.value = 0;
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(today: _fixedDate)));
+    await tester.pump();
+
+    expect(find.textContaining('Salom, Odiljon'), findsOneWidget);
+    expect(find.text('3D kadastr'), findsOneWidget);
+    expect(find.text('AI baholash'), findsOneWidget);
+    expect(find.text('Kalkulyator'), findsOneWidget);
+    expect(find.text('Market'), findsOneWidget);
+    expect(find.text('14 aprel, 2026'), findsOneWidget);
+  });
+
+  testWidgets('home: guest shows guest greeting', (tester) async {
+    userProfileNotifier.value = null;
+    notificationUnreadNotifier.value = 0;
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(today: _fixedDate)));
+    await tester.pump();
+
+    expect(find.textContaining('Salom, mehmon'), findsOneWidget);
+    expect(find.text('Kirish'), findsOneWidget);
+    expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
+  });
+
+  testWidgets('home: bell shows red dot when unread > 0, hides when 0', (
+    tester,
+  ) async {
+    userProfileNotifier.value = const UserProfile(name: 'Odiljon');
+    notificationUnreadNotifier.value = 2;
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(today: _fixedDate)));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('home.bell.dot')), findsOneWidget);
+
+    notificationUnreadNotifier.value = 0;
+    await tester.pump();
+    expect(find.byKey(const ValueKey('home.bell.dot')), findsNothing);
   });
 
   testWidgets('onboarding: continue button advances through all pages', (

@@ -1,84 +1,108 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../theme/app_colors.dart';
+import '../onboarding/onboarding_page_data.dart';
+import 'user_profile.dart';
+import 'widgets/home_card.dart';
+import 'widgets/home_header.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.locale = AppLocale.uz, this.today});
+
+  final Locale locale;
+  final DateTime? today;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
+    final date = today ?? DateTime.now();
 
     return Scaffold(
-      body: Stack(
-        children: [
-          const _GradientBackdrop(),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SvgPicture.asset(
-                    'assets/branding/splash-full-logo.svg',
-                    height: 56,
-                    semanticsLabel: 'Kadastr',
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Добро пожаловать',
-                    style: textTheme.displaySmall?.copyWith(
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Kadastr — стартовый Flutter-проект с фирменной типографикой и палитрой.',
-                    style: textTheme.bodyLarge?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.85),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  ElevatedButton(
-                    onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Готово к работе')),
+      backgroundColor: AppColors.greenBlack,
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ValueListenableBuilder<UserProfile?>(
+                valueListenable: userProfileNotifier,
+                builder: (context, profile, _) {
+                  return ValueListenableBuilder<int>(
+                    valueListenable: notificationUnreadNotifier,
+                    builder: (context, unread, _) {
+                      return HomeHeader(
+                        profile: profile,
+                        unreadCount: unread,
+                        locale: locale,
+                        today: date,
                       );
                     },
-                    child: const Text('Начать'),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white70),
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    onPressed: () {},
-                    child: const Text('Подробнее'),
-                  ),
-                ],
+                  );
+                },
               ),
-            ),
+              const SizedBox(height: 20),
+              const _CardsGrid(),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _GradientBackdrop extends StatelessWidget {
-  const _GradientBackdrop();
+class _CardsGrid extends StatelessWidget {
+  const _CardsGrid();
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(gradient: AppColors.brandGradient),
-      child: SizedBox.expand(),
+    const gap = 12.0;
+    const height = 97.0;
+
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          height: height,
+          child: Row(
+            children: [
+              Expanded(
+                child: HomeCard(
+                  title: '3D kadastr',
+                  iconAsset: 'assets/images/home/card-3d.svg',
+                ),
+              ),
+              SizedBox(width: gap),
+              Expanded(
+                child: HomeCard(
+                  title: 'AI baholash',
+                  iconAsset: 'assets/images/home/card-ai.svg',
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: gap),
+        SizedBox(
+          height: height,
+          child: Row(
+            children: [
+              Expanded(
+                child: HomeCard(
+                  title: 'Kalkulyator',
+                  iconAsset: 'assets/images/home/card-calculator.svg',
+                ),
+              ),
+              SizedBox(width: gap),
+              Expanded(
+                child: HomeCard(
+                  title: 'Market',
+                  iconAsset: 'assets/images/home/card-market.svg',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
