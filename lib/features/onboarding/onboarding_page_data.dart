@@ -112,4 +112,12 @@ class AppLocale {
     'en' => 'Back',
     _ => 'Ortga',
   };
+
+  static String chooseLanguageTitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'uz' => 'Tilni tanlang',
+        'ru' => 'Выберите язык',
+        'en' => 'Choose language',
+        _ => 'Tilni tanlang',
+      };
 }

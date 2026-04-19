@@ -16,6 +16,12 @@ class AppColors {
   static const Color onSurface = Color(0xFF0E1A12);
   static const Color outline = Color(0xFFCBD5CE);
 
+  static const Color sheetTitle = Color(0xFF111E2B);
+  static const Color sheetListBg = Color(0xFFF4F4F4);
+  static const Color sheetDivider = Color(0xFFEBEBEB);
+  static const Color radioBorder = Color(0xFFCCCFCD);
+  static const Color accentGreen = Color(0xFF00E135);
+
   static const LinearGradient brandGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,

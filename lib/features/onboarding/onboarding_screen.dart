@@ -339,11 +339,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _slideSwap(
-                    begin: 0.30,
-                    end: 1.0,
-                    builder: (idx) => _buildNavRow(idx),
-                  ),
+                  if (_prevIndex != null && _prevIndex != 0 && _index != 0)
+                    _buildNavRow(_index)
+                  else
+                    _slideSwap(
+                      begin: 0.30,
+                      end: 1.0,
+                      builder: (idx) => _buildNavRow(idx),
+                    ),
                 ],
               ),
             ),
@@ -356,7 +359,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
 class _NavRow extends StatelessWidget {
   const _NavRow({
-    super.key,
     required this.showBack,
     required this.continueLabel,
     required this.backLabel,
