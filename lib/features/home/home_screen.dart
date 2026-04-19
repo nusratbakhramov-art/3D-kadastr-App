@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../onboarding/onboarding_page_data.dart';
 import 'user_profile.dart';
 import 'widgets/home_card.dart';
+import 'widgets/home_cta.dart';
 import 'widgets/home_header.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -42,6 +43,13 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 20),
               const _CardsGrid(),
+              const SizedBox(height: 12),
+              ValueListenableBuilder<UserProfile?>(
+                valueListenable: userProfileNotifier,
+                builder: (context, profile, _) {
+                  return HomeCta(isGuest: profile == null, locale: locale);
+                },
+              ),
             ],
           ),
         ),

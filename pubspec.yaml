@@ -25,6 +25,7 @@ flutter:
 
   assets:
     - assets/branding/
+    - assets/icons/
     - assets/images/
     - assets/images/flags/
     - assets/images/home/

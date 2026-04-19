@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
-import 'features/home/home_screen.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
+import 'features/shell/main_shell.dart';
 import 'features/splash/animated_splash_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
@@ -101,7 +101,7 @@ class _AppRootState extends State<_AppRoot> {
           key: const ValueKey('onboarding'),
           onFinished: _handleOnboardingFinished,
         ),
-        _Stage.home => const HomeScreen(key: ValueKey('home')),
+        _Stage.home => const MainShell(key: ValueKey('home')),
       },
     );
   }

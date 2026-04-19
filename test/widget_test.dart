@@ -5,6 +5,7 @@ import 'package:kadastr/features/home/home_screen.dart';
 import 'package:kadastr/features/home/user_profile.dart';
 import 'package:kadastr/features/onboarding/onboarding_screen.dart';
 import 'package:kadastr/features/onboarding/onboarding_storage.dart';
+import 'package:kadastr/features/shell/main_shell.dart';
 import 'package:kadastr/features/splash/animated_splash_screen.dart';
 import 'package:kadastr/main.dart';
 
@@ -103,8 +104,34 @@ void main() {
     await tester.pump();
 
     expect(find.textContaining('Salom, mehmon'), findsOneWidget);
-    expect(find.text('Kirish'), findsOneWidget);
+    expect(find.text('Kirish'), findsNWidgets(2));
     expect(find.byIcon(Icons.notifications_none_rounded), findsNothing);
+  });
+
+  testWidgets('home: CTA shows headline and order button when logged-in', (
+    tester,
+  ) async {
+    userProfileNotifier.value = const UserProfile(name: 'Odiljon');
+    notificationUnreadNotifier.value = 0;
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(today: _fixedDate)));
+    await tester.pump();
+
+    expect(
+      find.text('Professional skan + AI baholash + QR hisobot'),
+      findsOneWidget,
+    );
+    expect(find.text('Buyurtma berish'), findsOneWidget);
+  });
+
+  testWidgets('home: CTA button reads Kirish when guest', (tester) async {
+    userProfileNotifier.value = null;
+    notificationUnreadNotifier.value = 0;
+    await tester.pumpWidget(MaterialApp(home: HomeScreen(today: _fixedDate)));
+    await tester.pump();
+
+    // Two 'Kirish' buttons visible in guest mode: header pill + CTA button.
+    expect(find.text('Kirish'), findsNWidgets(2));
+    expect(find.text('Buyurtma berish'), findsNothing);
   });
 
   testWidgets('home: bell shows red dot when unread > 0, hides when 0', (
@@ -119,6 +146,34 @@ void main() {
     notificationUnreadNotifier.value = 0;
     await tester.pump();
     expect(find.byKey(const ValueKey('home.bell.dot')), findsNothing);
+  });
+
+  testWidgets('shell: renders all 5 tab labels', (tester) async {
+    userProfileNotifier.value = const UserProfile(name: 'Odiljon');
+    notificationUnreadNotifier.value = 0;
+    await tester.pumpWidget(const MaterialApp(home: MainShell()));
+    await tester.pump();
+
+    expect(find.text('Asosiy'), findsOneWidget);
+    expect(find.text('Xizmatlar'), findsOneWidget);
+    expect(find.text('Arizalar'), findsOneWidget);
+    expect(find.text('Profil'), findsOneWidget);
+  });
+
+  testWidgets('shell: tapping Xizmatlar swaps content', (tester) async {
+    userProfileNotifier.value = const UserProfile(name: 'Odiljon');
+    notificationUnreadNotifier.value = 0;
+    await tester.pumpWidget(const MaterialApp(home: MainShell()));
+    await tester.pump();
+
+    // Home tab active by default.
+    expect(find.text('3D kadastr'), findsOneWidget);
+
+    await tester.tap(find.text('Xizmatlar'));
+    await tester.pump();
+
+    // Home content no longer visible (offstage inside IndexedStack).
+    expect(find.text('3D kadastr'), findsNothing);
   });
 
   testWidgets('onboarding: continue button advances through all pages', (
