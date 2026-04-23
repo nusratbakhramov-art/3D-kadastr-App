@@ -24,8 +24,13 @@ class AppBottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backgroundColor = isDark
+        ? AppColors.greenBlack
+        : const Color(0xFFFEFEFE);
+
     return Container(
-      color: AppColors.greenBlack,
+      color: backgroundColor,
       child: SafeArea(
         top: false,
         child: Padding(

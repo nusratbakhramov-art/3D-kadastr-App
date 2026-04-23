@@ -57,8 +57,19 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? Colors.white.withValues(alpha: 0.04)
+        : Colors.white.withValues(alpha: 0.88);
+    final borderColor = selected
+        ? AppColors.splashGreen
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : const Color(0xFFD9DDE2));
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+
     return Material(
-      color: Colors.white.withValues(alpha: 0.04),
+      color: bg,
       borderRadius: BorderRadius.circular(28),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -67,12 +78,7 @@ class _Pill extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(28),
-            border: Border.all(
-              color: selected
-                  ? AppColors.splashGreen
-                  : Colors.white.withValues(alpha: 0.12),
-              width: 1.5,
-            ),
+            border: Border.all(color: borderColor, width: 1.5),
           ),
           child: Row(
             children: [
@@ -90,8 +96,8 @@ class _Pill extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: textColor,
                     fontSize: 15,
                     fontWeight: FontWeight.w500,
                   ),
@@ -113,6 +119,11 @@ class _Radio extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inactiveBorder = isDark
+        ? Colors.white.withValues(alpha: 0.4)
+        : AppColors.textBlack.withValues(alpha: 0.4);
+
     return Container(
       width: 22,
       height: 22,
@@ -120,9 +131,7 @@ class _Radio extends StatelessWidget {
         shape: BoxShape.circle,
         color: selected ? AppColors.splashGreen : Colors.transparent,
         border: Border.all(
-          color: selected
-              ? AppColors.splashGreen
-              : Colors.white.withValues(alpha: 0.4),
+          color: selected ? AppColors.splashGreen : inactiveBorder,
           width: 1.5,
         ),
       ),

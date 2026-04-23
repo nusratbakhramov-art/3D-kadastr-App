@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../theme/app_colors.dart';
 import '../auth_service.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/auth_toast.dart';
@@ -114,6 +115,10 @@ class _OtpStepState extends State<OtpStep> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark
+        ? Colors.white70
+        : AppColors.textBlack.withValues(alpha: 0.65);
     final complete = _otp.value.length == widget.otpLength;
     return AuthScaffold(
       title: 'Tasdiqlash kodi',
@@ -124,9 +129,9 @@ class _OtpStepState extends State<OtpStep> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Raqamingizga yuborilgan kodni kiriting',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 12),
             _PhonePill(text: _prettyPhone(), onEdit: widget.onEdit),
@@ -166,6 +171,18 @@ class _PhonePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? Colors.white.withValues(alpha: 0.05)
+        : Colors.white.withValues(alpha: 0.88);
+    final borderColor = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : const Color(0xFFD9DDE2);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final iconColor = isDark
+        ? Colors.white.withValues(alpha: 0.8)
+        : AppColors.textBlack.withValues(alpha: 0.7);
+
     return GestureDetector(
       key: const ValueKey('otp.edit'),
       onTap: onEdit,
@@ -173,23 +190,16 @@ class _PhonePill extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
+          color: bg,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+          border: Border.all(color: borderColor),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              text,
-              style: const TextStyle(color: Colors.white, fontSize: 14),
-            ),
+            Text(text, style: TextStyle(color: textColor, fontSize: 14)),
             const SizedBox(width: 8),
-            Icon(
-              Icons.edit,
-              color: Colors.white.withValues(alpha: 0.8),
-              size: 14,
-            ),
+            Icon(Icons.edit, color: iconColor, size: 14),
           ],
         ),
       ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/phone_input_field.dart';
 import '../widgets/primary_cta.dart';
@@ -52,6 +53,11 @@ class _PhoneStepState extends State<PhoneStep> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark
+        ? Colors.white70
+        : AppColors.textBlack.withValues(alpha: 0.65);
+
     return AuthScaffold(
       title: 'Ilovaga kiring',
       iconAsset: 'assets/images/auth/login.png',
@@ -60,9 +66,9 @@ class _PhoneStepState extends State<PhoneStep> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Sizning raqamingiz',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 12),
             PhoneInputField(controller: _phone),

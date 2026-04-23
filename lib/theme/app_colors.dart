@@ -12,7 +12,8 @@ class AppColors {
   static const Color textBlack = Color(0xFF18181B);
   static const Color buttonTextBlack = Color(0xFF151515);
 
-  static const Color surface = Color(0xFFF5F7F4);
+  static const Color lightBackground = Color(0xFFF4F4F4);
+  static const Color surface = lightBackground;
   static const Color onSurface = Color(0xFF0E1A12);
   static const Color outline = Color(0xFFCBD5CE);
 

@@ -22,8 +22,14 @@ class AuthScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    final backgroundColor = isDark
+        ? AppColors.greenBlack
+        : AppColors.lightBackground;
+
     return Scaffold(
-      backgroundColor: AppColors.greenBlack,
+      backgroundColor: backgroundColor,
       resizeToAvoidBottomInset: true,
       body: SafeArea(
         child: Column(
@@ -44,8 +50,7 @@ class AuthScaffold extends StatelessWidget {
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
                     fontSize: 28,
-                    color: Colors.white,
-                  ),
+                  ).copyWith(color: titleColor),
                 ),
               ),
             ),
@@ -108,8 +113,14 @@ class _CircleIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.06);
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+
     return Material(
-      color: Colors.white.withValues(alpha: 0.08),
+      color: bg,
       shape: const CircleBorder(),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -117,7 +128,7 @@ class _CircleIconButton extends StatelessWidget {
         child: SizedBox(
           width: 40,
           height: 40,
-          child: Icon(icon, color: Colors.white, size: 20),
+          child: Icon(icon, color: fg, size: 20),
         ),
       ),
     );
@@ -131,8 +142,14 @@ class _SkipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.06);
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+
     return Material(
-      color: Colors.white.withValues(alpha: 0.08),
+      color: bg,
       borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -141,17 +158,17 @@ class _SkipButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               Text(
                 "O'tkazib yuborish",
                 style: TextStyle(
-                  color: Colors.white,
+                  color: fg,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
               ),
               SizedBox(width: 6),
-              Icon(Icons.arrow_forward, color: Colors.white, size: 14),
+              Icon(Icons.arrow_forward, color: fg, size: 14),
             ],
           ),
         ),

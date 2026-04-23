@@ -15,10 +15,10 @@ class AppTheme {
         seedColor: AppColors.brandGreenDark,
         primary: AppColors.brandGreenDark,
         onPrimary: Colors.white,
-        surface: AppColors.surface,
+        surface: AppColors.lightBackground,
         onSurface: AppColors.onSurface,
       ),
-      scaffoldBackgroundColor: AppColors.surface,
+      scaffoldBackgroundColor: AppColors.lightBackground,
       fontFamily: textFont,
     );
 

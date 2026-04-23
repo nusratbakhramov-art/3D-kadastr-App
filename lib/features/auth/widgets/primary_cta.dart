@@ -18,11 +18,18 @@ class PrimaryCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isActive = enabled && !loading;
     final bg = isActive
         ? AppColors.splashGreen
-        : Colors.white.withValues(alpha: 0.12);
-    final fg = isActive ? Colors.black : Colors.white.withValues(alpha: 0.55);
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.12)
+              : const Color(0xFFE4E7EB));
+    final fg = isActive
+        ? Colors.black
+        : (isDark
+              ? Colors.white.withValues(alpha: 0.55)
+              : const Color(0xFF8A9097));
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(28),

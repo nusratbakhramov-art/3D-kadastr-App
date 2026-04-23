@@ -59,13 +59,22 @@ class _ResendTimerState extends State<ResendTimer> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    final timerBg = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : Colors.black.withValues(alpha: 0.06);
+    final timerFg = isDark
+        ? Colors.white70
+        : AppColors.textBlack.withValues(alpha: 0.65);
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Text(
+        Text(
           'Qayta yuborish',
           style: TextStyle(
-            color: Colors.white,
+            color: titleColor,
             fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
@@ -75,13 +84,13 @@ class _ResendTimerState extends State<ResendTimer> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: timerBg,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
               _format(_remaining),
-              style: const TextStyle(
-                color: Colors.white70,
+              style: TextStyle(
+                color: timerFg,
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
               ),

@@ -166,6 +166,15 @@ class _OtpBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final neutralBg = isDark
+        ? Colors.white.withValues(alpha: 0.04)
+        : Colors.white.withValues(alpha: 0.88);
+    final neutralBorder = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : const Color(0xFFD9DDE2);
+    final neutralFg = isDark ? Colors.white : AppColors.textBlack;
+
     final (bg, border, fg) = switch (state) {
       OtpBoxState.success => (
         const Color(0xFF0B3B19),
@@ -175,12 +184,12 @@ class _OtpBox extends StatelessWidget {
       OtpBoxState.error => (
         Colors.transparent,
         const Color(0xFFEB5757),
-        Colors.white,
+        neutralFg,
       ),
       OtpBoxState.neutral => (
-        Colors.white.withValues(alpha: 0.04),
-        focused ? AppColors.splashGreen : Colors.white.withValues(alpha: 0.10),
-        Colors.white,
+        neutralBg,
+        focused ? AppColors.splashGreen : neutralBorder,
+        neutralFg,
       ),
     };
     return Container(

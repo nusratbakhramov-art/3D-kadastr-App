@@ -23,11 +23,16 @@ class HomeHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final isGuest = profile == null;
     final greeting = isGuest
         ? _HomeStrings.guestGreeting(locale)
         : _HomeStrings.userGreeting(locale, profile!.name);
     final dateText = _HomeStrings.formatDate(locale, today);
+    final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    final dateColor = isDark
+        ? Colors.white.withValues(alpha: 0.6)
+        : AppColors.textBlack.withValues(alpha: 0.55);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -48,8 +53,7 @@ class HomeHeader extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 20,
                   height: 1.3,
-                  color: Colors.white,
-                ),
+                ).copyWith(color: titleColor),
               ),
               const SizedBox(height: 2),
               Text(
@@ -59,7 +63,7 @@ class HomeHeader extends StatelessWidget {
                   fontWeight: FontWeight.w400,
                   fontSize: 14,
                   height: 1.2,
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: dateColor,
                 ),
               ),
             ],
@@ -72,7 +76,11 @@ class HomeHeader extends StatelessWidget {
             onTap: onLoginTap,
           )
         else
-          _BellButton(hasUnread: unreadCount > 0, onTap: onBellTap),
+          _BellButton(
+            hasUnread: unreadCount > 0,
+            isDark: isDark,
+            onTap: onBellTap,
+          ),
       ],
     );
   }
@@ -167,13 +175,22 @@ class _Avatar extends StatelessWidget {
 }
 
 class _BellButton extends StatelessWidget {
-  const _BellButton({required this.hasUnread, required this.onTap});
+  const _BellButton({
+    required this.hasUnread,
+    required this.isDark,
+    required this.onTap,
+  });
 
   final bool hasUnread;
+  final bool isDark;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
+    final backgroundColor = isDark ? const Color(0xFF1A1F21) : Colors.white;
+    final iconColor = isDark ? Colors.white : const Color(0xFF18181B);
+    final dotBorderColor = isDark ? const Color(0xFF000702) : Colors.white;
+
     return Material(
       color: Colors.transparent,
       shape: const CircleBorder(),
@@ -186,15 +203,15 @@ class _BellButton extends StatelessWidget {
             Container(
               width: 40,
               height: 40,
-              decoration: const BoxDecoration(
-                color: Color(0xFF1A1F21),
+              decoration: BoxDecoration(
+                color: backgroundColor,
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: const Icon(
+              child: Icon(
                 Icons.notifications_none_rounded,
                 size: 22,
-                color: Colors.white,
+                color: iconColor,
               ),
             ),
             if (hasUnread)
@@ -208,10 +225,7 @@ class _BellButton extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: const Color(0xFFFF3B30),
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF000702),
-                      width: 2,
-                    ),
+                    border: Border.all(color: dotBorderColor, width: 2),
                   ),
                 ),
               ),

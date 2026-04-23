@@ -15,11 +15,21 @@ class HomeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: const Color(0xFF121617),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF121617) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF101113);
+    final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(24),
+      side: isDark
+          ? BorderSide.none
+          : const BorderSide(color: Color(0xFFE1E1E1), width: 1),
+    );
+
+    return Material(
+      color: cardColor,
+      shape: shape,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        customBorder: shape,
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -31,7 +41,7 @@ class HomeCard extends StatelessWidget {
                 children: [
                   SvgPicture.asset(iconAsset, width: 32, height: 32),
                   const Spacer(),
-                  const _ArrowCircle(),
+                  _ArrowCircle(isDark: isDark),
                 ],
               ),
               const Spacer(),
@@ -44,8 +54,7 @@ class HomeCard extends StatelessWidget {
                   fontWeight: FontWeight.w500,
                   fontSize: 16,
                   height: 1.3,
-                  color: Colors.white,
-                ),
+                ).copyWith(color: textColor),
               ),
             ],
           ),
@@ -56,23 +65,21 @@ class HomeCard extends StatelessWidget {
 }
 
 class _ArrowCircle extends StatelessWidget {
-  const _ArrowCircle();
+  const _ArrowCircle({required this.isDark});
+
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final circleColor = isDark ? Colors.white : const Color(0xFF050505);
+    final iconColor = isDark ? const Color(0xFF0F1712) : Colors.white;
+
     return Container(
       width: 24,
       height: 24,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: circleColor, shape: BoxShape.circle),
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.chevron_right_rounded,
-        size: 18,
-        color: Color(0xFF0F1712),
-      ),
+      child: Icon(Icons.chevron_right_rounded, size: 18, color: iconColor),
     );
   }
 }

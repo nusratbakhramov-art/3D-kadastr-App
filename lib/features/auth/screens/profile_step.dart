@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_colors.dart';
 import '../models/user_profile.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/dob_field.dart';
@@ -71,7 +72,22 @@ class _ProfileStepState extends State<ProfileStep> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark
+        ? Colors.white70
+        : AppColors.textBlack.withValues(alpha: 0.65);
+    final fieldBg = isDark
+        ? Colors.white.withValues(alpha: 0.04)
+        : Colors.white.withValues(alpha: 0.88);
+    final fieldBorder = isDark
+        ? Colors.white.withValues(alpha: 0.10)
+        : const Color(0xFFD9DDE2);
+    final inputTextColor = isDark ? Colors.white : AppColors.textBlack;
+    final hintColor = isDark
+        ? Colors.white.withValues(alpha: 0.35)
+        : AppColors.textBlack.withValues(alpha: 0.4);
     final showNameError = _nameTouched && !_nameValid;
+
     return AuthScaffold(
       title: "O'zingiz haqingizda",
       iconAsset: 'assets/images/auth/user.png',
@@ -81,29 +97,25 @@ class _ProfileStepState extends State<ProfileStep> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               "To'liq ism",
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
+                color: fieldBg,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: showNameError
-                      ? const Color(0xFFE74C4C)
-                      : Colors.white.withValues(alpha: 0.10),
+                  color: showNameError ? const Color(0xFFE74C4C) : fieldBorder,
                 ),
               ),
               child: TextField(
                 controller: _name,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: inputTextColor, fontSize: 16),
                 decoration: InputDecoration(
                   hintText: "To'liq ismingizni kiriting",
-                  hintStyle: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.35),
-                  ),
+                  hintStyle: TextStyle(color: hintColor),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 14,
@@ -114,17 +126,14 @@ class _ProfileStepState extends State<ProfileStep> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               "Tug'ilgan sana",
-              style: TextStyle(color: Colors.white70, fontSize: 14),
+              style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
             DobField(value: _dob, onChanged: (d) => setState(() => _dob = d)),
             const SizedBox(height: 16),
-            const Text(
-              'Jins',
-              style: TextStyle(color: Colors.white70, fontSize: 14),
-            ),
+            Text('Jins', style: TextStyle(color: labelColor, fontSize: 14)),
             const SizedBox(height: 8),
             GenderToggle(
               value: _gender,

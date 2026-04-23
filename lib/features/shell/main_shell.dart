@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
 import '../auth/auth_flow_screen.dart';
 import '../auth/auth_storage.dart';
 import '../home/home_screen.dart';
@@ -83,7 +82,7 @@ class _MainShellState extends State<MainShell> {
     final items = _ShellStrings.items(widget.locale);
 
     return Scaffold(
-      backgroundColor: AppColors.greenBlack,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),

@@ -33,6 +33,24 @@ class KadastrApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
+      builder: (context, child) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final overlayStyle = isDark
+            ? const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.light,
+                statusBarBrightness: Brightness.dark,
+              )
+            : const SystemUiOverlayStyle(
+                statusBarColor: Colors.transparent,
+                statusBarIconBrightness: Brightness.dark,
+                statusBarBrightness: Brightness.light,
+              );
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyle,
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       home: _AppRoot(
         onboardingStorage: onboardingStorage,
         authStorage: authStorage,
@@ -63,13 +81,6 @@ class _AppRootState extends State<_AppRoot> {
     _bootstrap();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FlutterNativeSplash.remove();
-      SystemChrome.setSystemUIOverlayStyle(
-        const SystemUiOverlayStyle(
-          statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
-        ),
-      );
     });
   }
 

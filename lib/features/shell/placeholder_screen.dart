@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
-
 class PlaceholderScreen extends StatelessWidget {
   const PlaceholderScreen({super.key, required this.title});
 
@@ -9,17 +7,19 @@ class PlaceholderScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppColors.greenBlack,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Center(
           child: Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
               fontSize: 22,
-              color: Colors.white,
+              color: isDark ? Colors.white : const Color(0xFF1B1C1E),
             ),
           ),
         ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../theme/app_colors.dart';
+
 class PhoneInputController extends ChangeNotifier {
   String _digits = '';
 
@@ -101,11 +103,17 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
 
   @override
   Widget build(BuildContext context) {
-    const style = TextStyle(
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final placeholderColor = isDark
+        ? const Color(0x66FFFFFF)
+        : AppColors.textBlack.withValues(alpha: 0.32);
+
+    final style = TextStyle(
       fontFamily: 'MTSCompact',
       fontWeight: FontWeight.w700,
       fontSize: 28,
-      color: Colors.white,
+      color: textColor,
     );
     return GestureDetector(
       onTap: _focus.requestFocus,
@@ -119,13 +127,13 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              const Text('+998', style: style, maxLines: 1, softWrap: false),
+              Text('+998', style: style, maxLines: 1, softWrap: false),
               const SizedBox(width: 10),
               Expanded(
                 child: Stack(
                   children: [
                     if (_ctrl.digits.isEmpty)
-                      const IgnorePointer(
+                      IgnorePointer(
                         child: Text(
                           '00 000-00-00',
                           maxLines: 1,
@@ -135,7 +143,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                             fontFamily: 'MTSCompact',
                             fontWeight: FontWeight.w700,
                             fontSize: 28,
-                            color: Color(0x66FFFFFF),
+                            color: placeholderColor,
                           ),
                         ),
                       ),
