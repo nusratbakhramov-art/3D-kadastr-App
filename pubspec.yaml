@@ -12,6 +12,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   flutter_svg: ^2.0.10+1
   flutter_native_splash: ^2.4.3
+  photo_view: ^0.15.0
   shared_preferences: ^2.5.5
 
 dev_dependencies:
@@ -30,6 +31,7 @@ flutter:
     - assets/images/auth/
     - assets/images/flags/
     - assets/images/home/
+    - assets/images/payment/
 
   fonts:
     - family: MTSCompact

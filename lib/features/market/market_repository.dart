@@ -1,3 +1,4 @@
+import 'models/market_filters.dart';
 import 'models/market_listing.dart';
 
 class MarketPage {
@@ -5,84 +6,115 @@ class MarketPage {
     required this.items,
     required this.hasMore,
     required this.nextOffset,
+    required this.totalCount,
   });
 
   final List<MarketListing> items;
   final bool hasMore;
   final int nextOffset;
+  final int totalCount;
 }
 
-class MarketRepository {
-  const MarketRepository();
+abstract class MarketRepository {
+  Future<MarketPage> fetchPage({
+    required String query,
+    required String categoryId,
+    required int offset,
+    required int limit,
+    MarketFilters filters,
+  });
+}
 
-  static const List<String> _districts = [
-    'Yashnabod tumani',
-    'Mirzo Ulug\'bek tumani',
-    'Yunusobod tumani',
-    'Chilonzor tumani',
-    'Sergeli tumani',
-  ];
+class FakeMarketRepository implements MarketRepository {
+  FakeMarketRepository({
+    this.delay = const Duration(milliseconds: 520),
+    int seed = 42,
+    int count = 60,
+  }) : _items = _generate(count, seed);
+
+  final Duration delay;
+  final List<MarketListing> _items;
 
   static const List<String> _titles = [
     'Zamonaviy villa',
-    'Panorama apartment',
-    'Business center',
+    'Panorama kvartira',
+    'Biznes markaz',
     'Savdo majmuasi',
     'Yangi loyiha',
     'Shinam hovli uy',
   ];
 
-  static const List<String> _categories = [
+  static const List<String> _categoryIds = [
     'residential',
     'nonresidential',
     'projects',
   ];
 
-  static final List<MarketListing> _all = List.generate(120, (i) {
-    final categoryId = _categories[i % _categories.length];
-    final district = _districts[i % _districts.length];
-    final title = _titles[i % _titles.length];
+  static const List<String> _descriptions = [
+    '3D model ko\'rinishi. Zamonaviy loyiha, qulay rejalash.',
+    'Shahar markazida, infratuzilma rivojlangan hududda.',
+    'Yangi qurilgan, barcha kommunikatsiyalar mavjud.',
+    'Oilaviy yashash uchun ideal, bolalar maydonchasi yaqin.',
+    'Tijorat uchun mos, keng hudud va oson yetib borish.',
+    'Premium sinf, dizayn asosida to\'liq tayyor.',
+  ];
 
-    return MarketListing(
-      id: 'listing_$i',
-      imageUrl: 'https://picsum.photos/seed/kadastr_$i/960/720',
-      priceUzs: 120000 + (i % 17) * 18000,
-      title: title,
-      district: district,
-      areaM2: 52 + (i % 11) * 7,
-      categoryId: categoryId,
-    );
-  });
+  static List<MarketListing> _generate(int count, int seed) {
+    return List<MarketListing>.generate(count, (i) {
+      final k = (i + seed) & 0x7FFFFFFF;
+      final primary = 'https://picsum.photos/seed/kadastr_${i}_0/960/720';
+      final gallery = List<String>.generate(
+        5,
+        (g) => 'https://picsum.photos/seed/kadastr_${i}_$g/960/720',
+      );
+      return MarketListing(
+        id: 'listing_$i',
+        imageUrl: primary,
+        priceUzs: 120000 + (k % 17) * 15000,
+        title: _titles[k % _titles.length],
+        district: kMarketDistricts[k % kMarketDistricts.length],
+        areaM2: 52 + (k % 11) * 7,
+        categoryId: _categoryIds[k % _categoryIds.length],
+        gallery: gallery,
+        description: _descriptions[k % _descriptions.length],
+      );
+    });
+  }
 
-  Future<MarketPage> fetchListings({
+  @override
+  Future<MarketPage> fetchPage({
     required String query,
     required String categoryId,
     required int offset,
     required int limit,
+    MarketFilters filters = MarketFilters.empty,
   }) async {
-    await Future<void>.delayed(const Duration(milliseconds: 520));
+    if (delay > Duration.zero) {
+      await Future<void>.delayed(delay);
+    }
 
     final q = query.trim().toLowerCase();
-    final filtered = _all
-        .where((item) {
+    final filtered = _items
+        .where((l) {
           final byCategory =
-              categoryId == 'all' || item.categoryId == categoryId;
-          final byQuery =
-              q.isEmpty ||
-              item.title.toLowerCase().contains(q) ||
-              item.district.toLowerCase().contains(q);
-          return byCategory && byQuery;
+              categoryId == kMarketCategoryAll || l.categoryId == categoryId;
+          if (!byCategory) return false;
+          if (!filters.matches(l)) return false;
+          if (q.isEmpty) return true;
+          return l.title.toLowerCase().contains(q) ||
+              l.district.toLowerCase().contains(q);
         })
         .toList(growable: false);
 
     final start = offset.clamp(0, filtered.length);
     final end = (start + limit).clamp(0, filtered.length);
-    final pageItems = filtered.sublist(start, end);
+    final slice = filtered.sublist(start, end);
 
     return MarketPage(
-      items: pageItems,
+      items: slice,
       hasMore: end < filtered.length,
       nextOffset: end,
+      totalCount: filtered.length,
     );
   }
 }

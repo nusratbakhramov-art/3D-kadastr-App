@@ -38,13 +38,17 @@ class KadastrApp extends StatelessWidget {
         final overlayStyle = isDark
             ? const SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.light,
-                statusBarBrightness: Brightness.dark,
+                statusBarIconBrightness: Brightness.light, // Android: white
+                statusBarBrightness: Brightness.dark, // iOS: white
+                systemNavigationBarColor: Colors.transparent,
+                systemNavigationBarIconBrightness: Brightness.light,
               )
             : const SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.dark,
-                statusBarBrightness: Brightness.light,
+                statusBarIconBrightness: Brightness.dark, // Android: dark
+                statusBarBrightness: Brightness.light, // iOS: dark
+                systemNavigationBarColor: Colors.transparent,
+                systemNavigationBarIconBrightness: Brightness.dark,
               );
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: overlayStyle,

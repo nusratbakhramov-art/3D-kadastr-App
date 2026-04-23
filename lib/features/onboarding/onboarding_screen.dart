@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import 'onboarding_page_data.dart';
@@ -122,6 +123,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 
+  void _onHorizontalDragEnd(DragEndDetails details) {
+    final v = details.primaryVelocity ?? 0;
+    const threshold = 250.0;
+    // Swipe left -> next. Blocked on last page (no "next"), only Continue advances.
+    if (v < -threshold && _index < onboardingPages.length - 1) {
+      _goToPage(_index + 1);
+    }
+    // Swipe right -> previous. Works everywhere including last page.
+    else if (v > threshold && _index > 0) {
+      _goToPage(_index - 1);
+    }
+  }
+
   @override
   void dispose() {
     _progress.removeStatusListener(_onProgressStatus);
@@ -241,113 +255,126 @@ class _OnboardingScreenState extends State<OnboardingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.greenBlack,
-      body: Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: _pauseHold,
-        onPointerUp: _resumeHold,
-        onPointerCancel: _resumeHold,
-        child: OnboardingBackground(
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              child: Column(
-                children: [
-                  StoryProgressBar(
-                    count: onboardingPages.length,
-                    currentIndex: _index,
-                    progress: _progress,
-                    height: 4,
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    height: 36,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        LanguageSelector(
-                          current: _locale,
-                          onChanged: (l) => setState(() => _locale = l),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Onboarding bg is always dark; force light status bar icons so they
+      // stay visible regardless of app theme.
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+      ),
+      child: Scaffold(
+        backgroundColor: AppColors.greenBlack,
+        body: Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerDown: _pauseHold,
+          onPointerUp: _resumeHold,
+          onPointerCancel: _resumeHold,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragEnd: _onHorizontalDragEnd,
+            child: OnboardingBackground(
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                  child: Column(
+                    children: [
+                      StoryProgressBar(
+                        count: onboardingPages.length,
+                        currentIndex: _index,
+                        progress: _progress,
+                        height: 4,
+                      ),
+                      const SizedBox(height: 18),
+                      SizedBox(
+                        height: 36,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            LanguageSelector(
+                              current: _locale,
+                              onChanged: (l) => setState(() => _locale = l),
+                            ),
+                            const Spacer(),
+                            SkipButton(
+                              label: AppLocale.skipLabel(_locale),
+                              onPressed: widget.onFinished,
+                            ),
+                          ],
                         ),
-                        const Spacer(),
-                        SkipButton(
-                          label: AppLocale.skipLabel(_locale),
-                          onPressed: widget.onFinished,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Expanded(
-                    child: Center(
-                      child: AspectRatio(
-                        aspectRatio: 1200 / (2480 * 0.78),
-                        child: ShaderMask(
-                          shaderCallback: (rect) => const LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Colors.white,
-                              Colors.white,
-                              Color(0x00FFFFFF),
-                            ],
-                            stops: [0.0, 0.78, 1.0],
-                          ).createShader(rect),
-                          blendMode: BlendMode.dstIn,
-                          child: Image.asset(
-                            onboardingPages[_index].mockupAsset,
-                            fit: BoxFit.cover,
-                            alignment: Alignment.topCenter,
+                      ),
+                      const SizedBox(height: 8),
+                      Expanded(
+                        child: Center(
+                          child: AspectRatio(
+                            aspectRatio: 1200 / (2480 * 0.78),
+                            child: ShaderMask(
+                              shaderCallback: (rect) => const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.white,
+                                  Colors.white,
+                                  Color(0x00FFFFFF),
+                                ],
+                                stops: [0.0, 0.78, 1.0],
+                              ).createShader(rect),
+                              blendMode: BlendMode.dstIn,
+                              child: Image.asset(
+                                onboardingPages[_index].mockupAsset,
+                                fit: BoxFit.cover,
+                                alignment: Alignment.topCenter,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 116,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.max,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          height: 36,
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: _slideSwap(
-                              begin: 0.0,
-                              end: 0.65,
-                              builder: (idx) =>
-                                  _buildTitle(onboardingPages[idx]),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 116,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.max,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            SizedBox(
+                              height: 36,
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: _slideSwap(
+                                  begin: 0.0,
+                                  end: 0.65,
+                                  builder: (idx) =>
+                                      _buildTitle(onboardingPages[idx]),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Expanded(
-                          child: Align(
-                            alignment: Alignment.topCenter,
-                            child: _slideSwap(
-                              begin: 0.15,
-                              end: 0.80,
-                              builder: (idx) =>
-                                  _buildDescription(onboardingPages[idx]),
+                            const SizedBox(height: 8),
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.topCenter,
+                                child: _slideSwap(
+                                  begin: 0.15,
+                                  end: 0.80,
+                                  builder: (idx) =>
+                                      _buildDescription(onboardingPages[idx]),
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(height: 18),
+                      if (_prevIndex != null && _prevIndex != 0 && _index != 0)
+                        _buildNavRow(_index)
+                      else
+                        _slideSwap(
+                          begin: 0.30,
+                          end: 1.0,
+                          builder: (idx) => _buildNavRow(idx),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 18),
-                  if (_prevIndex != null && _prevIndex != 0 && _index != 0)
-                    _buildNavRow(_index)
-                  else
-                    _slideSwap(
-                      begin: 0.30,
-                      end: 1.0,
-                      builder: (idx) => _buildNavRow(idx),
-                    ),
-                ],
+                ),
               ),
             ),
           ),

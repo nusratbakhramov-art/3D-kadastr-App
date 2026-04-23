@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../auth/auth_flow_screen.dart';
 import '../auth/auth_storage.dart';
 import '../home/home_screen.dart';
+import '../market/market_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
 import 'app_bottom_nav.dart';
 import 'placeholder_screen.dart';
@@ -92,7 +93,7 @@ class _MainShellState extends State<MainShell> {
         children: [
           HomeScreen(locale: widget.locale, onLoginTap: _openAuth),
           PlaceholderScreen(title: items[1].label),
-          PlaceholderScreen(title: items[2].label),
+          const MarketScreen(),
           PlaceholderScreen(title: items[3].label),
           PlaceholderScreen(title: items[4].label),
         ],

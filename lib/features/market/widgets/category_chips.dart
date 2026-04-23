@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
+import '../../../theme/app_colors.dart';
 import '../models/market_listing.dart';
 
 class CategoryChips extends StatelessWidget {
@@ -16,27 +18,33 @@ class CategoryChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          for (final category in categories)
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: _Chip(
-                label: category.label,
-                selected: category.id == selectedId,
-                onTap: () => onSelected(category.id),
-              ),
-            ),
-        ],
+    return SizedBox(
+      height: 34,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: categories.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final c = categories[i];
+          final selected = c.id == selectedId;
+          return _CategoryChip(
+            label: c.label,
+            selected: selected,
+            onTap: () {
+              if (selected) return;
+              HapticFeedback.selectionClick();
+              onSelected(c.id);
+            },
+          );
+        },
       ),
     );
   }
 }
 
-class _Chip extends StatelessWidget {
-  const _Chip({
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -48,22 +56,39 @@ class _Chip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = selected
+        ? AppColors.splashGreen
+        : (isDark ? const Color(0xFF121617) : Colors.white);
+    final fg = selected
+        ? AppColors.buttonTextBlack
+        : (isDark ? Colors.white : AppColors.textBlack);
+    final border = selected || isDark
+        ? null
+        : Border.all(color: const Color(0xFFE1E1E1));
+
     return Material(
-      color: selected ? const Color(0xFF00BF47) : Colors.white,
+      color: bg,
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              height: 1,
-              color: selected ? Colors.white : Colors.black,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: border,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                height: 1.2,
+                color: fg,
+              ),
             ),
           ),
         ),
