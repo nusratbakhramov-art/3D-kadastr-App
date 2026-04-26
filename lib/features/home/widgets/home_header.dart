@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
@@ -126,10 +128,17 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const size = 44.0;
-    final asset = profile?.avatarAsset;
-    if (asset != null) {
+    final path = profile?.avatarPath;
+    if (path != null) {
+      final isAsset = path.startsWith('assets/');
       return ClipOval(
-        child: Image.asset(asset, width: size, height: size, fit: BoxFit.cover),
+        child: SizedBox(
+          width: size,
+          height: size,
+          child: isAsset
+              ? Image.asset(path, fit: BoxFit.cover)
+              : Image.file(File(path), fit: BoxFit.cover),
+        ),
       );
     }
 

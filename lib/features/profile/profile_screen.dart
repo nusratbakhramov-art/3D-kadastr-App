@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../../widgets/app_avatar.dart';
 import '../../widgets/app_bell_button.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_menu_card.dart';
@@ -18,6 +19,7 @@ class ProfileScreen extends StatefulWidget {
     this.onMyScansTap,
     this.onRatingsTap,
     this.onPaymentsTap,
+    this.onNotificationsTap,
     this.onSettingsTap,
     this.onHelpTap,
   });
@@ -29,6 +31,7 @@ class ProfileScreen extends StatefulWidget {
   final VoidCallback? onMyScansTap;
   final VoidCallback? onRatingsTap;
   final VoidCallback? onPaymentsTap;
+  final VoidCallback? onNotificationsTap;
   final VoidCallback? onSettingsTap;
   final VoidCallback? onHelpTap;
 
@@ -71,6 +74,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         'assets/icons/menu-payments.svg',
         _ProfileStrings.payments(locale),
         widget.onPaymentsTap,
+      ),
+      _RowSpec.icon(
+        Icons.notifications_none_rounded,
+        _ProfileStrings.notifications(locale),
+        widget.onNotificationsTap,
       ),
       _RowSpec(
         'assets/icons/menu-settings.svg',
@@ -126,7 +134,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                               0.6,
                               curve: Curves.easeOutCubic,
                             ),
-                            child: Center(child: _Avatar(profile: profile)),
+                            child: Center(
+                              child: AppAvatar(
+                                path: profile?.avatarPath,
+                                name: profile?.name ?? '',
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 12),
                           AppReveal(
@@ -193,7 +206,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       curve: Curves.easeOutCubic,
                                     ),
                                     child: AppMenuRow(
-                                      iconAsset: rows[i].icon,
+                                      iconAsset: rows[i].iconAsset,
+                                      icon: rows[i].icon,
                                       label: rows[i].label,
                                       onTap: rows[i].onTap,
                                     ),
@@ -216,63 +230,13 @@ class _ProfileScreenState extends State<ProfileScreen>
 }
 
 class _RowSpec {
-  const _RowSpec(this.icon, this.label, this.onTap);
-  final String icon;
+  const _RowSpec(this.iconAsset, this.label, this.onTap) : icon = null;
+  const _RowSpec.icon(IconData this.icon, this.label, this.onTap)
+    : iconAsset = null;
+  final String? iconAsset;
+  final IconData? icon;
   final String label;
   final VoidCallback? onTap;
-}
-
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.profile});
-
-  final UserProfile? profile;
-
-  @override
-  Widget build(BuildContext context) {
-    const size = 96.0;
-    final asset = profile?.avatarAsset;
-    if (asset != null) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white, width: 3),
-        ),
-        child: ClipOval(child: Image.asset(asset, fit: BoxFit.cover)),
-      );
-    }
-
-    final initial = (profile?.name.isNotEmpty ?? false)
-        ? profile!.name.characters.first.toUpperCase()
-        : null;
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: initial == null ? const Color(0xFF2A2F31) : AppColors.brandGreen,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 3),
-      ),
-      alignment: Alignment.center,
-      child: initial == null
-          ? const Icon(
-              Icons.person_outline_rounded,
-              size: 44,
-              color: Colors.white70,
-            )
-          : Text(
-              initial,
-              style: const TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w700,
-                fontSize: 36,
-                color: Colors.white,
-              ),
-            ),
-    );
-  }
 }
 
 class _ProfileStrings {
@@ -318,5 +282,11 @@ class _ProfileStrings {
     'ru' => 'Помощь',
     'en' => 'Help',
     _ => 'Yordam',
+  };
+
+  static String notifications(Locale l) => switch (l.languageCode) {
+    'ru' => 'Уведомления',
+    'en' => 'Notifications',
+    _ => 'Bildirishnomalar',
   };
 }

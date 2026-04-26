@@ -4,6 +4,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'features/auth/auth_storage.dart';
 import 'features/home/user_profile.dart';
+import 'features/notifications/notification_model.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
 import 'features/settings/settings_state.dart';
@@ -15,12 +16,14 @@ import 'theme/app_theme.dart';
 void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
-  userProfileNotifier.value = const UserProfile(
+  userProfileNotifier.value = UserProfile(
     name: 'Odiljon Sanoyev',
     phone: '+998 90 123 45 67',
-    avatarAsset: 'assets/images/auth/user.png',
+    avatarPath: 'assets/images/auth/user.png',
+    dateOfBirth: DateTime(1995, 6, 14),
+    gender: Gender.male,
   );
-  notificationUnreadNotifier.value = 1;
+  notificationUnreadNotifier.value = unreadNotificationCount();
   runApp(const KadastrApp());
 }
 

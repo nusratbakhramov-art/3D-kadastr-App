@@ -2,14 +2,21 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_flow_screen.dart';
 import '../auth/auth_storage.dart';
+import '../help/help_screen.dart';
 import '../home/home_screen.dart';
+import '../home/user_profile.dart';
+import '../listings/my_listings_screen.dart';
 import '../market/market_screen.dart';
+import '../notifications/notifications_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
+import '../payments/payments_screen.dart';
+import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
+import '../ratings/my_ratings_screen.dart';
+import '../scans/my_scans_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
 import 'app_bottom_nav.dart';
-import 'placeholder_screen.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({
@@ -29,6 +36,7 @@ class _MainShellState extends State<MainShell> {
   int _index = 0;
   int _servicesAnimToken = 0;
   int _profileAnimToken = 0;
+  int _listingsAnimToken = 0;
   final PageController _pageController = PageController();
 
   @override
@@ -43,6 +51,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _index = i;
       if (i == 1) _servicesAnimToken++;
+      if (i == 3) _listingsAnimToken++;
       if (i == 4) _profileAnimToken++;
     });
     if (delta > 1) {
@@ -88,9 +97,57 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _openSettings() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SettingsScreen(onLogoutConfirmed: _handleLogout),
+      ),
+    );
+  }
+
+  Future<void> _handleLogout() async {
+    await widget.authStorage.clear();
+    userProfileNotifier.value = null;
+    notificationUnreadNotifier.value = 0;
+    if (!mounted) return;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    setState(() => _index = 0);
+    _pageController.jumpToPage(0);
+  }
+
+  Future<void> _openMyProfile() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
+    ).push(MaterialPageRoute<void>(builder: (_) => const MyProfileScreen()));
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const NotificationsScreen()),
+    );
+  }
+
+  Future<void> _openHelp() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const HelpScreen()));
+  }
+
+  Future<void> _openRatings() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const MyRatingsScreen()));
+  }
+
+  Future<void> _openScans() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const MyScansScreen()));
+  }
+
+  Future<void> _openPayments() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const PaymentsScreen()));
   }
 
   @override
@@ -112,11 +169,18 @@ class _MainShellState extends State<MainShell> {
             animateToken: _servicesAnimToken,
           ),
           const MarketScreen(),
-          PlaceholderScreen(title: items[3].label),
+          MyListingsScreen(animateToken: _listingsAnimToken),
           ProfileScreen(
             locale: widget.locale,
             animateToken: _profileAnimToken,
             onSettingsTap: _openSettings,
+            onMyProfileTap: _openMyProfile,
+            onNotificationsTap: _openNotifications,
+            onBellTap: _openNotifications,
+            onHelpTap: _openHelp,
+            onRatingsTap: _openRatings,
+            onMyScansTap: _openScans,
+            onPaymentsTap: _openPayments,
           ),
         ],
       ),

@@ -31,11 +31,12 @@ void main() {
     await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
     await tester.pump();
 
-    expect(find.byType(AppMenuRow), findsNWidgets(6));
+    expect(find.byType(AppMenuRow), findsNWidgets(7));
     expect(find.text('Mening profilim'), findsOneWidget);
     expect(find.text('Mening skanerlarim'), findsOneWidget);
     expect(find.text('Baholashlarim'), findsOneWidget);
     expect(find.text("To'lovlar"), findsOneWidget);
+    expect(find.text('Bildirishnomalar'), findsOneWidget);
     expect(find.text('Sozlamalar'), findsOneWidget);
     expect(find.text('Yordam'), findsOneWidget);
   });
