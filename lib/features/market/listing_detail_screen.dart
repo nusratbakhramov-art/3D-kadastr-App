@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../theme/app_colors.dart';
 import 'models/listing_format.dart';
@@ -27,11 +28,15 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   void _close() => Navigator.of(context).maybePop();
 
   void _share() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text('Ulashish tez orada'),
-      ),
+    final l = widget.listing;
+    final box = context.findRenderObject() as RenderBox?;
+    final origin = box != null
+        ? box.localToGlobal(Offset.zero) & box.size
+        : null;
+    Share.share(
+      '${l.title}\n${l.district} · ${l.areaM2} m²',
+      subject: l.title,
+      sharePositionOrigin: origin,
     );
   }
 

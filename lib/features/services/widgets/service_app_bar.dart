@@ -1,0 +1,88 @@
+import 'package:flutter/material.dart';
+
+import '../../../theme/app_colors.dart';
+
+class ServiceAppBar extends StatelessWidget {
+  const ServiceAppBar({super.key, required this.title, this.subtitle});
+
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+    final subFg = isDark ? Colors.white70 : const Color(0xFF8A9097);
+
+    return SizedBox(
+      height: 56,
+      child: Stack(
+        children: [
+          Align(
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 17,
+                    height: 1.2,
+                    color: fg,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      height: 1.2,
+                      color: subFg,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: _CircleBackButton(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CircleBackButton extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+    return Material(
+      color: bg,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: () => Navigator.of(context).maybePop(),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.arrow_back_rounded, size: 20, color: fg),
+        ),
+      ),
+    );
+  }
+}

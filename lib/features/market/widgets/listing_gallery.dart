@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../theme/app_colors.dart';
 import 'fullscreen_gallery.dart';
@@ -69,7 +70,7 @@ class _ListingGalleryState extends State<ListingGallery> {
                   left: 12,
                   top: 12,
                   child: _RoundIconButton(
-                    icon: Icons.ios_share_rounded,
+                    asset: 'assets/icons/share.svg',
                     onTap: () {
                       HapticFeedback.selectionClick();
                       widget.onShare();
@@ -80,7 +81,7 @@ class _ListingGalleryState extends State<ListingGallery> {
                   right: 12,
                   top: 12,
                   child: _RoundIconButton(
-                    icon: Icons.close_rounded,
+                    asset: 'assets/icons/close.svg',
                     onTap: () {
                       HapticFeedback.selectionClick();
                       widget.onClose();
@@ -121,9 +122,9 @@ class _GalleryImage extends StatelessWidget {
 }
 
 class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon, required this.onTap});
+  const _RoundIconButton({required this.asset, required this.onTap});
 
-  final IconData icon;
+  final String asset;
   final VoidCallback onTap;
 
   @override
@@ -138,7 +139,17 @@ class _RoundIconButton extends StatelessWidget {
         child: SizedBox(
           width: 36,
           height: 36,
-          child: Icon(icon, size: 18, color: AppColors.textBlack),
+          child: Center(
+            child: SvgPicture.asset(
+              asset,
+              width: 18,
+              height: 18,
+              colorFilter: const ColorFilter.mode(
+                AppColors.textBlack,
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
         ),
       ),
     );

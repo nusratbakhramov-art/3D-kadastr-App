@@ -50,6 +50,7 @@ class ListingPaymentCard extends StatelessWidget {
                   method: PaymentMethod.payme,
                   selected: selected == PaymentMethod.payme,
                   onTap: () => _select(PaymentMethod.payme),
+                  isDark: isDark,
                 ),
               ),
               const SizedBox(width: 10),
@@ -58,6 +59,7 @@ class ListingPaymentCard extends StatelessWidget {
                   method: PaymentMethod.uzum,
                   selected: selected == PaymentMethod.uzum,
                   onTap: () => _select(PaymentMethod.uzum),
+                  isDark: isDark,
                 ),
               ),
             ],
@@ -70,6 +72,7 @@ class ListingPaymentCard extends StatelessWidget {
                   method: PaymentMethod.click,
                   selected: selected == PaymentMethod.click,
                   onTap: () => _select(PaymentMethod.click),
+                  isDark: isDark,
                 ),
               ),
               const SizedBox(width: 10),
@@ -78,6 +81,7 @@ class ListingPaymentCard extends StatelessWidget {
                   method: PaymentMethod.paynet,
                   selected: selected == PaymentMethod.paynet,
                   onTap: () => _select(PaymentMethod.paynet),
+                  isDark: isDark,
                 ),
               ),
             ],
@@ -99,16 +103,26 @@ class _Option extends StatelessWidget {
     required this.method,
     required this.selected,
     required this.onTap,
+    required this.isDark,
   });
 
   final PaymentMethod method;
   final bool selected;
   final VoidCallback onTap;
+  final bool isDark;
 
   @override
   Widget build(BuildContext context) {
+    final surface = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final borderColor = isDark
+        ? const Color(0xFF2C3133)
+        : const Color(0xFFE3E5E8);
+    final idleRadioColor = isDark
+        ? const Color(0xFF3A4042)
+        : const Color(0xFFD1D5D9);
+
     return Material(
-      color: Colors.white,
+      color: surface,
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -120,7 +134,7 @@ class _Option extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: const Color(0xFFE3E5E8), width: 1),
+            border: Border.all(color: borderColor, width: 1),
           ),
           child: Row(
             children: [
@@ -130,7 +144,7 @@ class _Option extends StatelessWidget {
                 fit: BoxFit.fitHeight,
               ),
               const Spacer(),
-              _Radio(selected: selected),
+              _Radio(selected: selected, idleColor: idleRadioColor),
             ],
           ),
         ),
@@ -140,9 +154,10 @@ class _Option extends StatelessWidget {
 }
 
 class _Radio extends StatelessWidget {
-  const _Radio({required this.selected});
+  const _Radio({required this.selected, required this.idleColor});
 
   final bool selected;
+  final Color idleColor;
 
   @override
   Widget build(BuildContext context) {
@@ -155,7 +170,7 @@ class _Radio extends StatelessWidget {
         shape: BoxShape.circle,
         color: selected ? AppColors.splashGreen : Colors.transparent,
         border: Border.all(
-          color: selected ? AppColors.splashGreen : const Color(0xFFD1D5D9),
+          color: selected ? AppColors.splashGreen : idleColor,
           width: 2,
         ),
       ),

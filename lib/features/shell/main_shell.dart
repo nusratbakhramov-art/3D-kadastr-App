@@ -5,6 +5,9 @@ import '../auth/auth_storage.dart';
 import '../home/home_screen.dart';
 import '../market/market_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
+import '../profile/profile_screen.dart';
+import '../services/services_screen.dart';
+import '../settings/settings_screen.dart';
 import 'app_bottom_nav.dart';
 import 'placeholder_screen.dart';
 
@@ -24,6 +27,8 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
+  int _servicesAnimToken = 0;
+  int _profileAnimToken = 0;
   final PageController _pageController = PageController();
 
   @override
@@ -35,7 +40,11 @@ class _MainShellState extends State<MainShell> {
   void _onTabChanged(int i) {
     if (i == _index) return;
     final delta = (i - _index).abs();
-    setState(() => _index = i);
+    setState(() {
+      _index = i;
+      if (i == 1) _servicesAnimToken++;
+      if (i == 4) _profileAnimToken++;
+    });
     if (delta > 1) {
       _pageController.jumpToPage(i);
     } else {
@@ -78,6 +87,12 @@ class _MainShellState extends State<MainShell> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _openSettings() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SettingsScreen()));
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = _ShellStrings.items(widget.locale);
@@ -92,10 +107,17 @@ class _MainShellState extends State<MainShell> {
         },
         children: [
           HomeScreen(locale: widget.locale, onLoginTap: _openAuth),
-          PlaceholderScreen(title: items[1].label),
+          ServicesScreen(
+            locale: widget.locale,
+            animateToken: _servicesAnimToken,
+          ),
           const MarketScreen(),
           PlaceholderScreen(title: items[3].label),
-          PlaceholderScreen(title: items[4].label),
+          ProfileScreen(
+            locale: widget.locale,
+            animateToken: _profileAnimToken,
+            onSettingsTap: _openSettings,
+          ),
         ],
       ),
       bottomNavigationBar: AppBottomNav(

@@ -3,8 +3,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'features/auth/auth_storage.dart';
+import 'features/home/user_profile.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
+import 'features/settings/settings_state.dart';
 import 'features/shell/main_shell.dart';
 import 'features/splash/animated_splash_screen.dart';
 import 'theme/app_colors.dart';
@@ -13,6 +15,12 @@ import 'theme/app_theme.dart';
 void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
+  userProfileNotifier.value = const UserProfile(
+    name: 'Odiljon Sanoyev',
+    phone: '+998 90 123 45 67',
+    avatarAsset: 'assets/images/auth/user.png',
+  );
+  notificationUnreadNotifier.value = 1;
   runApp(const KadastrApp());
 }
 
@@ -28,46 +36,65 @@ class KadastrApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Kadastr',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      builder: (context, child) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final overlayStyle = isDark
-            ? const SystemUiOverlayStyle(
-                statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.light, // Android: white
-                statusBarBrightness: Brightness.dark, // iOS: white
-                systemNavigationBarColor: Colors.transparent,
-                systemNavigationBarIconBrightness: Brightness.light,
-              )
-            : const SystemUiOverlayStyle(
-                statusBarColor: Colors.transparent,
-                statusBarIconBrightness: Brightness.dark, // Android: dark
-                statusBarBrightness: Brightness.light, // iOS: dark
-                systemNavigationBarColor: Colors.transparent,
-                systemNavigationBarIconBrightness: Brightness.dark,
-              );
-        return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: overlayStyle,
-          child: child ?? const SizedBox.shrink(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: themeModeNotifier,
+      builder: (context, themeMode, _) {
+        return ValueListenableBuilder<Locale>(
+          valueListenable: localeNotifier,
+          builder: (context, locale, _) {
+            return MaterialApp(
+              title: 'Kadastr',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.light(),
+              darkTheme: AppTheme.dark(),
+              themeMode: themeMode,
+              builder: _systemUiBuilder,
+              home: _AppRoot(
+                onboardingStorage: onboardingStorage,
+                authStorage: authStorage,
+                locale: locale,
+              ),
+            );
+          },
         );
       },
-      home: _AppRoot(
-        onboardingStorage: onboardingStorage,
-        authStorage: authStorage,
-      ),
+    );
+  }
+
+  Widget _systemUiBuilder(BuildContext context, Widget? child) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final overlayStyle = isDark
+        ? const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.light, // Android: white
+            statusBarBrightness: Brightness.dark, // iOS: white
+            systemNavigationBarColor: Colors.transparent,
+            systemNavigationBarIconBrightness: Brightness.light,
+          )
+        : const SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness: Brightness.dark, // Android: dark
+            statusBarBrightness: Brightness.light, // iOS: dark
+            systemNavigationBarColor: Colors.transparent,
+            systemNavigationBarIconBrightness: Brightness.dark,
+          );
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: overlayStyle,
+      child: child ?? const SizedBox.shrink(),
     );
   }
 }
 
 class _AppRoot extends StatefulWidget {
-  const _AppRoot({required this.onboardingStorage, required this.authStorage});
+  const _AppRoot({
+    required this.onboardingStorage,
+    required this.authStorage,
+    required this.locale,
+  });
 
   final OnboardingStorage onboardingStorage;
   final AuthStorage authStorage;
+  final Locale locale;
 
   @override
   State<_AppRoot> createState() => _AppRootState();
@@ -126,6 +153,7 @@ class _AppRootState extends State<_AppRoot> {
         _Stage.home => MainShell(
           key: const ValueKey('home'),
           authStorage: widget.authStorage,
+          locale: widget.locale,
         ),
       },
     );
