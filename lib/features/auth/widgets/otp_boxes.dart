@@ -135,6 +135,7 @@ class _OtpBoxesState extends State<OtpBoxes> {
                   child: TextField(
                     controller: _text,
                     focusNode: _focus,
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
                     autofocus: widget.autofocus,
                     keyboardType: TextInputType.number,
                     maxLength: widget.length,

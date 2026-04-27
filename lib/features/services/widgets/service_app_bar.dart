@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../theme/app_colors.dart';
 
@@ -80,7 +81,14 @@ class _CircleBackButton extends StatelessWidget {
         child: SizedBox(
           width: 40,
           height: 40,
-          child: Icon(Icons.arrow_back_rounded, size: 20, color: fg),
+          child: Center(
+            child: SvgPicture.asset(
+              'assets/icons/arrow.svg',
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+            ),
+          ),
         ),
       ),
     );

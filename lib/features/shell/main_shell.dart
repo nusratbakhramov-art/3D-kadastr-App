@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_flow_screen.dart';
 import '../auth/auth_storage.dart';
+import '../applications/applications_screen.dart';
 import '../help/help_screen.dart';
 import '../home/home_screen.dart';
 import '../home/user_profile.dart';
-import '../listings/my_listings_screen.dart';
 import '../market/market_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
@@ -36,7 +36,7 @@ class _MainShellState extends State<MainShell> {
   int _index = 0;
   int _servicesAnimToken = 0;
   int _profileAnimToken = 0;
-  int _listingsAnimToken = 0;
+  int _applicationsAnimToken = 0;
   final PageController _pageController = PageController();
 
   @override
@@ -51,7 +51,7 @@ class _MainShellState extends State<MainShell> {
     setState(() {
       _index = i;
       if (i == 1) _servicesAnimToken++;
-      if (i == 3) _listingsAnimToken++;
+      if (i == 3) _applicationsAnimToken++;
       if (i == 4) _profileAnimToken++;
     });
     if (delta > 1) {
@@ -169,7 +169,7 @@ class _MainShellState extends State<MainShell> {
             animateToken: _servicesAnimToken,
           ),
           const MarketScreen(),
-          MyListingsScreen(animateToken: _listingsAnimToken),
+          ApplicationsScreen(animateToken: _applicationsAnimToken),
           ProfileScreen(
             locale: widget.locale,
             animateToken: _profileAnimToken,

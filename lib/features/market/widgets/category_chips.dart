@@ -10,11 +10,13 @@ class CategoryChips extends StatelessWidget {
     required this.categories,
     required this.selectedId,
     required this.onSelected,
+    this.padding = const EdgeInsets.symmetric(horizontal: 16),
   });
 
   final List<MarketCategory> categories;
   final String selectedId;
   final ValueChanged<String> onSelected;
+  final EdgeInsetsGeometry padding;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +24,7 @@ class CategoryChips extends StatelessWidget {
       height: 34,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: padding,
         itemCount: categories.length,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, i) {

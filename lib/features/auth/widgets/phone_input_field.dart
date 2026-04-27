@@ -150,6 +150,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                     TextField(
                       controller: _text,
                       focusNode: _focus,
+                      onTapOutside: (_) => FocusScope.of(context).unfocus(),
                       keyboardType: TextInputType.number,
                       autofocus: true,
                       maxLines: 1,

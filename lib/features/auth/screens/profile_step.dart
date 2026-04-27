@@ -112,6 +112,7 @@ class _ProfileStepState extends State<ProfileStep> {
               ),
               child: TextField(
                 controller: _name,
+                onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 style: TextStyle(color: inputTextColor, fontSize: 16),
                 decoration: InputDecoration(
                   hintText: "To'liq ismingizni kiriting",

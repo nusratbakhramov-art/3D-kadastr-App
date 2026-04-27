@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../theme/app_colors.dart';
 
@@ -30,7 +31,15 @@ class OnboardingNavButton extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (!isPrimary) ...[
-            const Icon(Icons.arrow_back_rounded, size: 18, color: Colors.white),
+            SvgPicture.asset(
+              'assets/icons/arrow.svg',
+              width: 18,
+              height: 18,
+              colorFilter: const ColorFilter.mode(
+                Colors.white,
+                BlendMode.srcIn,
+              ),
+            ),
             const SizedBox(width: 8),
           ],
           Text(

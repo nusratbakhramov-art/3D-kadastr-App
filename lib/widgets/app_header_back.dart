@@ -1,21 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/app_colors.dart';
 
-/// Standard inner-page header: leading 40dp white circle with a black
-/// chevron-left back button, centered title in MTSCompact, and an optional
-/// trailing widget (kept symmetric with the leading slot).
+/// Standard inner-page header: leading 40dp white circle with a default
+/// arrow.svg (or custom SVG) back button, centered title in MTSCompact,
+/// and an optional trailing widget (kept symmetric with the leading slot).
 class AppHeaderBack extends StatelessWidget {
+  static const String defaultBackIconAsset = 'assets/icons/arrow.svg';
+
   const AppHeaderBack({
     super.key,
     required this.title,
     this.onBack,
     this.trailing,
+    this.backIconAsset,
   });
 
   final String title;
   final VoidCallback? onBack;
   final Widget? trailing;
+  final String? backIconAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +33,7 @@ class AppHeaderBack extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: _BackButton(
               onTap: onBack ?? () => Navigator.of(context).maybePop(),
+              iconAsset: backIconAsset,
             ),
           ),
           Text(
@@ -51,9 +57,10 @@ class AppHeaderBack extends StatelessWidget {
 }
 
 class _BackButton extends StatelessWidget {
-  const _BackButton({required this.onTap});
+  const _BackButton({required this.onTap, this.iconAsset});
 
   final VoidCallback onTap;
+  final String? iconAsset;
 
   @override
   Widget build(BuildContext context) {
@@ -78,10 +85,10 @@ class _BackButton extends StatelessWidget {
             ],
           ),
           alignment: Alignment.center,
-          child: const Icon(
-            Icons.chevron_left_rounded,
-            size: 22,
-            color: AppColors.textBlack,
+          child: SvgPicture.asset(
+            iconAsset ?? AppHeaderBack.defaultBackIconAsset,
+            width: 20,
+            height: 20,
           ),
         ),
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
@@ -48,6 +49,17 @@ class KadastrApp extends StatelessWidget {
             return MaterialApp(
               title: 'Kadastr',
               debugShowCheckedModeBanner: false,
+              locale: locale,
+              supportedLocales: const [
+                Locale('uz'),
+                Locale('ru'),
+                Locale('en'),
+              ],
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
               theme: AppTheme.light(),
               darkTheme: AppTheme.dark(),
               themeMode: themeMode,
@@ -81,9 +93,32 @@ class KadastrApp extends StatelessWidget {
             systemNavigationBarColor: Colors.transparent,
             systemNavigationBarIconBrightness: Brightness.dark,
           );
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: overlayStyle,
-      child: child ?? const SizedBox.shrink(),
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (event) {
+        final focus = FocusManager.instance.primaryFocus;
+        if (focus == null) return;
+
+        final focusContext = focus.context;
+        if (focusContext != null) {
+          final renderObject = focusContext.findRenderObject();
+          if (renderObject is RenderBox) {
+            final local = renderObject.globalToLocal(event.position);
+            final isInsideFocusedField =
+                local.dx >= 0 &&
+                local.dy >= 0 &&
+                local.dx <= renderObject.size.width &&
+                local.dy <= renderObject.size.height;
+            if (isInsideFocusedField) return;
+          }
+        }
+
+        focus.unfocus();
+      },
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: overlayStyle,
+        child: child ?? const SizedBox.shrink(),
+      ),
     );
   }
 }

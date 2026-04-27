@@ -15,10 +15,12 @@ class DobField extends StatelessWidget {
 
   Future<void> _pick(BuildContext context) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final locale = Localizations.maybeLocaleOf(context);
     final now = DateTime.now();
     final initial = value ?? DateTime(now.year - 20, now.month, now.day);
     final picked = await showDatePicker(
       context: context,
+      locale: locale,
       initialDate: initial,
       firstDate: DateTime(1900),
       lastDate: now,

@@ -212,6 +212,7 @@ class _CadastreInput extends StatelessWidget {
 
     return TextField(
       controller: controller,
+      onTapOutside: (_) => FocusScope.of(context).unfocus(),
       keyboardType: TextInputType.number,
       inputFormatters: [_CadastreMaskFormatter()],
       style: TextStyle(

@@ -442,6 +442,7 @@ class _AreaInput extends StatelessWidget {
 
     return TextField(
       controller: controller,
+      onTapOutside: (_) => FocusScope.of(context).unfocus(),
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]'))],
       style: TextStyle(fontFamily: 'MTSText', fontSize: 15, color: textColor),

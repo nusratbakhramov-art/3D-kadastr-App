@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../theme/app_colors.dart';
 
@@ -88,7 +89,7 @@ class _TopBar extends StatelessWidget {
           if (onBack != null)
             _CircleIconButton(
               key: const ValueKey('auth.back'),
-              icon: Icons.arrow_back,
+              iconAsset: 'assets/icons/arrow.svg',
               onPressed: onBack!,
             )
           else
@@ -104,11 +105,16 @@ class _TopBar extends StatelessWidget {
 class _CircleIconButton extends StatelessWidget {
   const _CircleIconButton({
     super.key,
-    required this.icon,
+    this.icon,
+    this.iconAsset,
     required this.onPressed,
-  });
+  }) : assert(
+         icon != null || iconAsset != null,
+         'Either icon or iconAsset must be provided.',
+       );
 
-  final IconData icon;
+  final IconData? icon;
+  final String? iconAsset;
   final VoidCallback onPressed;
 
   @override
@@ -128,7 +134,16 @@ class _CircleIconButton extends StatelessWidget {
         child: SizedBox(
           width: 40,
           height: 40,
-          child: Icon(icon, color: fg, size: 20),
+          child: Center(
+            child: iconAsset != null
+                ? SvgPicture.asset(
+                    iconAsset!,
+                    width: 20,
+                    height: 20,
+                    colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+                  )
+                : Icon(icon, color: fg, size: 20),
+          ),
         ),
       ),
     );

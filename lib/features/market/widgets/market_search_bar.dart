@@ -79,6 +79,7 @@ class _MarketSearchBarState extends State<MarketSearchBar> {
                 child: TextField(
                   controller: widget.controller,
                   focusNode: _focus,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   onChanged: widget.onChanged,
                   cursorColor: AppColors.splashGreen,
                   textInputAction: TextInputAction.search,

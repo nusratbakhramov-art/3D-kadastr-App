@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../theme/app_colors.dart';
@@ -270,24 +271,46 @@ class _EditToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final label = editing ? saveLabel : editLabel;
-    final color = editing ? AppColors.brandGreen : AppColors.textBlack;
+    final semanticsLabel = editing ? saveLabel : editLabel;
+    final borderRadius = BorderRadius.circular(20);
     return Material(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: borderRadius,
       child: InkWell(
         onTap: editing ? onSave : onEdit,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w700,
-              fontSize: 14,
-              color: color,
-            ),
+        borderRadius: borderRadius,
+        child: Tooltip(
+          message: semanticsLabel,
+          child: Semantics(
+            label: semanticsLabel,
+            button: true,
+            child: editing
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    child: Text(
+                      saveLabel,
+                      style: const TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: AppColors.brandGreen,
+                      ),
+                    ),
+                  )
+                : SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Center(
+                      child: SvgPicture.asset(
+                        'assets/icons/pen-square.svg',
+                        width: 20,
+                        height: 20,
+                      ),
+                    ),
+                  ),
           ),
         ),
       ),
@@ -436,36 +459,34 @@ class _NameField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white.withValues(alpha: 0.88),
-      borderRadius: BorderRadius.circular(12),
-      clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFFD9DDE2)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD9DDE2)),
+      ),
+      child: TextField(
+        controller: controller,
+        onTapOutside: (_) => FocusScope.of(context).unfocus(),
+        textCapitalization: TextCapitalization.words,
+        style: const TextStyle(
+          color: AppColors.textBlack,
+          fontFamily: 'MTSCompact',
+          fontSize: 16,
+          fontWeight: FontWeight.w400,
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        height: 52,
-        child: TextField(
-          controller: controller,
-          textCapitalization: TextCapitalization.words,
-          style: const TextStyle(
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: AppColors.textBlack.withValues(alpha: 0.4),
             fontFamily: 'MTSCompact',
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w400,
             fontSize: 16,
-            color: AppColors.textBlack,
           ),
-          decoration: InputDecoration(
-            border: InputBorder.none,
-            isCollapsed: true,
-            hintText: hint,
-            hintStyle: TextStyle(
-              color: AppColors.textBlack.withValues(alpha: 0.35),
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w400,
-              fontSize: 16,
-            ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
           ),
         ),
       ),

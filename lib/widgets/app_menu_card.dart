@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import 'circle_chevron_right.dart';
+
 /// White rounded card that hosts a vertical list of [AppMenuRow]s separated by
 /// hairline dividers.
 class AppMenuCard extends StatelessWidget {
@@ -35,7 +37,7 @@ class AppMenuCard extends StatelessWidget {
 }
 
 /// A row inside an [AppMenuCard]: 32dp leading icon (SVG asset or Material
-/// icon), label, and a 24dp black-circle chevron-right by default.
+/// icon), label, and a 20dp black-circle chevron-right by default.
 ///
 /// Set [destructive] to render the label in red and replace the trailing
 /// chevron with nothing — used for logout-style rows.
@@ -81,22 +83,7 @@ class AppMenuRow extends StatelessWidget {
 
     final trailingWidget =
         trailing ??
-        (destructive
-            ? const SizedBox.shrink()
-            : Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF18181B),
-                  shape: BoxShape.circle,
-                ),
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.chevron_right_rounded,
-                  size: 16,
-                  color: Colors.white,
-                ),
-              ));
+        (destructive ? const SizedBox.shrink() : const CircleChevronRight());
 
     return Material(
       color: Colors.transparent,

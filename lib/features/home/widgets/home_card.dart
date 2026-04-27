@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../widgets/circle_chevron_right.dart';
+
 class HomeCard extends StatelessWidget {
   const HomeCard({
     super.key,
@@ -41,7 +43,7 @@ class HomeCard extends StatelessWidget {
                 children: [
                   SvgPicture.asset(iconAsset, width: 32, height: 32),
                   const Spacer(),
-                  _ArrowCircle(isDark: isDark),
+                  const CircleChevronRight(),
                 ],
               ),
               const Spacer(),
@@ -60,26 +62,6 @@ class HomeCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _ArrowCircle extends StatelessWidget {
-  const _ArrowCircle({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final circleColor = isDark ? Colors.white : const Color(0xFF050505);
-    final iconColor = isDark ? const Color(0xFF0F1712) : Colors.white;
-
-    return Container(
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(color: circleColor, shape: BoxShape.circle),
-      alignment: Alignment.center,
-      child: Icon(Icons.chevron_right_rounded, size: 18, color: iconColor),
     );
   }
 }

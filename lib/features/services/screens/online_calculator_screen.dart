@@ -249,6 +249,7 @@ class _Field extends StatelessWidget {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
+          onTapOutside: (_) => FocusScope.of(context).unfocus(),
           keyboardType: keyboard,
           inputFormatters: [FilteringTextInputFormatter.allow(allow)],
           style: TextStyle(
