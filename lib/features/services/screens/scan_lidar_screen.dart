@@ -10,6 +10,7 @@ import '../widgets/scan_camera_card.dart';
 import '../widgets/scan_tips_card.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import 'scan_diagnostics_screen.dart';
 import 'scan_metadata_screen.dart';
 
 class ScanLidarScreen extends StatefulWidget {
@@ -107,7 +108,18 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          ScanCameraCard(state: _state, onTap: _startScan),
+                          ScanCameraCard(
+                            state: _state,
+                            onTap: _startScan,
+                            onLongPress: () {
+                              HapticFeedback.mediumImpact();
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const ScanDiagnosticsScreen(),
+                                ),
+                              );
+                            },
+                          ),
                           const SizedBox(height: 16),
                           const ScanTipsCard(),
                         ],

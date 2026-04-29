@@ -9,6 +9,7 @@ class ScanCameraCard extends StatelessWidget {
     super.key,
     required this.state,
     required this.onTap,
+    this.onLongPress,
     this.idleLabel = 'LiDAR kamerani ishga tushiring',
     this.scanningLabel = 'Skanerlanmoqda...',
     this.doneLabel = 'Skan tayyor',
@@ -16,6 +17,7 @@ class ScanCameraCard extends StatelessWidget {
 
   final ScanCardState state;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final String idleLabel;
   final String scanningLabel;
   final String doneLabel;
@@ -45,6 +47,7 @@ class ScanCameraCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: state == ScanCardState.scanning ? null : onTap,
+        onLongPress: state == ScanCardState.scanning ? null : onLongPress,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),
           alignment: Alignment.center,
