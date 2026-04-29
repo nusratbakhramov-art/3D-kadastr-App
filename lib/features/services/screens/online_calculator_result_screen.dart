@@ -8,9 +8,9 @@ import '../models/calculator_draft.dart';
 import '../widgets/service_app_bar.dart';
 
 class OnlineCalculatorResultScreen extends StatefulWidget {
-  const OnlineCalculatorResultScreen({super.key, required this.draft});
+  const OnlineCalculatorResultScreen({super.key, required this.result});
 
-  final CalculatorDraft draft;
+  final CalculatorResult result;
 
   @override
   State<OnlineCalculatorResultScreen> createState() =>
@@ -21,12 +21,10 @@ class _OnlineCalculatorResultScreenState
     extends State<OnlineCalculatorResultScreen> {
   bool _loading = true;
   Timer? _timer;
-  late final _Result _result;
 
   @override
   void initState() {
     super.initState();
-    _result = _compute(widget.draft);
     _timer = Timer(const Duration(milliseconds: 1500), () {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -62,8 +60,8 @@ class _OnlineCalculatorResultScreenState
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: 'Onlayn kalkulyator',
-                        subtitle: widget.draft.tab.label,
+                        title: 'Hisob natijasi',
+                        subtitle: widget.result.categoryTitle,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -83,7 +81,7 @@ class _OnlineCalculatorResultScreenState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Materiallar, ish kuchi va xizmatlar tahlil qilinmoqda.',
+                              'Tarif jadvali bo\'yicha narx aniqlanmoqda.',
                               style: TextStyle(
                                 fontFamily: 'MTSText',
                                 fontSize: 13,
@@ -97,7 +95,7 @@ class _OnlineCalculatorResultScreenState
                             const _BreakdownSkeleton(),
                           ] else ...[
                             Text(
-                              'Taxminiy umumiy narx',
+                              'Umumiy narx',
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w600,
@@ -106,7 +104,7 @@ class _OnlineCalculatorResultScreenState
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _PriceCard(result: _result),
+                            _PriceCard(result: widget.result),
                             const SizedBox(height: 18),
                             Text(
                               'Tarkibi',
@@ -118,7 +116,7 @@ class _OnlineCalculatorResultScreenState
                               ),
                             ),
                             const SizedBox(height: 10),
-                            _BreakdownCard(result: _result),
+                            _BreakdownCard(result: widget.result),
                           ],
                           const SizedBox(height: 24),
                         ],
@@ -146,7 +144,7 @@ class _OnlineCalculatorResultScreenState
 
 class _PriceCard extends StatelessWidget {
   const _PriceCard({required this.result});
-  final _Result result;
+  final CalculatorResult result;
 
   @override
   Widget build(BuildContext context) {
@@ -167,7 +165,7 @@ class _PriceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _fmtUzs(result.totalUzs),
+            fmtUzsPublic(result.totalUzs),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w900,
@@ -178,7 +176,7 @@ class _PriceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Diapazon: ${_fmtUzs(result.lowUzs)} – ${_fmtUzs(result.highUzs)}',
+            result.note,
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 13,
@@ -193,7 +191,7 @@ class _PriceCard extends StatelessWidget {
 
 class _BreakdownCard extends StatelessWidget {
   const _BreakdownCard({required this.result});
-  final _Result result;
+  final CalculatorResult result;
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +230,7 @@ class _BreakdownCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    _fmtUzs(rows[i].valueUzs),
+                    rows[i].value,
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -380,75 +378,4 @@ class _BreakdownSkeletonState extends State<_BreakdownSkeleton>
           borderRadius: BorderRadius.circular(8),
         ),
       );
-}
-
-class _Result {
-  const _Result({
-    required this.totalUzs,
-    required this.lowUzs,
-    required this.highUzs,
-    required this.lines,
-  });
-  final int totalUzs;
-  final int lowUzs;
-  final int highUzs;
-  final List<_Line> lines;
-}
-
-class _Line {
-  const _Line(this.label, this.valueUzs);
-  final String label;
-  final int valueUzs;
-}
-
-_Result _compute(CalculatorDraft d) {
-  // Mock pricing while real engine is offline.
-  // Per-m² baselines per tab (UZS).
-  final basePerM2 = switch (d.tab) {
-    CalculatorTab.arxitektura => 350000,
-    CalculatorTab.dizayn => 600000,
-    CalculatorTab.qurilish => 4200000,
-  };
-  final styleMultiplier = switch (d.style) {
-    CalculatorStyle.minimalizm => 1.0,
-    CalculatorStyle.klassika => 1.18,
-    CalculatorStyle.modern => 1.1,
-  };
-  final floorMultiplier = 1.0 + (d.floors - 1) * 0.05;
-  final residentsMultiplier = 1.0 + (d.residents - 1) * 0.02;
-
-  final buildingTotal =
-      (d.buildingM2 * basePerM2 * styleMultiplier * floorMultiplier).round();
-  final landSetup = (d.landSotix * 250000).round();
-  final overhead = ((buildingTotal + landSetup) * 0.08 * residentsMultiplier)
-      .round();
-  final total = buildingTotal + landSetup + overhead;
-  final spread = (total * 0.07).round();
-
-  return _Result(
-    totalUzs: total,
-    lowUzs: total - spread,
-    highUzs: total + spread,
-    lines: [
-      _Line(
-        'Bino qismi (${d.buildingM2.toStringAsFixed(0)} m²)',
-        buildingTotal,
-      ),
-      _Line(
-        'Yer va tayyorlash (${d.landSotix.toStringAsFixed(0)} sotix)',
-        landSetup,
-      ),
-      _Line('Loyiha xizmatlari va kommunikatsiyalar', overhead),
-    ],
-  );
-}
-
-String _fmtUzs(int value) {
-  final s = value.toString();
-  final buf = StringBuffer();
-  for (var i = 0; i < s.length; i++) {
-    if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
-    buf.write(s[i]);
-  }
-  return '${buf.toString()} so\'m';
 }

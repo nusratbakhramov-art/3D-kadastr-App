@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../models/calculator_draft.dart';
-import '../widgets/segmented_tabs.dart';
 import '../widgets/service_app_bar.dart';
-import '../widgets/style_chip.dart';
-import 'online_calculator_result_screen.dart';
+import 'calculator/arxitektura_form_screen.dart';
+import 'calculator/baholash_form_screen.dart';
+import 'calculator/dizayn_form_screen.dart';
+import 'calculator/kadastr_form_screen.dart';
+import 'calculator/tamirlash_form_screen.dart';
+import 'calculator/yuridik_screen.dart';
 
 class OnlineCalculatorScreen extends StatefulWidget {
   const OnlineCalculatorScreen({super.key});
@@ -16,75 +17,33 @@ class OnlineCalculatorScreen extends StatefulWidget {
   State<OnlineCalculatorScreen> createState() => _OnlineCalculatorScreenState();
 }
 
-class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen> {
-  CalculatorTab _tab = CalculatorTab.arxitektura;
-  CalculatorStyle _style = CalculatorStyle.minimalizm;
-
-  final TextEditingController _land = TextEditingController();
-  final TextEditingController _building = TextEditingController();
-  final TextEditingController _floors = TextEditingController();
-  final TextEditingController _residents = TextEditingController();
+class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    for (final c in [_land, _building, _floors, _residents]) {
-      c.addListener(_refresh);
-    }
-  }
-
-  void _refresh() {
-    if (mounted) setState(() {});
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    )..forward();
   }
 
   @override
   void dispose() {
-    for (final c in [_land, _building, _floors, _residents]) {
-      c
-        ..removeListener(_refresh)
-        ..dispose();
-    }
+    _controller.dispose();
     super.dispose();
-  }
-
-  bool get _ready {
-    final land = double.tryParse(_land.text.replaceAll(',', '.'));
-    final building = double.tryParse(_building.text.replaceAll(',', '.'));
-    final floors = int.tryParse(_floors.text);
-    final residents = int.tryParse(_residents.text);
-    return land != null &&
-        land > 0 &&
-        building != null &&
-        building > 0 &&
-        floors != null &&
-        floors > 0 &&
-        residents != null &&
-        residents > 0;
-  }
-
-  void _calculate() {
-    if (!_ready) return;
-    HapticFeedback.lightImpact();
-    final draft = CalculatorDraft(
-      tab: _tab,
-      landSotix: double.parse(_land.text.replaceAll(',', '.')),
-      buildingM2: double.parse(_building.text.replaceAll(',', '.')),
-      floors: int.parse(_floors.text),
-      residents: int.parse(_residents.text),
-      style: _style,
-    );
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => OnlineCalculatorResultScreen(draft: draft),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
-    final labelColor = isDark ? Colors.white : AppColors.textBlack;
+    final headingColor = isDark ? Colors.white : AppColors.textBlack;
+    final subColor = isDark
+        ? Colors.white.withValues(alpha: 0.6)
+        : const Color(0xFF8A9097);
 
     return Scaffold(
       backgroundColor: bg,
@@ -101,97 +60,56 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen> {
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: const ServiceAppBar(title: 'Onlayn kalkulyator'),
                     ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: SegmentedTabs<CalculatorTab>(
-                        values: CalculatorTab.values,
-                        labelOf: (t) => t.label,
-                        selected: _tab,
-                        onChanged: (t) => setState(() => _tab = t),
-                      ),
-                    ),
                     Expanded(
                       child: ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                         children: [
-                          _Field(
-                            label: 'Yer maydoni (sotix)',
-                            placeholder: 'Yer maydonini kiriting',
-                            controller: _land,
-                            keyboard: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            allow: RegExp(r'[0-9.,]'),
-                            labelColor: labelColor,
-                            isDark: isDark,
-                          ),
-                          const SizedBox(height: 14),
-                          _Field(
-                            label: 'Bino (m²)',
-                            placeholder: 'Bino kvadratini kiriting',
-                            controller: _building,
-                            keyboard: const TextInputType.numberWithOptions(
-                              decimal: true,
-                            ),
-                            allow: RegExp(r'[0-9.,]'),
-                            labelColor: labelColor,
-                            isDark: isDark,
-                          ),
-                          const SizedBox(height: 14),
-                          _Field(
-                            label: 'Qavatlar soni',
-                            placeholder: 'Qavatlar sonini kiriting',
-                            controller: _floors,
-                            keyboard: TextInputType.number,
-                            allow: RegExp(r'[0-9]'),
-                            labelColor: labelColor,
-                            isDark: isDark,
-                          ),
-                          const SizedBox(height: 14),
-                          _Field(
-                            label: 'Yashovchilar soni',
-                            placeholder: 'Yashovchilar sonini kiriting',
-                            controller: _residents,
-                            keyboard: TextInputType.number,
-                            allow: RegExp(r'[0-9]'),
-                            labelColor: labelColor,
-                            isDark: isDark,
-                          ),
-                          const SizedBox(height: 22),
-                          Text(
-                            'Uslubni tanlang',
-                            style: TextStyle(
-                              fontFamily: 'MTSCompact',
-                              fontWeight: FontWeight.w700,
-                              fontSize: 16,
-                              height: 1.25,
-                              color: labelColor,
+                          _StaggeredEntry(
+                            controller: _controller,
+                            index: 0,
+                            child: Text(
+                              'Xizmatni tanlang',
+                              style: TextStyle(
+                                fontFamily: 'MTSCompact',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 24,
+                                height: 1.2,
+                                color: headingColor,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              for (final s in CalculatorStyle.values)
-                                StyleChip(
-                                  label: s.label,
-                                  selected: _style == s,
-                                  onTap: () => setState(() => _style = s),
+                          const SizedBox(height: 4),
+                          _StaggeredEntry(
+                            controller: _controller,
+                            index: 0,
+                            child: Text(
+                              'Har bir xizmatning narxini alohida hisoblang.',
+                              style: TextStyle(
+                                fontFamily: 'MTSText',
+                                fontSize: 13,
+                                height: 1.4,
+                                color: subColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          for (var i = 0;
+                              i < CalculatorCategory.values.length;
+                              i++) ...[
+                            _StaggeredEntry(
+                              controller: _controller,
+                              index: i + 1,
+                              child: _CategoryCard(
+                                category: CalculatorCategory.values[i],
+                                onTap: () => _open(
+                                  context,
+                                  CalculatorCategory.values[i],
                                 ),
-                            ],
-                          ),
-                          const SizedBox(height: 24),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                          ],
                         ],
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: ListingCtaButton(
-                        label: 'Hisoblash',
-                        enabled: _ready,
-                        onTap: _calculate,
                       ),
                     ),
                   ],
@@ -203,85 +121,130 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen> {
       ),
     );
   }
+
+  void _open(BuildContext context, CalculatorCategory cat) {
+    final WidgetBuilder builder = switch (cat) {
+      CalculatorCategory.arxitektura => (_) => const ArxitekturaFormScreen(),
+      CalculatorCategory.kadastr => (_) =>
+          const KadastrFormScreen(is3d: false),
+      CalculatorCategory.kadastr3d => (_) =>
+          const KadastrFormScreen(is3d: true),
+      CalculatorCategory.baholash => (_) => const BaholashFormScreen(),
+      CalculatorCategory.dizayn => (_) => const DizaynFormScreen(),
+      CalculatorCategory.tamirlash => (_) => const TamirlashFormScreen(),
+      CalculatorCategory.yuridik => (_) => const YuridikScreen(),
+    };
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: builder));
+  }
 }
 
-class _Field extends StatelessWidget {
-  const _Field({
-    required this.label,
-    required this.placeholder,
-    required this.controller,
-    required this.keyboard,
-    required this.allow,
-    required this.labelColor,
-    required this.isDark,
-  });
+class _CategoryCard extends StatelessWidget {
+  const _CategoryCard({required this.category, required this.onTap});
 
-  final String label;
-  final String placeholder;
-  final TextEditingController controller;
-  final TextInputType keyboard;
-  final RegExp allow;
-  final Color labelColor;
-  final bool isDark;
+  final CalculatorCategory category;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
-    final textColor = isDark ? Colors.white : AppColors.textBlack;
-    final hintColor = isDark
-        ? Colors.white.withValues(alpha: 0.45)
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    final subColor = isDark
+        ? Colors.white.withValues(alpha: 0.6)
+        : const Color(0xFF8A9097);
+    final chevronColor = isDark
+        ? Colors.white.withValues(alpha: 0.4)
         : const Color(0xFFB4B9BF);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontFamily: 'MTSCompact',
-            fontWeight: FontWeight.w700,
-            fontSize: 16,
-            height: 1.25,
-            color: labelColor,
+    return Material(
+      color: cardBg,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: category.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(category.icon, color: category.accent, size: 22),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      category.title,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        height: 1.25,
+                        color: titleColor,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      category.subtitle,
+                      style: TextStyle(
+                        fontFamily: 'MTSText',
+                        fontSize: 12.5,
+                        height: 1.3,
+                        color: subColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: chevronColor,
+                size: 22,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          onTapOutside: (_) => FocusScope.of(context).unfocus(),
-          keyboardType: keyboard,
-          inputFormatters: [FilteringTextInputFormatter.allow(allow)],
-          style: TextStyle(
-            fontFamily: 'MTSText',
-            fontSize: 15,
-            color: textColor,
-          ),
-          decoration: InputDecoration(
-            isDense: true,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 18,
-            ),
-            hintText: placeholder,
-            hintStyle: TextStyle(
-              fontFamily: 'MTSText',
-              fontSize: 15,
-              color: hintColor,
-            ),
-            filled: true,
-            fillColor: fill,
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(color: AppColors.splashGreen, width: 1.4),
-            ),
-          ),
-        ),
-      ],
+      ),
+    );
+  }
+}
+
+class _StaggeredEntry extends StatelessWidget {
+  const _StaggeredEntry({
+    required this.controller,
+    required this.index,
+    required this.child,
+  });
+
+  final AnimationController controller;
+  final int index;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    const startStep = 0.07;
+    final start = (index * startStep).clamp(0.0, 0.6);
+    final end = (start + 0.5).clamp(0.0, 1.0);
+    final curved = CurvedAnimation(
+      parent: controller,
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
+    );
+    final offset = Tween<Offset>(
+      begin: const Offset(0, 0.16),
+      end: Offset.zero,
+    ).animate(curved);
+
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(position: offset, child: child),
     );
   }
 }

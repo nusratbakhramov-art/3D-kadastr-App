@@ -252,57 +252,149 @@ class _SettingsScreenState extends State<SettingsScreen>
   }
 
   Future<void> _confirmLogout(BuildContext context, Locale locale) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-          _S.logoutTitle(locale),
-          style: const TextStyle(
-            fontFamily: 'MTSCompact',
-            fontWeight: FontWeight.w700,
-            fontSize: 18,
-            color: AppColors.textBlack,
-          ),
-        ),
-        content: Text(
-          _S.logoutMessage(locale),
-          style: const TextStyle(
-            fontFamily: 'MTSText',
-            fontSize: 14,
-            color: AppColors.textBlack,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(
-              _S.cancel(locale),
-              style: const TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w500,
-                color: AppColors.textBlack,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(
-              _S.logout(locale),
-              style: const TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w700,
-                color: Color(0xFFE5484D),
-              ),
-            ),
-          ),
-        ],
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (ctx) => _LogoutSheet(locale: locale),
     );
     if (confirmed == true && mounted) {
       widget.onLogoutConfirmed?.call();
     }
+  }
+}
+
+class _LogoutSheet extends StatelessWidget {
+  const _LogoutSheet({required this.locale});
+
+  final Locale locale;
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E0E0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFDE8E8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.logout_rounded,
+                  color: Color(0xFFE5484D),
+                  size: 26,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              _S.logoutTitle(locale),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 19,
+                color: AppColors.textBlack,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _S.logoutMessage(locale),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 14,
+                height: 1.4,
+                color: AppColors.textBlack.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetButton(
+                    label: _S.cancel(locale),
+                    onTap: () => Navigator.pop(context, false),
+                    background: const Color(0xFFF1F3F5),
+                    foreground: AppColors.textBlack,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SheetButton(
+                    label: _S.logout(locale),
+                    onTap: () => Navigator.pop(context, true),
+                    background: const Color(0xFFE5484D),
+                    foreground: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetButton extends StatelessWidget {
+  const _SheetButton({
+    required this.label,
+    required this.onTap,
+    required this.background,
+    required this.foreground,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final Color background;
+  final Color foreground;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: background,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: SizedBox(
+          height: 52,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: foreground,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
