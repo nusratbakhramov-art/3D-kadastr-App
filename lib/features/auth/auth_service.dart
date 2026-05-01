@@ -23,6 +23,7 @@ abstract class AuthService {
   Future<OtpTicket> sendOtp(String phone);
   Future<VerifyResult> verifyOtp(String phone, String code);
   Future<void> completeProfile(String token, UserProfile profile);
+  Future<UserProfile> fetchProfile(String token);
 }
 
 class FakeAuthService implements AuthService {
@@ -70,5 +71,11 @@ class FakeAuthService implements AuthService {
     if (!profile.isComplete) {
       throw const AuthException('Profil to\'liq emas');
     }
+  }
+
+  @override
+  Future<UserProfile> fetchProfile(String token) async {
+    await Future<void>.delayed(delay);
+    return UserProfile.empty;
   }
 }

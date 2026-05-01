@@ -155,6 +155,14 @@ class _AppRootState extends State<_AppRoot> {
 
   Future<void> _bootstrap() async {
     final done = await widget.onboardingStorage.hasCompleted();
+    final profile = await widget.authStorage.loadProfile();
+    if (profile.fullName.isNotEmpty) {
+      userProfileNotifier.value = UserProfile(
+        name: profile.fullName,
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+      );
+    }
     if (!mounted) return;
     setState(() => _onboardingDone = done);
   }

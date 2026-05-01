@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../home/user_profile.dart' as home;
+import 'api_auth_service.dart';
 import 'auth_service.dart';
 import 'auth_storage.dart';
 import 'models/auth_session.dart';
 import 'models/user_profile.dart';
+// home/user_profile.dart re-exports Gender, but biz auth/UserProfile bilan ham ishlaymiz.
 import 'screens/otp_step.dart';
 import 'screens/phone_step.dart';
 import 'screens/profile_step.dart';
@@ -38,7 +41,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
   @override
   void initState() {
     super.initState();
-    _service = widget.service ?? FakeAuthService();
+    _service = widget.service ?? ApiAuthService();
   }
 
   Future<void> _handlePhoneSubmit(String phone) async {
@@ -71,6 +74,31 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     if (result.isNewUser) {
       setState(() => _step = _AuthStep.profile);
     } else {
+      // Mavjud foydalanuvchi — backend'dan profilni olib mahalliy saqlash.
+      try {
+        final remote = await _service.fetchProfile(result.token);
+        if (remote.fullName.isNotEmpty) {
+          await widget.storage.saveProfile(remote);
+          home.userProfileNotifier.value = home.UserProfile(
+            name: remote.fullName,
+            phone: '+$_phone',
+            dateOfBirth: remote.dateOfBirth,
+            gender: remote.gender,
+          );
+        }
+      } catch (_) {
+        // Network xatosi bo'lsa, mahalliy saqlangan bo'lsa shuni olamiz.
+        final saved = await widget.storage.loadProfile();
+        if (saved.fullName.isNotEmpty) {
+          home.userProfileNotifier.value = home.UserProfile(
+            name: saved.fullName,
+            phone: '+$_phone',
+            dateOfBirth: saved.dateOfBirth,
+            gender: saved.gender,
+          );
+        }
+      }
+      if (!mounted) return;
       widget.onAuthenticated();
     }
   }
@@ -82,6 +110,12 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
         await _service.completeProfile(_token!, profile);
       }
       await widget.storage.saveProfile(profile);
+      home.userProfileNotifier.value = home.UserProfile(
+        name: profile.fullName,
+        phone: '+$_phone',
+        dateOfBirth: profile.dateOfBirth,
+        gender: profile.gender,
+      );
       if (!mounted) return;
       widget.onAuthenticated();
     } on AuthException catch (e) {
