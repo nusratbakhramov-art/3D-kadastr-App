@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_reveal.dart';
@@ -26,7 +26,7 @@ class _MyRatingsScreenState extends State<MyRatingsScreen>
       builder: (context, locale, _) {
         final items = mockValuations;
         return Scaffold(
-          backgroundColor: AppColors.lightBackground,
+          backgroundColor: ColorTokens.scaffoldBg(context),
           body: Stack(
             fit: StackFit.expand,
             children: [
@@ -89,7 +89,7 @@ class _ValuationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: ColorTokens.cardBg(context),
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -107,12 +107,12 @@ class _ValuationCard extends StatelessWidget {
                       item.address,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'MTSCompact',
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
                         height: 1.3,
-                        color: AppColors.textBlack,
+                        color: ColorTokens.primaryText(context),
                       ),
                     ),
                   ),
@@ -123,7 +123,7 @@ class _ValuationCard extends StatelessWidget {
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w400,
                       fontSize: 12,
-                      color: AppColors.textBlack.withValues(alpha: 0.55),
+                      color: ColorTokens.secondaryText(context),
                     ),
                   ),
                 ],
@@ -135,7 +135,7 @@ class _ValuationCard extends StatelessWidget {
                   fontFamily: 'MTSText',
                   fontWeight: FontWeight.w400,
                   fontSize: 13,
-                  color: AppColors.textBlack.withValues(alpha: 0.55),
+                  color: ColorTokens.secondaryText(context),
                 ),
               ),
               const SizedBox(height: 14),
@@ -153,17 +153,17 @@ class _ValuationCard extends StatelessWidget {
                             fontFamily: 'MTSCompact',
                             fontWeight: FontWeight.w500,
                             fontSize: 12,
-                            color: AppColors.textBlack.withValues(alpha: 0.55),
+                            color: ColorTokens.secondaryText(context),
                           ),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           formatSum(item.finalValue),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'MTSCompact',
                             fontWeight: FontWeight.w700,
                             fontSize: 20,
-                            color: AppColors.textBlack,
+                            color: ColorTokens.primaryText(context),
                           ),
                         ),
                       ],
@@ -260,7 +260,7 @@ class _ComponentChip extends StatelessWidget {
               fontWeight: FontWeight.w500,
               fontSize: 11,
               color: disabled
-                  ? AppColors.textBlack.withValues(alpha: 0.4)
+                  ? ColorTokens.tertiaryText(context)
                   : tintFinal,
             ),
           ),
@@ -275,8 +275,8 @@ class _ComponentChip extends StatelessWidget {
               fontSize: 12,
               height: 1.2,
               color: disabled
-                  ? AppColors.textBlack.withValues(alpha: 0.4)
-                  : AppColors.textBlack,
+                  ? ColorTokens.tertiaryText(context)
+                  : ColorTokens.primaryText(context),
             ),
           ),
         ],
@@ -342,32 +342,32 @@ class _EmptyState extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: ColorTokens.cardBg(context),
               borderRadius: BorderRadius.circular(20),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x0F000000),
+                  color: ColorTokens.shadow(context),
                   blurRadius: 12,
-                  offset: Offset(0, 2),
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
             alignment: Alignment.center,
-            child: const Icon(
+            child: Icon(
               Icons.bar_chart_rounded,
               size: 28,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
               fontSize: 18,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
           const SizedBox(height: 6),
@@ -377,7 +377,7 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 14,
-              color: AppColors.textBlack.withValues(alpha: 0.55),
+              color: ColorTokens.secondaryText(context),
             ),
           ),
         ],

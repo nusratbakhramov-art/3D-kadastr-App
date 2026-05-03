@@ -2,10 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_toast.dart';
+import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../api_architecture_order_service.dart';
+import '../models/architecture_order_draft.dart';
 import '../models/scan_draft.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import 'calculator/arxitektura_tz_success_screen.dart';
 
 const _viloyatlar = <String>[
   'Toshkent shahri',
@@ -96,12 +101,7 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
     if (_viloyat == null) return;
     final options = _tumanlarByViloyat[_viloyat!] ?? const <String>[];
     if (options.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('Tumanlar ro\'yxati tez orada'),
-        ),
-      );
+      AppToast.error(context, 'Tumanlar ro\'yxati tez orada');
       return;
     }
     final t = await _showPicker(
@@ -210,15 +210,65 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
     );
   }
 
-  void _submit() {
+  bool _submitting = false;
+
+  Future<void> _submitToSpecialist() async {
+    if (!_ready || _submitting) return;
+    HapticFeedback.lightImpact();
+
+    final tz = widget.draft.tzDraft;
+    if (tz == null || !tz.canSubmit) {
+      AppToast.error(context, 'TZ ma\'lumotlari to\'liq emas');
+      return;
+    }
+
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null) {
+      if (!mounted) return;
+      AppToast.error(context, 'Yuborish uchun avval tizimga kiring');
+      return;
+    }
+
+    setState(() => _submitting = true);
+    try {
+      // Hudud qo'lda tanlangan bo'lsa, TZ draft'ga ham qo'shamiz
+      // (backend `address` matni sifatida).
+      final enrichedTz = tz;
+      if (_viloyat != null || _tuman != null) {
+        final extra = [
+          ?_tuman,
+          ?_viloyat,
+        ].join(', ');
+        if (enrichedTz.address.trim().isEmpty) {
+          enrichedTz.address = extra;
+        } else {
+          enrichedTz.address = '${enrichedTz.address} ($extra)';
+        }
+      }
+
+      final api = ArchitectureOrderApiService();
+      final created = await api.submit(draft: enrichedTz, token: token);
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => ArxitekturaTzSuccessScreen(orderId: created.id),
+        ),
+      );
+    } on ArchitectureOrderApiException catch (e) {
+      if (mounted) AppToast.error(context, e.message);
+    } catch (e) {
+      if (mounted) AppToast.error(context, 'Tarmoq xatosi: $e');
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
+  }
+
+  void _submitForAiValuation() {
     if (!_ready) return;
     HapticFeedback.lightImpact();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        behavior: SnackBarBehavior.floating,
-        content: Text('Skan yuborildi. To\'lov tez orada'),
-      ),
-    );
+    // TODO: AI baholash flow'iga ulash (yangi ekran).
+    AppToast.success(context, 'AI baholash boshlandi…');
   }
 
   @override
@@ -277,10 +327,42 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: ListingCtaButton(
-                        label: 'To\'lov qilish va yuklab olish',
-                        enabled: _ready,
-                        onTap: _submit,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ListingCtaButton(
+                            label: _submitting
+                                ? 'Yuborilmoqda…'
+                                : 'Mutaxasisga yuborish',
+                            enabled: _ready && !_submitting,
+                            onTap: _submitToSpecialist,
+                          ),
+                          const SizedBox(height: 10),
+                          OutlinedButton(
+                            onPressed: _ready && !_submitting
+                                ? _submitForAiValuation
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(54),
+                              side: const BorderSide(
+                                color: AppColors.splashGreen,
+                                width: 1.4,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                            child: const Text(
+                              'AI baholash',
+                              style: TextStyle(
+                                fontFamily: 'MTSCompact',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 15,
+                                color: AppColors.splashGreen,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -381,6 +463,18 @@ class _PickerField extends StatelessWidget {
   }
 }
 
+String _objectTypeLabel(ArchObjectType t) => switch (t) {
+      ArchObjectType.yakkaSmall => 'Yakka uy <500 m²',
+      ArchObjectType.yakkaLarge => 'Yakka uy >500 m²',
+      ArchObjectType.kopQavatli => 'Ko\'p qavatli turar-joy',
+      ArchObjectType.ofis => 'Ofis',
+      ArchObjectType.savdoMarkazi => 'Savdo markazi',
+      ArchObjectType.mehmonxona => 'Mehmonxona',
+      ArchObjectType.sanoat => 'Sanoat',
+      ArchObjectType.omborxona => 'Omborxona',
+      ArchObjectType.boshqa => 'Boshqa',
+    };
+
 class _SummaryCard extends StatelessWidget {
   const _SummaryCard({required this.draft});
 
@@ -396,10 +490,46 @@ class _SummaryCard extends StatelessWidget {
         : const Color(0xFF8A9097);
     final valueColor = isDark ? Colors.white : AppColors.textBlack;
 
+    final tz = draft.tzDraft;
     final rows = <(String, String)>[
       ('Kadastr raqami', draft.cadastreNumber),
       ('Obyekt turi', draft.objectType?.label ?? '—'),
       ('Skan', draft.scanCompleted ? 'Tayyor' : 'Kutilmoqda'),
+      if (draft.hasLocation)
+        (
+          'Xarita',
+          'lat: ${draft.latitude!.toStringAsFixed(6)}, '
+              'lon: ${draft.longitude!.toStringAsFixed(6)}',
+        ),
+      if (tz != null) ...[
+        ('Buyurtmachi', tz.customerName),
+        if (tz.tin.trim().isNotEmpty) ('STIR', tz.tin),
+        ('Telefon', tz.phone),
+        if (tz.email.trim().isNotEmpty) ('E-mail', tz.email),
+        if (tz.objectName.trim().isNotEmpty) ('Obyekt nomi', tz.objectName),
+        if (tz.objectType != null)
+          ('Loyiha turi', _objectTypeLabel(tz.objectType!)),
+        (
+          'Qurilish turi',
+          tz.constructionType.apiValue == 'rekonstruksiya'
+              ? 'Rekonstruksiya'
+              : 'Yangi qurilish',
+        ),
+        if (tz.floors != null) ('Qavatlar', '${tz.floors}'),
+        if (tz.totalAreaSqm != null)
+          ('Umumiy maydon', '${tz.totalAreaSqm} m²'),
+        if (tz.buildingAreaSqm != null)
+          ('Qurilish maydoni', '${tz.buildingAreaSqm} m²'),
+        if (tz.maxHeightM != null) ('Balandlik', '${tz.maxHeightM} m'),
+        if (tz.rooms.isNotEmpty)
+          ('Xonalar', '${tz.rooms.length} ta'),
+        if (tz.architecture.style != null)
+          ('Uslub', tz.architecture.style!),
+        if (tz.timeline.sketchDays != null)
+          ('Eskiz loyiha', '${tz.timeline.sketchDays} kun'),
+        if (tz.timeline.workingDays != null)
+          ('Ishchi loyiha', '${tz.timeline.workingDays} kun'),
+      ],
     ];
 
     return Container(

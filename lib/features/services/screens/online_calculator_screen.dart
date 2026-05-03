@@ -44,6 +44,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
     final subColor = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: bg,
@@ -58,7 +59,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(title: 'Onlayn kalkulyator'),
+                      child: ServiceAppBar(title: _Strings.appBar(locale)),
                     ),
                     Expanded(
                       child: ListView(
@@ -68,7 +69,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                             controller: _controller,
                             index: 0,
                             child: Text(
-                              'Xizmatni tanlang',
+                              _Strings.heading(locale),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w900,
@@ -83,7 +84,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                             controller: _controller,
                             index: 0,
                             child: Text(
-                              'Har bir xizmatning narxini alohida hisoblang.',
+                              _Strings.subheading(locale),
                               style: TextStyle(
                                 fontFamily: 'MTSText',
                                 fontSize: 13,
@@ -101,6 +102,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                               index: i + 1,
                               child: _CategoryCard(
                                 category: CalculatorCategory.values[i],
+                                locale: locale,
                                 onTap: () => _open(
                                   context,
                                   CalculatorCategory.values[i],
@@ -139,9 +141,14 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
 }
 
 class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({required this.category, required this.onTap});
+  const _CategoryCard({
+    required this.category,
+    required this.locale,
+    required this.onTap,
+  });
 
   final CalculatorCategory category;
+  final Locale locale;
   final VoidCallback onTap;
 
   @override
@@ -181,7 +188,7 @@ class _CategoryCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      category.title,
+                      category.title(locale),
                       style: TextStyle(
                         fontFamily: 'MTSCompact',
                         fontWeight: FontWeight.w700,
@@ -192,7 +199,7 @@ class _CategoryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      category.subtitle,
+                      category.subtitle(locale),
                       style: TextStyle(
                         fontFamily: 'MTSText',
                         fontSize: 12.5,
@@ -215,6 +222,30 @@ class _CategoryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Strings {
+  const _Strings._();
+
+  static String _pick(Locale l, String uz, String ru, String en) =>
+      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  static String appBar(Locale l) => _pick(
+        l,
+        'Onlayn kalkulyator',
+        'Онлайн калькулятор',
+        'Online calculator',
+      );
+
+  static String heading(Locale l) =>
+      _pick(l, 'Xizmatni tanlang', 'Выберите услугу', 'Choose a service');
+
+  static String subheading(Locale l) => _pick(
+        l,
+        'Har bir xizmatning narxini alohida hisoblang.',
+        'Рассчитайте стоимость каждой услуги отдельно.',
+        'Calculate the cost of each service separately.',
+      );
 }
 
 class _StaggeredEntry extends StatelessWidget {

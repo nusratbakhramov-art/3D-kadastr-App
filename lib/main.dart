@@ -8,6 +8,7 @@ import 'features/home/user_profile.dart';
 import 'features/notifications/notification_model.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
+import 'features/settings/locale_storage.dart';
 import 'features/settings/settings_state.dart';
 import 'features/shell/main_shell.dart';
 import 'features/splash/animated_splash_screen.dart';
@@ -154,11 +155,22 @@ class _AppRootState extends State<_AppRoot> {
   }
 
   Future<void> _bootstrap() async {
+    // Avval saqlangan locale ni yuklab, app bo'ylab qo'llaymiz. Bu
+    // localeNotifier'ni o'zgartiradi va MaterialApp rebuild bo'lib, butun
+    // widget tree yangi til bilan tarjima qilinadi.
+    final savedLocale = await const LocaleStorage().load();
+    if (savedLocale != null && savedLocale != localeNotifier.value) {
+      localeNotifier.value = savedLocale;
+    }
+
     final done = await widget.onboardingStorage.hasCompleted();
     final profile = await widget.authStorage.loadProfile();
+    final session = await widget.authStorage.loadSession();
+    final phone = session.phone == null ? null : '+${session.phone}';
     if (profile.fullName.isNotEmpty) {
       userProfileNotifier.value = UserProfile(
         name: profile.fullName,
+        phone: phone,
         dateOfBirth: profile.dateOfBirth,
         gender: profile.gender,
       );

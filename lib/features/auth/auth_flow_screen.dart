@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../widgets/app_toast.dart';
 import '../home/user_profile.dart' as home;
 import 'api_auth_service.dart';
 import 'auth_service.dart';
@@ -59,9 +60,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
+      AppToast.error(context, e.message);
     }
   }
 
@@ -71,6 +70,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       AuthSession(token: result.token, phone: _phone),
     );
     if (!mounted) return;
+    AppToast.success(context, "Siz kiritgan tasdiqlash kodi to'g'ri kiritildi!");
     if (result.isNewUser) {
       setState(() => _step = _AuthStep.profile);
     } else {
@@ -121,9 +121,7 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(e.message)));
+      AppToast.error(context, e.message);
     }
   }
 

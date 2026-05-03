@@ -62,15 +62,52 @@ class AppTheme {
         brightness: Brightness.dark,
         primary: AppColors.brandGreen,
         onPrimary: Colors.white,
-        surface: AppColors.brandGreenDeep,
+        surface: AppColors.darkSurface,
         onSurface: Colors.white,
+        outline: AppColors.darkOutline,
+        outlineVariant: AppColors.darkDivider,
       ),
-      scaffoldBackgroundColor: AppColors.brandGreenDeep,
+      scaffoldBackgroundColor: AppColors.darkBackground,
       fontFamily: textFont,
     );
 
     return base.copyWith(
       textTheme: _buildTextTheme(base.textTheme, Colors.white),
+      cardTheme: const CardThemeData(
+        color: AppColors.darkSurface,
+        surfaceTintColor: Colors.transparent,
+      ),
+      dividerTheme: const DividerThemeData(
+        color: AppColors.darkDivider,
+        thickness: 1,
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.darkBackground,
+        foregroundColor: Colors.white,
+        centerTitle: false,
+        elevation: 0,
+        titleTextStyle: TextStyle(
+          fontFamily: displayFont,
+          fontWeight: FontWeight.w700,
+          fontSize: 20,
+          color: Colors.white,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.brandGreen,
+          foregroundColor: Colors.white,
+          minimumSize: const Size.fromHeight(52),
+          textStyle: const TextStyle(
+            fontFamily: displayFont,
+            fontWeight: FontWeight.w700,
+            fontSize: 16,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
     );
   }
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
 import '../../widgets/app_avatar.dart';
 import '../../widgets/app_bell_button.dart';
 import '../../widgets/app_glow_background.dart';
@@ -19,7 +19,6 @@ class ProfileScreen extends StatefulWidget {
     this.onMyScansTap,
     this.onRatingsTap,
     this.onPaymentsTap,
-    this.onNotificationsTap,
     this.onSettingsTap,
     this.onHelpTap,
   });
@@ -31,7 +30,6 @@ class ProfileScreen extends StatefulWidget {
   final VoidCallback? onMyScansTap;
   final VoidCallback? onRatingsTap;
   final VoidCallback? onPaymentsTap;
-  final VoidCallback? onNotificationsTap;
   final VoidCallback? onSettingsTap;
   final VoidCallback? onHelpTap;
 
@@ -75,11 +73,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         _ProfileStrings.payments(locale),
         widget.onPaymentsTap,
       ),
-      _RowSpec.icon(
-        Icons.notifications_none_rounded,
-        _ProfileStrings.notifications(locale),
-        widget.onNotificationsTap,
-      ),
       _RowSpec(
         'assets/icons/menu-settings.svg',
         _ProfileStrings.settings(locale),
@@ -93,7 +86,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     ];
 
     return Scaffold(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: ColorTokens.scaffoldBg(context),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -154,12 +147,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   ? profile!.name
                                   : _ProfileStrings.guestName(locale),
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
                                 fontSize: 22,
                                 height: 1.25,
-                                color: AppColors.textBlack,
+                                color: ColorTokens.primaryText(context),
                               ),
                             ),
                           ),
@@ -179,9 +172,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 fontWeight: FontWeight.w400,
                                 fontSize: 15,
                                 height: 1.2,
-                                color: AppColors.textBlack.withValues(
-                                  alpha: 0.5,
-                                ),
+                                color: ColorTokens.secondaryText(context),
                               ),
                             ),
                           ),
@@ -231,8 +222,6 @@ class _ProfileScreenState extends State<ProfileScreen>
 
 class _RowSpec {
   const _RowSpec(this.iconAsset, this.label, this.onTap) : icon = null;
-  const _RowSpec.icon(IconData this.icon, this.label, this.onTap)
-    : iconAsset = null;
   final String? iconAsset;
   final IconData? icon;
   final String label;
@@ -282,11 +271,5 @@ class _ProfileStrings {
     'ru' => 'Помощь',
     'en' => 'Help',
     _ => 'Yordam',
-  };
-
-  static String notifications(Locale l) => switch (l.languageCode) {
-    'ru' => 'Уведомления',
-    'en' => 'Notifications',
-    _ => 'Bildirishnomalar',
   };
 }

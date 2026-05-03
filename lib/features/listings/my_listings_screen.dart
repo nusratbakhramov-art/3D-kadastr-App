@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_reveal.dart';
 import '../ratings/valuation_model.dart' show formatSum, formatShortDate;
@@ -35,7 +36,7 @@ class _MyListingsScreenState extends State<MyListingsScreen>
       builder: (context, locale, _) {
         final items = mockListings;
         return Scaffold(
-          backgroundColor: AppColors.lightBackground,
+          backgroundColor: ColorTokens.scaffoldBg(context),
           body: Stack(
             fit: StackFit.expand,
             children: [
@@ -99,11 +100,11 @@ class _Header extends StatelessWidget {
         Expanded(
           child: Text(
             _S.title(locale),
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
               fontSize: 22,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
         ),
@@ -148,7 +149,7 @@ class _ListingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: ColorTokens.cardBg(context),
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -172,11 +173,11 @@ class _ListingCard extends StatelessWidget {
                             item.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
                               fontSize: 15,
-                              color: AppColors.textBlack,
+                              color: ColorTokens.primaryText(context),
                             ),
                           ),
                         ),
@@ -193,17 +194,17 @@ class _ListingCard extends StatelessWidget {
                         fontFamily: 'MTSText',
                         fontWeight: FontWeight.w400,
                         fontSize: 12,
-                        color: AppColors.textBlack.withValues(alpha: 0.55),
+                        color: ColorTokens.secondaryText(context),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       formatSum(item.priceUzs),
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'MTSCompact',
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
-                        color: AppColors.textBlack,
+                        color: ColorTokens.primaryText(context),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -338,7 +339,7 @@ class _MetaPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFF4F4F4),
+        color: ColorTokens.iconBg(context),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
@@ -347,7 +348,7 @@ class _MetaPill extends StatelessWidget {
           Icon(
             icon,
             size: 12,
-            color: AppColors.textBlack.withValues(alpha: 0.55),
+            color: ColorTokens.secondaryText(context),
           ),
           const SizedBox(width: 4),
           Text(
@@ -356,7 +357,7 @@ class _MetaPill extends StatelessWidget {
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w500,
               fontSize: 11,
-              color: AppColors.textBlack.withValues(alpha: 0.7),
+              color: ColorTokens.secondaryText(context),
             ),
           ),
         ],
@@ -379,7 +380,7 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.textBlack,
+      color: ColorTokens.primaryText(context),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -389,15 +390,15 @@ class _ActionButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 14, color: Colors.white),
+              Icon(icon, size: 14, color: ColorTokens.cardBg(context)),
               const SizedBox(width: 4),
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
                   fontSize: 11,
-                  color: Colors.white,
+                  color: ColorTokens.cardBg(context),
                 ),
               ),
             ],
@@ -430,32 +431,32 @@ class _EmptyState extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: ColorTokens.cardBg(context),
               borderRadius: BorderRadius.circular(20),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x0F000000),
+                  color: ColorTokens.shadow(context),
                   blurRadius: 12,
-                  offset: Offset(0, 2),
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
             alignment: Alignment.center,
-            child: const Icon(
+            child: Icon(
               Icons.home_work_outlined,
               size: 28,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
               fontSize: 18,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
           const SizedBox(height: 6),
@@ -465,7 +466,7 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 14,
-              color: AppColors.textBlack.withValues(alpha: 0.55),
+              color: ColorTokens.secondaryText(context),
             ),
           ),
           const SizedBox(height: 16),

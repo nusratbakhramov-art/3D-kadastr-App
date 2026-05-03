@@ -3,7 +3,13 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
 import '../../widgets/app_avatar.dart';
+import '../../widgets/app_toast.dart';
+import '../auth/api_auth_service.dart';
+import '../auth/auth_service.dart';
+import '../auth/auth_storage.dart';
+import '../auth/models/user_profile.dart' as auth;
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_menu_card.dart';
@@ -14,7 +20,14 @@ import '../home/user_profile.dart';
 import '../settings/settings_state.dart';
 
 class MyProfileScreen extends StatefulWidget {
-  const MyProfileScreen({super.key});
+  const MyProfileScreen({
+    super.key,
+    this.authService,
+    this.authStorage = const AuthStorage(),
+  });
+
+  final AuthService? authService;
+  final AuthStorage authStorage;
 
   @override
   State<MyProfileScreen> createState() => _MyProfileScreenState();
@@ -23,7 +36,9 @@ class MyProfileScreen extends StatefulWidget {
 class _MyProfileScreenState extends State<MyProfileScreen>
     with SingleTickerProviderStateMixin, RevealEntryMixin<MyProfileScreen> {
   bool _editing = false;
+  bool _saving = false;
   late final TextEditingController _nameCtrl;
+  late final AuthService _service;
   String? _draftAvatarPath;
   DateTime? _draftDob;
   Gender? _draftGender;
@@ -34,6 +49,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
   @override
   void initState() {
     super.initState();
+    _service = widget.authService ?? ApiAuthService();
     final p = userProfileNotifier.value;
     _nameCtrl = TextEditingController(text: p?.name ?? '');
     _draftAvatarPath = p?.avatarPath;
@@ -67,16 +83,59 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     }
   }
 
-  void _save(Locale locale) {
-    final current = userProfileNotifier.value;
-    userProfileNotifier.value = (current ?? const UserProfile(name: ''))
-        .copyWith(
-          name: _nameCtrl.text.trim(),
-          avatarPath: _draftAvatarPath,
-          dateOfBirth: _draftDob,
-          gender: _draftGender,
-        );
-    setState(() => _editing = false);
+  Future<void> _save(Locale locale) async {
+    if (_saving) return;
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) {
+      AppToast.error(context, _S.errorEmptyName(locale));
+      return;
+    }
+    if (_draftDob == null || _draftGender == null) {
+      AppToast.error(context, _S.errorIncomplete(locale));
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      final session = await widget.authStorage.loadSession();
+      if (session.token == null) {
+        if (!mounted) return;
+        AppToast.error(context, _S.errorUnauthenticated(locale));
+        setState(() => _saving = false);
+        return;
+      }
+
+      final apiProfile = auth.UserProfile(
+        fullName: name,
+        dateOfBirth: _draftDob,
+        gender: _draftGender,
+      );
+      await _service.completeProfile(session.token!, apiProfile);
+      await widget.authStorage.saveProfile(apiProfile);
+
+      if (!mounted) return;
+      final current = userProfileNotifier.value;
+      userProfileNotifier.value = (current ?? const UserProfile(name: ''))
+          .copyWith(
+            name: name,
+            avatarPath: _draftAvatarPath,
+            dateOfBirth: _draftDob,
+            gender: _draftGender,
+          );
+      setState(() {
+        _editing = false;
+        _saving = false;
+      });
+      AppToast.success(context, _S.saved(locale));
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      AppToast.error(context, _S.errorNetwork(locale));
+    }
   }
 
   @override
@@ -88,7 +147,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
           valueListenable: userProfileNotifier,
           builder: (context, profile, _) {
             return Scaffold(
-              backgroundColor: AppColors.lightBackground,
+              backgroundColor: ColorTokens.scaffoldBg(context),
               body: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -110,6 +169,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
                               title: _S.title(locale),
                               trailing: _EditToggle(
                                 editing: _editing,
+                                saving: _saving,
                                 editLabel: _S.edit(locale),
                                 saveLabel: _S.save(locale),
                                 onEdit: () {
@@ -257,6 +317,7 @@ class _MyProfileScreenState extends State<MyProfileScreen>
 class _EditToggle extends StatelessWidget {
   const _EditToggle({
     required this.editing,
+    required this.saving,
     required this.editLabel,
     required this.saveLabel,
     required this.onEdit,
@@ -264,6 +325,7 @@ class _EditToggle extends StatelessWidget {
   });
 
   final bool editing;
+  final bool saving;
   final String editLabel;
   final String saveLabel;
   final VoidCallback onEdit;
@@ -274,10 +336,10 @@ class _EditToggle extends StatelessWidget {
     final semanticsLabel = editing ? saveLabel : editLabel;
     final borderRadius = BorderRadius.circular(20);
     return Material(
-      color: Colors.white,
+      color: ColorTokens.cardBg(context),
       borderRadius: borderRadius,
       child: InkWell(
-        onTap: editing ? onSave : onEdit,
+        onTap: saving ? null : (editing ? onSave : onEdit),
         borderRadius: borderRadius,
         child: Tooltip(
           message: semanticsLabel,
@@ -290,15 +352,26 @@ class _EditToggle extends StatelessWidget {
                       horizontal: 14,
                       vertical: 8,
                     ),
-                    child: Text(
-                      saveLabel,
-                      style: const TextStyle(
-                        fontFamily: 'MTSCompact',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: AppColors.brandGreen,
-                      ),
-                    ),
+                    child: saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(
+                                AppColors.brandGreen,
+                              ),
+                            ),
+                          )
+                        : Text(
+                            saveLabel,
+                            style: const TextStyle(
+                              fontFamily: 'MTSCompact',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: AppColors.brandGreen,
+                            ),
+                          ),
                   )
                 : SizedBox(
                     width: 40,
@@ -308,6 +381,10 @@ class _EditToggle extends StatelessWidget {
                         'assets/icons/pen-square.svg',
                         width: 20,
                         height: 20,
+                        colorFilter: ColorFilter.mode(
+                          ColorTokens.primaryText(context),
+                          BlendMode.srcIn,
+                        ),
                       ),
                     ),
                   ),
@@ -343,8 +420,11 @@ class _AvatarBlock extends StatelessWidget {
             bottom: -2,
             child: Material(
               color: AppColors.brandGreen,
-              shape: const CircleBorder(
-                side: BorderSide(color: Colors.white, width: 3),
+              shape: CircleBorder(
+                side: BorderSide(
+                  color: ColorTokens.scaffoldBg(context),
+                  width: 3,
+                ),
               ),
               child: InkWell(
                 customBorder: const CircleBorder(),
@@ -387,11 +467,15 @@ class _ReadOnlyRow extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: const Color(0xFFF4F4F4),
+              color: ColorTokens.iconBg(context),
               borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,
-            child: Icon(icon, size: 18, color: AppColors.textBlack),
+            child: Icon(
+              icon,
+              size: 18,
+              color: ColorTokens.primaryText(context),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -405,7 +489,7 @@ class _ReadOnlyRow extends StatelessWidget {
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
-                    color: AppColors.textBlack.withValues(alpha: 0.5),
+                    color: ColorTokens.secondaryText(context),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -413,11 +497,11 @@ class _ReadOnlyRow extends StatelessWidget {
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w500,
                     fontSize: 15,
-                    color: AppColors.textBlack,
+                    color: ColorTokens.primaryText(context),
                   ),
                 ),
               ],
@@ -444,7 +528,7 @@ class _FieldLabel extends StatelessWidget {
           fontFamily: 'MTSCompact',
           fontWeight: FontWeight.w500,
           fontSize: 13,
-          color: AppColors.textBlack.withValues(alpha: 0.6),
+          color: ColorTokens.secondaryText(context),
         ),
       ),
     );
@@ -461,16 +545,16 @@ class _NameField extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.88),
+        color: ColorTokens.inputFill(context),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DDE2)),
+        border: Border.all(color: ColorTokens.outline(context)),
       ),
       child: TextField(
         controller: controller,
         onTapOutside: (_) => FocusScope.of(context).unfocus(),
         textCapitalization: TextCapitalization.words,
-        style: const TextStyle(
-          color: AppColors.textBlack,
+        style: TextStyle(
+          color: ColorTokens.primaryText(context),
           fontFamily: 'MTSCompact',
           fontSize: 16,
           fontWeight: FontWeight.w400,
@@ -478,7 +562,7 @@ class _NameField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: TextStyle(
-            color: AppColors.textBlack.withValues(alpha: 0.4),
+            color: ColorTokens.tertiaryText(context),
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w400,
             fontSize: 16,
@@ -512,9 +596,9 @@ class _LockedField extends StatelessWidget {
       height: 52,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.55),
+        color: ColorTokens.inputFill(context).withValues(alpha: 0.55),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFD9DDE2)),
+        border: Border.all(color: ColorTokens.outline(context)),
       ),
       child: Row(
         children: [
@@ -526,12 +610,15 @@ class _LockedField extends StatelessWidget {
                 fontWeight: FontWeight.w500,
                 fontSize: 16,
                 color: showHint
-                    ? AppColors.textBlack.withValues(alpha: 0.35)
-                    : AppColors.textBlack.withValues(alpha: 0.6),
+                    ? ColorTokens.tertiaryText(context)
+                    : ColorTokens.secondaryText(context),
               ),
             ),
           ),
-          trailing,
+          IconTheme(
+            data: IconThemeData(color: ColorTokens.secondaryText(context)),
+            child: trailing,
+          ),
         ],
       ),
     );
@@ -580,5 +667,30 @@ class _S {
     'ru' => '—',
     'en' => '—',
     _ => '—',
+  };
+  static String saved(Locale l) => switch (l.languageCode) {
+    'ru' => 'Профиль сохранён',
+    'en' => 'Profile saved',
+    _ => 'Profil saqlandi',
+  };
+  static String errorEmptyName(Locale l) => switch (l.languageCode) {
+    'ru' => 'Имя не может быть пустым',
+    'en' => 'Name cannot be empty',
+    _ => 'Ism bo‘sh bo‘lishi mumkin emas',
+  };
+  static String errorIncomplete(Locale l) => switch (l.languageCode) {
+    'ru' => 'Заполните все поля',
+    'en' => 'Please fill in all fields',
+    _ => 'Barcha maydonlarni to‘ldiring',
+  };
+  static String errorUnauthenticated(Locale l) => switch (l.languageCode) {
+    'ru' => 'Сессия истекла, войдите снова',
+    'en' => 'Session expired, please sign in again',
+    _ => 'Sessiya tugagan, qayta kirib oling',
+  };
+  static String errorNetwork(Locale l) => switch (l.languageCode) {
+    'ru' => 'Ошибка сети',
+    'en' => 'Network error',
+    _ => 'Tarmoq xatosi',
   };
 }

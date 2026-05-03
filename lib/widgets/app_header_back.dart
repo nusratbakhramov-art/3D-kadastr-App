@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../theme/app_colors.dart';
+import '../theme/color_tokens.dart';
 
 /// Standard inner-page header: leading 40dp white circle with a default
 /// arrow.svg (or custom SVG) back button, centered title in MTSCompact,
@@ -40,12 +40,12 @@ class AppHeaderBack extends StatelessWidget {
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
               fontSize: 18,
               height: 1.2,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
           if (trailing != null)
@@ -73,14 +73,14 @@ class _BackButton extends StatelessWidget {
         child: Container(
           width: 40,
           height: 40,
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          decoration: BoxDecoration(
+            color: ColorTokens.cardBg(context),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Color(0x0F000000),
+                color: ColorTokens.shadow(context),
                 blurRadius: 8,
-                offset: Offset(0, 1),
+                offset: const Offset(0, 1),
               ),
             ],
           ),
@@ -89,6 +89,10 @@ class _BackButton extends StatelessWidget {
             iconAsset ?? AppHeaderBack.defaultBackIconAsset,
             width: 20,
             height: 20,
+            colorFilter: ColorFilter.mode(
+              ColorTokens.primaryText(context),
+              BlendMode.srcIn,
+            ),
           ),
         ),
       ),

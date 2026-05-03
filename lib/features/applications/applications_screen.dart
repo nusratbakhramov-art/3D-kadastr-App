@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
+import '../auth/auth_storage.dart';
+import '../services/api_architecture_order_service.dart';
 import 'application_detail_screen.dart';
 import '../market/models/market_listing.dart' show MarketCategory;
 import '../market/widgets/category_chips.dart';
@@ -27,8 +30,9 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   String _selectedServiceId = applicationServiceChips.first.id;
   late final ScrollController _scrollController;
   final ValueNotifier<bool> _showScrollTop = ValueNotifier<bool>(false);
-  late final List<ApplicationItem> _allItems;
+  List<ApplicationItem> _allItems = const <ApplicationItem>[];
   final List<ApplicationItem> _items = <ApplicationItem>[];
+  String? _loadError;
 
   bool _initialized = false;
   bool _loadingInitial = false;
@@ -45,7 +49,6 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   @override
   void initState() {
     super.initState();
-    _allItems = _buildSeedItems();
     _scrollController = ScrollController()..addListener(_onScroll);
     if (widget.animateToken > 0) {
       unawaited(_ensureInitialized());
@@ -122,9 +125,24 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       _refreshing = false;
       _nextOffset = 0;
       _hasMore = true;
+      _loadError = null;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 260));
+    // Backend dan olamiz (faqat birinchi marta yoki refresh paytida).
+    if (_allItems.isEmpty) {
+      try {
+        await _fetchAllFromBackend();
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _loadError = '$e';
+          _loadingInitial = false;
+          _initialized = _initialized || markInitialized;
+        });
+        return;
+      }
+    }
+
     final source = _sourceItems;
     final next = source.take(_pageSize).toList(growable: false);
 
@@ -143,6 +161,51 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       _initialized = _initialized || markInitialized;
       _entryEpoch++;
     });
+  }
+
+  Future<void> _fetchAllFromBackend() async {
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null) {
+      // Login qilinmagan: hech narsa ko'rsatmaymiz, mock'ka qaytmaymiz.
+      _allItems = const <ApplicationItem>[];
+      return;
+    }
+    final api = ArchitectureOrderApiService();
+    final page = await api.list(token: token, page: 1, size: 100);
+    _allItems = page.items
+        .map(_orderToApplicationItem)
+        .toList(growable: false);
+  }
+
+  static ApplicationItem _orderToApplicationItem(OrderSummary o) {
+    return ApplicationItem(
+      id: 'arch_${o.id}',
+      // Backend hozir faqat arxitektura buyurtmasini qaytaradi —
+      // 3D kadastr/AI baholash uchun alohida endpoint'lar keyinroq.
+      serviceId: 'arch',
+      serviceLabel: 'Arxitektura TZ',
+      statusGroup: _statusToGroup(o.status),
+      addressLabel: 'Manzil',
+      addressValue: (o.address ?? o.cadastreNumber ?? '—'),
+      dateLabel: 'Ariza sanasi',
+      dateValue: _formatDate(o.createdAt),
+      timeline: const <ApplicationTimelineStep>[],
+    );
+  }
+
+  static ApplicationStatusGroup _statusToGroup(String status) {
+    return switch (status) {
+      'accepted' || 'quoted' => ApplicationStatusGroup.completed,
+      'rejected' => ApplicationStatusGroup.cancelled,
+      _ => ApplicationStatusGroup.inProgress,
+    };
+  }
+
+  static String _formatDate(DateTime dt) {
+    final d = dt.toLocal();
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(d.day)}.${two(d.month)}.${d.year}';
   }
 
   Future<void> _loadMore() async {
@@ -187,9 +250,22 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     setState(() {
       _refreshing = true;
       _loadingMore = false;
+      _loadError = null;
     });
 
-    await Future<void>.delayed(const Duration(milliseconds: 260));
+    // Pull-to-refresh: backend dan qayta olamiz.
+    try {
+      _allItems = const <ApplicationItem>[];
+      await _fetchAllFromBackend();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadError = '$e';
+        _refreshing = false;
+      });
+      return;
+    }
+
     final source = _sourceItems;
     final next = source.take(_pageSize).toList(growable: false);
 
@@ -216,37 +292,12 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     unawaited(_loadFirstPage());
   }
 
-  List<ApplicationItem> _buildSeedItems() {
-    final seed = mockApplicationItems;
-    if (seed.isEmpty) return const <ApplicationItem>[];
-    return List<ApplicationItem>.generate(30, (i) {
-      final base = seed[i % seed.length];
-      final month = (i % 12) + 1;
-      final day = (i % 28) + 1;
-      final dateValue =
-          '${day.toString().padLeft(2, '0')}.${month.toString().padLeft(2, '0')}.2026';
-      return ApplicationItem(
-        id: '${base.id}_$i',
-        serviceId: base.serviceId,
-        serviceLabel: base.serviceLabel,
-        statusGroup: base.statusGroup,
-        addressLabel: base.addressLabel,
-        addressValue: base.addressValue,
-        dateLabel: base.dateLabel,
-        dateValue: dateValue,
-        timeline: base.timeline,
-        typeLabel: base.typeLabel,
-        typeValue: base.typeValue,
-      );
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     super.build(context);
 
     return Scaffold(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: ColorTokens.scaffoldBg(context),
       body: SafeArea(
         child: Stack(
           children: [
@@ -279,6 +330,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                       sliver: SliverToBoxAdapter(
                         child: _CardLoadingBlock(count: 3),
                       ),
+                    )
+                  else if (_loadError != null)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _ErrorState(message: _loadError!),
                     )
                   else if (_initialized && _items.isEmpty)
                     const SliverFillRemaining(
@@ -390,21 +446,21 @@ class _ScrollToTopButton extends StatelessWidget {
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
           child: Material(
-            color: Colors.white,
+            color: ColorTokens.cardBg(context),
             elevation: 6,
-            shadowColor: Colors.black.withValues(alpha: 0.16),
+            shadowColor: ColorTokens.shadow(context),
             shape: const CircleBorder(),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
               onTap: onTap,
               customBorder: const CircleBorder(),
-              child: const SizedBox(
+              child: SizedBox(
                 width: 44,
                 height: 44,
                 child: Icon(
                   Icons.keyboard_arrow_up_rounded,
                   size: 24,
-                  color: AppColors.textBlack,
+                  color: ColorTokens.primaryText(context),
                 ),
               ),
             ),
@@ -459,14 +515,15 @@ class _CardLoadingSkeletonState extends State<_CardLoadingSkeleton>
       animation: _shimmer,
       builder: (context, _) {
         final t = _shimmer.value;
+        final dividerColor = ColorTokens.divider(context);
         return Container(
           constraints: const BoxConstraints(minHeight: 125),
           width: 335,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: ColorTokens.cardBg(context),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFDADADA), width: 0.5),
+            border: Border.all(color: ColorTokens.outline(context), width: 0.5),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -490,7 +547,7 @@ class _CardLoadingSkeletonState extends State<_CardLoadingSkeleton>
                 ],
               ),
               const SizedBox(height: 12),
-              const Divider(height: 1, thickness: 1, color: Color(0xFFE8E8E8)),
+              Divider(height: 1, thickness: 1, color: dividerColor),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -517,7 +574,7 @@ class _CardLoadingSkeletonState extends State<_CardLoadingSkeleton>
                 ],
               ),
               const SizedBox(height: 12),
-              const Divider(height: 1, thickness: 1, color: Color(0xFFE8E8E8)),
+              Divider(height: 1, thickness: 1, color: dividerColor),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -566,15 +623,18 @@ class _ShimmerBone extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const base = Color(0xFFE9ECEF);
-    const highlight = Color(0xFFF7F8FA);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final base = isDark ? const Color(0xFF2A3032) : const Color(0xFFE9ECEF);
+    final highlight = isDark
+        ? const Color(0xFF3A4145)
+        : const Color(0xFFF7F8FA);
     return ClipRRect(
       borderRadius: borderRadius,
       child: ShaderMask(
         blendMode: BlendMode.srcATop,
         shaderCallback: (bounds) {
           return LinearGradient(
-            colors: const [base, highlight, base],
+            colors: [base, highlight, base],
             stops: const [0.25, 0.5, 0.75],
             begin: const Alignment(-1, -0.2),
             end: const Alignment(1, 0.2),
@@ -607,14 +667,58 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Text(
         'Arizalar topilmadi',
         style: TextStyle(
           fontFamily: 'MTSCompact',
           fontWeight: FontWeight.w500,
           fontSize: 15,
-          color: Color(0xFF8A8A8A),
+          color: ColorTokens.secondaryText(context),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: ColorTokens.secondaryText(context),
+              size: 32,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Yuklab boʻlmadi',
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 13,
+                color: ColorTokens.secondaryText(context),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -626,14 +730,14 @@ class _Title extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Text(
+    return Text(
       'Arizalar',
       style: TextStyle(
         fontFamily: 'MTSCompact',
         fontWeight: FontWeight.w700,
         fontSize: 24,
         height: 1.3,
-        color: AppColors.textBlack,
+        color: ColorTokens.primaryText(context),
       ),
     );
   }
@@ -670,8 +774,9 @@ class _ApplicationCard extends StatelessWidget {
     final showResultButton =
         item.statusGroup == ApplicationStatusGroup.completed;
 
+    final dividerColor = ColorTokens.divider(context);
     return Material(
-      color: Colors.white,
+      color: ColorTokens.cardBg(context),
       borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -682,7 +787,7 @@ class _ApplicationCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFDADADA), width: 0.5),
+            border: Border.all(color: ColorTokens.outline(context), width: 0.5),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -694,12 +799,12 @@ class _ApplicationCard extends StatelessWidget {
                       item.serviceLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'MTSCompact',
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
                         height: 1.3,
-                        color: AppColors.textBlack,
+                        color: ColorTokens.primaryText(context),
                       ),
                     ),
                   ),
@@ -708,14 +813,14 @@ class _ApplicationCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              const Divider(height: 1, thickness: 1, color: Color(0xFFE8E8E8)),
+              Divider(height: 1, thickness: 1, color: dividerColor),
               const SizedBox(height: 12),
               _MetaRow(
                 label: '${item.addressLabel}:',
                 value: item.addressValue,
               ),
               const SizedBox(height: 12),
-              const Divider(height: 1, thickness: 1, color: Color(0xFFE8E8E8)),
+              Divider(height: 1, thickness: 1, color: dividerColor),
               const SizedBox(height: 12),
               _MetaRow(label: '${item.dateLabel}:', value: item.dateValue),
               if (showResultButton) ...[
@@ -781,12 +886,12 @@ class _MetaRow extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
                 height: 1.3,
-                color: Color(0xFF8A8A8A),
+                color: ColorTokens.secondaryText(context),
               ),
             ),
           ),
@@ -798,12 +903,12 @@ class _MetaRow extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.right,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w500,
               fontSize: 14,
               height: 1.3,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
         ),
@@ -855,11 +960,15 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark
+        ? style.fgColor.withValues(alpha: 0.18)
+        : style.bgColor;
     return Container(
       height: 24,
       padding: const EdgeInsets.fromLTRB(3, 3, 8, 3),
       decoration: BoxDecoration(
-        color: style.bgColor,
+        color: bg,
         borderRadius: BorderRadius.circular(10000),
       ),
       child: Row(

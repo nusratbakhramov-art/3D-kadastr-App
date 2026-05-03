@@ -23,6 +23,18 @@ class AppColors {
   static const Color radioBorder = Color(0xFFCCCFCD);
   static const Color accentGreen = Color(0xFF00E135);
 
+  // ---------------------------------------------------------------------------
+  // Dark-theme palette. Mirrors the patterns already used in
+  // `features/services/*` so styling stays consistent across the app.
+  // ---------------------------------------------------------------------------
+  static const Color darkBackground = greenBlack; // scaffold bg (#000702)
+  static const Color darkSurface = Color(0xFF1F2426); // card / sheet bg
+  static const Color darkSurfaceHigh = Color(0xFF252D2B); // elevated card
+  static const Color darkOutline = Color(0xFF2C3133); // borders & dividers
+  static const Color darkDivider = Color(0xFF1A2022);
+  static const Color darkTextSecondary = Color(0xFFB0B5BB);
+  static const Color darkIconBg = Color(0xFF2A2F32);
+
   static const LinearGradient brandGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,

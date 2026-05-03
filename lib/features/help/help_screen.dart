@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_menu_card.dart';
@@ -26,7 +26,7 @@ class _HelpScreenState extends State<HelpScreen>
       builder: (context, locale, _) {
         final faqs = _S.faqs(locale);
         return Scaffold(
-          backgroundColor: AppColors.lightBackground,
+          backgroundColor: ColorTokens.scaffoldBg(context),
           body: Stack(
             fit: StackFit.expand,
             children: [
@@ -132,21 +132,22 @@ class _FaqCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dividerColor = ColorTokens.divider(context);
     final children = <Widget>[];
     for (var i = 0; i < items.length; i++) {
       children.add(_FaqItem(question: items[i].q, answer: items[i].a));
       if (i != items.length - 1) {
         children.add(
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Divider(height: 1, thickness: 1, color: Color(0xFFEFEFEF)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Divider(height: 1, thickness: 1, color: dividerColor),
           ),
         );
       }
     }
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ColorTokens.cardBg(context),
         borderRadius: BorderRadius.circular(16),
       ),
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -201,12 +202,12 @@ class _FaqItemState extends State<_FaqItem>
                   Expanded(
                     child: Text(
                       widget.question,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontFamily: 'MTSCompact',
                         fontWeight: FontWeight.w500,
                         fontSize: 15,
                         height: 1.3,
-                        color: AppColors.textBlack,
+                        color: ColorTokens.primaryText(context),
                       ),
                     ),
                   ),
@@ -215,7 +216,7 @@ class _FaqItemState extends State<_FaqItem>
                     turns: Tween<double>(begin: 0, end: 0.5).animate(_ctrl),
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      color: AppColors.textBlack.withValues(alpha: 0.6),
+                      color: ColorTokens.secondaryText(context),
                       size: 22,
                     ),
                   ),
@@ -233,7 +234,7 @@ class _FaqItemState extends State<_FaqItem>
                       fontWeight: FontWeight.w400,
                       fontSize: 14,
                       height: 1.45,
-                      color: AppColors.textBlack.withValues(alpha: 0.7),
+                      color: ColorTokens.secondaryText(context),
                     ),
                   ),
                 ),
@@ -261,7 +262,7 @@ class _SectionLabel extends StatelessWidget {
           fontFamily: 'MTSCompact',
           fontWeight: FontWeight.w500,
           fontSize: 13,
-          color: AppColors.textBlack.withValues(alpha: 0.55),
+          color: ColorTokens.secondaryText(context),
         ),
       ),
     );
@@ -281,7 +282,7 @@ class _ContactValue extends StatelessWidget {
         fontFamily: 'MTSCompact',
         fontWeight: FontWeight.w500,
         fontSize: 13,
-        color: AppColors.textBlack.withValues(alpha: 0.55),
+        color: ColorTokens.secondaryText(context),
       ),
     );
   }

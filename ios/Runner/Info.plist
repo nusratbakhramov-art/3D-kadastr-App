@@ -64,5 +64,9 @@
 		</dict>
 		<key>NSLocalNetworkUsageDescription</key>
 		<string>Ilova lokal tarmoqdagi server bilan bog'lanadi (test rejimi).</string>
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Xaritada obyekt joylashuvini avtomatik aniqlash uchun joriy joylashuv kerak.</string>
+		<key>NSCameraUsageDescription</key>
+		<string>3D kadastr skanini olish uchun kamera va LiDAR sensori kerak.</string>
 	</dict>
 </plist>

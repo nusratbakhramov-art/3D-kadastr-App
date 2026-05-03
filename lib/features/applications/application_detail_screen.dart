@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../services/widgets/segmented_tabs.dart';
 import 'application_model.dart';
@@ -25,7 +25,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
         .where((s) => s.completed)
         .toList(growable: false);
     return Scaffold(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: ColorTokens.scaffoldBg(context),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
@@ -45,7 +45,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
                   fontWeight: FontWeight.w500,
                   fontSize: 14,
                   height: 1.3,
-                  color: AppColors.textBlack.withValues(alpha: 0.55),
+                  color: ColorTokens.secondaryText(context),
                 ),
               ),
               const SizedBox(height: 14),
@@ -102,9 +102,9 @@ class _TimelineCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
+        color: ColorTokens.cardBg(context),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE3E3E3), width: 0.6),
+        border: Border.all(color: ColorTokens.outline(context), width: 0.6),
       ),
       child: Column(
         children: [
@@ -117,7 +117,7 @@ class _TimelineCard extends StatelessWidget {
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w500,
                 fontSize: 14,
-                color: AppColors.textBlack.withValues(alpha: 0.55),
+                color: ColorTokens.secondaryText(context),
               ),
             ),
         ],
@@ -153,7 +153,11 @@ class _TimelineRow extends StatelessWidget {
                 child: Icon(style.icon, color: Colors.white, size: 22),
               ),
               if (showTail)
-                Container(width: 1, height: 34, color: const Color(0xFFD0D0D0)),
+                Container(
+                  width: 1,
+                  height: 34,
+                  color: ColorTokens.outline(context),
+                ),
             ],
           ),
         ),
@@ -166,12 +170,12 @@ class _TimelineRow extends StatelessWidget {
               children: [
                 Text(
                   style.label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                     height: 1.3,
-                    color: AppColors.textBlack,
+                    color: ColorTokens.primaryText(context),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -182,7 +186,7 @@ class _TimelineRow extends StatelessWidget {
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
                     height: 1.3,
-                    color: AppColors.textBlack.withValues(alpha: 0.5),
+                    color: ColorTokens.secondaryText(context),
                   ),
                 ),
               ],
@@ -256,32 +260,32 @@ class _AboutTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Text(
+        Text(
           'Hisobot',
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
             fontSize: 20,
-            color: AppColors.textBlack,
+            color: ColorTokens.primaryText(context),
           ),
         ),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.92),
+            color: ColorTokens.cardBg(context),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFFE3E3E3), width: 0.6),
+            border: Border.all(color: ColorTokens.outline(context), width: 0.6),
           ),
           child: Column(
             children: [
               for (var i = 0; i < rows.length; i++) ...[
                 _InfoRow(label: rows[i].$1, value: rows[i].$2),
                 if (i != rows.length - 1)
-                  const Divider(
+                  Divider(
                     height: 1,
                     thickness: 1,
-                    color: Color(0xFFE8E8E8),
+                    color: ColorTokens.divider(context),
                   ),
               ],
             ],
@@ -318,7 +322,7 @@ class _InfoRow extends StatelessWidget {
                 fontWeight: FontWeight.w400,
                 fontSize: 14,
                 height: 1.3,
-                color: AppColors.textBlack.withValues(alpha: 0.5),
+                color: ColorTokens.secondaryText(context),
               ),
             ),
           ),
@@ -329,12 +333,12 @@ class _InfoRow extends StatelessWidget {
               child: Text(
                 value,
                 textAlign: TextAlign.right,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w500,
                   fontSize: 14,
                   height: 1.3,
-                  color: AppColors.textBlack,
+                  color: ColorTokens.primaryText(context),
                 ),
               ),
             ),
@@ -350,12 +354,13 @@ class _FileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
+        color: ColorTokens.cardBg(context),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE3E3E3), width: 0.6),
+        border: Border.all(color: ColorTokens.outline(context), width: 0.6),
       ),
       child: Row(
         children: [
@@ -364,7 +369,7 @@ class _FileCard extends StatelessWidget {
             height: 36,
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF2F2F2),
+              color: ColorTokens.iconBg(context),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -373,7 +378,7 @@ class _FileCard extends StatelessWidget {
               width: 20,
               height: 20,
               colorFilter: ColorFilter.mode(
-                AppColors.textBlack.withValues(alpha: 0.5),
+                ColorTokens.secondaryText(context),
                 BlendMode.srcIn,
               ),
             ),
@@ -390,7 +395,7 @@ class _FileCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                     height: 1.3,
-                    color: AppColors.textBlack,
+                    color: ColorTokens.primaryText(context),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -403,7 +408,7 @@ class _FileCard extends StatelessWidget {
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
                     height: 1.3,
-                    color: Color(0xFF8A8A8A),
+                    color: ColorTokens.secondaryText(context),
                   ),
                 ),
               ],
@@ -412,7 +417,9 @@ class _FileCard extends StatelessWidget {
           _MiniPillButton(
             label: 'Yuklash',
             fg: const Color(0xFF03B54F),
-            bg: const Color(0xFFD7F3E3),
+            bg: isDark
+                ? const Color(0xFF03B54F).withValues(alpha: 0.18)
+                : const Color(0xFFD7F3E3),
             iconAsset: 'assets/icons/download.svg',
           ),
         ],
@@ -429,9 +436,9 @@ class _ModelCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
+        color: ColorTokens.cardBg(context),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE3E3E3), width: 0.6),
+        border: Border.all(color: ColorTokens.outline(context), width: 0.6),
       ),
       child: Row(
         children: [
@@ -440,7 +447,7 @@ class _ModelCard extends StatelessWidget {
             height: 36,
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFF2F2F2),
+              color: ColorTokens.iconBg(context),
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
@@ -449,7 +456,7 @@ class _ModelCard extends StatelessWidget {
               width: 20,
               height: 20,
               colorFilter: ColorFilter.mode(
-                AppColors.textBlack.withValues(alpha: 0.5),
+                ColorTokens.secondaryText(context),
                 BlendMode.srcIn,
               ),
             ),
@@ -466,7 +473,7 @@ class _ModelCard extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
                     height: 1.3,
-                    color: AppColors.textBlack,
+                    color: ColorTokens.primaryText(context),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -477,7 +484,7 @@ class _ModelCard extends StatelessWidget {
                     fontWeight: FontWeight.w400,
                     fontSize: 12,
                     height: 1.3,
-                    color: Color(0xFF8A8A8A),
+                    color: ColorTokens.secondaryText(context),
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -487,8 +494,8 @@ class _ModelCard extends StatelessWidget {
           ),
           _MiniPillButton(
             label: "Ko'rish",
-            fg: AppColors.textBlack,
-            bg: const Color(0xFFF2F2F2),
+            fg: ColorTokens.primaryText(context),
+            bg: ColorTokens.iconBg(context),
             iconAsset: 'assets/icons/chevron-right.svg',
           ),
         ],
@@ -551,8 +558,10 @@ class _PrimaryBlackAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bg = ColorTokens.primaryText(context);
+    final fg = ColorTokens.scaffoldBg(context);
     return Material(
-      color: Colors.black,
+      color: bg,
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -564,15 +573,15 @@ class _PrimaryBlackAction extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
                   fontSize: 14,
-                  color: Colors.white,
+                  color: fg,
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.call_outlined, size: 24, color: Colors.white),
+              Icon(Icons.call_outlined, size: 24, color: fg),
             ],
           ),
         ),

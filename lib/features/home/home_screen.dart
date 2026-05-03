@@ -13,11 +13,21 @@ class HomeScreen extends StatelessWidget {
     this.locale = AppLocale.uz,
     this.today,
     this.onLoginTap,
+    this.onOpenKadastr3d,
+    this.onOpenAiValuation,
+    this.onOpenCalculator,
+    this.onOpenMarket,
+    this.onOpenOrder,
   });
 
   final Locale locale;
   final DateTime? today;
   final VoidCallback? onLoginTap;
+  final VoidCallback? onOpenKadastr3d;
+  final VoidCallback? onOpenAiValuation;
+  final VoidCallback? onOpenCalculator;
+  final VoidCallback? onOpenMarket;
+  final VoidCallback? onOpenOrder;
 
   @override
   Widget build(BuildContext context) {
@@ -60,7 +70,13 @@ class HomeScreen extends StatelessWidget {
                     },
                   ),
                   const SizedBox(height: 20),
-                  const _CardsGrid(),
+                  _CardsGrid(
+                    locale: locale,
+                    onOpenKadastr3d: onOpenKadastr3d,
+                    onOpenAiValuation: onOpenAiValuation,
+                    onOpenCalculator: onOpenCalculator,
+                    onOpenMarket: onOpenMarket,
+                  ),
                   const SizedBox(height: 12),
                   ValueListenableBuilder<UserProfile?>(
                     valueListenable: userProfileNotifier,
@@ -69,6 +85,7 @@ class HomeScreen extends StatelessWidget {
                         isGuest: profile == null,
                         locale: locale,
                         onLoginTap: onLoginTap,
+                        onOrderTap: onOpenOrder,
                       );
                     },
                   ),
@@ -152,14 +169,26 @@ class _HomePatternBackground extends StatelessWidget {
 }
 
 class _CardsGrid extends StatelessWidget {
-  const _CardsGrid();
+  const _CardsGrid({
+    required this.locale,
+    this.onOpenKadastr3d,
+    this.onOpenAiValuation,
+    this.onOpenCalculator,
+    this.onOpenMarket,
+  });
+
+  final Locale locale;
+  final VoidCallback? onOpenKadastr3d;
+  final VoidCallback? onOpenAiValuation;
+  final VoidCallback? onOpenCalculator;
+  final VoidCallback? onOpenMarket;
 
   @override
   Widget build(BuildContext context) {
     const gap = 12.0;
     const height = 97.0;
 
-    return const Column(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
@@ -168,36 +197,40 @@ class _CardsGrid extends StatelessWidget {
             children: [
               Expanded(
                 child: HomeCard(
-                  title: '3D kadastr',
+                  title: _CardStrings.kadastr3d(locale),
                   iconAsset: 'assets/images/home/card-3d.svg',
+                  onTap: onOpenKadastr3d,
                 ),
               ),
-              SizedBox(width: gap),
+              const SizedBox(width: gap),
               Expanded(
                 child: HomeCard(
-                  title: 'AI baholash',
+                  title: _CardStrings.aiValuation(locale),
                   iconAsset: 'assets/images/home/card-ai.svg',
+                  onTap: onOpenAiValuation,
                 ),
               ),
             ],
           ),
         ),
-        SizedBox(height: gap),
+        const SizedBox(height: gap),
         SizedBox(
           height: height,
           child: Row(
             children: [
               Expanded(
                 child: HomeCard(
-                  title: 'Kalkulyator',
+                  title: _CardStrings.calculator(locale),
                   iconAsset: 'assets/images/home/card-calculator.svg',
+                  onTap: onOpenCalculator,
                 ),
               ),
-              SizedBox(width: gap),
+              const SizedBox(width: gap),
               Expanded(
                 child: HomeCard(
-                  title: 'Market',
+                  title: _CardStrings.market(locale),
                   iconAsset: 'assets/images/home/card-market.svg',
+                  onTap: onOpenMarket,
                 ),
               ),
             ],
@@ -206,4 +239,23 @@ class _CardsGrid extends StatelessWidget {
       ],
     );
   }
+}
+
+class _CardStrings {
+  const _CardStrings._();
+
+  static String _pick(Locale l, String uz, String ru, String en) =>
+      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  static String kadastr3d(Locale l) =>
+      _pick(l, '3D kadastr', '3D кадастр', '3D cadastre');
+
+  static String aiValuation(Locale l) =>
+      _pick(l, 'AI baholash', 'AI оценка', 'AI valuation');
+
+  static String calculator(Locale l) =>
+      _pick(l, 'Kalkulyator', 'Калькулятор', 'Calculator');
+
+  static String market(Locale l) =>
+      _pick(l, 'Market', 'Маркет', 'Market');
 }

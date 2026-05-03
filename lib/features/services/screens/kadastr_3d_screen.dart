@@ -2,15 +2,21 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../api_cadastre_service.dart';
 import '../models/scan_draft.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import 'calculator/arxitektura_tz_wizard_screen.dart';
+import 'map_location_picker_screen.dart';
 import 'scan_object_type_screen.dart';
+import '../models/architecture_order_draft.dart';
 
-enum _LoadStatus { idle, loading, loaded }
+enum _LoadStatus { idle, loading, loaded, error }
 
 class Kadastr3dScreen extends StatefulWidget {
   const Kadastr3dScreen({super.key});
@@ -20,10 +26,13 @@ class Kadastr3dScreen extends StatefulWidget {
 }
 
 class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
-  static const _fullMaskLength = 22; // 18 digits + 4 colons
+  static const _fullMaskLength = 19; // 14 digits + 5 colons (NN:NN:NN:NN:NN:NNNN)
   final TextEditingController _cadastreController = TextEditingController();
   Timer? _loadTimer;
   _LoadStatus _status = _LoadStatus.idle;
+  CadastreLookupResult? _info;
+  String? _errorMsg;
+  int _lookupRequestId = 0;
 
   @override
   void initState() {
@@ -39,22 +48,112 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
     super.dispose();
   }
 
+  Future<void> _openMapPicker() async {
+    final picked = await Navigator.of(context).push<LatLng>(
+      MaterialPageRoute<LatLng>(
+        builder: (_) => const MapLocationPickerScreen(
+          title: 'Obyekt joylashuvi',
+          subtitle: 'Xaritada uy joyini belgilang',
+        ),
+      ),
+    );
+    if (picked == null || !mounted) return;
+
+    final scanDraft = ScanDraft(
+      cadastreNumber: _cadastreController.text,
+      latitude: picked.latitude,
+      longitude: picked.longitude,
+    );
+
+    // Wizard'ga avvalgi step'larda yig'ilgan ma'lumotlarni prefill:
+    // kadastr raqami va manzil (xaritadan tanlangan koordinatadan).
+    final tzPrefill = ArchitectureOrderDraft()
+      ..cadastreNumber = scanDraft.cadastreNumber
+      ..address = 'lat: ${picked.latitude.toStringAsFixed(6)}, '
+          'lon: ${picked.longitude.toStringAsFixed(6)}';
+
+    // MAP PICKER → TZ wizard (DOCX so'rovnomadagi 7 step) → ScanObjectType
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ArxitekturaTzWizardScreen(
+          initialDraft: tzPrefill,
+          submitLabel: 'Davom etish',
+          onSubmit: (tzDraft) {
+            // Wizard tugagandan keyin TZ draft'ni ScanDraft.tzDraft'ga
+            // saqlab, navbatdagi step'ga o'tamiz.
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    ScanObjectTypeScreen(draft: scanDraft.copyWith(
+                      tzDraft: tzDraft,
+                    )),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   void _onCadastreChanged() {
     final filled = _cadastreController.text.length == _fullMaskLength;
     if (filled) {
-      if (_status == _LoadStatus.idle) {
+      if (_status == _LoadStatus.idle ||
+          _status == _LoadStatus.error) {
         _loadTimer?.cancel();
+        // 250 ms debounce — paste yoki tez yozishda bir nechta API call
+        // ketmasligi uchun.
+        _loadTimer = Timer(const Duration(milliseconds: 250), _runLookup);
         setState(() => _status = _LoadStatus.loading);
-        _loadTimer = Timer(const Duration(milliseconds: 1500), () {
-          if (!mounted) return;
-          setState(() => _status = _LoadStatus.loaded);
-        });
       }
     } else {
       _loadTimer?.cancel();
       if (_status != _LoadStatus.idle) {
-        setState(() => _status = _LoadStatus.idle);
+        setState(() {
+          _status = _LoadStatus.idle;
+          _info = null;
+          _errorMsg = null;
+        });
       }
+    }
+  }
+
+  Future<void> _runLookup() async {
+    final number = _cadastreController.text;
+    final reqId = ++_lookupRequestId;
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null) {
+      if (!mounted || reqId != _lookupRequestId) return;
+      setState(() {
+        _status = _LoadStatus.error;
+        _errorMsg = 'Avval tizimga kiring';
+      });
+      return;
+    }
+    try {
+      final result = await CadastreApiService().lookup(
+        cadastreNumber: number,
+        token: token,
+      );
+      if (!mounted || reqId != _lookupRequestId) return;
+      setState(() {
+        _info = result;
+        _status = _LoadStatus.loaded;
+        _errorMsg = null;
+      });
+    } on CadastreLookupException catch (e) {
+      if (!mounted || reqId != _lookupRequestId) return;
+      setState(() {
+        _status = _LoadStatus.error;
+        _errorMsg = e.message;
+      });
+    } catch (e) {
+      if (!mounted || reqId != _lookupRequestId) return;
+      setState(() {
+        _status = _LoadStatus.error;
+        _errorMsg = 'Tarmoq xatosi: $e';
+      });
     }
   }
 
@@ -134,8 +233,19 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                                         _PropertyInfoCardSkeleton(
                                           isDark: isDark,
                                         )
+                                      else if (_status == _LoadStatus.error)
+                                        _LookupErrorCard(
+                                          message: _errorMsg ?? 'Xato',
+                                          onRetry: _runLookup,
+                                          isDark: isDark,
+                                        )
+                                      else if (_info != null)
+                                        _PropertyInfoCard(
+                                          isDark: isDark,
+                                          info: _info!,
+                                        )
                                       else
-                                        _PropertyInfoCard(isDark: isDark),
+                                        const SizedBox.shrink(),
                                     ],
                                   ),
                           ),
@@ -146,19 +256,9 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: 'To\'lov qilish va yuklab olish',
+                        label: 'Davom etish',
                         enabled: _status == _LoadStatus.loaded,
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => ScanObjectTypeScreen(
-                                draft: ScanDraft(
-                                  cadastreNumber: _cadastreController.text,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
+                        onTap: _openMapPicker,
                       ),
                     ),
                   ],
@@ -227,7 +327,7 @@ class _CadastreInput extends StatelessWidget {
           horizontal: 16,
           vertical: 18,
         ),
-        hintText: 'XX:XX:XXXXXXX:XXX:XXXX',
+        hintText: 'XX:XX:XX:XX:XX:XXXX',
         hintStyle: TextStyle(
           fontFamily: 'MTSText',
           fontSize: 15,
@@ -249,11 +349,12 @@ class _CadastreInput extends StatelessWidget {
   }
 }
 
-/// Formats raw digits into `NN:NN:NNNNNNN:NNN:NNNN` (segments 2/2/7/3/4),
-/// auto-inserting colons as the user types and stripping non-digits on paste.
+/// Formats raw digits into `NN:NN:NN:NN:NN:NNNN` (davreestr.uz formati,
+/// segments 2/2/2/2/2/4), auto-inserting colons as the user types and
+/// stripping non-digits on paste.
 class _CadastreMaskFormatter extends TextInputFormatter {
-  static const _segments = [2, 2, 7, 3, 4];
-  static const _maxDigits = 18;
+  static const _segments = [2, 2, 2, 2, 2, 4];
+  static const _maxDigits = 14;
 
   @override
   TextEditingValue formatEditUpdate(
@@ -403,17 +504,35 @@ class _PropertyInfoCardSkeletonState extends State<_PropertyInfoCardSkeleton>
 }
 
 class _PropertyInfoCard extends StatelessWidget {
-  const _PropertyInfoCard({required this.isDark});
+  const _PropertyInfoCard({required this.isDark, required this.info});
 
   final bool isDark;
+  final CadastreLookupResult info;
 
-  static const _rows = <(String, String)>[
-    ('Manzil', 'Toshkent, Chilonzor'),
-    ('Turi', 'Ko\'p qavatli xonadon'),
-    ('Maydon', '120.5 m²'),
-    ('Qavat', '5/9'),
-    ('Kadastr qiymati', '385 mln'),
-  ];
+  List<(String, String)> get _rows {
+    String fmtNum(double? v, String unit) =>
+        v == null ? '—' : '${_formatDecimal(v)} $unit';
+    String fmtUzs(double? v) {
+      if (v == null) return '—';
+      if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)} mlrd';
+      if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(1)} mln';
+      return _formatDecimal(v);
+    }
+
+    return [
+      ('Manzil', info.address ?? '—'),
+      if (info.objectTypeHint != null) ('Turi', info.objectTypeHint!),
+      ('Maydon', fmtNum(info.totalArea, 'm²')),
+      if (info.livingArea != null)
+        ('Yashash maydoni', fmtNum(info.livingArea, 'm²')),
+      ('Kadastr qiymati', fmtUzs(info.cadastreValue)),
+    ];
+  }
+
+  static String _formatDecimal(double v) {
+    if (v == v.roundToDouble()) return v.toInt().toString();
+    return v.toStringAsFixed(2);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -424,6 +543,7 @@ class _PropertyInfoCard extends StatelessWidget {
         : const Color(0xFF8A9097);
     final valueColor = isDark ? Colors.white : AppColors.textBlack;
 
+    final rows = _rows;
     return Container(
       decoration: BoxDecoration(
         color: cardBg,
@@ -432,14 +552,14 @@ class _PropertyInfoCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
-          for (var i = 0; i < _rows.length; i++) ...[
+          for (var i = 0; i < rows.length; i++) ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
-                      '${_rows[i].$1}:',
+                      '${rows[i].$1}:',
                       style: TextStyle(
                         fontFamily: 'MTSText',
                         fontSize: 14,
@@ -449,7 +569,7 @@ class _PropertyInfoCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    _rows[i].$2,
+                    rows[i].$2,
                     textAlign: TextAlign.right,
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
@@ -462,8 +582,89 @@ class _PropertyInfoCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (i != _rows.length - 1) Container(height: 1, color: divider),
+            if (i != rows.length - 1) Container(height: 1, color: divider),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LookupErrorCard extends StatelessWidget {
+  const _LookupErrorCard({
+    required this.message,
+    required this.onRetry,
+    required this.isDark,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final hintColor = isDark
+        ? Colors.white.withValues(alpha: 0.6)
+        : const Color(0xFF8A9097);
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE0492A)),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.error_outline,
+                color: Color(0xFFE0492A),
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Ma\'lumot olib bo\'lmadi',
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: textColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            style: TextStyle(
+              fontFamily: 'MTSText',
+              fontSize: 13,
+              height: 1.35,
+              color: hintColor,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Qayta urinish'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.splashGreen,
+                side: const BorderSide(color: AppColors.splashGreen),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

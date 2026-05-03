@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../models/ai_valuation_draft.dart';
 import '../models/scan_draft.dart';
@@ -137,12 +138,7 @@ class _AiMetadataScreenState extends State<AiMetadataScreen> {
     if (_viloyat == null) return;
     final options = _tumanlarByViloyat[_viloyat!] ?? const <String>[];
     if (options.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          behavior: SnackBarBehavior.floating,
-          content: Text('Tumanlar ro\'yxati tez orada'),
-        ),
-      );
+      AppToast.error(context, 'Tumanlar ro\'yxati tez orada');
       return;
     }
     final t = await _showPicker(

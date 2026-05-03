@@ -44,10 +44,12 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
   void _calculate() {
     if (!_ready) return;
     HapticFeedback.lightImpact();
+    final locale = Localizations.localeOf(context);
     final result = computeDizayn(
       objectType: _objectType!,
       style: _style!,
       areaM2: parseAmount(_area.text)!,
+      locale: locale,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -60,6 +62,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: bg,
@@ -74,9 +77,9 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(
-                        title: 'Dizayn loyihasi',
-                        subtitle: 'Interyer va eksteryer',
+                      child: ServiceAppBar(
+                        title: CalculatorCategory.dizayn.title(locale),
+                        subtitle: _Strings.subtitle(locale),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -84,21 +87,21 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
-                          const CalculatorSectionLabel(
-                            text: "Ob'ekt turini tanlang",
+                          CalculatorSectionLabel(
+                            text: _Strings.chooseObject(locale),
                           ),
                           const SizedBox(height: 12),
                           for (final t in DizaynObjectType.values) ...[
                             ChoiceTile(
-                              label: t.label,
+                              label: t.label(locale),
                               selected: _objectType == t,
                               onTap: () => setState(() => _objectType = t),
                             ),
                             const SizedBox(height: 10),
                           ],
                           const SizedBox(height: 18),
-                          const CalculatorSectionLabel(
-                            text: 'Dizayn uslubini tanlang',
+                          CalculatorSectionLabel(
+                            text: _Strings.chooseStyle(locale),
                           ),
                           const SizedBox(height: 12),
                           Wrap(
@@ -107,7 +110,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                             children: [
                               for (final s in DizaynStyle.values)
                                 StyleChip(
-                                  label: s.label,
+                                  label: s.label(locale),
                                   selected: _style == s,
                                   onTap: () => setState(() => _style = s),
                                 ),
@@ -115,8 +118,8 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                           ),
                           const SizedBox(height: 18),
                           CalculatorField(
-                            label: 'Dizayn maydoni',
-                            placeholder: 'Maydonni kiriting',
+                            label: _Strings.areaLabel(locale),
+                            placeholder: _Strings.areaPlaceholder(locale),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -126,7 +129,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: 'Hisoblash',
+                        label: _Strings.calculate(locale),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -140,4 +143,45 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
       ),
     );
   }
+}
+
+class _Strings {
+  const _Strings._();
+
+  static String _pick(Locale l, String uz, String ru, String en) =>
+      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  static String subtitle(Locale l) => _pick(
+        l,
+        'Interyer va eksteryer',
+        'Интерьер и экстерьер',
+        'Interior & exterior',
+      );
+
+  static String chooseObject(Locale l) => _pick(
+        l,
+        "Ob'ekt turini tanlang",
+        'Выберите тип объекта',
+        'Choose object type',
+      );
+
+  static String chooseStyle(Locale l) => _pick(
+        l,
+        'Dizayn uslubini tanlang',
+        'Выберите стиль дизайна',
+        'Choose design style',
+      );
+
+  static String areaLabel(Locale l) =>
+      _pick(l, 'Dizayn maydoni', 'Площадь дизайна', 'Design area');
+
+  static String areaPlaceholder(Locale l) => _pick(
+        l,
+        'Maydonni kiriting',
+        'Введите площадь',
+        'Enter area',
+      );
+
+  static String calculate(Locale l) =>
+      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
 }

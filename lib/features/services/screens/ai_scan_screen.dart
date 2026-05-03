@@ -1,10 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../data/room_plan_scanner.dart';
 import '../models/ai_valuation_draft.dart';
 import '../widgets/scan_camera_card.dart';
 import '../widgets/scan_tips_card.dart';
@@ -21,34 +21,73 @@ class AiScanScreen extends StatefulWidget {
 
 class _AiScanScreenState extends State<AiScanScreen> {
   ScanCardState _state = ScanCardState.idle;
-  Timer? _timer;
+  RoomScanResult? _scanResult;
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startScan() {
+  Future<void> _startScan() async {
     if (_state == ScanCardState.scanning) return;
     HapticFeedback.lightImpact();
-    setState(() => _state = ScanCardState.scanning);
-    _timer?.cancel();
-    _timer = Timer(const Duration(seconds: 2), () {
+
+    final supported = await RoomPlanScanner.isSupported();
+    if (!supported) {
       if (!mounted) return;
-      setState(() => _state = ScanCardState.done);
-    });
+      AppToast.error(
+        context,
+        'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
+        '(iOS 16+ va LiDAR sensori).',
+      );
+      return;
+    }
+
+    setState(() => _state = ScanCardState.scanning);
+    try {
+      final result = await RoomPlanScanner.startTexturedScan();
+      if (!mounted) return;
+      if (result == null) {
+        setState(() => _state = ScanCardState.idle);
+        return;
+      }
+      setState(() {
+        _scanResult = result;
+        _state = ScanCardState.done;
+      });
+    } on RoomPlanScannerException catch (e) {
+      if (!mounted) return;
+      setState(() => _state = ScanCardState.idle);
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _state = ScanCardState.idle);
+      AppToast.error(context, 'Skan xatosi: $e');
+    }
   }
 
   void _continue() {
     if (_state != ScanCardState.done) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const AiMetadataScreen(
-          draft: AiValuationDraft(scanCompleted: true),
+        builder: (_) => AiMetadataScreen(
+          draft: AiValuationDraft(
+            scanCompleted: true,
+            areaM2: _scanResult?.floorAreaSqm,
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _preview() async {
+    final path = _scanResult?.filePath;
+    if (path == null) return;
+    HapticFeedback.lightImpact();
+    try {
+      await RoomPlanScanner.preview(path);
+    } on RoomPlanScannerException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, 'Ko\'rsatish xatosi: $e');
+    }
   }
 
   @override
@@ -109,6 +148,11 @@ class _AiScanScreenState extends State<AiScanScreen> {
                           ),
                           const SizedBox(height: 16),
                           ScanCameraCard(state: _state, onTap: _startScan),
+                          if (_state == ScanCardState.done &&
+                              _scanResult != null) ...[
+                            const SizedBox(height: 12),
+                            _PreviewButton(onTap: _preview),
+                          ],
                           const SizedBox(height: 16),
                           const ScanTipsCard(),
                         ],
@@ -131,6 +175,56 @@ class _AiScanScreenState extends State<AiScanScreen> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewButton extends StatelessWidget {
+  const _PreviewButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final border = AppColors.splashGreen.withValues(alpha: 0.6);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+
+    return Material(
+      color: fill,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: border, width: 1.4),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.view_in_ar_rounded,
+                  color: AppColors.splashGreen, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  '3D modelni ko\'rish',
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: textColor,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  color: textColor.withValues(alpha: 0.4), size: 22),
+            ],
+          ),
         ),
       ),
     );

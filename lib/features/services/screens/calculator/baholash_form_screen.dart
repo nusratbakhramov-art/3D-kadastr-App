@@ -42,9 +42,11 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
   void _calculate() {
     if (!_ready) return;
     HapticFeedback.lightImpact();
+    final locale = Localizations.localeOf(context);
     final result = computeBaholash(
       objectType: _selected!,
       areaM2: parseAmount(_area.text)!,
+      locale: locale,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -57,6 +59,7 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: bg,
@@ -71,9 +74,9 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(
-                        title: 'Mulk qiymatini baholash',
-                        subtitle: 'Bozor qiymatini aniqlash',
+                      child: ServiceAppBar(
+                        title: CalculatorCategory.baholash.title(locale),
+                        subtitle: CalculatorCategory.baholash.subtitle(locale),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -81,13 +84,13 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
-                          const CalculatorSectionLabel(
-                            text: "Ob'ekt turini tanlang",
+                          CalculatorSectionLabel(
+                            text: _Strings.chooseObject(locale),
                           ),
                           const SizedBox(height: 12),
                           for (final t in BaholashObject.values) ...[
                             ChoiceTile(
-                              label: t.label,
+                              label: t.label(locale),
                               selected: _selected == t,
                               onTap: () => setState(() => _selected = t),
                             ),
@@ -95,8 +98,8 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
                           ],
                           const SizedBox(height: 14),
                           CalculatorField(
-                            label: "Ko'chmas mulk maydoni",
-                            placeholder: 'Maydonni kiriting',
+                            label: _Strings.areaLabel(locale),
+                            placeholder: _Strings.areaPlaceholder(locale),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -106,7 +109,7 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: 'Hisoblash',
+                        label: _Strings.calculate(locale),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -120,4 +123,35 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
       ),
     );
   }
+}
+
+class _Strings {
+  const _Strings._();
+
+  static String _pick(Locale l, String uz, String ru, String en) =>
+      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  static String chooseObject(Locale l) => _pick(
+        l,
+        "Ob'ekt turini tanlang",
+        'Выберите тип объекта',
+        'Choose object type',
+      );
+
+  static String areaLabel(Locale l) => _pick(
+        l,
+        "Ko'chmas mulk maydoni",
+        'Площадь недвижимости',
+        'Property area',
+      );
+
+  static String areaPlaceholder(Locale l) => _pick(
+        l,
+        'Maydonni kiriting',
+        'Введите площадь',
+        'Enter area',
+      );
+
+  static String calculate(Locale l) =>
+      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
 }

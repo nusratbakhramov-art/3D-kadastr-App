@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
+import '../settings/locale_storage.dart';
+import '../settings/settings_state.dart';
 import 'onboarding_page_data.dart';
 import 'widgets/language_selector.dart';
 import 'widgets/onboarding_background.dart';
@@ -293,7 +295,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           children: [
                             LanguageSelector(
                               current: _locale,
-                              onChanged: (l) => setState(() => _locale = l),
+                              onChanged: (l) {
+                                setState(() => _locale = l);
+                                // Global state + disk: tanlangan til app bo'ylab
+                                // qo'llanadi va keyingi ishga tushganda saqlanadi.
+                                localeNotifier.value = l;
+                                const LocaleStorage().save(l);
+                              },
                             ),
                             const Spacer(),
                             SkipButton(

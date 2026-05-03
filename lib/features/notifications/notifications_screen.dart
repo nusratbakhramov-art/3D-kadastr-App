@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_reveal.dart';
@@ -32,7 +33,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             final hasUnread = items.any((n) => n.unread);
 
             return Scaffold(
-              backgroundColor: AppColors.lightBackground,
+              backgroundColor: ColorTokens.scaffoldBg(context),
               body: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -107,7 +108,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w500,
                 fontSize: 13,
-                color: AppColors.textBlack.withValues(alpha: 0.55),
+                color: ColorTokens.secondaryText(context),
               ),
             ),
           ),
@@ -173,16 +174,20 @@ class _NotificationGroupCard extends StatelessWidget {
       children.add(_NotificationTile(item: items[i]));
       if (i != items.length - 1) {
         children.add(
-          const Padding(
-            padding: EdgeInsets.only(left: 60),
-            child: Divider(height: 1, thickness: 1, color: Color(0xFFEFEFEF)),
+          Padding(
+            padding: const EdgeInsets.only(left: 60),
+            child: Divider(
+              height: 1,
+              thickness: 1,
+              color: ColorTokens.divider(context),
+            ),
           ),
         );
       }
     }
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ColorTokens.cardBg(context),
         borderRadius: BorderRadius.circular(16),
       ),
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -242,7 +247,7 @@ class _NotificationTile extends StatelessWidget {
                                   ? FontWeight.w700
                                   : FontWeight.w500,
                               fontSize: 15,
-                              color: AppColors.textBlack,
+                              color: ColorTokens.primaryText(context),
                             ),
                           ),
                         ),
@@ -253,7 +258,7 @@ class _NotificationTile extends StatelessWidget {
                             fontFamily: 'MTSCompact',
                             fontWeight: FontWeight.w400,
                             fontSize: 12,
-                            color: AppColors.textBlack.withValues(alpha: 0.45),
+                            color: ColorTokens.tertiaryText(context),
                           ),
                         ),
                         if (item.unread) ...[
@@ -279,7 +284,7 @@ class _NotificationTile extends StatelessWidget {
                         fontWeight: FontWeight.w400,
                         fontSize: 13,
                         height: 1.3,
-                        color: AppColors.textBlack.withValues(alpha: 0.65),
+                        color: ColorTokens.secondaryText(context),
                       ),
                     ),
                   ],
@@ -308,7 +313,7 @@ class _MarkAllButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: ColorTokens.cardBg(context),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         onTap: onTap,
@@ -347,32 +352,32 @@ class _EmptyState extends StatelessWidget {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: ColorTokens.cardBg(context),
               borderRadius: BorderRadius.circular(20),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
-                  color: Color(0x0F000000),
+                  color: ColorTokens.shadow(context),
                   blurRadius: 12,
-                  offset: Offset(0, 2),
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
             alignment: Alignment.center,
-            child: const Icon(
+            child: Icon(
               Icons.notifications_off_outlined,
               size: 28,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
           const SizedBox(height: 16),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
               fontSize: 18,
-              color: AppColors.textBlack,
+              color: ColorTokens.primaryText(context),
             ),
           ),
           const SizedBox(height: 6),
@@ -382,7 +387,7 @@ class _EmptyState extends StatelessWidget {
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 14,
-              color: AppColors.textBlack.withValues(alpha: 0.55),
+              color: ColorTokens.secondaryText(context),
             ),
           ),
         ],

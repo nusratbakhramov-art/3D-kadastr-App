@@ -48,11 +48,13 @@ class _TamirlashFormScreenState extends State<TamirlashFormScreen> {
   void _calculate() {
     if (!_ready) return;
     HapticFeedback.lightImpact();
+    final locale = Localizations.localeOf(context);
     final result = computeTamirlash(
       objectType: _objectType!,
       location: _location!,
       serviceType: _serviceType!,
       areaM2: parseAmount(_area.text)!,
+      locale: locale,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -65,6 +67,7 @@ class _TamirlashFormScreenState extends State<TamirlashFormScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: bg,
@@ -79,9 +82,9 @@ class _TamirlashFormScreenState extends State<TamirlashFormScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(
-                        title: "Ta'mirlash va qurilish",
-                        subtitle: "Ta'mir yoki qurilish narxi",
+                      child: ServiceAppBar(
+                        title: _Strings.title(locale),
+                        subtitle: _Strings.subtitle(locale),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -89,39 +92,39 @@ class _TamirlashFormScreenState extends State<TamirlashFormScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
-                          const CalculatorSectionLabel(
-                            text: 'Xizmat turini tanlang',
+                          CalculatorSectionLabel(
+                            text: _Strings.chooseService(locale),
                           ),
                           const SizedBox(height: 12),
                           for (final s in TamirlashServiceType.values) ...[
                             ChoiceTile(
-                              label: s.label,
+                              label: s.label(locale),
                               selected: _serviceType == s,
                               onTap: () => setState(() => _serviceType = s),
                             ),
                             const SizedBox(height: 10),
                           ],
                           const SizedBox(height: 18),
-                          const CalculatorSectionLabel(
-                            text: "Ob'ekt turini tanlang",
+                          CalculatorSectionLabel(
+                            text: _Strings.chooseObject(locale),
                           ),
                           const SizedBox(height: 12),
                           for (final t in TamirlashObjectType.values) ...[
                             ChoiceTile(
-                              label: t.label,
+                              label: t.label(locale),
                               selected: _objectType == t,
                               onTap: () => setState(() => _objectType = t),
                             ),
                             const SizedBox(height: 10),
                           ],
                           const SizedBox(height: 18),
-                          const CalculatorSectionLabel(
-                            text: 'Manzilni tanlang',
+                          CalculatorSectionLabel(
+                            text: _Strings.chooseLocation(locale),
                           ),
                           const SizedBox(height: 12),
                           for (final l in TamirlashLocation.values) ...[
                             ChoiceTile(
-                              label: l.label,
+                              label: l.label(locale),
                               selected: _location == l,
                               onTap: () => setState(() => _location = l),
                             ),
@@ -129,8 +132,8 @@ class _TamirlashFormScreenState extends State<TamirlashFormScreen> {
                           ],
                           const SizedBox(height: 14),
                           CalculatorField(
-                            label: 'Maydon',
-                            placeholder: 'Maydonni kiriting',
+                            label: _Strings.areaLabel(locale),
+                            placeholder: _Strings.areaPlaceholder(locale),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -140,7 +143,7 @@ class _TamirlashFormScreenState extends State<TamirlashFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: 'Hisoblash',
+                        label: _Strings.calculate(locale),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -154,4 +157,59 @@ class _TamirlashFormScreenState extends State<TamirlashFormScreen> {
       ),
     );
   }
+}
+
+class _Strings {
+  const _Strings._();
+
+  static String _pick(Locale l, String uz, String ru, String en) =>
+      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  static String title(Locale l) => _pick(
+        l,
+        "Ta'mirlash va qurilish",
+        'Ремонт и строительство',
+        'Repair & construction',
+      );
+
+  static String subtitle(Locale l) => _pick(
+        l,
+        "Ta'mir yoki qurilish narxi",
+        'Цена ремонта или строительства',
+        'Repair or construction price',
+      );
+
+  static String chooseService(Locale l) => _pick(
+        l,
+        'Xizmat turini tanlang',
+        'Выберите тип услуги',
+        'Choose service type',
+      );
+
+  static String chooseObject(Locale l) => _pick(
+        l,
+        "Ob'ekt turini tanlang",
+        'Выберите тип объекта',
+        'Choose object type',
+      );
+
+  static String chooseLocation(Locale l) => _pick(
+        l,
+        'Manzilni tanlang',
+        'Выберите местоположение',
+        'Choose location',
+      );
+
+  static String areaLabel(Locale l) =>
+      _pick(l, 'Maydon', 'Площадь', 'Area');
+
+  static String areaPlaceholder(Locale l) => _pick(
+        l,
+        'Maydonni kiriting',
+        'Введите площадь',
+        'Enter area',
+      );
+
+  static String calculate(Locale l) =>
+      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
 }

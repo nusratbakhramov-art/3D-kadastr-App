@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_menu_card.dart';
 import '../../widgets/app_reveal.dart';
+import '../../widgets/app_toast.dart';
+import 'locale_storage.dart';
 import 'settings_state.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -29,7 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       valueListenable: localeNotifier,
       builder: (context, locale, _) {
         return Scaffold(
-          backgroundColor: AppColors.lightBackground,
+          backgroundColor: ColorTokens.scaffoldBg(context),
           body: Stack(
             fit: StackFit.expand,
             children: [
@@ -148,9 +151,9 @@ class _SettingsScreenState extends State<SettingsScreen>
             label: _S.notifications(locale),
             trailing: Switch.adaptive(
               value: on,
-              onChanged: (v) => notificationsEnabledNotifier.value = v,
+              onChanged: (v) => _toggleNotifications(context, locale, v),
             ),
-            onTap: () => notificationsEnabledNotifier.value = !on,
+            onTap: () => _toggleNotifications(context, locale, !on),
           ),
         ),
         ValueListenableBuilder<bool>(
@@ -160,9 +163,9 @@ class _SettingsScreenState extends State<SettingsScreen>
             label: _S.biometric(locale),
             trailing: Switch.adaptive(
               value: on,
-              onChanged: (v) => biometricEnabledNotifier.value = v,
+              onChanged: (v) => _toggleBiometric(context, locale, v),
             ),
-            onTap: () => biometricEnabledNotifier.value = !on,
+            onTap: () => _toggleBiometric(context, locale, !on),
           ),
         ),
       ],
@@ -219,7 +222,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     final locale = localeNotifier.value;
     final selected = await showModalBottomSheet<Locale>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: ColorTokens.cardBg(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -230,14 +233,30 @@ class _SettingsScreenState extends State<SettingsScreen>
         labelOf: _S.languageName,
       ),
     );
-    if (selected != null) localeNotifier.value = selected;
+    if (selected != null && selected != localeNotifier.value) {
+      localeNotifier.value = selected;
+      // Disk'ga saqlaymiz — keyingi ishga tushganda ham shu til ishlaydi.
+      await const LocaleStorage().save(selected);
+      if (!context.mounted) return;
+      AppToast.success(context, _S.savedToast(selected));
+    }
+  }
+
+  void _toggleNotifications(BuildContext context, Locale locale, bool v) {
+    notificationsEnabledNotifier.value = v;
+    AppToast.success(context, _S.savedToast(locale));
+  }
+
+  void _toggleBiometric(BuildContext context, Locale locale, bool v) {
+    biometricEnabledNotifier.value = v;
+    AppToast.success(context, _S.savedToast(locale));
   }
 
   Future<void> _openThemeSheet(BuildContext context) async {
     final locale = localeNotifier.value;
     final selected = await showModalBottomSheet<ThemeMode>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: ColorTokens.cardBg(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -248,13 +267,17 @@ class _SettingsScreenState extends State<SettingsScreen>
         labelOf: (m) => _S.themeName(locale, m),
       ),
     );
-    if (selected != null) themeModeNotifier.value = selected;
+    if (selected != null && selected != themeModeNotifier.value) {
+      themeModeNotifier.value = selected;
+      if (!context.mounted) return;
+      AppToast.success(context, _S.savedToast(locale));
+    }
   }
 
   Future<void> _confirmLogout(BuildContext context, Locale locale) async {
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: ColorTokens.cardBg(context),
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -311,11 +334,11 @@ class _LogoutSheet extends StatelessWidget {
             Text(
               _S.logoutTitle(locale),
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
                 fontSize: 19,
-                color: AppColors.textBlack,
+                color: ColorTokens.primaryText(context),
               ),
             ),
             const SizedBox(height: 6),
@@ -326,7 +349,7 @@ class _LogoutSheet extends StatelessWidget {
                 fontFamily: 'MTSText',
                 fontSize: 14,
                 height: 1.4,
-                color: AppColors.textBlack.withValues(alpha: 0.6),
+                color: ColorTokens.secondaryText(context),
               ),
             ),
             const SizedBox(height: 22),
@@ -336,8 +359,8 @@ class _LogoutSheet extends StatelessWidget {
                   child: _SheetButton(
                     label: _S.cancel(locale),
                     onTap: () => Navigator.pop(context, false),
-                    background: const Color(0xFFF1F3F5),
-                    foreground: AppColors.textBlack,
+                    background: ColorTokens.iconBg(context),
+                    foreground: ColorTokens.primaryText(context),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -413,7 +436,7 @@ class _SectionLabel extends StatelessWidget {
           fontFamily: 'MTSCompact',
           fontWeight: FontWeight.w500,
           fontSize: 13,
-          color: AppColors.textBlack.withValues(alpha: 0.55),
+          color: ColorTokens.secondaryText(context),
         ),
       ),
     );
@@ -436,14 +459,14 @@ class _ValueChip extends StatelessWidget {
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w500,
             fontSize: 14,
-            color: AppColors.textBlack.withValues(alpha: 0.55),
+            color: ColorTokens.secondaryText(context),
           ),
         ),
         const SizedBox(width: 4),
         Icon(
           Icons.chevron_right_rounded,
           size: 18,
-          color: AppColors.textBlack.withValues(alpha: 0.35),
+          color: ColorTokens.tertiaryText(context),
         ),
       ],
     );
@@ -487,11 +510,11 @@ class _OptionSheet<T> extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
                   fontSize: 18,
-                  color: AppColors.textBlack,
+                  color: ColorTokens.primaryText(context),
                 ),
               ),
             ),
@@ -510,11 +533,11 @@ class _OptionSheet<T> extends StatelessWidget {
                       Expanded(
                         child: Text(
                           labelOf(option),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'MTSCompact',
                             fontWeight: FontWeight.w500,
                             fontSize: 16,
-                            color: AppColors.textBlack,
+                            color: ColorTokens.primaryText(context),
                           ),
                         ),
                       ),
@@ -531,7 +554,7 @@ class _OptionSheet<T> extends StatelessWidget {
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             border: Border.all(
-                              color: const Color(0xFFCCCFCD),
+                              color: ColorTokens.outline(context),
                               width: 1.5,
                             ),
                           ),
@@ -657,5 +680,10 @@ class _S {
       'en' => 'Dark',
       _ => 'Tungi',
     },
+  };
+  static String savedToast(Locale l) => switch (l.languageCode) {
+    'ru' => 'Сохранено',
+    'en' => 'Saved',
+    _ => 'Saqlandi',
   };
 }

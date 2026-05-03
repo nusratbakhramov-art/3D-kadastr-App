@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../theme/color_tokens.dart';
 import 'circle_chevron_right.dart';
 
-/// White rounded card that hosts a vertical list of [AppMenuRow]s separated by
-/// hairline dividers.
+/// Rounded card that hosts a vertical list of [AppMenuRow]s separated by
+/// hairline dividers. Background and divider colors adapt to the active theme.
 class AppMenuCard extends StatelessWidget {
   const AppMenuCard({super.key, required this.rows});
 
@@ -12,14 +13,15 @@ class AppMenuCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dividerColor = ColorTokens.divider(context);
     final children = <Widget>[];
     for (var i = 0; i < rows.length; i++) {
       children.add(rows[i]);
       if (i != rows.length - 1) {
         children.add(
-          const Padding(
-            padding: EdgeInsets.only(left: 60),
-            child: Divider(height: 1, thickness: 1, color: Color(0xFFEFEFEF)),
+          Padding(
+            padding: const EdgeInsets.only(left: 60),
+            child: Divider(height: 1, thickness: 1, color: dividerColor),
           ),
         );
       }
@@ -27,7 +29,7 @@ class AppMenuCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ColorTokens.cardBg(context),
         borderRadius: BorderRadius.circular(16),
       ),
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -66,7 +68,7 @@ class AppMenuRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final labelColor = destructive
         ? const Color(0xFFE5484D)
-        : const Color(0xFF18181B);
+        : ColorTokens.primaryText(context);
 
     final leading = iconAsset != null
         ? SvgPicture.asset(iconAsset!, width: 32, height: 32)
@@ -74,7 +76,7 @@ class AppMenuRow extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: const Color(0xFFF4F4F4),
+              color: ColorTokens.iconBg(context),
               borderRadius: BorderRadius.circular(8),
             ),
             alignment: Alignment.center,

@@ -4,10 +4,16 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../../theme/app_colors.dart';
 
 class ServiceAppBar extends StatelessWidget {
-  const ServiceAppBar({super.key, required this.title, this.subtitle});
+  const ServiceAppBar({
+    super.key,
+    required this.title,
+    this.subtitle,
+    this.onBack,
+  });
 
   final String title;
   final String? subtitle;
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -56,7 +62,7 @@ class ServiceAppBar extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Padding(
               padding: const EdgeInsets.only(left: 8),
-              child: _CircleBackButton(),
+              child: _CircleBackButton(onBack: onBack),
             ),
           ),
         ],
@@ -66,6 +72,9 @@ class ServiceAppBar extends StatelessWidget {
 }
 
 class _CircleBackButton extends StatelessWidget {
+  const _CircleBackButton({this.onBack});
+  final VoidCallback? onBack;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -77,7 +86,7 @@ class _CircleBackButton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: () => Navigator.of(context).maybePop(),
+        onTap: onBack ?? () => Navigator.of(context).maybePop(),
         child: SizedBox(
           width: 40,
           height: 40,

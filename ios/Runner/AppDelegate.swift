@@ -14,15 +14,98 @@ import RoomPlan
     GeneratedPluginRegistrant.register(with: self)
 
     if let controller = window?.rootViewController as? FlutterViewController {
-      let channel = FlutterMethodChannel(
+      let probeChannel = FlutterMethodChannel(
         name: "kadastr/scan_capability",
         binaryMessenger: controller.binaryMessenger
       )
-      channel.setMethodCallHandler { [weak self] call, result in
+      probeChannel.setMethodCallHandler { [weak self] call, result in
         guard let self = self else { return }
         switch call.method {
         case "probe":
           result(self.probe())
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      // RoomPlan scanner — iOS 16+, faqat LiDAR'li qurilmalarda.
+      let scannerChannel = FlutterMethodChannel(
+        name: "kadastr/room_plan_scanner",
+        binaryMessenger: controller.binaryMessenger
+      )
+      scannerChannel.setMethodCallHandler { [weak controller] call, result in
+        switch call.method {
+        case "isSupported":
+          var supported = false
+          #if canImport(RoomPlan)
+          if #available(iOS 16, *) {
+            supported = RoomCaptureSession.isSupported
+          }
+          #endif
+          result(supported)
+
+        case "startScan":
+          guard let controller = controller else {
+            result(FlutterError(
+              code: "NO_CONTROLLER",
+              message: "Flutter view controller mavjud emas",
+              details: nil,
+            ))
+            return
+          }
+          if #available(iOS 16, *) {
+            RoomPlanScannerCoordinator.shared.start(from: controller, result: result)
+          } else {
+            result(FlutterError(
+              code: "UNSUPPORTED",
+              message: "RoomPlan iOS 16+ ga muhtoj",
+              details: nil,
+            ))
+          }
+
+        case "startTexturedScan":
+          guard let controller = controller else {
+            result(FlutterError(
+              code: "NO_CONTROLLER",
+              message: "Flutter view controller mavjud emas",
+              details: nil,
+            ))
+            return
+          }
+          if #available(iOS 17.0, *) {
+            TexturedScanCoordinator.shared.start(from: controller, result: result)
+          } else {
+            result(FlutterError(
+              code: "UNSUPPORTED",
+              message: "Photogrammetry scan iOS 17+ ga muhtoj",
+              details: nil,
+            ))
+          }
+
+        case "previewModel":
+          guard let args = call.arguments as? [String: Any],
+                let path = args["filePath"] as? String else {
+            result(FlutterError(
+              code: "ARGS",
+              message: "filePath argument kerak",
+              details: nil,
+            ))
+            return
+          }
+          guard let controller = controller else {
+            result(FlutterError(
+              code: "NO_CONTROLLER",
+              message: "Flutter view controller mavjud emas",
+              details: nil,
+            ))
+            return
+          }
+          UsdzPreviewer.shared.present(
+            filePath: path,
+            from: controller,
+            result: result,
+          )
+
         default:
           result(FlutterMethodNotImplemented)
         }
@@ -33,7 +116,10 @@ import RoomPlan
   }
 
   private func probe() -> [String: Any] {
-    let hasLidar = ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
+    var hasLidar = false
+    if #available(iOS 13.4, *) {
+      hasLidar = ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
+    }
     let arSupported = ARWorldTrackingConfiguration.isSupported
     var hasRoomPlan = false
     #if canImport(RoomPlan)

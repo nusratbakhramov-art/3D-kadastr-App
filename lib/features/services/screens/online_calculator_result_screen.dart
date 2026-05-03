@@ -8,9 +8,19 @@ import '../models/calculator_draft.dart';
 import '../widgets/service_app_bar.dart';
 
 class OnlineCalculatorResultScreen extends StatefulWidget {
-  const OnlineCalculatorResultScreen({super.key, required this.result});
+  const OnlineCalculatorResultScreen({
+    super.key,
+    required this.result,
+    this.onPlaceOrder,
+    this.placeOrderLabel,
+  });
 
   final CalculatorResult result;
+
+  /// Agar berilsa, "Yopish" tugmasi ustida qo'shimcha CTA ko'rsatiladi.
+  /// Arxitektura kalkulatoridan TZ wizard'iga o'tish uchun.
+  final VoidCallback? onPlaceOrder;
+  final String? placeOrderLabel;
 
   @override
   State<OnlineCalculatorResultScreen> createState() =>
@@ -45,6 +55,7 @@ class _OnlineCalculatorResultScreenState
     final subColor = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: bg,
@@ -60,7 +71,7 @@ class _OnlineCalculatorResultScreenState
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: 'Hisob natijasi',
+                        title: _Strings.appBar(locale),
                         subtitle: widget.result.categoryTitle,
                       ),
                     ),
@@ -71,7 +82,7 @@ class _OnlineCalculatorResultScreenState
                         children: [
                           if (_loading) ...[
                             Text(
-                              'Hisoblanmoqda...',
+                              _Strings.calculating(locale),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
@@ -81,7 +92,7 @@ class _OnlineCalculatorResultScreenState
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Tarif jadvali bo\'yicha narx aniqlanmoqda.',
+                              _Strings.calculatingHint(locale),
                               style: TextStyle(
                                 fontFamily: 'MTSText',
                                 fontSize: 13,
@@ -95,7 +106,7 @@ class _OnlineCalculatorResultScreenState
                             const _BreakdownSkeleton(),
                           ] else ...[
                             Text(
-                              'Umumiy narx',
+                              _Strings.totalLabel(locale),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w600,
@@ -104,10 +115,10 @@ class _OnlineCalculatorResultScreenState
                               ),
                             ),
                             const SizedBox(height: 8),
-                            _PriceCard(result: widget.result),
+                            _PriceCard(result: widget.result, locale: locale),
                             const SizedBox(height: 18),
                             Text(
-                              'Tarkibi',
+                              _Strings.breakdown(locale),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
@@ -124,11 +135,30 @@ class _OnlineCalculatorResultScreenState
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: ListingCtaButton(
-                        label: 'Yopish',
-                        enabled: !_loading,
-                        onTap: () =>
-                            Navigator.of(context).popUntil((r) => r.isFirst),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (widget.onPlaceOrder != null) ...[
+                            ListingCtaButton(
+                              label: widget.placeOrderLabel ??
+                                  _Strings.placeOrder(locale),
+                              enabled: !_loading,
+                              onTap: widget.onPlaceOrder!,
+                            ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () => Navigator.of(context)
+                                  .popUntil((r) => r.isFirst),
+                              child: Text(_Strings.close(locale)),
+                            ),
+                          ] else
+                            ListingCtaButton(
+                              label: _Strings.close(locale),
+                              enabled: !_loading,
+                              onTap: () => Navigator.of(context)
+                                  .popUntil((r) => r.isFirst),
+                            ),
+                        ],
                       ),
                     ),
                   ],
@@ -142,9 +172,50 @@ class _OnlineCalculatorResultScreenState
   }
 }
 
+class _Strings {
+  const _Strings._();
+
+  static String _pick(Locale l, String uz, String ru, String en) =>
+      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  static String appBar(Locale l) => _pick(
+        l,
+        'Hisob natijasi',
+        'Результат расчёта',
+        'Calculation result',
+      );
+
+  static String calculating(Locale l) =>
+      _pick(l, 'Hisoblanmoqda...', 'Расчёт...', 'Calculating...');
+
+  static String calculatingHint(Locale l) => _pick(
+        l,
+        "Tarif jadvali bo'yicha narx aniqlanmoqda.",
+        'Цена определяется по тарифной таблице.',
+        'Determining price by tariff table.',
+      );
+
+  static String totalLabel(Locale l) =>
+      _pick(l, 'Umumiy narx', 'Общая стоимость', 'Total');
+
+  static String breakdown(Locale l) =>
+      _pick(l, 'Tarkibi', 'Состав', 'Breakdown');
+
+  static String close(Locale l) =>
+      _pick(l, 'Yopish', 'Закрыть', 'Close');
+
+  static String placeOrder(Locale l) => _pick(
+        l,
+        'Buyurtma berish',
+        'Оформить заказ',
+        'Place order',
+      );
+}
+
 class _PriceCard extends StatelessWidget {
-  const _PriceCard({required this.result});
+  const _PriceCard({required this.result, required this.locale});
   final CalculatorResult result;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -165,7 +236,7 @@ class _PriceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            fmtUzsPublic(result.totalUzs),
+            fmtUzsPublic(locale, result.totalUzs),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w900,

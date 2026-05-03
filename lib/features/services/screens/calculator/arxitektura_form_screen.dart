@@ -3,11 +3,13 @@ import 'package:flutter/services.dart';
 
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
+import '../../models/architecture_order_draft.dart';
 import '../../models/calculator_draft.dart';
 import '../../widgets/choice_tile.dart';
 import '../../widgets/service_app_bar.dart';
 import '../online_calculator_result_screen.dart';
 import '_calculator_field.dart';
+import 'arxitektura_tz_wizard_screen.dart';
 
 class ArxitekturaFormScreen extends StatefulWidget {
   const ArxitekturaFormScreen({super.key});
@@ -42,21 +44,72 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
   void _calculate() {
     if (!_ready) return;
     HapticFeedback.lightImpact();
+    final locale = Localizations.localeOf(context);
+    final selected = _selected!;
+    final area = parseAmount(_area.text)!;
     final result = computeArxitektura(
-      objectType: _selected!,
-      areaM2: parseAmount(_area.text)!,
+      objectType: selected,
+      areaM2: area,
+      locale: locale,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => OnlineCalculatorResultScreen(result: result),
+        builder: (ctx) => OnlineCalculatorResultScreen(
+          result: result,
+          placeOrderLabel: _Strings.placeTzOrder(locale),
+          onPlaceOrder: () {
+            final draft = _draftFromCalculator(selected, area);
+            Navigator.of(ctx).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ArxitekturaTzWizardScreen(initialDraft: draft),
+              ),
+            );
+          },
+        ),
       ),
     );
+  }
+
+  /// Calculator natijasidan TZ wizard uchun boshlang'ich draft tuzish:
+  /// obyekt turi va umumiy maydonni oldindan to'ldirib qo'yamiz.
+  static ArchitectureOrderDraft _draftFromCalculator(
+    ArxitekturaObject calc,
+    double area,
+  ) {
+    final draft = ArchitectureOrderDraft();
+    draft.totalAreaSqm = area;
+    switch (calc) {
+      case ArxitekturaObject.yakkaSmall:
+        draft.objectType = ArchObjectType.yakkaSmall;
+        draft.constructionType = ConstructionType.yangi;
+      case ArxitekturaObject.yakkaLarge:
+        draft.objectType = ArchObjectType.yakkaLarge;
+        draft.constructionType = ConstructionType.yangi;
+      case ArxitekturaObject.kopQavatli:
+        draft.objectType = ArchObjectType.kopQavatli;
+        draft.constructionType = ConstructionType.yangi;
+      case ArxitekturaObject.jamoat:
+        // Jamoat ostida bir nechta tur bor — default `ofis`. Foydalanuvchi
+        // wizardda o'zgartira oladi.
+        draft.objectType = ArchObjectType.ofis;
+        draft.constructionType = ConstructionType.yangi;
+      case ArxitekturaObject.sanoat:
+        draft.objectType = ArchObjectType.sanoat;
+        draft.constructionType = ConstructionType.yangi;
+      case ArxitekturaObject.rekonstruksiya:
+        // Rekonstruksiya — qurilish turi alohida o'lcham; obyekt turi
+        // sifatida default `yakkaSmall` qoldiramiz, foydalanuvchi tanlaydi.
+        draft.objectType = ArchObjectType.yakkaSmall;
+        draft.constructionType = ConstructionType.rekonstruksiya;
+    }
+    return draft;
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: bg,
@@ -71,9 +124,9 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(
-                        title: 'Arxitektura va qurilish',
-                        subtitle: 'Loyiha narxini hisoblang',
+                      child: ServiceAppBar(
+                        title: _Strings.title(locale),
+                        subtitle: _Strings.subtitle(locale),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -81,14 +134,14 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
-                          const CalculatorSectionLabel(
-                            text: "Ob'ekt turini tanlang",
+                          CalculatorSectionLabel(
+                            text: _Strings.chooseObject(locale),
                           ),
                           const SizedBox(height: 12),
                           for (final t in ArxitekturaObject.values) ...[
                             _ObjectTile(
-                              label: t.label,
-                              hint: t.hint,
+                              label: t.label(locale),
+                              hint: t.hint(locale),
                               selected: _selected == t,
                               onTap: () => setState(() => _selected = t),
                             ),
@@ -96,8 +149,8 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
                           ],
                           const SizedBox(height: 14),
                           CalculatorField(
-                            label: 'Qurilish hajmi',
-                            placeholder: 'Maydonni kiriting',
+                            label: _Strings.areaLabel(locale),
+                            placeholder: _Strings.areaPlaceholder(locale),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -107,7 +160,7 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: 'Hisoblash',
+                        label: _Strings.calculate(locale),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -121,6 +174,58 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
       ),
     );
   }
+}
+
+class _Strings {
+  const _Strings._();
+
+  static String _pick(Locale l, String uz, String ru, String en) =>
+      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  static String title(Locale l) => _pick(
+        l,
+        'Arxitektura va qurilish',
+        'Архитектура и строительство',
+        'Architecture & construction',
+      );
+
+  static String subtitle(Locale l) => _pick(
+        l,
+        'Loyiha narxini hisoblang',
+        'Рассчитайте стоимость проекта',
+        'Calculate project cost',
+      );
+
+  static String chooseObject(Locale l) => _pick(
+        l,
+        "Ob'ekt turini tanlang",
+        'Выберите тип объекта',
+        'Choose object type',
+      );
+
+  static String areaLabel(Locale l) => _pick(
+        l,
+        'Qurilish hajmi',
+        'Объём строительства',
+        'Construction volume',
+      );
+
+  static String areaPlaceholder(Locale l) => _pick(
+        l,
+        'Maydonni kiriting',
+        'Введите площадь',
+        'Enter area',
+      );
+
+  static String calculate(Locale l) =>
+      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
+
+  static String placeTzOrder(Locale l) => _pick(
+        l,
+        "Texnik topshiriqni to'ldirish",
+        'Заполнить техническое задание',
+        'Fill technical task',
+      );
 }
 
 class _ObjectTile extends StatelessWidget {

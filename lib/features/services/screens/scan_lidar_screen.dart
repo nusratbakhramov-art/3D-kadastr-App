@@ -1,10 +1,10 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../data/room_plan_scanner.dart';
 import '../models/scan_draft.dart';
 import '../widgets/scan_camera_card.dart';
 import '../widgets/scan_tips_card.dart';
@@ -24,23 +24,46 @@ class ScanLidarScreen extends StatefulWidget {
 
 class _ScanLidarScreenState extends State<ScanLidarScreen> {
   ScanCardState _state = ScanCardState.idle;
-  Timer? _timer;
+  RoomScanResult? _scanResult;
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _startScan() {
+  Future<void> _startScan() async {
     if (_state == ScanCardState.scanning) return;
     HapticFeedback.lightImpact();
-    setState(() => _state = ScanCardState.scanning);
-    _timer?.cancel();
-    _timer = Timer(const Duration(seconds: 2), () {
+
+    // Avval qurilma RoomPlan'ni qo'llaydimi tekshirish.
+    final supported = await RoomPlanScanner.isSupported();
+    if (!supported) {
       if (!mounted) return;
-      setState(() => _state = ScanCardState.done);
-    });
+      AppToast.error(
+        context,
+        'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
+        '(iOS 16+ va LiDAR sensori).',
+      );
+      return;
+    }
+
+    setState(() => _state = ScanCardState.scanning);
+    try {
+      final result = await RoomPlanScanner.startScan();
+      if (!mounted) return;
+      if (result == null) {
+        // Foydalanuvchi bekor qildi.
+        setState(() => _state = ScanCardState.idle);
+        return;
+      }
+      setState(() {
+        _scanResult = result;
+        _state = ScanCardState.done;
+      });
+    } on RoomPlanScannerException catch (e) {
+      if (!mounted) return;
+      setState(() => _state = ScanCardState.idle);
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _state = ScanCardState.idle);
+      AppToast.error(context, 'Skan xatosi: $e');
+    }
   }
 
   void _continue() {
@@ -120,6 +143,10 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
                               );
                             },
                           ),
+                          if (_state == ScanCardState.done && _scanResult != null) ...[
+                            const SizedBox(height: 12),
+                            _ScanResultCard(result: _scanResult!),
+                          ],
                           const SizedBox(height: 16),
                           const ScanTipsCard(),
                         ],
@@ -143,6 +170,82 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+class _ScanResultCard extends StatelessWidget {
+  const _ScanResultCard({required this.result});
+  final RoomScanResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final divider = isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
+    final keyColor = isDark
+        ? Colors.white.withValues(alpha: 0.6)
+        : const Color(0xFF8A9097);
+    final valColor = isDark ? Colors.white : AppColors.textBlack;
+
+    String fmtSize(int bytes) {
+      if (bytes >= 1024 * 1024) {
+        return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
+      }
+      return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    }
+
+    final rows = <(String, String)>[
+      ('Devorlar', '${result.walls}'),
+      ('Eshiklar', '${result.doors}'),
+      ('Oynalar', '${result.windows}'),
+      if (result.openings > 0) ('Boshqa ochiqliklar', '${result.openings}'),
+      if (result.objects > 0) ('Mebel/obyektlar', '${result.objects}'),
+      if (result.floorAreaSqm != null)
+        ('Maydon (taxminiy)', '${result.floorAreaSqm!.toStringAsFixed(1)} m²'),
+      ('Fayl hajmi', fmtSize(result.fileSize)),
+    ];
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.splashGreen.withValues(alpha: 0.4)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      rows[i].$1,
+                      style: TextStyle(
+                        fontFamily: 'MTSText',
+                        fontSize: 13,
+                        color: keyColor,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    rows[i].$2,
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: valColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (i != rows.length - 1) Container(height: 1, color: divider),
+          ],
+        ],
       ),
     );
   }

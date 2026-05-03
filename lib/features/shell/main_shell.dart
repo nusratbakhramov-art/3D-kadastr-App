@@ -14,6 +14,9 @@ import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
 import '../scans/my_scans_screen.dart';
+import '../services/screens/ai_scan_screen.dart';
+import '../services/screens/kadastr_3d_screen.dart';
+import '../services/screens/online_calculator_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
 import 'app_bottom_nav.dart';
@@ -150,6 +153,26 @@ class _MainShellState extends State<MainShell> {
     ).push(MaterialPageRoute<void>(builder: (_) => const PaymentsScreen()));
   }
 
+  Future<void> _openKadastr3d() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()));
+  }
+
+  Future<void> _openAiValuation() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const AiScanScreen()));
+  }
+
+  Future<void> _openCalculator() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
+    );
+  }
+
+  void _openMarketTab() => _onTabChanged(2);
+
   @override
   Widget build(BuildContext context) {
     final items = _ShellStrings.items(widget.locale);
@@ -163,7 +186,15 @@ class _MainShellState extends State<MainShell> {
           if (i != _index) setState(() => _index = i);
         },
         children: [
-          HomeScreen(locale: widget.locale, onLoginTap: _openAuth),
+          HomeScreen(
+            locale: widget.locale,
+            onLoginTap: _openAuth,
+            onOpenKadastr3d: _openKadastr3d,
+            onOpenAiValuation: _openAiValuation,
+            onOpenCalculator: _openCalculator,
+            onOpenMarket: _openMarketTab,
+            onOpenOrder: _openKadastr3d,
+          ),
           ServicesScreen(
             locale: widget.locale,
             animateToken: _servicesAnimToken,
@@ -175,7 +206,6 @@ class _MainShellState extends State<MainShell> {
             animateToken: _profileAnimToken,
             onSettingsTap: _openSettings,
             onMyProfileTap: _openMyProfile,
-            onNotificationsTap: _openNotifications,
             onBellTap: _openNotifications,
             onHelpTap: _openHelp,
             onRatingsTap: _openRatings,

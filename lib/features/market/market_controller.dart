@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import 'api_market_repository.dart';
 import 'market_repository.dart';
 import 'models/market_filters.dart';
 import 'models/market_listing.dart';
@@ -182,5 +183,5 @@ MarketController? _shared;
 /// alive across tab switches so the user doesn't see loading skeletons
 /// every time they come back to Market. Pull-to-refresh still refetches.
 MarketController sharedMarketController() {
-  return _shared ??= MarketController(repository: FakeMarketRepository());
+  return _shared ??= MarketController(repository: ApiMarketRepository());
 }
