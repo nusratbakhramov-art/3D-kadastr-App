@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
@@ -18,27 +19,112 @@ class DobField extends StatelessWidget {
     final locale = Localizations.maybeLocaleOf(context);
     final now = DateTime.now();
     final initial = value ?? DateTime(now.year - 20, now.month, now.day);
-    final picked = await showDatePicker(
+
+    DateTime tempPicked = initial;
+
+    final picked = await showModalBottomSheet<DateTime>(
       context: context,
-      locale: locale,
-      initialDate: initial,
-      firstDate: DateTime(1900),
-      lastDate: now,
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme:
-              (isDark ? const ColorScheme.dark() : const ColorScheme.light())
-                  .copyWith(
-                    primary: const Color(0xFF00E135),
-                    onPrimary: Colors.black,
-                    surface: isDark ? const Color(0xFF0E1A12) : Colors.white,
-                    onSurface: isDark ? Colors.white : AppColors.textBlack,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        final sheetBg = isDark ? const Color(0xFF121214) : Colors.white;
+        final textColor = isDark ? Colors.white : AppColors.textBlack;
+        final dividerColor = isDark
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.black.withValues(alpha: 0.08);
+
+        return SafeArea(
+          top: false,
+          child: Container(
+            decoration: BoxDecoration(
+              color: sheetBg,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 12, 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Tug‘ilgan sana',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: textColor,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(Icons.close, color: textColor),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
                   ),
-        ),
-        child: child ?? const SizedBox(),
-      ),
+                ),
+                Divider(height: 1, color: dividerColor),
+                SizedBox(
+                  height: 220,
+                  child: CupertinoTheme(
+                    data: CupertinoThemeData(
+                      brightness: isDark ? Brightness.dark : Brightness.light,
+                      textTheme: CupertinoTextThemeData(
+                        dateTimePickerTextStyle: TextStyle(
+                          fontSize: 20,
+                          color: textColor,
+                        ),
+                      ),
+                    ),
+                    child: CupertinoDatePicker(
+                      mode: CupertinoDatePickerMode.date,
+                      initialDateTime: initial,
+                      minimumDate: DateTime(1900),
+                      maximumDate: now,
+                      dateOrder: DatePickerDateOrder.mdy,
+                      onDateTimeChanged: (d) => tempPicked = d,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        elevation: 0,
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(tempPicked),
+                      child: const Text(
+                        'Tasdiqlash',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
+
     if (picked != null) onChanged(picked);
+    // ignore unused locale (CupertinoDatePicker uses ambient localization)
+    locale?.toString();
   }
 
   @override

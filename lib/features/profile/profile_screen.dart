@@ -7,6 +7,7 @@ import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_menu_card.dart';
 import '../../widgets/app_reveal.dart';
 import '../home/user_profile.dart';
+import '../market/widgets/listing_cta_button.dart';
 import '../onboarding/onboarding_page_data.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class ProfileScreen extends StatefulWidget {
     this.onPaymentsTap,
     this.onSettingsTap,
     this.onHelpTap,
+    this.onLoginTap,
   });
 
   final Locale locale;
@@ -32,6 +34,10 @@ class ProfileScreen extends StatefulWidget {
   final VoidCallback? onPaymentsTap;
   final VoidCallback? onSettingsTap;
   final VoidCallback? onHelpTap;
+
+  /// Foydalanuvchi tizimga kirmagan (`profile == null` yoki bo'sh) bo'lsa,
+  /// menyu o'rniga "Kirish" tugmasi shu callback'ni chaqiradi.
+  final VoidCallback? onLoginTap;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -52,7 +58,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   Widget build(BuildContext context) {
     super.build(context);
     final locale = widget.locale;
-    final rows = <_RowSpec>[
+
+    // Tizimga kirgan foydalanuvchi uchun to'liq menyu.
+    final authedRows = <_RowSpec>[
       _RowSpec(
         'assets/icons/menu-profile.svg',
         _ProfileStrings.myProfile(locale),
@@ -85,6 +93,21 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     ];
 
+    // Mehmon (login qilmagan) uchun cheklangan menyu — faqat Sozlamalar +
+    // Yordam.
+    final guestRows = <_RowSpec>[
+      _RowSpec(
+        'assets/icons/menu-settings.svg',
+        _ProfileStrings.settings(locale),
+        widget.onSettingsTap,
+      ),
+      _RowSpec(
+        'assets/icons/menu-help.svg',
+        _ProfileStrings.help(locale),
+        widget.onHelpTap,
+      ),
+    ];
+
     return Scaffold(
       backgroundColor: ColorTokens.scaffoldBg(context),
       body: Stack(
@@ -95,6 +118,10 @@ class _ProfileScreenState extends State<ProfileScreen>
             child: ValueListenableBuilder<UserProfile?>(
               valueListenable: userProfileNotifier,
               builder: (context, profile, _) {
+                // Foydalanuvchi tizimga kirgani — profile bor va ismi bo'sh
+                // emas. Boshqa hollarda mehmon hisoblanadi.
+                final isAuthed = profile != null && profile.name.trim().isNotEmpty;
+                final rows = isAuthed ? authedRows : guestRows;
                 return ValueListenableBuilder<int>(
                   valueListenable: notificationUnreadNotifier,
                   builder: (context, unread, _) {
@@ -177,6 +204,40 @@ class _ProfileScreenState extends State<ProfileScreen>
                             ),
                           ),
                           const SizedBox(height: 24),
+                          if (!isAuthed) ...[
+                            AppReveal(
+                              controller: entryController,
+                              interval: const Interval(
+                                0.32,
+                                0.85,
+                                curve: Curves.easeOutCubic,
+                              ),
+                              child: ListingCtaButton(
+                                label: _ProfileStrings.login(locale),
+                                onTap: widget.onLoginTap ?? () {},
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            AppReveal(
+                              controller: entryController,
+                              interval: const Interval(
+                                0.4,
+                                0.9,
+                                curve: Curves.easeOutCubic,
+                              ),
+                              child: Text(
+                                _ProfileStrings.guestHint(locale),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontFamily: 'MTSText',
+                                  fontSize: 13,
+                                  height: 1.35,
+                                  color: ColorTokens.secondaryText(context),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
                           AppReveal(
                             controller: entryController,
                             interval: const Interval(
@@ -271,5 +332,20 @@ class _ProfileStrings {
     'ru' => 'Помощь',
     'en' => 'Help',
     _ => 'Yordam',
+  };
+
+  static String login(Locale l) => switch (l.languageCode) {
+    'ru' => 'Войти',
+    'en' => 'Log in',
+    _ => 'Kirish',
+  };
+
+  static String guestHint(Locale l) => switch (l.languageCode) {
+    'ru' =>
+        'Войдите, чтобы видеть свои сканирования, оценки и историю заказов.',
+    'en' =>
+        'Log in to see your scans, valuations and order history.',
+    _ => 'Skanerlaringiz, baholashlaringiz va buyurtmalar tarixini ko\'rish '
+        'uchun tizimga kiring.',
   };
 }

@@ -88,6 +88,7 @@ class ApiAuthService implements AuthService {
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       return VerifyResult(
         token: body['access_token'] as String,
+        refreshToken: body['refresh_token'] as String?,
         isNewUser: (body['is_new_user'] as bool?) ?? false,
       );
     } on AuthException {

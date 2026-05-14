@@ -5,6 +5,7 @@ import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../../settings/settings_state.dart';
 import '../api_architecture_order_service.dart';
 import '../models/architecture_order_draft.dart';
 import '../models/scan_draft.dart';
@@ -81,8 +82,9 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
   bool get _ready => _viloyat != null && _tuman != null;
 
   Future<void> _pickViloyat() async {
+    final locale = localeNotifier.value;
     final v = await _showPicker(
-      title: 'Viloyatni tanlang',
+      title: _ScanMetadataStrings.pickViloyatTitle(locale),
       options: _viloyatlar,
       current: _viloyat,
     );
@@ -99,13 +101,14 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
 
   Future<void> _pickTuman() async {
     if (_viloyat == null) return;
+    final locale = localeNotifier.value;
     final options = _tumanlarByViloyat[_viloyat!] ?? const <String>[];
     if (options.isEmpty) {
-      AppToast.error(context, 'Tumanlar ro\'yxati tez orada');
+      AppToast.error(context, _ScanMetadataStrings.tumanListSoon(locale));
       return;
     }
     final t = await _showPicker(
-      title: 'Tumanni tanlang',
+      title: _ScanMetadataStrings.pickTumanTitle(locale),
       options: options,
       current: _tuman,
     );
@@ -215,10 +218,11 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
   Future<void> _submitToSpecialist() async {
     if (!_ready || _submitting) return;
     HapticFeedback.lightImpact();
+    final locale = localeNotifier.value;
 
     final tz = widget.draft.tzDraft;
     if (tz == null || !tz.canSubmit) {
-      AppToast.error(context, 'TZ ma\'lumotlari to\'liq emas');
+      AppToast.error(context, _ScanMetadataStrings.tzIncomplete(locale));
       return;
     }
 
@@ -226,7 +230,7 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
     final token = session.token;
     if (token == null) {
       if (!mounted) return;
-      AppToast.error(context, 'Yuborish uchun avval tizimga kiring');
+      AppToast.error(context, _ScanMetadataStrings.loginRequired(locale));
       return;
     }
 
@@ -258,7 +262,12 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
     } on ArchitectureOrderApiException catch (e) {
       if (mounted) AppToast.error(context, e.message);
     } catch (e) {
-      if (mounted) AppToast.error(context, 'Tarmoq xatosi: $e');
+      if (mounted) {
+        AppToast.error(
+          context,
+          '${_ScanMetadataStrings.networkError(locale)}: $e',
+        );
+      }
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -268,11 +277,21 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
     if (!_ready) return;
     HapticFeedback.lightImpact();
     // TODO: AI baholash flow'iga ulash (yangi ekran).
-    AppToast.success(context, 'AI baholash boshlandi…');
+    AppToast.success(
+      context,
+      _ScanMetadataStrings.aiValuationStarted(localeNotifier.value),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<Locale>(
+      valueListenable: localeNotifier,
+      builder: (context, locale, _) => _build(context, locale),
+    );
+  }
+
+  Widget _build(BuildContext context, Locale locale) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final labelColor = isDark ? Colors.white : AppColors.textBlack;
@@ -290,9 +309,9 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(
-                        title: '3D kadastr',
-                        subtitle: 'Ma\'lumotlarni tasdiqlang',
+                      child: ServiceAppBar(
+                        title: _ScanMetadataStrings.appBarTitle(locale),
+                        subtitle: _ScanMetadataStrings.appBarSubtitle(locale),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -304,23 +323,31 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
-                          _SectionLabel('Hudud', color: labelColor),
+                          _SectionLabel(
+                            _ScanMetadataStrings.sectionRegion(locale),
+                            color: labelColor,
+                          ),
                           const SizedBox(height: 10),
                           _PickerField(
-                            placeholder: 'Viloyatni tanlang',
+                            placeholder:
+                                _ScanMetadataStrings.pickViloyatTitle(locale),
                             value: _viloyat,
                             onTap: _pickViloyat,
                           ),
                           const SizedBox(height: 10),
                           _PickerField(
-                            placeholder: 'Tumanni tanlang',
+                            placeholder:
+                                _ScanMetadataStrings.pickTumanTitle(locale),
                             value: _tuman,
                             onTap: _viloyat == null ? null : _pickTuman,
                           ),
                           const SizedBox(height: 22),
-                          _SectionLabel('Xulosa', color: labelColor),
+                          _SectionLabel(
+                            _ScanMetadataStrings.sectionSummary(locale),
+                            color: labelColor,
+                          ),
                           const SizedBox(height: 10),
-                          _SummaryCard(draft: widget.draft),
+                          _SummaryCard(draft: widget.draft, locale: locale),
                           const SizedBox(height: 24),
                         ],
                       ),
@@ -332,8 +359,9 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
                         children: [
                           ListingCtaButton(
                             label: _submitting
-                                ? 'Yuborilmoqda…'
-                                : 'Mutaxasisga yuborish',
+                                ? _ScanMetadataStrings.sending(locale)
+                                : _ScanMetadataStrings
+                                    .submitToSpecialist(locale),
                             enabled: _ready && !_submitting,
                             onTap: _submitToSpecialist,
                           ),
@@ -352,9 +380,9 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
                                 borderRadius: BorderRadius.circular(999),
                               ),
                             ),
-                            child: const Text(
-                              'AI baholash',
-                              style: TextStyle(
+                            child: Text(
+                              _ScanMetadataStrings.aiValuationButton(locale),
+                              style: const TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
                                 fontSize: 15,
@@ -463,22 +491,48 @@ class _PickerField extends StatelessWidget {
   }
 }
 
-String _objectTypeLabel(ArchObjectType t) => switch (t) {
-      ArchObjectType.yakkaSmall => 'Yakka uy <500 m²',
-      ArchObjectType.yakkaLarge => 'Yakka uy >500 m²',
-      ArchObjectType.kopQavatli => 'Ko\'p qavatli turar-joy',
-      ArchObjectType.ofis => 'Ofis',
-      ArchObjectType.savdoMarkazi => 'Savdo markazi',
-      ArchObjectType.mehmonxona => 'Mehmonxona',
-      ArchObjectType.sanoat => 'Sanoat',
-      ArchObjectType.omborxona => 'Omborxona',
-      ArchObjectType.boshqa => 'Boshqa',
+String _objectTypeLabel(ArchObjectType t, Locale locale) =>
+    switch (locale.languageCode) {
+      'ru' => switch (t) {
+          ArchObjectType.yakkaSmall => 'Частный дом <500 м²',
+          ArchObjectType.yakkaLarge => 'Частный дом >500 м²',
+          ArchObjectType.kopQavatli => 'Многоквартирный дом',
+          ArchObjectType.ofis => 'Офис',
+          ArchObjectType.savdoMarkazi => 'Торговый центр',
+          ArchObjectType.mehmonxona => 'Гостиница',
+          ArchObjectType.sanoat => 'Промышленный',
+          ArchObjectType.omborxona => 'Склад',
+          ArchObjectType.boshqa => 'Другое',
+        },
+      'en' => switch (t) {
+          ArchObjectType.yakkaSmall => 'Single house <500 m²',
+          ArchObjectType.yakkaLarge => 'Single house >500 m²',
+          ArchObjectType.kopQavatli => 'Multi-family residence',
+          ArchObjectType.ofis => 'Office',
+          ArchObjectType.savdoMarkazi => 'Shopping mall',
+          ArchObjectType.mehmonxona => 'Hotel',
+          ArchObjectType.sanoat => 'Industrial',
+          ArchObjectType.omborxona => 'Warehouse',
+          ArchObjectType.boshqa => 'Other',
+        },
+      _ => switch (t) {
+          ArchObjectType.yakkaSmall => 'Yakka uy <500 m²',
+          ArchObjectType.yakkaLarge => 'Yakka uy >500 m²',
+          ArchObjectType.kopQavatli => 'Ko\'p qavatli turar-joy',
+          ArchObjectType.ofis => 'Ofis',
+          ArchObjectType.savdoMarkazi => 'Savdo markazi',
+          ArchObjectType.mehmonxona => 'Mehmonxona',
+          ArchObjectType.sanoat => 'Sanoat',
+          ArchObjectType.omborxona => 'Omborxona',
+          ArchObjectType.boshqa => 'Boshqa',
+        },
     };
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.draft});
+  const _SummaryCard({required this.draft, required this.locale});
 
   final ScanDraft draft;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -508,7 +562,7 @@ class _SummaryCard extends StatelessWidget {
         if (tz.email.trim().isNotEmpty) ('E-mail', tz.email),
         if (tz.objectName.trim().isNotEmpty) ('Obyekt nomi', tz.objectName),
         if (tz.objectType != null)
-          ('Loyiha turi', _objectTypeLabel(tz.objectType!)),
+          ('Loyiha turi', _objectTypeLabel(tz.objectType!, locale)),
         (
           'Qurilish turi',
           tz.constructionType.apiValue == 'rekonstruksiya'
@@ -575,4 +629,94 @@ class _SummaryCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ScanMetadataStrings {
+  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Регион и сводка',
+        'en' => 'Region & summary',
+        _ => 'Hudud va xulosa',
+      };
+
+  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Укажите регион и проверьте данные',
+        'en' => 'Select the region and review the data',
+        _ => 'Hududni tanlang va ma\'lumotlarni tekshiring',
+      };
+
+  static String sectionRegion(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Регион',
+        'en' => 'Region',
+        _ => 'Hudud',
+      };
+
+  static String sectionSummary(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Сводка',
+        'en' => 'Summary',
+        _ => 'Xulosa',
+      };
+
+  static String pickViloyatTitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Выберите регион',
+        'en' => 'Select region',
+        _ => 'Viloyatni tanlang',
+      };
+
+  static String pickTumanTitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Выберите район',
+        'en' => 'Select district',
+        _ => 'Tumanni tanlang',
+      };
+
+  static String tumanListSoon(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Список районов появится позже',
+        'en' => 'District list will be available soon',
+        _ => 'Tumanlar ro\'yxati keyinroq qo\'shiladi',
+      };
+
+  static String tzIncomplete(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Заявка ТЗ не заполнена',
+        'en' => 'TZ form is incomplete',
+        _ => 'TZ so\'rovnomasi to\'liq emas',
+      };
+
+  static String loginRequired(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Сначала войдите в аккаунт',
+        'en' => 'Please log in first',
+        _ => 'Avval tizimga kiring',
+      };
+
+  static String networkError(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Ошибка сети',
+        'en' => 'Network error',
+        _ => 'Tarmoq xatosi',
+      };
+
+  static String aiValuationStarted(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'AI-оценка скоро будет подключена',
+        'en' => 'AI valuation will be connected soon',
+        _ => 'AI baholash yaqinda ulanadi',
+      };
+
+  static String submitToSpecialist(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Отправить специалисту',
+        'en' => 'Submit to specialist',
+        _ => 'Mutaxassisga yuborish',
+      };
+
+  static String aiValuationButton(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'AI оценка',
+        'en' => 'AI valuation',
+        _ => 'AI baholash',
+      };
+
+  static String sending(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Отправка...',
+        'en' => 'Sending...',
+        _ => 'Yuborilmoqda...',
+      };
 }

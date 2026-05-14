@@ -211,6 +211,7 @@ class _MainShellState extends State<MainShell> {
             onRatingsTap: _openRatings,
             onMyScansTap: _openScans,
             onPaymentsTap: _openPayments,
+            onLoginTap: _openAuth,
           ),
         ],
       ),

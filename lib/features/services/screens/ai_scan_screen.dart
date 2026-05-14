@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/api_config.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
+import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../../settings/settings_state.dart';
 import '../data/room_plan_scanner.dart';
-import '../models/ai_valuation_draft.dart';
+import '../models/architecture_order_draft.dart';
 import '../widgets/scan_camera_card.dart';
 import '../widgets/scan_tips_card.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
-import 'ai_metadata_screen.dart';
+import 'ai_result_screen.dart';
+import 'calculator/arxitektura_tz_wizard_screen.dart';
 
 class AiScanScreen extends StatefulWidget {
   const AiScanScreen({super.key});
@@ -32,24 +36,55 @@ class _AiScanScreenState extends State<AiScanScreen> {
       if (!mounted) return;
       AppToast.error(
         context,
-        'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
-        '(iOS 16+ va LiDAR sensori).',
+        _AiScanStrings.unsupportedDevice(localeNotifier.value),
+      );
+      return;
+    }
+
+    // 3D pipeline tanlash — Polycam (default), AWS GPU (skip-COLMAP), Kiri 3DGS
+    final selectedProvider = await _pickProvider();
+    if (selectedProvider == null) return;  // foydalanuvchi bekor qildi
+
+    // Auth token kerak (server processing)
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null || token.isEmpty) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        'Skan uchun avval tizimga kiring',
       );
       return;
     }
 
     setState(() => _state = ScanCardState.scanning);
     try {
-      final result = await RoomPlanScanner.startTexturedScan();
+      // Provider'ga qarab algoritm avtomatik tanlanadi:
+      //   polycam — server-side WASM USDZ (30-60 daq)
+      //   aws_gpu — kadastr COLMAP+OpenMVS+USDZ, ARKit poses bilan tezroq
+      //   kiri_engine — Kiri cloud, 3DGS algoritmi (5-20 daq, $1/scan)
+      final algorithm = selectedProvider == 'kiri_engine' ? '3dgs' : '';
+      final hybrid = await RoomPlanScanner.startHybridScan(
+        baseUrl: ApiConfig.serverBaseUrl,
+        token: token,
+        provider: selectedProvider,
+        algorithm: algorithm,
+      );
       if (!mounted) return;
-      if (result == null) {
+      if (hybrid == null) {
         setState(() => _state = ScanCardState.idle);
         return;
       }
       setState(() {
-        _scanResult = result;
         _state = ScanCardState.done;
       });
+      final providerLabel = _providerLabel(selectedProvider);
+      final etaLabel = _providerEta(selectedProvider);
+      AppToast.success(
+        context,
+        'Foto\'lar $providerLabel\'ga yuborildi. 3D model $etaLabel\'da tayyor — '
+        'Arizalar bo\'limidan kuzating.',
+      );
     } on RoomPlanScannerException catch (e) {
       if (!mounted) return;
       setState(() => _state = ScanCardState.idle);
@@ -57,19 +92,99 @@ class _AiScanScreenState extends State<AiScanScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _state = ScanCardState.idle);
-      AppToast.error(context, 'Skan xatosi: $e');
+      AppToast.error(
+        context,
+        '${_AiScanStrings.scanError(localeNotifier.value)}: $e',
+      );
+    }
+  }
+
+  /// Bottom sheet — 3D pipeline tanlash. Foydalanuvchi cancel qilsa null
+  /// qaytaradi (skan boshlanmaydi).
+  Future<String?> _pickProvider() async {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _ProviderPickerSheet(),
+    );
+  }
+
+  String _providerLabel(String provider) {
+    switch (provider) {
+      case 'aws_gpu':
+        return 'AWS GPU';
+      case 'kiri_engine':
+        return 'Kiri';
+      case 'polycam':
+      default:
+        return 'Polycam';
+    }
+  }
+
+  String _providerEta(String provider) {
+    switch (provider) {
+      case 'aws_gpu':
+        return '15-30 daqiqa';
+      case 'kiri_engine':
+        return '5-20 daqiqa';
+      case 'polycam':
+      default:
+        return '30-60 daqiqa';
     }
   }
 
   void _continue() {
     if (_state != ScanCardState.done) return;
+    _openWizard(
+      scanCompleted: _scanResult != null,
+      areaM2: _scanResult?.floorAreaSqm,
+    );
+  }
+
+  void _skip() {
+    if (_state == ScanCardState.scanning) return;
+    HapticFeedback.lightImpact();
+    _openWizard(scanCompleted: false);
+  }
+
+  /// Skan/skip natijasini hisobga olib 9-step wizard ochish.
+  /// Wizard tugagandan keyin AI baholash natijasi ekraniga o'tadi.
+  void _openWizard({required bool scanCompleted, double? areaM2}) {
+    final initialDraft = ArchitectureOrderDraft();
+    if (areaM2 != null) {
+      // RoomPlan'dan kelgan maydonni initial qiymat sifatida qo'yamiz —
+      // foydalanuvchi step 3'da uni ko'radi va kerak bo'lsa to'g'rilaydi.
+      initialDraft.totalAreaSqm = areaM2;
+    }
+
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => AiMetadataScreen(
-          draft: AiValuationDraft(
-            scanCompleted: true,
-            areaM2: _scanResult?.floorAreaSqm,
+        builder: (_) => ArxitekturaTzWizardScreen(
+          mode: WizardMode.aiValuation,
+          initialDraft: initialDraft,
+          onSubmit: (draft) => _onWizardComplete(
+            draft: draft,
+            scanCompleted: scanCompleted,
+            scanArea: areaM2,
           ),
+        ),
+      ),
+    );
+  }
+
+  void _onWizardComplete({
+    required ArchitectureOrderDraft draft,
+    required bool scanCompleted,
+    double? scanArea,
+  }) {
+    HapticFeedback.lightImpact();
+    // Wizard'dan kelgan to'liq draft + skan natijasi → backend AI baholash.
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => AiResultScreen(
+          draft: draft,
+          scanCompleted: scanCompleted,
         ),
       ),
     );
@@ -86,12 +201,22 @@ class _AiScanScreenState extends State<AiScanScreen> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, 'Ko\'rsatish xatosi: $e');
+      AppToast.error(
+        context,
+        '${_AiScanStrings.previewError(localeNotifier.value)}: $e',
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<Locale>(
+      valueListenable: localeNotifier,
+      builder: (context, locale, _) => _build(context, locale),
+    );
+  }
+
+  Widget _build(BuildContext context, Locale locale) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final headingColor = isDark ? Colors.white : AppColors.textBlack;
@@ -112,9 +237,9 @@ class _AiScanScreenState extends State<AiScanScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(
-                        title: 'AI Baholash',
-                        subtitle: 'Ko\'chmas mulk qiymatini aniqlash',
+                      child: ServiceAppBar(
+                        title: _AiScanStrings.appBarTitle(locale),
+                        subtitle: _AiScanStrings.appBarSubtitle(locale),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -127,7 +252,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
                           Text(
-                            'Obyektni skan qiling',
+                            _AiScanStrings.heading(locale),
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
@@ -138,7 +263,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'RoomPlan LiDAR orqali skan qiling',
+                            _AiScanStrings.subheading(locale),
                             style: TextStyle(
                               fontFamily: 'MTSText',
                               fontSize: 13,
@@ -147,29 +272,63 @@ class _AiScanScreenState extends State<AiScanScreen> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          ScanCameraCard(state: _state, onTap: _startScan),
+                          ScanCameraCard(
+                            state: _state,
+                            onTap: _startScan,
+                            idleLabel: _AiScanStrings.cameraIdle(locale),
+                            scanningLabel:
+                                _AiScanStrings.cameraScanning(locale),
+                            doneLabel: _AiScanStrings.cameraDone(locale),
+                          ),
                           if (_state == ScanCardState.done &&
                               _scanResult != null) ...[
                             const SizedBox(height: 12),
-                            _PreviewButton(onTap: _preview),
+                            _PreviewButton(
+                              onTap: _preview,
+                              label: _AiScanStrings.preview3dModel(locale),
+                            ),
                           ],
                           const SizedBox(height: 16),
-                          const ScanTipsCard(),
+                          ScanTipsCard(tips: _AiScanStrings.tips(locale)),
                         ],
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
                       child: ListingCtaButton(
                         label: _state == ScanCardState.done
-                            ? 'Davom etish'
-                            : 'Scan boshlash',
+                            ? _AiScanStrings.ctaContinue(locale)
+                            : _AiScanStrings.ctaStart(locale),
                         enabled: _state != ScanCardState.scanning,
                         onTap: _state == ScanCardState.done
                             ? _continue
                             : _startScan,
                       ),
                     ),
+                    if (_state != ScanCardState.done)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                        child: TextButton(
+                          onPressed: _state == ScanCardState.scanning
+                              ? null
+                              : _skip,
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size.fromHeight(44),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                          child: Text(
+                            _AiScanStrings.ctaSkip(locale),
+                            style: TextStyle(
+                              fontFamily: 'MTSCompact',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: subColor,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -182,9 +341,10 @@ class _AiScanScreenState extends State<AiScanScreen> {
 }
 
 class _PreviewButton extends StatelessWidget {
-  const _PreviewButton({required this.onTap});
+  const _PreviewButton({required this.onTap, required this.label});
 
   final VoidCallback onTap;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
@@ -212,7 +372,7 @@ class _PreviewButton extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  '3D modelni ko\'rish',
+                  label,
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -225,6 +385,311 @@ class _PreviewButton extends StatelessWidget {
                   color: textColor.withValues(alpha: 0.4), size: 22),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Locale-aware strings for the AI valuation scan screen.
+/// Keeps the inline `switch (locale.languageCode)` pattern used elsewhere
+/// in the app (see `home_cta.dart`).
+class _AiScanStrings {
+  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'AI Оценка',
+        'en' => 'AI Valuation',
+        _ => 'AI Baholash',
+      };
+
+  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Определение стоимости недвижимости',
+        'en' => 'Determine property value',
+        _ => 'Ko\'chmas mulk qiymatini aniqlash',
+      };
+
+  static String heading(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Сканируйте объект',
+        'en' => 'Scan the object',
+        _ => 'Obyektni skan qiling',
+      };
+
+  static String subheading(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Сканируйте через RoomPlan LiDAR',
+        'en' => 'Scan via RoomPlan LiDAR',
+        _ => 'RoomPlan LiDAR orqali skan qiling',
+      };
+
+  static String cameraIdle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Запустите LiDAR-камеру',
+        'en' => 'Start LiDAR camera',
+        _ => 'LiDAR kamerani ishga tushiring',
+      };
+
+  static String cameraScanning(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Сканирование...',
+        'en' => 'Scanning...',
+        _ => 'Skanerlanmoqda...',
+      };
+
+  static String cameraDone(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Скан готов',
+        'en' => 'Scan ready',
+        _ => 'Skan tayyor',
+      };
+
+  static List<String> tips(Locale locale) => switch (locale.languageCode) {
+        'ru' => const [
+            'Двигайте устройство медленно',
+            'Охватите всю комнату',
+            'Освещение должно быть достаточным',
+          ],
+        'en' => const [
+            'Move the device slowly',
+            'Cover the entire room',
+            'Sufficient lighting is required',
+          ],
+        _ => const [
+            'Qurilmani sekin harakatlantiring',
+            'Xonani to\'liq qamrab oling',
+            'Yorug\'lik yetarli bo\'lishi kerak',
+          ],
+      };
+
+  static String ctaStart(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Начать сканирование',
+        'en' => 'Start scan',
+        _ => 'Scan boshlash',
+      };
+
+  static String ctaContinue(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Продолжить',
+        'en' => 'Continue',
+        _ => 'Davom etish',
+      };
+
+  static String ctaSkip(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Пропустить и продолжить',
+        'en' => 'Skip and continue',
+        _ => 'O\'tkazib yuborish',
+      };
+
+  static String preview3dModel(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Просмотр 3D-модели',
+        'en' => 'View 3D model',
+        _ => '3D modelni ko\'rish',
+      };
+
+  static String unsupportedDevice(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' =>
+          'На этом устройстве нет RoomPlan. Требуется iPhone Pro или iPad Pro '
+              '(iOS 16+ и LiDAR-сенсор).',
+        'en' =>
+          'This device does not support RoomPlan. iPhone Pro or iPad Pro is '
+              'required (iOS 16+ with a LiDAR sensor).',
+        _ => 'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
+            '(iOS 16+ va LiDAR sensori).',
+      };
+
+  static String scanError(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Ошибка сканирования',
+        'en' => 'Scan error',
+        _ => 'Skan xatosi',
+      };
+
+  static String previewError(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Ошибка просмотра',
+        'en' => 'Preview error',
+        _ => 'Ko\'rsatish xatosi',
+      };
+
+}
+
+/// 3D pipeline tanlash uchun bottom sheet — Polycam / AWS GPU / Kiri.
+/// Foydalanuvchi tanlagan provider id'sini Navigator.pop bilan qaytaradi.
+class _ProviderPickerSheet extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              '3D pipeline tanlang',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Foto\'lar qaysi tizimda 3D model qilinsin?',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white60,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            _providerCard(
+              context,
+              id: 'polycam',
+              title: 'Polycam',
+              subtitle: 'Web UI orqali, sifat baland (mesh-based USDZ)',
+              eta: '30-60 daqiqa',
+              icon: Icons.cloud,
+              color: const Color(0xFFE85A4F),
+            ),
+            const SizedBox(height: 12),
+            _providerCard(
+              context,
+              id: 'aws_gpu',
+              title: 'AWS GPU (kadastr)',
+              subtitle: 'O\'z server, ARKit pose\'lar bilan tezroq + arzon',
+              eta: '15-30 daqiqa',
+              icon: Icons.memory,
+              color: const Color(0xFFFF9900),
+              recommended: true,
+            ),
+            const SizedBox(height: 12),
+            _providerCard(
+              context,
+              id: 'kiri_engine',
+              title: 'Kiri Engine 3DGS',
+              subtitle: 'Gaussian Splatting — past sifatli foto\'larga ham yaxshi',
+              eta: '5-20 daqiqa',
+              icon: Icons.auto_awesome,
+              color: const Color(0xFF3DB99F),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Bekor qilish'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _providerCard(
+    BuildContext context, {
+    required String id,
+    required String title,
+    required String subtitle,
+    required String eta,
+    required IconData icon,
+    required Color color,
+    bool recommended = false,
+  }) {
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(id),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: recommended ? color : Colors.white12,
+            width: recommended ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.18),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (recommended) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: color.withOpacity(0.22),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'TAVSIYA',
+                            style: TextStyle(
+                              color: color,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white60,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule,
+                          size: 12, color: Colors.white54),
+                      const SizedBox(width: 4),
+                      Text(
+                        eta,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white24),
+          ],
         ),
       ),
     );

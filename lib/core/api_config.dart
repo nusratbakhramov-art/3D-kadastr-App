@@ -3,7 +3,8 @@ class ApiConfig {
 
   /// Backend host (no path). Used for static assets, presigned URLs that
   /// come back relative, etc.
-  static const String serverBaseUrl = 'http://192.168.1.8:8009';
+  static const String serverBaseUrl = 'http://192.168.1.37:8009';
+  // Prod: 'https://api.3dkadastr.uz'
 
   /// API prefix — versioned REST endpoints live here.
   static const String baseUrl = '$serverBaseUrl/api/v1';

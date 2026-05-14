@@ -42,13 +42,40 @@ class DownloadInfo {
 }
 
 class MarketplaceApiService {
-  MarketplaceApiService({http.Client? client, String? baseUrl})
+  MarketplaceApiService({http.Client? client, String? baseUrl, String? locale})
     : _client = client ?? http.Client(),
-      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+      _baseUrl = baseUrl ?? ApiConfig.baseUrl,
+      _locale = locale;
 
   final http.Client _client;
   final String _baseUrl;
+  final String? _locale;
   static const Duration _timeout = Duration(seconds: 15);
+
+  Map<String, String> _headers([Map<String, String>? extra]) {
+    final h = <String, String>{};
+    if (_locale != null && _locale.isNotEmpty) h['Accept-Language'] = _locale;
+    if (extra != null) h.addAll(extra);
+    return h;
+  }
+
+  Future<List<MarketCategoryRemote>> fetchCategories() async {
+    final uri = Uri.parse('$_baseUrl/marketplace/categories');
+    final res = await _client.get(uri, headers: _headers()).timeout(_timeout);
+    if (res.statusCode != 200) _throw(res);
+    final body = jsonDecode(res.body) as List;
+    return body
+        .cast<Map<String, dynamic>>()
+        .map(
+          (m) => MarketCategoryRemote(
+            id: (m['id'] as num).toInt(),
+            slug: m['slug'] as String,
+            name: m['name'] as String,
+            sortOrder: (m['sort_order'] as num?)?.toInt() ?? 0,
+          ),
+        )
+        .toList(growable: false);
+  }
 
   Future<MarketplaceListPage> listModels({
     String? category,
@@ -68,7 +95,7 @@ class MarketplaceApiService {
       '$_baseUrl/marketplace/',
     ).replace(queryParameters: params);
 
-    final res = await _client.get(uri).timeout(_timeout);
+    final res = await _client.get(uri, headers: _headers()).timeout(_timeout);
     if (res.statusCode != 200) _throw(res);
 
     final body = jsonDecode(res.body) as Map<String, dynamic>;
@@ -84,7 +111,7 @@ class MarketplaceApiService {
 
   Future<MarketListing> getModel(int id) async {
     final res = await _client
-        .get(Uri.parse('$_baseUrl/marketplace/$id'))
+        .get(Uri.parse('$_baseUrl/marketplace/$id'), headers: _headers())
         .timeout(_timeout);
     if (res.statusCode != 200) _throw(res);
     return _parseListing(jsonDecode(res.body) as Map<String, dynamic>);
@@ -139,14 +166,17 @@ class MarketplaceApiService {
 
     final scenes = ((json['scenes'] as List?) ?? const [])
         .cast<Map<String, dynamic>>()
-        .map(
-          (s) => MarketListingScene(
+        .map((s) {
+          final rawUrl = s['preview_url'] as String?;
+          return MarketListingScene(
             id: (s['id'] as num).toInt(),
             name: s['name'] as String? ?? '',
-            previewUrl: s['preview_url'] as String?,
+            previewUrl: (rawUrl == null || rawUrl.isEmpty)
+                ? null
+                : ApiConfig.resolveUrl(rawUrl),
             sortOrder: (s['sort_order'] as num?)?.toInt() ?? 0,
-          ),
-        )
+          );
+        })
         .toList(growable: false);
 
     final files = ((json['files'] as List?) ?? const [])
@@ -167,29 +197,26 @@ class MarketplaceApiService {
       title: name,
       district: region,
       areaM2: area,
-      categoryId: _mapCategory(json['category'] as String? ?? 'other'),
+      categoryId: (json['category'] as String? ?? 'other').toLowerCase(),
+      categoryLabel: json['category_label'] as String?,
       description: json['description'] as String?,
       isFree: isFree,
       scenes: scenes,
       files: files,
     );
   }
+}
 
-  // Backend has 6 categories; mobile UI groups them into 3 chip-friendly
-  // buckets. Mapping is purely for filter UX — the original value is not lost
-  // because the chip itself filters server-side via `category` query param.
-  String _mapCategory(String backend) {
-    switch (backend) {
-      case 'residential':
-        return 'residential';
-      case 'commercial':
-      case 'industrial':
-        return 'nonresidential';
-      case 'architectural':
-      case 'interior':
-      case 'other':
-      default:
-        return 'projects';
-    }
-  }
+class MarketCategoryRemote {
+  const MarketCategoryRemote({
+    required this.id,
+    required this.slug,
+    required this.name,
+    required this.sortOrder,
+  });
+
+  final int id;
+  final String slug;
+  final String name;
+  final int sortOrder;
 }

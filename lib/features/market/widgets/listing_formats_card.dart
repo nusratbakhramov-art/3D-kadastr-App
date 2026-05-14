@@ -2,17 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
-import '../models/listing_format.dart';
+import '../models/market_listing.dart';
 
 class ListingFormatsCard extends StatelessWidget {
   const ListingFormatsCard({
     super.key,
-    required this.selected,
-    required this.onChanged,
+    required this.files,
+    required this.onTap,
+    this.downloadingFileId,
   });
 
-  final ListingFormat selected;
-  final ValueChanged<ListingFormat> onChanged;
+  /// Files available for this listing (only these formats are shown).
+  final List<MarketListingFile> files;
+
+  /// Called when a chip is tapped — receives the file to download.
+  final ValueChanged<MarketListingFile> onTap;
+
+  /// If non-null, that file's chip shows a spinner.
+  final int? downloadingFileId;
 
   @override
   Widget build(BuildContext context) {
@@ -20,6 +27,10 @@ class ListingFormatsCard extends StatelessWidget {
     final bg = isDark ? const Color(0xFF121617) : Colors.white;
     final fg = isDark ? Colors.white : AppColors.textBlack;
     final border = isDark ? null : Border.all(color: const Color(0xFFE3E5E8));
+
+    if (files.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -46,13 +57,14 @@ class ListingFormatsCard extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              for (final f in ListingFormat.values)
+              for (final f in files)
                 _FormatChip(
-                  label: f.label,
-                  selected: f == selected,
+                  label: _formatLabel(f.format),
+                  loading: downloadingFileId == f.id,
                   onTap: () {
+                    if (downloadingFileId != null) return;
                     HapticFeedback.selectionClick();
-                    onChanged(f);
+                    onTap(f);
                   },
                   fg: fg,
                 ),
@@ -62,30 +74,35 @@ class ListingFormatsCard extends StatelessWidget {
       ),
     );
   }
+
+  static String _formatLabel(String raw) {
+    final u = raw.toUpperCase();
+    return u == 'GLTF' ? 'glTF' : u;
+  }
 }
 
 class _FormatChip extends StatelessWidget {
   const _FormatChip({
     required this.label,
-    required this.selected,
+    required this.loading,
     required this.onTap,
     required this.fg,
   });
 
   final String label;
-  final bool selected;
+  final bool loading;
   final VoidCallback onTap;
   final Color fg;
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = selected
+    final borderColor = loading
         ? AppColors.splashGreen
         : const Color(0xFFD1D5D9);
-    final textColor = selected
+    final textColor = loading
         ? AppColors.splashGreen
         : fg.withValues(alpha: 0.8);
-    final bg = selected
+    final bg = loading
         ? AppColors.splashGreen.withValues(alpha: 0.12)
         : Colors.transparent;
 
@@ -95,23 +112,38 @@ class _FormatChip extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+        child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: borderColor, width: 1),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-              height: 1.2,
-              letterSpacing: 0.2,
-              color: textColor,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (loading) ...[
+                SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 1.6,
+                    valueColor: AlwaysStoppedAnimation(AppColors.splashGreen),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  height: 1.2,
+                  letterSpacing: 0.2,
+                  color: textColor,
+                ),
+              ),
+            ],
           ),
         ),
       ),

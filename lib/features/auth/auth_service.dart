@@ -14,8 +14,13 @@ class OtpTicket {
 }
 
 class VerifyResult {
-  const VerifyResult({required this.token, required this.isNewUser});
+  const VerifyResult({
+    required this.token,
+    required this.isNewUser,
+    this.refreshToken,
+  });
   final String token;
+  final String? refreshToken;
   final bool isNewUser;
 }
 

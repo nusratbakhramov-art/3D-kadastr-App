@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../settings/settings_state.dart';
 import '../data/scan_capability_probe.dart';
 import '../models/scan_capability.dart';
 import '../widgets/service_app_bar.dart';
@@ -27,6 +28,13 @@ class _ScanDiagnosticsScreenState extends State<ScanDiagnosticsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<Locale>(
+      valueListenable: localeNotifier,
+      builder: (context, locale, _) => _build(context, locale),
+    );
+  }
+
+  Widget _build(BuildContext context, Locale locale) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -43,9 +51,10 @@ class _ScanDiagnosticsScreenState extends State<ScanDiagnosticsScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(
-                        title: 'Scan diagnostika',
-                        subtitle: 'LiDAR / depth sensor probe',
+                      child: ServiceAppBar(
+                        title: _ScanDiagnosticsStrings.appBarTitle(locale),
+                        subtitle:
+                            _ScanDiagnosticsStrings.appBarSubtitle(locale),
                       ),
                     ),
                     Expanded(
@@ -62,12 +71,14 @@ class _ScanDiagnosticsScreenState extends State<ScanDiagnosticsScreen> {
                               error: snap.error.toString(),
                               onRetry: _reprobe,
                               isDark: isDark,
+                              locale: locale,
                             );
                           }
                           return _ResultBody(
                             capability: snap.requireData,
                             onReprobe: _reprobe,
                             isDark: isDark,
+                            locale: locale,
                           );
                         },
                       ),
@@ -88,11 +99,13 @@ class _ResultBody extends StatelessWidget {
     required this.capability,
     required this.onReprobe,
     required this.isDark,
+    required this.locale,
   });
 
   final ScanCapability capability;
   final VoidCallback onReprobe;
   final bool isDark;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -100,7 +113,7 @@ class _ResultBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       children: [
-        _TierBanner(tier: tier, isDark: isDark),
+        _TierBanner(tier: tier, isDark: isDark, locale: locale),
         const SizedBox(height: 16),
         _SectionLabel('Probe', isDark: isDark),
         const SizedBox(height: 8),
@@ -134,9 +147,9 @@ class _ResultBody extends StatelessWidget {
           ),
           onPressed: onReprobe,
           icon: const Icon(Icons.refresh_rounded),
-          label: const Text(
-            'Re-probe',
-            style: TextStyle(
+          label: Text(
+            _ScanDiagnosticsStrings.reprobe(locale),
+            style: const TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
             ),
@@ -150,10 +163,15 @@ class _ResultBody extends StatelessWidget {
 }
 
 class _TierBanner extends StatelessWidget {
-  const _TierBanner({required this.tier, required this.isDark});
+  const _TierBanner({
+    required this.tier,
+    required this.isDark,
+    required this.locale,
+  });
 
   final ScanTier tier;
   final bool isDark;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -161,27 +179,27 @@ class _TierBanner extends StatelessWidget {
       ScanTier.roomPlan => (
         'RoomPlan + LiDAR',
         const Color(0xFF00E135),
-        'Bu qurilmada to\'liq RoomPlan skani mavjud.',
+        _ScanDiagnosticsStrings.tierRoomPlanHint(locale),
       ),
       ScanTier.lidar => (
         'LiDAR',
         const Color(0xFF00E135),
-        'LiDAR mesh rekonstruksiyasi mavjud, RoomPlan yo\'q (iOS < 16).',
+        _ScanDiagnosticsStrings.tierLidarHint(locale),
       ),
       ScanTier.depthApi => (
         'ARCore Depth API',
         const Color(0xFF22D3EE),
-        'Hardware LiDAR yo\'q, lekin depth sensing mavjud.',
+        _ScanDiagnosticsStrings.tierDepthHint(locale),
       ),
       ScanTier.photogrammetry => (
-        'Fotogrammetriya',
+        _ScanDiagnosticsStrings.tierPhotogrammetryLabel(locale),
         const Color(0xFFF59E0B),
-        'Real-time depth yo\'q. Foto-asosli skanga fallback bo\'ladi.',
+        _ScanDiagnosticsStrings.tierPhotogrammetryHint(locale),
       ),
       ScanTier.unsupported => (
-        'Qo\'llab-quvvatlanmaydi',
+        _ScanDiagnosticsStrings.tierUnsupportedLabel(locale),
         const Color(0xFFEF4444),
-        '3D skan ishlamaydi.',
+        _ScanDiagnosticsStrings.tierUnsupportedHint(locale),
       ),
     };
 
@@ -211,7 +229,7 @@ class _TierBanner extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'Tanlangan tier',
+                _ScanDiagnosticsStrings.selectedTier(locale),
                 style: TextStyle(
                   fontFamily: 'MTSText',
                   fontSize: 12,
@@ -332,11 +350,13 @@ class _ErrorBody extends StatelessWidget {
     required this.error,
     required this.onRetry,
     required this.isDark,
+    required this.locale,
   });
 
   final String error;
   final VoidCallback onRetry;
   final bool isDark;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -349,7 +369,7 @@ class _ErrorBody extends StatelessWidget {
           Icon(Icons.error_outline_rounded, size: 48, color: fg),
           const SizedBox(height: 12),
           Text(
-            'Probe xatoligi',
+            _ScanDiagnosticsStrings.probeError(locale),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
@@ -368,9 +388,102 @@ class _ErrorBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: onRetry, child: const Text('Retry')),
+          FilledButton(
+            onPressed: onRetry,
+            child: Text(_ScanDiagnosticsStrings.retry(locale)),
+          ),
         ],
       ),
     );
   }
+}
+
+class _ScanDiagnosticsStrings {
+  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Диагностика сканирования',
+        'en' => 'Scan diagnostics',
+        _ => 'Skan diagnostika',
+      };
+
+  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'LiDAR / depth sensor probe',
+        'en' => 'LiDAR / depth sensor probe',
+        _ => 'LiDAR / depth sensor probe',
+      };
+
+  static String selectedTier(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Выбранный уровень',
+        'en' => 'Selected tier',
+        _ => 'Tanlangan tier',
+      };
+
+  static String reprobe(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Перепроверить',
+        'en' => 'Re-probe',
+        _ => 'Qayta tekshirish',
+      };
+
+  static String retry(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Повторить',
+        'en' => 'Retry',
+        _ => 'Qayta urinish',
+      };
+
+  static String probeError(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Ошибка проверки',
+        'en' => 'Probe error',
+        _ => 'Probe xatoligi',
+      };
+
+  static String tierRoomPlanHint(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'На этом устройстве доступно полное RoomPlan-сканирование.',
+        'en' => 'Full RoomPlan scanning is available on this device.',
+        _ => 'Bu qurilmada to\'liq RoomPlan skani mavjud.',
+      };
+
+  static String tierLidarHint(Locale locale) => switch (locale.languageCode) {
+        'ru' =>
+          'Доступна реконструкция меша LiDAR, RoomPlan нет (iOS < 16).',
+        'en' =>
+          'LiDAR mesh reconstruction is available, no RoomPlan (iOS < 16).',
+        _ => 'LiDAR mesh rekonstruksiyasi mavjud, RoomPlan yo\'q (iOS < 16).',
+      };
+
+  static String tierDepthHint(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Аппаратного LiDAR нет, но depth sensing доступен.',
+        'en' => 'No hardware LiDAR, but depth sensing is available.',
+        _ => 'Hardware LiDAR yo\'q, lekin depth sensing mavjud.',
+      };
+
+  static String tierPhotogrammetryLabel(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Фотограмметрия',
+        'en' => 'Photogrammetry',
+        _ => 'Fotogrammetriya',
+      };
+
+  static String tierPhotogrammetryHint(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' =>
+          'Real-time depth нет. Будет fallback на фото-сканирование.',
+        'en' =>
+          'No real-time depth. Will fall back to photo-based scanning.',
+        _ =>
+          'Real-time depth yo\'q. Foto-asosli skanga fallback bo\'ladi.',
+      };
+
+  static String tierUnsupportedLabel(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Не поддерживается',
+        'en' => 'Unsupported',
+        _ => 'Qo\'llab-quvvatlanmaydi',
+      };
+
+  static String tierUnsupportedHint(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => '3D-сканирование не работает.',
+        'en' => '3D scanning is not available.',
+        _ => '3D skan ishlamaydi.',
+      };
 }

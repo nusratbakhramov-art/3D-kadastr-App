@@ -16,6 +16,7 @@ import VideoToolbox
 import UniformTypeIdentifiers
 import RealityKit
 import CoreMotion
+import AVFoundation
 #if canImport(RoomPlan)
 import RoomPlan
 #endif
@@ -1016,6 +1017,14 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     private var statusLabel: UILabel!
     private var doneBtn: UIButton!
     private var cancelBtn: UIButton!
+    private var pauseBtn: UIButton!
+    private var flashlightBtn: UIButton!
+    private var trackingLostBanner: UILabel!
+    private var pauseOverlay: UIView!  // ko'k tint paused state'da
+    private var pauseMessageLabel: UILabel!
+    private var startOverBtn: UIButton!
+    private var isPaused: Bool = false
+    private var isFlashlightOn: Bool = false
     // Polycam-style overlays
     private var areaPill: UILabel!         // "est X m²" yuqori chapda
     private var photoPill: UILabel!        // "Foto: N" yuqori o'ngda
@@ -1032,8 +1041,6 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     /// Anchor birinchi marta ko'rilgandan keyin shuncha sekund o'tgach geometry
     /// yangilanishi to'xtaydi — ARKit drift'i visualizatsiyani buzmasligi uchun.
     /// Foto capture davom etadi, lekin ko'rgan mesh barqaror qoladi.
-    private var anchorFreezeTime: [UUID: TimeInterval] = [:]
-    private let anchorFreezeAfterSec: TimeInterval = 4.0
     private var lastFramePos: SIMD3<Float>?
     private var lastFrameTime: TimeInterval = 0
     private var lastSpeedSamples: [Float] = []  // moving avg, m/s
@@ -1145,35 +1152,81 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     }
 
     private func setupOverlay() {
+        // Polycam-style: katta dumaloq Pause/Resume tugmasi markaz-pastda
+        pauseBtn = UIButton(type: .system)
+        pauseBtn.tintColor = .white
+        let pauseImage = UIImage(systemName: "pause.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .bold))
+        pauseBtn.setImage(pauseImage, for: .normal)
+        pauseBtn.backgroundColor = UIColor.clear
+        pauseBtn.layer.borderWidth = 3
+        pauseBtn.layer.borderColor = UIColor.white.withAlphaComponent(0.95).cgColor
+        pauseBtn.layer.cornerRadius = 36
+        pauseBtn.translatesAutoresizingMaskIntoConstraints = false
+        pauseBtn.addTarget(self, action: #selector(pauseTapped), for: .touchUpInside)
+        view.addSubview(pauseBtn)
+
+        // Done — o'ng tomonda, Polycam style oval check tugmasi
         doneBtn = UIButton(type: .system)
-        doneBtn.setTitle("Tugatish", for: .normal)
+        doneBtn.setTitle("  Done", for: .normal)
+        doneBtn.setImage(UIImage(systemName: "checkmark",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .bold)), for: .normal)
+        doneBtn.tintColor = .white
         doneBtn.setTitleColor(.white, for: .normal)
-        doneBtn.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
-        doneBtn.backgroundColor = UIColor(red: 0, green: 0.88, blue: 0.21, alpha: 1)
+        doneBtn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        doneBtn.backgroundColor = UIColor.clear
+        doneBtn.layer.borderWidth = 1.5
+        doneBtn.layer.borderColor = UIColor.white.withAlphaComponent(0.55).cgColor
         doneBtn.layer.cornerRadius = 24
+        doneBtn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 18, bottom: 0, right: 22)
         doneBtn.translatesAutoresizingMaskIntoConstraints = false
         doneBtn.addTarget(self, action: #selector(doneTapped), for: .touchUpInside)
         view.addSubview(doneBtn)
 
+        // X close (cancelBtn) — top right (Polycam)
         cancelBtn = UIButton(type: .system)
-        cancelBtn.setTitle("Bekor qilish", for: .normal)
-        cancelBtn.setTitleColor(.white, for: .normal)
-        cancelBtn.titleLabel?.font = .systemFont(ofSize: 15, weight: .semibold)
-        cancelBtn.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        cancelBtn.setImage(UIImage(systemName: "xmark",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 16, weight: .semibold)), for: .normal)
+        cancelBtn.tintColor = .white
+        cancelBtn.backgroundColor = UIColor.clear
+        cancelBtn.layer.borderWidth = 1.5
+        cancelBtn.layer.borderColor = UIColor.white.withAlphaComponent(0.55).cgColor
         cancelBtn.layer.cornerRadius = 18
         cancelBtn.translatesAutoresizingMaskIntoConstraints = false
         cancelBtn.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
         view.addSubview(cancelBtn)
 
+        // Flashlight toggle — o'ng yon (Polycam)
+        flashlightBtn = UIButton(type: .system)
+        flashlightBtn.setImage(UIImage(systemName: "flashlight.off.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)), for: .normal)
+        flashlightBtn.tintColor = .white
+        flashlightBtn.backgroundColor = UIColor.black.withAlphaComponent(0.35)
+        flashlightBtn.layer.cornerRadius = 22
+        flashlightBtn.translatesAutoresizingMaskIntoConstraints = false
+        flashlightBtn.addTarget(self, action: #selector(flashlightTapped), for: .touchUpInside)
+        view.addSubview(flashlightBtn)
+
+        // Tracking lost banner — Polycam style oq pill markaz-pastda
+        trackingLostBanner = UILabel()
+        trackingLostBanner.text = "Session tracking lost, trying to relocalize"
+        trackingLostBanner.textColor = .black
+        trackingLostBanner.textAlignment = .center
+        trackingLostBanner.font = .systemFont(ofSize: 14, weight: .medium)
+        trackingLostBanner.backgroundColor = UIColor.white.withAlphaComponent(0.95)
+        trackingLostBanner.layer.cornerRadius = 12
+        trackingLostBanner.layer.masksToBounds = true
+        trackingLostBanner.translatesAutoresizingMaskIntoConstraints = false
+        trackingLostBanner.isHidden = true
+        view.addSubview(trackingLostBanner)
+
         statusLabel = UILabel()
-        statusLabel.text = "Sekin yurib, xona bo'ylab kameragayni aylantiring (kamida 20 ta foto)"
+        statusLabel.text = ""
         statusLabel.textColor = .white
         statusLabel.textAlignment = .center
         statusLabel.numberOfLines = 2
         statusLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        statusLabel.backgroundColor = UIColor.black.withAlphaComponent(0.55)
-        statusLabel.layer.cornerRadius = 12
-        statusLabel.layer.masksToBounds = true
+        statusLabel.backgroundColor = .clear
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(statusLabel)
 
@@ -1216,43 +1269,114 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         view.addSubview(speedWarning)
 
         NSLayoutConstraint.activate([
-            doneBtn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
-            doneBtn.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            doneBtn.widthAnchor.constraint(equalToConstant: 200),
+            // Pause — markaz-pastda katta dumaloq
+            pauseBtn.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -32),
+            pauseBtn.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            pauseBtn.widthAnchor.constraint(equalToConstant: 72),
+            pauseBtn.heightAnchor.constraint(equalToConstant: 72),
+
+            // Done — o'ng tomonda, pause yonida
+            doneBtn.centerYAnchor.constraint(equalTo: pauseBtn.centerYAnchor),
+            doneBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
             doneBtn.heightAnchor.constraint(equalToConstant: 48),
 
+            // Cancel — top right (X)
             cancelBtn.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-            cancelBtn.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            cancelBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             cancelBtn.heightAnchor.constraint(equalToConstant: 36),
-            cancelBtn.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
+            cancelBtn.widthAnchor.constraint(equalToConstant: 36),
 
-            statusLabel.bottomAnchor.constraint(equalTo: doneBtn.topAnchor, constant: -16),
+            // Flashlight — o'ng yon, ekran o'rtasida
+            flashlightBtn.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            flashlightBtn.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            flashlightBtn.widthAnchor.constraint(equalToConstant: 44),
+            flashlightBtn.heightAnchor.constraint(equalToConstant: 44),
+
+            // Tracking lost banner — markaz-pastda
+            trackingLostBanner.bottomAnchor.constraint(equalTo: pauseBtn.topAnchor, constant: -24),
+            trackingLostBanner.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            trackingLostBanner.heightAnchor.constraint(equalToConstant: 36),
+            trackingLostBanner.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 32),
+            trackingLostBanner.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -32),
+
+            statusLabel.bottomAnchor.constraint(equalTo: pauseBtn.topAnchor, constant: -8),
             statusLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 24),
             statusLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -24),
-            statusLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
 
-            areaPill.topAnchor.constraint(equalTo: cancelBtn.bottomAnchor, constant: 12),
+            // Area pill — top left (Polycam style)
+            areaPill.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
             areaPill.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            areaPill.heightAnchor.constraint(equalToConstant: 28),
-            areaPill.widthAnchor.constraint(greaterThanOrEqualToConstant: 86),
+            areaPill.heightAnchor.constraint(equalToConstant: 32),
+            areaPill.widthAnchor.constraint(greaterThanOrEqualToConstant: 110),
 
-            photoPill.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 12),
-            photoPill.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            // Photo pill — areaPill ostida
+            photoPill.topAnchor.constraint(equalTo: areaPill.bottomAnchor, constant: 8),
+            photoPill.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             photoPill.heightAnchor.constraint(equalToConstant: 28),
             photoPill.widthAnchor.constraint(greaterThanOrEqualToConstant: 86),
 
             speedWarning.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            speedWarning.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -80),
+            speedWarning.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -120),
             speedWarning.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 24),
             speedWarning.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -24),
             speedWarning.heightAnchor.constraint(greaterThanOrEqualToConstant: 40),
         ])
 
-        // Update areaPill / speedWarning insets so text isn't crammed.
         for pill in [areaPill, photoPill] as [UILabel] {
             pill.layer.borderColor = UIColor.black.withAlphaComponent(0.1).cgColor
             pill.layer.borderWidth = 0.5
         }
+
+        setupPauseOverlay()
+    }
+
+    /// Pause holatida ko'k ramka + "Move iPhone to start" + Start Over tugmasi.
+    /// Dastlab yashirilgan, pauseTapped'da ko'rsatiladi.
+    private func setupPauseOverlay() {
+        pauseOverlay = UIView()
+        pauseOverlay.backgroundColor = UIColor(red: 0.05, green: 0.10, blue: 0.30, alpha: 0.55)
+        pauseOverlay.translatesAutoresizingMaskIntoConstraints = false
+        pauseOverlay.isHidden = true
+        view.addSubview(pauseOverlay)
+
+        // "Move iPhone to start" markazda
+        pauseMessageLabel = UILabel()
+        pauseMessageLabel.text = "iPhone'ni harakatlantiring"
+        pauseMessageLabel.textColor = .white
+        pauseMessageLabel.font = .systemFont(ofSize: 18, weight: .medium)
+        pauseMessageLabel.textAlignment = .center
+        pauseMessageLabel.translatesAutoresizingMaskIntoConstraints = false
+        pauseOverlay.addSubview(pauseMessageLabel)
+
+        // Start Over tugmasi pause overlay ichida
+        startOverBtn = UIButton(type: .system)
+        startOverBtn.setTitle("Boshidan boshlash", for: .normal)
+        startOverBtn.setTitleColor(.white, for: .normal)
+        startOverBtn.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        startOverBtn.backgroundColor = UIColor.clear
+        startOverBtn.layer.borderWidth = 1.5
+        startOverBtn.layer.borderColor = UIColor.white.withAlphaComponent(0.7).cgColor
+        startOverBtn.layer.cornerRadius = 22
+        startOverBtn.contentEdgeInsets = UIEdgeInsets(top: 0, left: 24, bottom: 0, right: 24)
+        startOverBtn.translatesAutoresizingMaskIntoConstraints = false
+        startOverBtn.addTarget(self, action: #selector(startOverTapped), for: .touchUpInside)
+        pauseOverlay.addSubview(startOverBtn)
+
+        NSLayoutConstraint.activate([
+            // Pause overlay — pause/done tugmalarini ochiq qoldirgan holda
+            // qolgan ekranni qoplaydi.
+            pauseOverlay.topAnchor.constraint(equalTo: view.topAnchor),
+            pauseOverlay.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            pauseOverlay.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            pauseOverlay.bottomAnchor.constraint(equalTo: pauseBtn.topAnchor, constant: -16),
+
+            pauseMessageLabel.centerXAnchor.constraint(equalTo: pauseOverlay.centerXAnchor),
+            pauseMessageLabel.centerYAnchor.constraint(equalTo: pauseOverlay.centerYAnchor),
+
+            startOverBtn.centerXAnchor.constraint(equalTo: pauseOverlay.centerXAnchor),
+            startOverBtn.topAnchor.constraint(equalTo: pauseMessageLabel.bottomAnchor, constant: 24),
+            startOverBtn.heightAnchor.constraint(equalToConstant: 44),
+        ])
     }
 
     private func setupProcessingOverlay() {
@@ -1384,7 +1508,41 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         lastFramePos = pos
         lastFrameTime = now
 
-        guard case .normal = frame.camera.trackingState else { return }
+        // Polycam-style tracking lost banner — `.limited(.relocalizing)` yoki
+        // `.notAvailable` holatda ko'rsatiladi.
+        let trackingOK: Bool
+        switch frame.camera.trackingState {
+        case .normal:
+            trackingOK = true
+        case .limited(let reason):
+            trackingOK = false
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                let msg: String
+                switch reason {
+                case .relocalizing: msg = "Tracking yo'qoldi, qayta lokallashtirilmoqda"
+                case .initializing: msg = "Tracking ishga tushmoqda — iPhone'ni harakatlantiring"
+                case .excessiveMotion: msg = "Sekinroq harakatlaning"
+                case .insufficientFeatures: msg = "Yorug'roq joyda harakatlaning"
+                @unknown default: msg = "Tracking cheklangan"
+                }
+                self.trackingLostBanner.text = msg
+                self.trackingLostBanner.isHidden = false
+            }
+        case .notAvailable:
+            trackingOK = false
+            DispatchQueue.main.async { [weak self] in
+                self?.trackingLostBanner.text = "Tracking mavjud emas"
+                self?.trackingLostBanner.isHidden = false
+            }
+        }
+        if trackingOK {
+            DispatchQueue.main.async { [weak self] in
+                self?.trackingLostBanner.isHidden = true
+            }
+        }
+        guard trackingOK else { return }
+
         let limit = uploadMode ? uploadModeMaxPhotos : maxAllowedPhotos
         if captureCount >= limit { return }
 
@@ -1698,6 +1856,75 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         onCancel?()
     }
 
+    @objc private func pauseTapped() {
+        isPaused.toggle()
+        if isPaused {
+            arView.session.pause()
+            pauseOverlay.isHidden = false
+            let symbol = UIImage(systemName: "play.fill",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .bold))
+            pauseBtn.setImage(symbol, for: .normal)
+        } else {
+            // Resume — ARSession qaytadan boshlanadi (relocalize bilan)
+            let configuration = ARWorldTrackingConfiguration()
+            configuration.sceneReconstruction = .meshWithClassification
+            configuration.frameSemantics = .smoothedSceneDepth
+            arView.session.run(configuration, options: [])
+            pauseOverlay.isHidden = true
+            let symbol = UIImage(systemName: "pause.fill",
+                withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .bold))
+            pauseBtn.setImage(symbol, for: .normal)
+        }
+        captureHaptic.impactOccurred(intensity: 0.7)
+    }
+
+    @objc private func flashlightTapped() {
+        isFlashlightOn.toggle()
+        guard let device = AVCaptureDevice.default(for: .video), device.hasTorch else {
+            return
+        }
+        do {
+            try device.lockForConfiguration()
+            device.torchMode = isFlashlightOn ? .on : .off
+            device.unlockForConfiguration()
+        } catch {
+            isFlashlightOn = false
+            return
+        }
+        let iconName = isFlashlightOn ? "flashlight.on.fill" : "flashlight.off.fill"
+        flashlightBtn.setImage(UIImage(systemName: iconName,
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)), for: .normal)
+        flashlightBtn.backgroundColor = isFlashlightOn
+            ? UIColor.systemYellow.withAlphaComponent(0.85)
+            : UIColor.black.withAlphaComponent(0.35)
+        flashlightBtn.tintColor = isFlashlightOn ? .black : .white
+    }
+
+    @objc private func startOverTapped() {
+        // Hozirgi sessiyani tashlab, foto va mesh state'ni boshidan boshlash
+        captureCount = 0
+        capturedPoses.removeAll()
+        meshAreaByAnchor.removeAll()
+        totalMeshAreaM2 = 0
+        cleanupTempFolder()
+        setupPhotoFolder()
+        // Mesh anchor'larni tozalash
+        arView.scene.rootNode.childNodes.forEach { $0.removeFromParentNode() }
+        // ARSession qayta ishga tushirish (anchor'lar reset)
+        let configuration = ARWorldTrackingConfiguration()
+        configuration.sceneReconstruction = .meshWithClassification
+        configuration.frameSemantics = .smoothedSceneDepth
+        arView.session.run(configuration, options: [.resetTracking, .removeExistingAnchors])
+        // Pause overlay yopib, capture'ga qaytamiz
+        isPaused = false
+        pauseOverlay.isHidden = true
+        let symbol = UIImage(systemName: "pause.fill",
+            withConfiguration: UIImage.SymbolConfiguration(pointSize: 28, weight: .bold))
+        pauseBtn.setImage(symbol, for: .normal)
+        photoPill.text = "0 foto"
+        areaPill.text = "est 0 m²"
+    }
+
     private func cleanupTempFolder() {
         try? FileManager.default.removeItem(at: photoFolder)
     }
@@ -1816,7 +2043,6 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
     func renderer(_ renderer: SCNSceneRenderer, didAdd node: SCNNode, for anchor: ARAnchor) {
         guard let meshAnchor = anchor as? ARMeshAnchor else { return }
-        anchorFreezeTime[meshAnchor.identifier] = CACurrentMediaTime() + anchorFreezeAfterSec
         let geometry = SCNGeometry.fromARMesh(meshAnchor.geometry)
         geometry.materials = [Self.meshMaterial()]
         node.geometry = geometry
@@ -1825,13 +2051,6 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
     func renderer(_ renderer: SCNSceneRenderer, didUpdate node: SCNNode, for anchor: ARAnchor) {
         guard let meshAnchor = anchor as? ARMeshAnchor else { return }
-        // Anchor "muzlatilgan" bo'lsa — geometry yangilanmaydi (ARKit drift
-        // visual deformatsiya bermasin). Anchor transform ARSCNView tomonidan
-        // baribir tracked, lekin shakli o'zgarmaydi.
-        if let freezeAt = anchorFreezeTime[meshAnchor.identifier],
-           CACurrentMediaTime() > freezeAt {
-            return
-        }
         let geometry = SCNGeometry.fromARMesh(meshAnchor.geometry)
         geometry.materials = [Self.meshMaterial()]
         node.geometry = geometry
@@ -1909,27 +2128,16 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     }
 
     private static func meshMaterial() -> SCNMaterial {
-        // Polycam-style: opaque normal-based rang (pushti/cyan/sariq).
-        // Capture qilingan mesh ostidagi ko'k overlay'ni yopadi — foydalanuvchi
-        // qaysi joylar skanlanganini darhol ko'radi.
+        // Polycam-style: kamera feed ustiga oq wireframe.
+        // fillMode = .lines bilan har triangle edge sifatida render bo'ladi.
         let m = SCNMaterial()
         m.lightingModel = .constant
         m.isDoubleSided = true
-        m.diffuse.contents = UIColor.white
-        m.shaderModifiers = [
-            .fragment: """
-            #pragma transparent
-            float3 n = normalize(_surface.normal);
-            float3 a = abs(n);
-            float3 colX = float3(0.95, 0.10, 0.55);
-            float3 colY = float3(0.10, 0.85, 0.95);
-            float3 colZ = float3(0.98, 0.78, 0.20);
-            float w = a.x + a.y + a.z + 1e-4;
-            float3 col = (a.x * colX + a.y * colY + a.z * colZ) / w;
-            col = mix(col * 0.55, col, max(a.y, 0.4));
-            _output.color = float4(col, 1.0);
-            """
-        ]
+        m.fillMode = .lines
+        m.diffuse.contents = UIColor(white: 1.0, alpha: 0.85)
+        m.transparency = 0.85
+        m.writesToDepthBuffer = false
+        m.readsFromDepthBuffer = false
         return m
     }
 
@@ -2720,54 +2928,79 @@ final class HybridUploadCoordinator: NSObject {
         let boundary = "boundary_\(UUID().uuidString)"
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
 
-        // Multipart body — har foto uchun alohida part
         let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
         let jpegs = files.filter { $0.pathExtension.lowercased() == "jpg" || $0.pathExtension.lowercased() == "jpeg" }
         if jpegs.isEmpty {
             throw NSError(domain: "Hybrid", code: 1, userInfo: [NSLocalizedDescriptionKey: "Foto'lar topilmadi"])
         }
 
-        var body = Data()
-
-        // Provider va algorithm form field'lari (Kiri yoki local_mac uchun)
-        func addField(_ name: String, _ value: String) {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
-            body.append(value.data(using: .utf8)!)
-            body.append("\r\n".data(using: .utf8)!)
+        // Multipart body'ni temp faylga stream qilib yozamiz — 100+ MB upload
+        // uchun butun body'ni xotirada to'plash iOS URLSession'ni qotirib qo'yadi
+        // (httpBody = Data orqali). uploadTask(fromFile:) bilan disk → tarmoq
+        // chunked uzatiladi.
+        let tmpBody = FileManager.default.temporaryDirectory
+            .appendingPathComponent("upload_\(UUID().uuidString).multipart")
+        FileManager.default.createFile(atPath: tmpBody.path, contents: nil)
+        guard let bodyHandle = try? FileHandle(forWritingTo: tmpBody) else {
+            throw NSError(domain: "Hybrid", code: 4,
+                          userInfo: [NSLocalizedDescriptionKey: "Temp body fayl ochilmadi"])
         }
-        addField("provider", provider)
-        addField("algorithm", algorithm)
-        addField("quality", selectedQuality)
+        defer {
+            try? bodyHandle.close()
+            try? FileManager.default.removeItem(at: tmpBody)
+        }
 
+        func writeStr(_ s: String) {
+            if let d = s.data(using: .utf8) { bodyHandle.write(d) }
+        }
+        func writeField(_ name: String, _ value: String) {
+            writeStr("--\(boundary)\r\n")
+            writeStr("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n")
+            writeStr(value)
+            writeStr("\r\n")
+        }
+        writeField("provider", provider)
+        writeField("algorithm", algorithm)
+        writeField("quality", selectedQuality)
+
+        // Foto'lar — har birini chunked o'qib yozamiz, butunni xotiraga
+        // yuklamasdan (4K JPEG ~1-2 MB, 100+ ta bo'lishi mumkin).
         for url in jpegs.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-            let data = try Data(contentsOf: url)
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"photos\"; filename=\"\(url.lastPathComponent)\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-            body.append(data)
-            body.append("\r\n".data(using: .utf8)!)
+            writeStr("--\(boundary)\r\n")
+            writeStr("Content-Disposition: form-data; name=\"photos\"; filename=\"\(url.lastPathComponent)\"\r\n")
+            writeStr("Content-Type: image/jpeg\r\n\r\n")
+            guard let inFh = try? FileHandle(forReadingFrom: url) else { continue }
+            while autoreleasepool(invoking: {
+                let chunk = inFh.readData(ofLength: 256 * 1024)  // 256 KB
+                if chunk.isEmpty { return false }
+                bodyHandle.write(chunk)
+                return true
+            }) {}
+            try? inFh.close()
+            writeStr("\r\n")
         }
 
         // poses.json (ARKit camera transforms) — agar mavjud bo'lsa qo'shamiz.
         // AWS GPU pipeline buni topganda COLMAP SfM bosqichini o'tkazib
-        // yuboradi va ARKit pose'laridan to'g'ridan-to'g'ri foydalanadi
-        // (~25 daq tejaladi va past sifatli foto'larda ham ishonchli).
+        // yuboradi va ARKit pose'laridan to'g'ridan-to'g'ri foydalanadi.
         let posesURL = folder.appendingPathComponent("poses.json")
-        if FileManager.default.fileExists(atPath: posesURL.path),
-           let posesData = try? Data(contentsOf: posesURL) {
-            body.append("--\(boundary)\r\n".data(using: .utf8)!)
-            body.append("Content-Disposition: form-data; name=\"poses\"; filename=\"poses.json\"\r\n".data(using: .utf8)!)
-            body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
-            body.append(posesData)
-            body.append("\r\n".data(using: .utf8)!)
+        if FileManager.default.fileExists(atPath: posesURL.path) {
+            writeStr("--\(boundary)\r\n")
+            writeStr("Content-Disposition: form-data; name=\"poses\"; filename=\"poses.json\"\r\n")
+            writeStr("Content-Type: application/json\r\n\r\n")
+            if let posesData = try? Data(contentsOf: posesURL) {
+                bodyHandle.write(posesData)  // poses.json odatda <100 KB
+            }
+            writeStr("\r\n")
         }
-        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        writeStr("--\(boundary)--\r\n")
+        try? bodyHandle.synchronize()
+        try? bodyHandle.close()
 
-        request.httpBody = body
         request.timeoutInterval = 600  // 10 daqiqa
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        // uploadTask(fromFile:) — disk'dan tarmoqqa stream, xotira yuklanmaydi
+        let (data, response) = try await URLSession.shared.upload(for: request, fromFile: tmpBody)
         guard let http = response as? HTTPURLResponse, http.statusCode == 201 || http.statusCode == 200 else {
             let code = (response as? HTTPURLResponse)?.statusCode ?? -1
             let body = String(data: data, encoding: .utf8) ?? ""

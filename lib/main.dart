@@ -18,13 +18,10 @@ import 'theme/app_theme.dart';
 void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
-  userProfileNotifier.value = UserProfile(
-    name: 'Odiljon Sanoyev',
-    phone: '+998 90 123 45 67',
-    avatarPath: 'assets/images/auth/user.png',
-    dateOfBirth: DateTime(1995, 6, 14),
-    gender: Gender.male,
-  );
+  // Foydalanuvchi profili AuthStorage'dan KadastrApp.initState ichida
+  // yuklanadi (saqlangan sessiya bo'lsa). Mehmon (login qilmagan) holatda
+  // userProfileNotifier null bo'lib qoladi va Profil ekranida "Kirish" tugmasi
+  // ko'rinadi.
   notificationUnreadNotifier.value = unreadNotificationCount();
   runApp(const KadastrApp());
 }

@@ -82,6 +82,82 @@ import RoomPlan
             ))
           }
 
+        case "startTexturedRoomPlan":
+          guard let controller = controller else {
+            result(FlutterError(
+              code: "NO_CONTROLLER",
+              message: "Flutter view controller mavjud emas",
+              details: nil,
+            ))
+            return
+          }
+          if #available(iOS 17, *) {
+            TexturedRoomPlanCoordinator.shared.start(from: controller, result: result)
+          } else {
+            result(FlutterError(
+              code: "UNSUPPORTED",
+              message: "Textured RoomPlan iOS 17+ ga muhtoj",
+              details: nil,
+            ))
+          }
+
+        case "startObjectCapture":
+          guard let controller = controller else {
+            result(FlutterError(
+              code: "NO_CONTROLLER",
+              message: "Flutter view controller mavjud emas",
+              details: nil,
+            ))
+            return
+          }
+          if #available(iOS 17.0, *) {
+            ObjectCaptureCoordinator.shared.start(from: controller, result: result)
+          } else {
+            result(FlutterError(
+              code: "UNSUPPORTED",
+              message: "Object Capture iOS 17+ ga muhtoj",
+              details: nil,
+            ))
+          }
+
+        case "startHybridScan":
+          guard let controller = controller else {
+            result(FlutterError(
+              code: "NO_CONTROLLER",
+              message: "Flutter view controller mavjud emas",
+              details: nil,
+            ))
+            return
+          }
+          guard let args = call.arguments as? [String: Any],
+                let baseUrl = args["baseUrl"] as? String,
+                let token = args["token"] as? String else {
+            result(FlutterError(
+              code: "ARGS",
+              message: "baseUrl va token argumentlari kerak",
+              details: nil,
+            ))
+            return
+          }
+          let provider = (args["provider"] as? String) ?? "local_mac"
+          let algorithm = (args["algorithm"] as? String) ?? "3dgs"
+          if #available(iOS 17.0, *) {
+            HybridUploadCoordinator.shared.start(
+              from: controller,
+              baseUrl: baseUrl,
+              authToken: token,
+              provider: provider,
+              algorithm: algorithm,
+              result: result,
+            )
+          } else {
+            result(FlutterError(
+              code: "UNSUPPORTED",
+              message: "Hybrid scan iOS 17+ ga muhtoj",
+              details: nil,
+            ))
+          }
+
         case "previewModel":
           guard let args = call.arguments as? [String: Any],
                 let path = args["filePath"] as? String else {

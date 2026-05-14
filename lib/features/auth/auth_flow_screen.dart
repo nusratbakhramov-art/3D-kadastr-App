@@ -67,7 +67,11 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
   Future<void> _handleVerified(VerifyResult result) async {
     _token = result.token;
     await widget.storage.saveSession(
-      AuthSession(token: result.token, phone: _phone),
+      AuthSession(
+        token: result.token,
+        phone: _phone,
+        refreshToken: result.refreshToken,
+      ),
     );
     if (!mounted) return;
     AppToast.success(context, "Siz kiritgan tasdiqlash kodi to'g'ri kiritildi!");

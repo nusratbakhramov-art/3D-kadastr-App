@@ -1,10 +1,62 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
+import '../../widgets/app_toast.dart';
+import '../auth/auth_http_client.dart';
+import '../services/api_photogrammetry_service.dart';
+import '../services/data/room_plan_scanner.dart';
 import '../services/widgets/segmented_tabs.dart';
 import 'application_model.dart';
+
+/// Stream the .usdz to disk with progress callbacks.
+///
+/// [onProgress] is called with `(received, total)` byte counts; `total` is
+/// -1 if the server didn't send Content-Length.
+Future<String> _ensureUsdzCached({
+  required int jobId,
+  required String downloadUrl,
+  void Function(int received, int total)? onProgress,
+}) async {
+  final dir = await getApplicationDocumentsDirectory();
+  final scansDir = Directory('${dir.path}/scans');
+  if (!scansDir.existsSync()) scansDir.createSync(recursive: true);
+  final filePath = '${scansDir.path}/photo_$jobId.usdz';
+  final file = File(filePath);
+  if (await file.exists() && await file.length() > 0) {
+    onProgress?.call(await file.length(), await file.length());
+    return filePath;
+  }
+
+  final client = AuthHttpClient();
+  final req = http.Request('GET', Uri.parse(downloadUrl));
+  final res = await client.send(req);
+  if (res.statusCode != 200) {
+    throw HttpException('Yuklab olish xatosi (${res.statusCode})');
+  }
+  final total = res.contentLength ?? -1;
+  // Write to a tmp file first; rename on success so partials don't poison cache.
+  final tmp = File('$filePath.part');
+  final sink = tmp.openWrite();
+  var received = 0;
+  try {
+    await for (final chunk in res.stream) {
+      sink.add(chunk);
+      received += chunk.length;
+      onProgress?.call(received, total);
+    }
+    await sink.flush();
+  } finally {
+    await sink.close();
+  }
+  await tmp.rename(filePath);
+  return filePath;
+}
 
 class ApplicationDetailScreen extends StatefulWidget {
   const ApplicationDetailScreen({super.key, required this.item});
@@ -62,7 +114,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
               if (_tab == _DetailTab.status)
                 _StatusTab(steps: steps)
               else
-                const _AboutTab(),
+                _AboutTab(item: widget.item),
             ],
           ),
         ),
@@ -240,7 +292,9 @@ class _TimelineStyle {
 }
 
 class _AboutTab extends StatelessWidget {
-  const _AboutTab();
+  const _AboutTab({required this.item});
+
+  final ApplicationItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -294,9 +348,12 @@ class _AboutTab extends StatelessWidget {
         const SizedBox(height: 14),
         const _FileCard(),
         const SizedBox(height: 14),
-        const _ModelCard(),
+        _ModelCard(item: item),
         const SizedBox(height: 18),
-        const _PrimaryGreenAction(label: "AR orqali ko'rish"),
+        _PrimaryGreenAction(
+          label: "AR orqali ko'rish",
+          item: item,
+        ),
       ],
     );
   }
@@ -428,12 +485,111 @@ class _FileCard extends StatelessWidget {
   }
 }
 
-class _ModelCard extends StatelessWidget {
-  const _ModelCard();
+class _ModelCard extends StatefulWidget {
+  const _ModelCard({required this.item});
+  final ApplicationItem item;
+
+  @override
+  State<_ModelCard> createState() => _ModelCardState();
+}
+
+class _ModelCardState extends State<_ModelCard> {
+  bool _loading = false;
+  // 0..1 while downloading; null when not active or size unknown.
+  double? _progress;
+  // Bytes received / total for byte-precise label.
+  int _received = 0;
+  int _total = 0;
+
+  String _fmtBytes(int n) {
+    if (n <= 0) return '0 B';
+    if (n < 1024) return '$n B';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(0)} KB';
+    return '${(n / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+
+  /// Photogrammetry job ID — `photo_NNN` formatdan parse qilamiz.
+  /// Boshqa application turlari uchun null.
+  int? get _photogrammetryJobId {
+    final id = widget.item.id;
+    if (!id.startsWith('photo_')) return null;
+    return int.tryParse(id.substring('photo_'.length));
+  }
+
+  Future<void> _onTap() async {
+    if (_loading) return;
+    final jobId = _photogrammetryJobId;
+    if (jobId == null) {
+      AppToast.success(context, '3D model bu ariza turida mavjud emas');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      // 1. Job holatini tekshirish — completed bo'lishi shart
+      final api = PhotogrammetryApiService();
+      final job = await api.getJob(jobId);
+
+      if (!job.isCompleted) {
+        if (!mounted) return;
+        AppToast.success(
+          context,
+          job.status == 'failed'
+              ? '3D model qurib bo\'lmadi: ${job.errorMessage ?? 'xato'}'
+              : '3D model hali tayyor emas (${job.status}). Iltimos, kuting.',
+        );
+        return;
+      }
+      if (job.downloadUrl == null) {
+        if (!mounted) return;
+        AppToast.error(context, 'Download URL kelmadi');
+        return;
+      }
+
+      // 2. USDZ'ni cache'dan olish yoki yuklab olish
+      final filePath = await _ensureUsdzCached(
+        jobId: jobId,
+        downloadUrl: job.downloadUrl!,
+        onProgress: (received, total) {
+          if (!mounted) return;
+          setState(() {
+            _received = received;
+            _total = total;
+            _progress = total > 0 ? received / total : null;
+          });
+        },
+      );
+
+      // 3. QuickLook orqali ochish
+      if (!mounted) return;
+      await RoomPlanScanner.preview(filePath);
+    } on PhotogrammetryApiException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, 'Xato: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _progress = null;
+          _received = 0;
+          _total = 0;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return InkWell(
+      onTap: _onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: ColorTokens.cardBg(context),
@@ -478,7 +634,12 @@ class _ModelCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'RoomPlan viewer ochiladi',
+                  !_loading
+                      ? 'RoomPlan viewer ochiladi'
+                      : _total > 0
+                          ? 'Yuklab olinmoqda… ${(_progress! * 100).toStringAsFixed(0)}% '
+                              '(${_fmtBytes(_received)} / ${_fmtBytes(_total)})'
+                          : 'Yuklab olinmoqda… ${_fmtBytes(_received)}',
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w400,
@@ -489,16 +650,29 @@ class _ModelCard extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
+                if (_loading) ...[
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: _progress,
+                      minHeight: 4,
+                      backgroundColor: ColorTokens.iconBg(context),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          _MiniPillButton(
-            label: "Ko'rish",
-            fg: ColorTokens.primaryText(context),
-            bg: ColorTokens.iconBg(context),
-            iconAsset: 'assets/icons/chevron-right.svg',
-          ),
+          if (!_loading)
+            _MiniPillButton(
+              label: "Ko'rish",
+              fg: ColorTokens.primaryText(context),
+              bg: ColorTokens.iconBg(context),
+              iconAsset: 'assets/icons/chevron-right.svg',
+            ),
         ],
+      ),
       ),
     );
   }
@@ -590,10 +764,55 @@ class _PrimaryBlackAction extends StatelessWidget {
   }
 }
 
-class _PrimaryGreenAction extends StatelessWidget {
-  const _PrimaryGreenAction({required this.label});
+class _PrimaryGreenAction extends StatefulWidget {
+  const _PrimaryGreenAction({required this.label, required this.item});
 
   final String label;
+  final ApplicationItem item;
+
+  @override
+  State<_PrimaryGreenAction> createState() => _PrimaryGreenActionState();
+}
+
+class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
+  bool _loading = false;
+
+  Future<void> _onTap() async {
+    if (_loading) return;
+    final id = widget.item.id;
+    if (!id.startsWith('photo_')) {
+      AppToast.success(context, 'AR ko\'rish bu ariza turida mavjud emas');
+      return;
+    }
+    final jobId = int.tryParse(id.substring('photo_'.length));
+    if (jobId == null) return;
+
+    setState(() => _loading = true);
+    try {
+      final api = PhotogrammetryApiService();
+      final job = await api.getJob(jobId);
+      if (!job.isCompleted || job.downloadUrl == null) {
+        if (!mounted) return;
+        AppToast.success(context, '3D model hali tayyor emas');
+        return;
+      }
+      final filePath = await _ensureUsdzCached(
+        jobId: jobId,
+        downloadUrl: job.downloadUrl!,
+      );
+      if (!mounted) return;
+      // QuickLook AR rejimda ham ochadi (Object/AR toggle)
+      await RoomPlanScanner.preview(filePath);
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, 'Xato: $e');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -602,32 +821,43 @@ class _PrimaryGreenAction extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: _onTap,
         child: SizedBox(
           height: 52,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(width: 10),
-              SvgPicture.asset(
-                'assets/icons/camera.svg',
-                width: 30,
-                height: 30,
-                colorFilter: const ColorFilter.mode(
-                  Colors.black,
-                  BlendMode.srcIn,
-                ),
-              ),
-            ],
+            children: _loading
+                ? const [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ]
+                : [
+                    Text(
+                      widget.label,
+                      style: const TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SvgPicture.asset(
+                      'assets/icons/camera.svg',
+                      width: 30,
+                      height: 30,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.black,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ],
           ),
         ),
       ),

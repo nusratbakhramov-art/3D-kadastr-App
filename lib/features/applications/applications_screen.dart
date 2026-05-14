@@ -6,7 +6,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../auth/auth_storage.dart';
+import '../services/api_ai_valuation_service.dart';
 import '../services/api_architecture_order_service.dart';
+import '../services/api_photogrammetry_service.dart';
 import 'application_detail_screen.dart';
 import '../market/models/market_listing.dart' show MarketCategory;
 import '../market/widgets/category_chips.dart';
@@ -171,11 +173,49 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       _allItems = const <ApplicationItem>[];
       return;
     }
-    final api = ArchitectureOrderApiService();
-    final page = await api.list(token: token, page: 1, size: 100);
-    _allItems = page.items
-        .map(_orderToApplicationItem)
-        .toList(growable: false);
+
+    // Uch manbadan parallel yig'amiz: arxitektura buyurtmalari, AI baholash
+    // tasdiqlash arizalari va photogrammetry skan job'lari. Birortasi xato
+    // qaytarsa, qolganini ko'rsatamiz.
+    final ordersFuture = ArchitectureOrderApiService()
+        .list(token: token, page: 1, size: 100)
+        .then(
+          (page) => page.items
+              .map(_orderToApplicationItem)
+              .toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
+    final confirmationsFuture = AiValuationApiService()
+        .listConfirmations()
+        .then(
+          (list) =>
+              list.map(_confirmationToApplicationItem).toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
+    final photogrammetryFuture = PhotogrammetryApiService()
+        .listJobs()
+        .then(
+          (list) =>
+              list.map(_photogrammetryToApplicationItem).toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
+    final results = await Future.wait([
+      ordersFuture,
+      confirmationsFuture,
+      photogrammetryFuture,
+    ]);
+    final combined = <ApplicationItem>[
+      ...results[0],
+      ...results[1],
+      ...results[2],
+    ];
+    // Yangidan eskigacha tartiblash — sanalar string sifatida saqlangan,
+    // lekin DD.MM.YYYY format saqlanadi → teskari sort.
+    combined.sort((a, b) => b.dateValue.compareTo(a.dateValue));
+    _allItems = combined;
   }
 
   static ApplicationItem _orderToApplicationItem(OrderSummary o) {
@@ -194,12 +234,89 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     );
   }
 
+  static ApplicationItem _confirmationToApplicationItem(
+    AiConfirmationSummary c,
+  ) {
+    return ApplicationItem(
+      id: 'aival_${c.id}',
+      serviceId: 'ai_eval',
+      serviceLabel: 'AI Baholash',
+      statusGroup: _confirmationStatusToGroup(c.status),
+      addressLabel: 'Taxminiy qiymat',
+      addressValue: _formatUzs(c.aiEstimatedValue),
+      dateLabel: 'Ariza sanasi',
+      dateValue: _formatDate(c.createdAt),
+      typeLabel: c.finalValue != null ? 'Tasdiqlangan qiymat' : null,
+      typeValue: c.finalValue != null ? _formatUzs(c.finalValue!) : null,
+      timeline: const <ApplicationTimelineStep>[],
+    );
+  }
+
   static ApplicationStatusGroup _statusToGroup(String status) {
     return switch (status) {
       'accepted' || 'quoted' => ApplicationStatusGroup.completed,
       'rejected' => ApplicationStatusGroup.cancelled,
       _ => ApplicationStatusGroup.inProgress,
     };
+  }
+
+  static ApplicationStatusGroup _confirmationStatusToGroup(String status) {
+    return switch (status) {
+      'approved' || 'adjusted' => ApplicationStatusGroup.completed,
+      'rejected' => ApplicationStatusGroup.cancelled,
+      _ => ApplicationStatusGroup.inProgress,
+    };
+  }
+
+  static ApplicationItem _photogrammetryToApplicationItem(
+    PhotogrammetryJobSummary j,
+  ) {
+    return ApplicationItem(
+      id: 'photo_${j.id}',
+      serviceId: 'kad_3d',
+      serviceLabel: '3D Skan',
+      statusGroup: _photogrammetryStatusToGroup(j.status),
+      addressLabel: 'Foto soni',
+      addressValue: '${j.photoCount} ta',
+      dateLabel: 'Yuborilgan',
+      dateValue: _formatDate(j.createdAt),
+      typeLabel: j.isCompleted
+          ? '3D model'
+          : (j.status == 'failed' ? 'Xato' : 'Holat'),
+      typeValue: j.isCompleted
+          ? 'Tayyor'
+          : (j.errorMessage ?? _photogrammetryStatusLabel(j.status)),
+      timeline: const <ApplicationTimelineStep>[],
+    );
+  }
+
+  static ApplicationStatusGroup _photogrammetryStatusToGroup(String status) {
+    return switch (status) {
+      'completed' => ApplicationStatusGroup.completed,
+      'failed' || 'cancelled' => ApplicationStatusGroup.cancelled,
+      _ => ApplicationStatusGroup.inProgress,
+    };
+  }
+
+  static String _photogrammetryStatusLabel(String status) {
+    return switch (status) {
+      'pending' => 'Navbatda',
+      'processing' => 'Ishlamoqda',
+      'completed' => 'Tayyor',
+      'failed' => 'Xato',
+      'cancelled' => 'Bekor qilingan',
+      _ => status,
+    };
+  }
+
+  static String _formatUzs(double value) {
+    final s = value.round().toString();
+    final buf = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+      buf.write(s[i]);
+    }
+    return '${buf.toString()} so\'m';
   }
 
   static String _formatDate(DateTime dt) {

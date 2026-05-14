@@ -160,6 +160,12 @@ class ArchitectureOrderDraft extends ChangeNotifier {
   String cadastreNumber = '';
   double? landAreaSqm;
   String landUsePurpose = '';
+  // Hudud picker (AI baholash uchun aniqroq filter sifatida ishlatiladi).
+  // OLX market_listings region kalitlariga moslashtirilgan: tashkent_city,
+  // tashkent_region, andijan, bukhara, fergana, jizzakh, namangan, navoi,
+  // kashkadarya, karakalpakstan, samarkand, syrdarya, surkhandarya, khorezm.
+  String? viloyat;
+  String? tuman;
 
   // Step 3 — Loyiha umumiy
   ArchObjectType? objectType;
@@ -172,6 +178,8 @@ class ArchitectureOrderDraft extends ChangeNotifier {
   double? totalAreaSqm;
   double? buildingAreaSqm;
   double? maxHeightM;
+  // Qurilish yili — AI baholashda eskirish koeffitsienti uchun muhim faktor.
+  int? constructionYear;
 
   // Step 3 — Xonalar tarkibi
   final List<RoomEntry> rooms = [];
@@ -213,6 +221,9 @@ class ArchitectureOrderDraft extends ChangeNotifier {
       if (landAreaSqm != null) 'land_area_sqm': landAreaSqm,
       if (landUsePurpose.trim().isNotEmpty)
         'land_use_purpose': landUsePurpose.trim(),
+      if (viloyat != null) 'viloyat': viloyat,
+      if (tuman != null) 'tuman': tuman,
+      if (constructionYear != null) 'construction_year': constructionYear,
       'object_type': objectType!.apiValue,
       if (objectSubtype.trim().isNotEmpty)
         'object_subtype': objectSubtype.trim(),

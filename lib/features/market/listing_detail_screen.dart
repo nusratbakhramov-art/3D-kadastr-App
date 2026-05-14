@@ -10,8 +10,8 @@ import '../../widgets/app_toast.dart';
 import '../auth/auth_storage.dart';
 import 'api_marketplace_service.dart';
 import 'models/market_listing.dart';
-import 'widgets/listing_3d_viewer.dart';
-import 'widgets/listing_cta_button.dart';
+import 'widgets/listing_formats_card.dart';
+import 'widgets/listing_gallery_pager.dart';
 import 'widgets/listing_info_card.dart';
 import 'widgets/listing_meta_pills.dart';
 
@@ -33,57 +33,12 @@ class ListingDetailScreen extends StatefulWidget {
 
 class _ListingDetailScreenState extends State<ListingDetailScreen> {
   late final MarketplaceApiService _api;
-  bool _downloading = false;
-
-  /// Resolved direct URL to the model file (cached after first call).
-  String? _modelUrl;
+  int? _downloadingFileId;
 
   @override
   void initState() {
     super.initState();
     _api = widget.api ?? MarketplaceApiService();
-    _resolveModelUrl();
-  }
-
-  MarketListingFile? get _glbFile {
-    final files = widget.listing.files;
-    if (files.isEmpty) return null;
-    // Prefer GLB; otherwise fall back to the first available file.
-    for (final f in files) {
-      if (f.format.toUpperCase() == 'GLB') return f;
-    }
-    return files.first;
-  }
-
-  Future<void> _resolveModelUrl() async {
-    final id = widget.listing.backendId;
-    final file = _glbFile;
-    if (id == null || file == null) {
-      // Mock listing or no file — fall back to bundled test asset so the
-      // viewer still renders something during dev.
-      setState(() => _modelUrl = 'assets/3d/test_model.glb');
-      return;
-    }
-    try {
-      final session = await widget.authStorage.loadSession();
-      if (session.token == null) {
-        // Avtorizatsiyasiz — fallback bundled asset ishlatiladi.
-        setState(() => _modelUrl = 'assets/3d/test_model.glb');
-        return;
-      }
-      final info = await _api.getDownloadUrl(
-        modelId: id,
-        fileId: file.id,
-        token: session.token!,
-      );
-      if (!mounted) return;
-      setState(() => _modelUrl = info.url);
-    } catch (e) {
-      // Backend xatosi (eski cached id, network, va h.k.) — bundled asset
-      // ko'rinadi, shuning uchun foydalanuvchiga noaniq xato chiqarmaymiz.
-      if (!mounted) return;
-      setState(() => _modelUrl = 'assets/3d/test_model.glb');
-    }
   }
 
   void _close() => Navigator.of(context).maybePop();
@@ -101,24 +56,33 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     );
   }
 
-  Future<void> _download() async {
-    if (_downloading) return;
-    final url = _modelUrl;
-    if (url == null) {
-      AppToast.error(context, 'Model hali tayyor emas');
+  Future<void> _downloadFormat(MarketListingFile file) async {
+    if (_downloadingFileId != null) return;
+    final id = widget.listing.backendId;
+    if (id == null) {
+      AppToast.error(context, 'Model ID topilmadi');
       return;
     }
-    final file = _glbFile;
-    setState(() => _downloading = true);
+    setState(() => _downloadingFileId = file.id);
     try {
-      final bytes = await _bytesFor(url);
+      final session = await widget.authStorage.loadSession();
+      if (session.token == null) {
+        if (!mounted) return;
+        AppToast.error(context, 'Yuklab olish uchun tizimga kiring');
+        return;
+      }
+      final info = await _api.getDownloadUrl(
+        modelId: id,
+        fileId: file.id,
+        token: session.token!,
+      );
+      final bytes = await _bytesFor(info.url);
       final dir = await getTemporaryDirectory();
       final safeTitle = widget.listing.title
           .replaceAll(RegExp(r'[^A-Za-z0-9_\- ]'), '')
           .replaceAll(' ', '_');
-      final ext = (file?.format ?? 'GLB').toLowerCase();
-      final filename =
-          '${safeTitle.isEmpty ? 'model' : safeTitle}.$ext';
+      final ext = file.format.toLowerCase();
+      final filename = '${safeTitle.isEmpty ? 'model' : safeTitle}.$ext';
       final outFile = File('${dir.path}/$filename');
       await outFile.writeAsBytes(bytes, flush: true);
 
@@ -128,17 +92,17 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           ? box.localToGlobal(Offset.zero) & box.size
           : null;
       await Share.shareXFiles(
-        [XFile(outFile.path, mimeType: 'model/gltf-binary', name: filename)],
+        [XFile(outFile.path, name: filename)],
         subject: widget.listing.title,
         sharePositionOrigin: origin,
       );
       if (!mounted) return;
-      AppToast.success(context, 'Yuklab olishga tayyor: $filename');
+      AppToast.success(context, '$filename tayyor');
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, 'Yuklab olishda xatolik: $e');
     } finally {
-      if (mounted) setState(() => _downloading = false);
+      if (mounted) setState(() => _downloadingFileId = null);
     }
   }
 
@@ -154,12 +118,6 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     }
     if (src.startsWith('file://')) {
       return await File.fromUri(Uri.parse(src)).readAsBytes();
-    }
-    if (src.startsWith('assets/')) {
-      final data = await DefaultAssetBundle.of(
-        context,
-      ).load(src);
-      return data.buffer.asUint8List();
     }
     throw StateError('Unknown source: $src');
   }
@@ -179,9 +137,8 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Listing3DViewer(
-                source: _modelUrl ?? 'assets/3d/test_model.glb',
-                alt: listing.title,
+              child: ListingGalleryPager(
+                images: listing.galleryImages,
                 onClose: _close,
                 onShare: _share,
               ),
@@ -203,19 +160,18 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                 description: listing.description,
               ),
             ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ListingCtaButton(
-                label: _downloading ? 'Yuklanmoqda...' : 'Yuklab olish',
-                onTap: _downloading
-                    ? () {}
-                    : () {
-                        _download();
-                      },
+            if (listing.files.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ListingFormatsCard(
+                  files: listing.files,
+                  downloadingFileId: _downloadingFileId,
+                  onTap: _downloadFormat,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+            ],
+            const SizedBox(height: 24),
           ],
         ),
       ),

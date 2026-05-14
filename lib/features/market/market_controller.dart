@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import 'api_market_repository.dart';
+import 'api_marketplace_service.dart';
 import 'market_repository.dart';
 import 'models/market_filters.dart';
 import 'models/market_listing.dart';
@@ -12,15 +13,23 @@ enum MarketStatus { initial, loading, success, error }
 class MarketController extends ChangeNotifier {
   MarketController({
     required MarketRepository repository,
+    MarketplaceApiService? categoriesService,
     Duration searchDebounce = const Duration(milliseconds: 400),
     int pageSize = 12,
   }) : _repository = repository,
+       _categoriesService = categoriesService,
        _debounce = searchDebounce,
        _pageSize = pageSize;
 
   final MarketRepository _repository;
+  final MarketplaceApiService? _categoriesService;
   final Duration _debounce;
   final int _pageSize;
+
+  List<MarketCategory> _categories = const [
+    MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
+  ];
+  List<MarketCategory> get categories => _categories;
 
   final List<MarketListing> _items = [];
   Timer? _searchTimer;
@@ -50,7 +59,26 @@ class MarketController extends ChangeNotifier {
 
   Future<void> initialize() async {
     if (_status != MarketStatus.initial) return;
+    unawaited(_loadCategories());
     await _fetchFirstPage();
+  }
+
+  Future<void> _loadCategories() async {
+    final svc = _categoriesService;
+    if (svc == null) return;
+    try {
+      final remote = await svc.fetchCategories();
+      if (_disposed) return;
+      _categories = [
+        const MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
+        ...remote.map(
+          (c) => MarketCategory(id: c.slug, label: c.name),
+        ),
+      ];
+      _notify();
+    } catch (_) {
+      // Silent fallback — keep the default "Barchasi" entry.
+    }
   }
 
   void selectCategory(String id) {
@@ -178,10 +206,22 @@ class MarketController extends ChangeNotifier {
 }
 
 MarketController? _shared;
+String? _sharedLocale;
 
 /// App-wide MarketController singleton — keeps list/filters/scroll-state
 /// alive across tab switches so the user doesn't see loading skeletons
 /// every time they come back to Market. Pull-to-refresh still refetches.
-MarketController sharedMarketController() {
-  return _shared ??= MarketController(repository: ApiMarketRepository());
+///
+/// Recreated when [locale] differs from the cached one so category labels
+/// (and any other localized fields) re-fetch in the new language.
+MarketController sharedMarketController({String? locale}) {
+  if (_shared != null && _sharedLocale == locale) return _shared!;
+  _shared?.dispose();
+  final svc = MarketplaceApiService(locale: locale);
+  _shared = MarketController(
+    repository: ApiMarketRepository(service: svc),
+    categoriesService: svc,
+  );
+  _sharedLocale = locale;
+  return _shared!;
 }

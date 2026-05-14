@@ -35,6 +35,7 @@ class MarketListing {
     required this.district,
     required this.areaM2,
     required this.categoryId,
+    this.categoryLabel,
     this.gallery = const [],
     this.description,
     this.isFree = false,
@@ -49,6 +50,7 @@ class MarketListing {
   final String district;
   final int areaM2;
   final String categoryId;
+  final String? categoryLabel;
 
   /// Additional images for the detail view. By convention, the primary
   /// [imageUrl] is at index 0 when populated.
@@ -68,10 +70,18 @@ class MarketListing {
   /// Downloadable file variants (GLB, USDZ, OBJ, etc.).
   final List<MarketListingFile> files;
 
-  /// Images to show in the detail gallery — falls back to [imageUrl]
-  /// when no gallery is set.
-  List<String> get galleryImages =>
-      gallery.isNotEmpty ? gallery : <String>[imageUrl];
+  /// Images to show in the detail gallery. Order: cover image first,
+  /// then scene preview URLs. Empty entries are dropped.
+  List<String> get galleryImages {
+    if (gallery.isNotEmpty) return gallery;
+    final urls = <String>[];
+    if (imageUrl.isNotEmpty) urls.add(imageUrl);
+    for (final s in scenes) {
+      final u = s.previewUrl;
+      if (u != null && u.isNotEmpty) urls.add(u);
+    }
+    return urls.isEmpty ? const [] : urls;
+  }
 
   /// Numeric backend id (or `null` when this listing is mock-only).
   int? get backendId => int.tryParse(id);

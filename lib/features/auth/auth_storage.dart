@@ -7,6 +7,7 @@ class AuthStorage {
   const AuthStorage();
 
   static const String _tokenKey = 'auth_token_v1';
+  static const String _refreshTokenKey = 'auth_refresh_token_v1';
   static const String _phoneKey = 'auth_phone_v1';
   static const String _nameKey = 'auth_profile_name_v1';
   static const String _dobKey = 'auth_profile_dob_v1';
@@ -15,9 +16,14 @@ class AuthStorage {
   Future<AuthSession> loadSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
+    final refreshToken = prefs.getString(_refreshTokenKey);
     final phone = prefs.getString(_phoneKey);
     if (token == null && phone == null) return const AuthSession.guest();
-    return AuthSession(token: token, phone: phone);
+    return AuthSession(
+      token: token,
+      phone: phone,
+      refreshToken: refreshToken,
+    );
   }
 
   Future<void> saveSession(AuthSession session) async {
@@ -26,6 +32,11 @@ class AuthStorage {
       await prefs.remove(_tokenKey);
     } else {
       await prefs.setString(_tokenKey, session.token!);
+    }
+    if (session.refreshToken == null) {
+      await prefs.remove(_refreshTokenKey);
+    } else {
+      await prefs.setString(_refreshTokenKey, session.refreshToken!);
     }
     if (session.phone == null) {
       await prefs.remove(_phoneKey);
@@ -68,6 +79,7 @@ class AuthStorage {
     final prefs = await SharedPreferences.getInstance();
     await Future.wait([
       prefs.remove(_tokenKey),
+      prefs.remove(_refreshTokenKey),
       prefs.remove(_phoneKey),
       prefs.remove(_nameKey),
       prefs.remove(_dobKey),

@@ -1,13 +1,19 @@
 /// Arxitektura va qurilish loyihasi uchun TZ wizard.
 ///
-/// 7 step:
+/// 9 step:
 ///   1. Buyurtmachi rekvizitlari
 ///   2. Obyekt + manzil + kadastr
-///   3. Loyiha umumiy + xonalar tarkibi
-///   4. Arxitektura va dizayn
-///   5. Konstruktiv yechimlar
-///   6. Muhandislik tizimlari
-///   7. Hudud + muddatlar + qo'shimcha
+///   3. Loyiha haqida (turi, qavatlar, maydon, balandlik)
+///   4. Xonalar tarkibi
+///   5. Arxitektura va dizayn yechimlari
+///   6. Konstruktiv yechimlar
+///   7. Muhandislik tizimlari
+///   8. Hudud rejalashtirish
+///   9. Muddatlar + qo'shimcha talablar
+///
+/// `mode` parametri orqali ikki maqsadda ishlaydi:
+///   - `architectureOrder` — yakuniy step'da mutaxassisga yuborish
+///   - `aiValuation` — yakuniy step'da AI baholash chaqirish
 library;
 
 import 'package:flutter/material.dart';
@@ -24,12 +30,17 @@ import '../../widgets/step_progress_bar.dart';
 import '../../widgets/wizard_field.dart';
 import 'arxitektura_tz_success_screen.dart';
 
+/// Wizard'ning ikki ish rejimi: arxitektura buyurtmasini mutaxassisga yuborish,
+/// yoki shu fieldlarni AI baholash uchun ishlatish.
+enum WizardMode { architectureOrder, aiValuation }
+
 class ArxitekturaTzWizardScreen extends StatefulWidget {
   const ArxitekturaTzWizardScreen({
     super.key,
     this.initialDraft,
     this.onSubmit,
     this.submitLabel,
+    this.mode = WizardMode.architectureOrder,
   });
 
   final ArchitectureOrderDraft? initialDraft;
@@ -39,8 +50,12 @@ class ArxitekturaTzWizardScreen extends StatefulWidget {
   /// Bu 3D kadastr flow'i kabi embedded ishlatishlar uchun.
   final void Function(ArchitectureOrderDraft draft)? onSubmit;
 
-  /// Oxirgi step tugmasi yorlig'i (default: "Yuborish").
+  /// Oxirgi step tugmasi yorlig'i (default: mode'ga qarab).
   final String? submitLabel;
+
+  /// Wizard'ning ish rejimi (architectureOrder yoki aiValuation).
+  /// Default: architectureOrder (eski xulq-atvor saqlanadi).
+  final WizardMode mode;
 
   @override
   State<ArxitekturaTzWizardScreen> createState() =>
@@ -48,7 +63,7 @@ class ArxitekturaTzWizardScreen extends StatefulWidget {
 }
 
 class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
-  static const int _stepCount = 7;
+  static const int _stepCount = 9;
 
   late final ArchitectureOrderDraft _draft;
   late final PageController _pageController;
@@ -73,6 +88,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   late final TextEditingController _buildingArea;
   late final TextEditingController _maxHeight;
   late final TextEditingController _objectSubtype;
+  late final TextEditingController _constructionYear;
 
   // Step 4
   late final TextEditingController _colors;
@@ -131,6 +147,9 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       text: _draft.maxHeightM?.toString() ?? '',
     );
     _objectSubtype = TextEditingController(text: _draft.objectSubtype);
+    _constructionYear = TextEditingController(
+      text: _draft.constructionYear?.toString() ?? '',
+    );
 
     _colors = TextEditingController(text: _draft.architecture.colors ?? '');
     _roofMaterial = TextEditingController(
@@ -192,6 +211,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       _buildingArea,
       _maxHeight,
       _objectSubtype,
+      _constructionYear,
       _colors,
       _roofMaterial,
       _parkingCount,
@@ -236,6 +256,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     _draft.buildingAreaSqm = _parseDouble(_buildingArea.text);
     _draft.maxHeightM = _parseDouble(_maxHeight.text);
     _draft.objectSubtype = _objectSubtype.text;
+    _draft.constructionYear = _parseInt(_constructionYear.text);
 
     _draft.architecture.colors =
         _colors.text.trim().isEmpty ? null : _colors.text.trim();
@@ -294,7 +315,16 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       return;
     }
 
-    // Standalone mode: backend'ga yuborish.
+    // AI valuation mode: callback berilmagan bo'lsa ham, foydalanuvchi
+    // wizard'ni mustaqil ochishi mumkin emas (ai_scan_screen orqali keladi).
+    // Shu sababli onSubmit majburiy hisoblanadi va backend submission'siz
+    // qaytaramiz.
+    if (widget.mode == WizardMode.aiValuation) {
+      _showError('AI baholash uchun callback bog\'lanmagan');
+      return;
+    }
+
+    // Standalone mode (architectureOrder): backend'ga yuborish.
     final session = await const AuthStorage().loadSession();
     final token = session.token;
     if (token == null) {
@@ -348,7 +378,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: 'Arxitektura TZ',
+                        title: _appBarTitle,
                         subtitle: _stepTitle(_stepIndex),
                         onBack: _back,
                       ),
@@ -374,6 +404,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                           _buildStep5(),
                           _buildStep6(),
                           _buildStep7(),
+                          _buildStep8(),
+                          _buildStep9(),
                         ],
                       ),
                     ),
@@ -383,7 +415,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                         label: _submitting
                             ? 'Yuborilmoqda…'
                             : (_isLastStep
-                                ? (widget.submitLabel ?? 'Yuborish')
+                                ? (widget.submitLabel ?? _defaultSubmitLabel)
                                 : 'Davom etish'),
                         enabled: _canAdvance && !_submitting,
                         onTap: _next,
@@ -401,16 +433,28 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   String _stepTitle(int i) {
     return switch (i) {
-      0 => '1/7 — Buyurtmachi',
-      1 => '2/7 — Obyekt va manzil',
-      2 => '3/7 — Loyiha va xonalar',
-      3 => '4/7 — Arxitektura',
-      4 => '5/7 — Konstruktiv',
-      5 => '6/7 — Muhandislik',
-      6 => '7/7 — Hudud va muddatlar',
+      0 => '1/9 — Buyurtmachi',
+      1 => '2/9 — Obyekt va manzil',
+      2 => '3/9 — Loyiha haqida',
+      3 => '4/9 — Xonalar tarkibi',
+      4 => '5/9 — Arxitektura yechimlari',
+      5 => '6/9 — Konstruktiv yechimlar',
+      6 => '7/9 — Muhandislik tizimlari',
+      7 => '8/9 — Hudud rejalashtirish',
+      8 => '9/9 — Muddatlar va izoh',
       _ => '',
     };
   }
+
+  String get _defaultSubmitLabel => switch (widget.mode) {
+        WizardMode.aiValuation => 'AI baholash',
+        WizardMode.architectureOrder => 'Yuborish',
+      };
+
+  String get _appBarTitle => switch (widget.mode) {
+        WizardMode.aiValuation => 'AI Baholash',
+        WizardMode.architectureOrder => 'Arxitektura TZ',
+      };
 
   Widget _scrollableStep(List<Widget> children) {
     return ListView(
@@ -453,8 +497,11 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     ]);
   }
 
-  // ── Step 2: Obyekt ───────────────────────────────────────────────────
+  // ── Step 2: Obyekt va manzil ─────────────────────────────────────────
   Widget _buildStep2() {
+    final tumanlar = _draft.viloyat == null
+        ? const <String>[]
+        : _tumanlarByViloyat[_draft.viloyat!] ?? const <String>[];
     return _scrollableStep([
       const WizardSectionTitle(text: 'Obyekt va manzil'),
       WizardField(
@@ -468,6 +515,36 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         placeholder: 'Toshkent sh., Yakkasaroy t., …',
         maxLines: 2,
       ),
+      WizardChipPicker<String>(
+        label: 'Viloyat',
+        required: true,
+        options: _viloyatKeys,
+        labelOf: _viloyatLabel,
+        value: _draft.viloyat,
+        onChanged: (v) {
+          setState(() {
+            _draft.viloyat = v;
+            // Yangi viloyat tanlansa, tuman avvalgi viloyatga tegishli bo'lsa
+            // tozalanadi.
+            if (v != null) {
+              final allowed = _tumanlarByViloyat[v] ?? const <String>[];
+              if (_draft.tuman != null && !allowed.contains(_draft.tuman)) {
+                _draft.tuman = null;
+              }
+            } else {
+              _draft.tuman = null;
+            }
+          });
+        },
+      ),
+      if (tumanlar.isNotEmpty)
+        WizardChipPicker<String>(
+          label: 'Tuman',
+          options: tumanlar,
+          labelOf: (s) => s,
+          value: _draft.tuman,
+          onChanged: (v) => setState(() => _draft.tuman = v),
+        ),
       // Kadastr raqami avvalgi step'da kiritilgan bo'lsa, qayta so'ramaymiz.
       if (_cadastreNumber.text.trim().isEmpty)
         WizardField(
@@ -491,7 +568,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     ]);
   }
 
-  // ── Step 3: Loyiha umumiy + xonalar ──────────────────────────────────
+  // ── Step 3: Loyiha haqida ────────────────────────────────────────────
   Widget _buildStep3() {
     return _scrollableStep([
       const WizardSectionTitle(text: 'Loyiha umumiy ma\'lumotlari'),
@@ -540,6 +617,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
           ),
         ],
       ),
+      WizardField(
+        label: 'Qurilish yili',
+        controller: _constructionYear,
+        placeholder: '2018',
+        numericOnly: true,
+      ),
       Row(
         children: [
           Expanded(
@@ -580,7 +663,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         value: _draft.hasUndergroundParking,
         onChanged: (v) => setState(() => _draft.hasUndergroundParking = v),
       ),
-      const SizedBox(height: 4),
+    ]);
+  }
+
+  // ── Step 4: Xonalar tarkibi ──────────────────────────────────────────
+  Widget _buildStep4() {
+    return _scrollableStep([
       const WizardSectionTitle(text: 'Xonalar tarkibi'),
       _buildRoomsEditor(),
     ]);
@@ -683,8 +771,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     );
   }
 
-  // ── Step 4: Arxitektura ──────────────────────────────────────────────
-  Widget _buildStep4() {
+  // ── Step 5: Arxitektura yechimlari ───────────────────────────────────
+  Widget _buildStep5() {
     return _scrollableStep([
       const WizardSectionTitle(text: 'Arxitektura va dizayn'),
       WizardChipPicker<String>(
@@ -722,8 +810,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     ]);
   }
 
-  // ── Step 5: Konstruktiv ──────────────────────────────────────────────
-  Widget _buildStep5() {
+  // ── Step 6: Konstruktiv yechimlar ────────────────────────────────────
+  Widget _buildStep6() {
     return _scrollableStep([
       const WizardSectionTitle(text: 'Konstruktiv yechimlar'),
       WizardChipPicker<String>(
@@ -793,8 +881,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     ]);
   }
 
-  // ── Step 6: Muhandislik ──────────────────────────────────────────────
-  Widget _buildStep6() {
+  // ── Step 7: Muhandislik tizimlari ────────────────────────────────────
+  Widget _buildStep7() {
     return _scrollableStep([
       const WizardSectionTitle(text: 'Muhandislik tizimlari'),
       WizardSwitchTile(
@@ -873,8 +961,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     ]);
   }
 
-  // ── Step 7: Hudud + muddatlar + qo'shimcha ───────────────────────────
-  Widget _buildStep7() {
+  // ── Step 8: Hudud rejalashtirish ─────────────────────────────────────
+  Widget _buildStep8() {
     return _scrollableStep([
       const WizardSectionTitle(text: 'Hududni rejalashtirish'),
       WizardSwitchTile(
@@ -909,7 +997,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         value: _draft.territory.hasLighting,
         onChanged: (v) => setState(() => _draft.territory.hasLighting = v),
       ),
-      const SizedBox(height: 4),
+    ]);
+  }
+
+  // ── Step 9: Muddatlar va qo'shimcha talablar ─────────────────────────
+  Widget _buildStep9() {
+    return _scrollableStep([
       const WizardSectionTitle(text: 'Muddatlar'),
       Row(
         children: [
@@ -987,4 +1080,71 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         'boyoq' => 'Fasad bo\'yoqlari',
         _ => s,
       };
+
+  // ── Viloyat / tuman katalogi ─────────────────────────────────────────
+  // Kalitlar OLX scraper region kalitlariga (`OlxUzScraper._REGION_IDS`)
+  // mos keladi — backend AI baholash filteri uchun.
+  static const List<String> _viloyatKeys = [
+    'tashkent_city',
+    'tashkent_region',
+    'andijan',
+    'bukhara',
+    'fergana',
+    'jizzakh',
+    'namangan',
+    'navoi',
+    'kashkadarya',
+    'karakalpakstan',
+    'samarkand',
+    'syrdarya',
+    'surkhandarya',
+    'khorezm',
+  ];
+
+  static String _viloyatLabel(String key) => switch (key) {
+        'tashkent_city' => 'Toshkent shahri',
+        'tashkent_region' => 'Toshkent viloyati',
+        'andijan' => 'Andijon',
+        'bukhara' => 'Buxoro',
+        'fergana' => 'Farg\'ona',
+        'jizzakh' => 'Jizzax',
+        'namangan' => 'Namangan',
+        'navoi' => 'Navoiy',
+        'kashkadarya' => 'Qashqadaryo',
+        'karakalpakstan' => 'Qoraqalpog\'iston',
+        'samarkand' => 'Samarqand',
+        'syrdarya' => 'Sirdaryo',
+        'surkhandarya' => 'Surxondaryo',
+        'khorezm' => 'Xorazm',
+        _ => key,
+      };
+
+  static const Map<String, List<String>> _tumanlarByViloyat = {
+    'tashkent_city': [
+      'Bektemir',
+      'Chilonzor',
+      'Mirobod',
+      'Mirzo Ulug\'bek',
+      'Olmazor',
+      'Sirg\'ali',
+      'Shayxontohur',
+      'Uchtepa',
+      'Yakkasaroy',
+      'Yashnobod',
+      'Yunusobod',
+    ],
+    'tashkent_region': [
+      'Bekobod',
+      'Bo\'ka',
+      'Chinoz',
+      'Ohangaron',
+      'Olmaliq',
+      'Parkent',
+      'Piskent',
+      'Quyichirchiq',
+      'O\'rtachirchiq',
+      'Yangiyo\'l',
+      'Zangiota',
+    ],
+  };
 }

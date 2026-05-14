@@ -23,14 +23,12 @@ class ApiMarketRepository implements MarketRepository {
     final size = limit;
     final page = (offset ~/ size) + 1;
     final result = await _service.listModels(
-      category: _toBackendCategory(categoryId),
+      category: categoryId == kMarketCategoryAll ? null : categoryId,
       search: query.isEmpty ? null : query,
       page: page,
       size: size,
     );
 
-    // Apply client-side filter (price/area/district picks the controller
-    // already supports) since the backend doesn't expose them yet.
     final filtered = filters.isEmpty
         ? result.items
         : result.items.where(filters.matches).toList(growable: false);
@@ -42,22 +40,5 @@ class ApiMarketRepository implements MarketRepository {
       nextOffset: consumed,
       totalCount: result.total,
     );
-  }
-
-  String? _toBackendCategory(String mobileId) {
-    switch (mobileId) {
-      case 'residential':
-        return 'residential';
-      // Mobile bucket "nonresidential" covers two backend categories; pick the
-      // most likely one for now. A multi-value filter will need backend
-      // changes.
-      case 'nonresidential':
-        return 'commercial';
-      case 'projects':
-        return null; // bucket — don't filter server-side
-      case kMarketCategoryAll:
-      default:
-        return null;
-    }
   }
 }

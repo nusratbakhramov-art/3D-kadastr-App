@@ -2,11 +2,29 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../../settings/settings_state.dart';
 import '../models/scan_draft.dart';
 import '../widgets/choice_tile.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
 import 'scan_lidar_screen.dart';
+
+String _scanObjectTypeLabel(ScanObjectType t, Locale locale) =>
+    switch (locale.languageCode) {
+      'ru' => switch (t) {
+          ScanObjectType.turarJoy => 'Жилое',
+          ScanObjectType.noturarJoy => 'Нежилое',
+          ScanObjectType.ombor => 'Склад',
+          ScanObjectType.sanoat => 'Промышленные объекты',
+        },
+      'en' => switch (t) {
+          ScanObjectType.turarJoy => 'Residential',
+          ScanObjectType.noturarJoy => 'Non-residential',
+          ScanObjectType.ombor => 'Warehouse',
+          ScanObjectType.sanoat => 'Industrial objects',
+        },
+      _ => t.label,
+    };
 
 class ScanObjectTypeScreen extends StatefulWidget {
   const ScanObjectTypeScreen({super.key, required this.draft});
@@ -36,6 +54,13 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<Locale>(
+      valueListenable: localeNotifier,
+      builder: (context, locale, _) => _build(context, locale),
+    );
+  }
+
+  Widget _build(BuildContext context, Locale locale) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final labelColor = isDark ? Colors.white : AppColors.textBlack;
@@ -56,9 +81,10 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: const ServiceAppBar(
-                        title: '3D kadastr',
-                        subtitle: 'Obyekt turini tanlang',
+                      child: ServiceAppBar(
+                        title: _ScanObjectTypeStrings.appBarTitle(locale),
+                        subtitle:
+                            _ScanObjectTypeStrings.appBarSubtitle(locale),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -71,7 +97,7 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
                           Text(
-                            'Obyekt turi',
+                            _ScanObjectTypeStrings.heading(locale),
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
@@ -82,7 +108,7 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            'Skan qilinayotgan obyekt turini tanlang',
+                            _ScanObjectTypeStrings.subheading(locale),
                             style: TextStyle(
                               fontFamily: 'MTSText',
                               fontSize: 13,
@@ -93,7 +119,7 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
                           const SizedBox(height: 14),
                           for (final t in ScanObjectType.values) ...[
                             ChoiceTile(
-                              label: t.label,
+                              label: _scanObjectTypeLabel(t, locale),
                               selected: _selected == t,
                               onTap: () => setState(() => _selected = t),
                             ),
@@ -105,7 +131,7 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: 'Davom etish',
+                        label: _ScanObjectTypeStrings.ctaContinue(locale),
                         enabled: _selected != null,
                         onTap: _continue,
                       ),
@@ -119,4 +145,36 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
       ),
     );
   }
+}
+
+class _ScanObjectTypeStrings {
+  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => '3D Кадастр',
+        'en' => '3D Cadastre',
+        _ => '3D kadastr',
+      };
+
+  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Выберите тип объекта',
+        'en' => 'Select object type',
+        _ => 'Obyekt turini tanlang',
+      };
+
+  static String heading(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Тип объекта',
+        'en' => 'Object type',
+        _ => 'Obyekt turi',
+      };
+
+  static String subheading(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Выберите тип сканируемого объекта',
+        'en' => 'Select the type of object being scanned',
+        _ => 'Skan qilinayotgan obyekt turini tanlang',
+      };
+
+  static String ctaContinue(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Продолжить',
+        'en' => 'Continue',
+        _ => 'Davom etish',
+      };
 }

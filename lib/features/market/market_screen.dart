@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
+import '../settings/settings_state.dart';
 import 'listing_detail_screen.dart';
 import 'market_controller.dart';
 import 'models/market_filters.dart';
@@ -43,7 +44,9 @@ class _MarketScreenState extends State<MarketScreen> {
   @override
   void initState() {
     super.initState();
-    _controller = widget.controller ?? sharedMarketController();
+    _controller =
+        widget.controller ??
+        sharedMarketController(locale: localeNotifier.value.languageCode);
     _scroll = ScrollController()..addListener(_onScroll);
     _searchText = TextEditingController(text: _controller.searchInput);
     _controller.addListener(_syncSearchText);
@@ -277,7 +280,7 @@ class _ChipsRow extends StatelessWidget {
       listenable: controller,
       builder: (context, _) {
         return CategoryChips(
-          categories: marketCategories,
+          categories: controller.categories,
           selectedId: controller.categoryId,
           onSelected: controller.selectCategory,
         );
