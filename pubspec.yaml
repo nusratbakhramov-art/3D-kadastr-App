@@ -77,11 +77,10 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#00E135"
-  background_image: "assets/branding/splash/native-bg.png"
-  image: "assets/branding/splash/native-icon.png"
+  image: "assets/branding/appicon.png"
   android_12:
     color: "#00E135"
-    image: "assets/branding/splash/native-icon.png"
+    image: "assets/branding/appicon.png"
   android: true
   ios: true
   web: false
