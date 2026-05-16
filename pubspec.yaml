@@ -37,7 +37,6 @@ flutter:
   assets:
     - assets/3d/
     - assets/branding/
-    - assets/branding/splash/
     - assets/icons/
     - assets/images/
     - assets/images/auth/

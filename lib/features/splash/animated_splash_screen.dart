@@ -111,11 +111,8 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.splashGreen,
-      body: Stack(
-        children: [
-          const Positioned.fill(child: _SplashPatternBackground()),
-          Center(
-            child: AnimatedBuilder(
+      body: Center(
+        child: AnimatedBuilder(
           animation: _controller,
           builder: (context, _) {
             final scale = lerpDouble(
@@ -174,50 +171,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
               ],
             );
           },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SplashPatternBackground extends StatelessWidget {
-  const _SplashPatternBackground();
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final patternSize = constraints.maxWidth;
-          return Stack(
-            children: [
-              Positioned(
-                top: 0,
-                right: 0,
-                width: patternSize,
-                height: patternSize,
-                child: Image.asset(
-                  'assets/branding/splash/pattern-tr.png',
-                  fit: BoxFit.contain,
-                  alignment: Alignment.topRight,
-                ),
-              ),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                width: patternSize,
-                height: patternSize,
-                child: Image.asset(
-                  'assets/branding/splash/pattern-bl.png',
-                  fit: BoxFit.contain,
-                  alignment: Alignment.bottomLeft,
-                ),
-              ),
-            ],
-          );
-        },
+        ),
       ),
     );
   }
