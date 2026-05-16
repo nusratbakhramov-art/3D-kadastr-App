@@ -120,4 +120,11 @@ class AppLocale {
         'en' => 'Choose language',
         _ => 'Tilni tanlang',
       };
+
+  static String comingSoonLabel(Locale locale) => switch (locale.languageCode) {
+    'uz' => 'Tez kunda',
+    'ru' => 'Скоро',
+    'en' => 'Coming soon',
+    _ => 'Tez kunda',
+  };
 }

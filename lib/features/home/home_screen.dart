@@ -18,6 +18,8 @@ class HomeScreen extends StatelessWidget {
     this.onOpenCalculator,
     this.onOpenMarket,
     this.onOpenOrder,
+    this.onOpenProfile,
+    this.onOpenNotifications,
   });
 
   final Locale locale;
@@ -28,6 +30,8 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onOpenCalculator;
   final VoidCallback? onOpenMarket;
   final VoidCallback? onOpenOrder;
+  final VoidCallback? onOpenProfile;
+  final VoidCallback? onOpenNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +68,8 @@ class HomeScreen extends StatelessWidget {
                             locale: locale,
                             today: date,
                             onLoginTap: onLoginTap,
+                            onAvatarTap: onOpenProfile,
+                            onBellTap: onOpenNotifications,
                           );
                         },
                       );
@@ -113,8 +119,6 @@ class _HomePatternBackground extends StatelessWidget {
     return IgnorePointer(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final patternHeight = constraints.maxHeight * (2 / 3);
-
           return Stack(
             children: [
               Positioned.fill(
@@ -124,40 +128,14 @@ class _HomePatternBackground extends StatelessWidget {
               ),
               if (showPattern)
                 Positioned(
-                  left: 0,
                   top: 0,
                   right: 0,
-                  height: patternHeight,
-                  child: ClipRect(
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          top: -52,
-                          right: -190,
-                          child: Opacity(
-                            opacity: 0.32,
-                            child: Image.asset(
-                              'assets/images/home/pattern.png',
-                              width: constraints.maxWidth * 2.1,
-                              fit: BoxFit.cover,
-                              alignment: Alignment.topRight,
-                            ),
-                          ),
-                        ),
-                        Positioned.fill(
-                          child: DecoratedBox(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [Colors.transparent, backgroundColor],
-                                stops: const [0.76, 1.0],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  width: constraints.maxWidth,
+                  height: constraints.maxWidth,
+                  child: Image.asset(
+                    'assets/images/home/pattern.png',
+                    fit: BoxFit.contain,
+                    alignment: Alignment.topRight,
                   ),
                 ),
             ],

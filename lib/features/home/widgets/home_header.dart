@@ -14,6 +14,7 @@ class HomeHeader extends StatelessWidget {
     required this.today,
     this.onBellTap,
     this.onLoginTap,
+    this.onAvatarTap,
   });
 
   final UserProfile? profile;
@@ -22,6 +23,7 @@ class HomeHeader extends StatelessWidget {
   final DateTime today;
   final VoidCallback? onBellTap;
   final VoidCallback? onLoginTap;
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -39,7 +41,7 @@ class HomeHeader extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _Avatar(profile: profile),
+        _Avatar(profile: profile, onTap: onAvatarTap),
         const SizedBox(width: 12),
         Expanded(
           child: Column(
@@ -121,17 +123,19 @@ class _LoginButton extends StatelessWidget {
 }
 
 class _Avatar extends StatelessWidget {
-  const _Avatar({required this.profile});
+  const _Avatar({required this.profile, this.onTap});
 
   final UserProfile? profile;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     const size = 44.0;
     final path = profile?.avatarPath;
+    Widget avatar;
     if (path != null) {
       final isAsset = path.startsWith('assets/');
-      return ClipOval(
+      avatar = ClipOval(
         child: SizedBox(
           width: size,
           height: size,
@@ -140,10 +144,8 @@ class _Avatar extends StatelessWidget {
               : Image.file(File(path), fit: BoxFit.cover),
         ),
       );
-    }
-
-    if (profile == null) {
-      return Container(
+    } else if (profile == null) {
+      avatar = Container(
         width: size,
         height: size,
         decoration: const BoxDecoration(
@@ -157,27 +159,38 @@ class _Avatar extends StatelessWidget {
           color: Colors.white70,
         ),
       );
+    } else {
+      final initial = profile!.name.isNotEmpty
+          ? profile!.name.characters.first.toUpperCase()
+          : '?';
+      avatar = Container(
+        width: size,
+        height: size,
+        decoration: const BoxDecoration(
+          color: Color(0xFF0A6B23),
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          initial,
+          style: const TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w700,
+            fontSize: 18,
+            color: Colors.white,
+          ),
+        ),
+      );
     }
 
-    final initial = profile!.name.isNotEmpty
-        ? profile!.name.characters.first.toUpperCase()
-        : '?';
-    return Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
-        color: Color(0xFF0A6B23),
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        initial,
-        style: const TextStyle(
-          fontFamily: 'MTSCompact',
-          fontWeight: FontWeight.w700,
-          fontSize: 18,
-          color: Colors.white,
-        ),
+    return Material(
+      color: Colors.transparent,
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: avatar,
       ),
     );
   }

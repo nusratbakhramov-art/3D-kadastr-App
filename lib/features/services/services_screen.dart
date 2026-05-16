@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../../widgets/app_toast.dart';
+import '../onboarding/onboarding_page_data.dart';
 import 'models/service_item.dart';
-import 'screens/ai_scan_screen.dart';
 import 'screens/kadastr_3d_screen.dart';
-import 'screens/online_calculator_screen.dart';
 import 'widgets/service_card.dart';
 
 class ServicesScreen extends StatefulWidget {
@@ -191,12 +191,15 @@ class _ServicesScreenState extends State<ServicesScreen>
   }
 
   void _open(BuildContext context, ServiceItem item) {
-    final WidgetBuilder builder = switch (item.id) {
-      ServiceId.kadastr3d => (_) => const Kadastr3dScreen(),
-      ServiceId.aiValuation => (_) => const AiScanScreen(),
-      ServiceId.calculator => (_) => const OnlineCalculatorScreen(),
-    };
-    Navigator.of(context).push(MaterialPageRoute<void>(builder: builder));
+    switch (item.id) {
+      case ServiceId.kadastr3d:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()),
+        );
+      case ServiceId.aiValuation:
+      case ServiceId.calculator:
+        AppToast.success(context, AppLocale.comingSoonLabel(widget.locale));
+    }
   }
 }
 

@@ -37,6 +37,7 @@ flutter:
   assets:
     - assets/3d/
     - assets/branding/
+    - assets/branding/splash/
     - assets/icons/
     - assets/images/
     - assets/images/auth/
@@ -76,10 +77,11 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#00E135"
-  image: "assets/branding/appicon.png"
+  background_image: "assets/branding/splash/native-bg.png"
+  image: "assets/branding/splash/native-icon.png"
   android_12:
     color: "#00E135"
-    image: "assets/branding/appicon.png"
+    image: "assets/branding/splash/native-icon.png"
   android: true
   ios: true
   web: false

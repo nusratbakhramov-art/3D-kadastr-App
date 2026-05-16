@@ -14,11 +14,10 @@ import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
 import '../scans/my_scans_screen.dart';
-import '../services/screens/ai_scan_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
-import '../services/screens/online_calculator_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
+import '../../widgets/app_toast.dart';
 import 'app_bottom_nav.dart';
 
 class MainShell extends StatefulWidget {
@@ -159,16 +158,12 @@ class _MainShellState extends State<MainShell> {
     ).push(MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()));
   }
 
-  Future<void> _openAiValuation() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AiScanScreen()));
+  void _openAiValuation() {
+    AppToast.success(context, AppLocale.comingSoonLabel(widget.locale));
   }
 
-  Future<void> _openCalculator() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
-    );
+  void _openCalculator() {
+    AppToast.success(context, AppLocale.comingSoonLabel(widget.locale));
   }
 
   void _openMarketTab() => _onTabChanged(2);
@@ -194,6 +189,8 @@ class _MainShellState extends State<MainShell> {
             onOpenCalculator: _openCalculator,
             onOpenMarket: _openMarketTab,
             onOpenOrder: _openKadastr3d,
+            onOpenProfile: () => _onTabChanged(4),
+            onOpenNotifications: _openNotifications,
           ),
           ServicesScreen(
             locale: widget.locale,
