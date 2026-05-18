@@ -14,6 +14,7 @@ class ApiValuationHistoryService {
   Future<List<Valuation>> fetchHistory() async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/valuations/ai/history');
     final res = await _client.get(uri).timeout(_timeout);
+    if (res.statusCode == 404) return [];
     if (res.statusCode != 200) {
       throw Exception('Baholashlarni yuklashda xatolik: ${res.statusCode}');
     }

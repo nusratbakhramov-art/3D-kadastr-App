@@ -12,7 +12,7 @@ class ApiPaymentsService {
   static const _timeout = Duration(seconds: 15);
 
   Future<List<Payment>> fetchPayments({int page = 1, int size = 50}) async {
-    final uri = Uri.parse('${ApiConfig.baseUrl}/payments/')
+    final uri = Uri.parse('${ApiConfig.baseUrl}/profile/payments')
         .replace(queryParameters: {'page': '$page', 'size': '$size'});
     final res = await _client.get(uri).timeout(_timeout);
     if (res.statusCode != 200) {

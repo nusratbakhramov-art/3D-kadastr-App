@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:in_app_review/in_app_review.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api_config.dart';
 import '../auth/auth_http_client.dart';
@@ -18,8 +18,6 @@ import '../../widgets/app_toast.dart';
 import 'locale_storage.dart';
 import 'settings_state.dart';
 
-const _kTermsUrl = 'https://3dkadastr.uz/terms';
-const _kPrivacyUrl = 'https://3dkadastr.uz/privacy';
 const _kAppStoreId = '6744487945';
 
 class SettingsScreen extends StatefulWidget {
@@ -168,18 +166,19 @@ class _SettingsScreenState extends State<SettingsScreen>
             onTap: () => _toggleNotifications(context, locale, !on),
           ),
         ),
-        ValueListenableBuilder<bool>(
-          valueListenable: biometricEnabledNotifier,
-          builder: (context, on, _) => AppMenuRow(
-            icon: Icons.fingerprint_rounded,
-            label: _S.biometric(locale),
-            trailing: Switch.adaptive(
-              value: on,
-              onChanged: (v) => _toggleBiometric(context, locale, v),
-            ),
-            onTap: () => _toggleBiometric(context, locale, !on),
-          ),
-        ),
+        // TODO: enable when biometric lock is implemented
+        // ValueListenableBuilder<bool>(
+        //   valueListenable: biometricEnabledNotifier,
+        //   builder: (context, on, _) => AppMenuRow(
+        //     icon: Icons.fingerprint_rounded,
+        //     label: _S.biometric(locale),
+        //     trailing: Switch.adaptive(
+        //       value: on,
+        //       onChanged: (v) => _toggleBiometric(context, locale, v),
+        //     ),
+        //     onTap: () => _toggleBiometric(context, locale, !on),
+        //   ),
+        // ),
       ],
     );
   }
@@ -195,22 +194,15 @@ class _SettingsScreenState extends State<SettingsScreen>
         AppMenuRow(
           icon: Icons.description_outlined,
           label: _S.terms(locale),
-          onTap: () => _launchUrl(_kTermsUrl),
+          onTap: () => _openLegalSheet(context, locale, 'terms'),
         ),
         AppMenuRow(
           icon: Icons.shield_outlined,
           label: _S.privacyPolicy(locale),
-          onTap: () => _launchUrl(_kPrivacyUrl),
+          onTap: () => _openLegalSheet(context, locale, 'privacy'),
         ),
       ],
     );
-  }
-
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
   }
 
   Future<void> _openRateApp() async {
@@ -231,6 +223,15 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  Future<void> _openLegalSheet(BuildContext context, Locale locale, String type) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _LegalContentSheet(locale: locale, type: type),
+    );
+  }
+
   Widget _otherCard(BuildContext context, Locale locale) {
     return AppMenuCard(
       rows: [
@@ -242,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         AppMenuRow(
           icon: Icons.info_outline_rounded,
           label: _S.version(locale),
-          trailing: const _ValueChip(text: '1.0.0 (3)'),
+          trailing: const _ValueChip(text: '1.0.0 (3)', showChevron: false),
           onTap: null,
         ),
         AppMenuRow(
@@ -284,10 +285,10 @@ class _SettingsScreenState extends State<SettingsScreen>
     AppToast.success(context, _S.savedToast(locale));
   }
 
-  void _toggleBiometric(BuildContext context, Locale locale, bool v) {
-    biometricEnabledNotifier.value = v;
-    AppToast.success(context, _S.savedToast(locale));
-  }
+  // void _toggleBiometric(BuildContext context, Locale locale, bool v) {
+  //   biometricEnabledNotifier.value = v;
+  //   AppToast.success(context, _S.savedToast(locale));
+  // }
 
   Future<void> _openThemeSheet(BuildContext context) async {
     final locale = localeNotifier.value;
@@ -539,7 +540,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
           color: ColorTokens.cardBg(context),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.paddingOf(context).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -623,6 +624,280 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Legal Content Sheet  (terms / privacy — fetched from API, cached per session)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LegalFallback {
+  static ({String title, String content}) get(String type, String lang) {
+    if (type == 'terms') return _terms[lang] ?? _terms['uz']!;
+    return _privacy[lang] ?? _privacy['uz']!;
+  }
+
+  static const _terms = {
+    'uz': (
+      title: 'Foydalanish shartlari',
+      content:
+          '1. Umumiy qoidalar\n\n'
+          'Ushbu shartlar 3D Kadastr ilovasidan foydalanish qoidalarini belgilaydi. '
+          'Ilovadan foydalanib, siz ushbu shartlarga roziligingizni bildirasiz.\n\n'
+          '2. Xizmat tavsifi\n\n'
+          '3D Kadastr — ko\'chmas mulk obyektlarini 3D skanerlash, baholash va '
+          'kadastr ma\'lumotlarini boshqarish uchun mo\'ljallangan platforma.\n\n'
+          '3. Foydalanuvchi majburiyatlari\n\n'
+          'Foydalanuvchi haqiqiy ma\'lumotlar kiritishi, hisobni uchinchi shaxslarga '
+          'bermasligi va qonuniy maqsadlarda foydalanishi shart.\n\n'
+          '4. Intellektual mulk\n\n'
+          'Ilova va uning barcha tarkibi 3D Kadastr kompaniyasiga tegishli bo\'lib, '
+          'mualliflik huquqi bilan himoyalangan.\n\n'
+          '5. Javobgarlikni cheklash\n\n'
+          'Kompaniya texnik nosozliklar, uchinchi tomon xizmatlari yoki foydalanuvchi '
+          'xatolaridan yuzaga keladigan zararlar uchun javobgar emas.\n\n'
+          '6. O\'zgartirishlar\n\n'
+          'Kompaniya ushbu shartlarni oldindan ogohlantirmay o\'zgartirish huquqini '
+          'o\'zida saqlab qoladi. Yangilangan shartlar ilovada e\'lon qilinadi.\n\n'
+          '7. Bog\'lanish\n\nsupport@3dkadastr.uz',
+    ),
+    'ru': (
+      title: 'Условия использования',
+      content:
+          '1. Общие положения\n\n'
+          'Настоящие условия регулируют использование приложения 3D Kadastr. '
+          'Используя приложение, вы принимаете данные условия.\n\n'
+          '2. Описание сервиса\n\n'
+          '3D Kadastr — платформа для 3D-сканирования объектов недвижимости, '
+          'оценки стоимости и управления кадастровыми данными.\n\n'
+          '3. Обязанности пользователя\n\n'
+          'Пользователь обязан предоставлять достоверные данные, не передавать '
+          'учётную запись третьим лицам и использовать сервис в законных целях.\n\n'
+          '4. Интеллектуальная собственность\n\n'
+          'Приложение и весь его контент принадлежат компании 3D Kadastr и '
+          'защищены авторским правом.\n\n'
+          '5. Ограничение ответственности\n\n'
+          'Компания не несёт ответственности за ущерб, возникший вследствие '
+          'технических сбоев, сервисов третьих сторон или действий пользователя.\n\n'
+          '6. Изменения\n\n'
+          'Компания оставляет за собой право изменять настоящие условия. '
+          'Актуальная версия публикуется в приложении.\n\n'
+          '7. Контакты\n\nsupport@3dkadastr.uz',
+    ),
+    'en': (
+      title: 'Terms of Use',
+      content:
+          '1. General Terms\n\n'
+          'These terms govern your use of the 3D Kadastr application. '
+          'By using the app, you agree to these terms.\n\n'
+          '2. Service Description\n\n'
+          '3D Kadastr is a platform for 3D scanning of real estate objects, '
+          'property valuation, and cadastral data management.\n\n'
+          '3. User Obligations\n\n'
+          'Users must provide accurate information, not share accounts with '
+          'third parties, and use the service for lawful purposes only.\n\n'
+          '4. Intellectual Property\n\n'
+          'The app and all its content belong to 3D Kadastr company and are '
+          'protected by copyright.\n\n'
+          '5. Limitation of Liability\n\n'
+          'The company is not liable for damages arising from technical failures, '
+          'third-party services, or user errors.\n\n'
+          '6. Changes\n\n'
+          'The company reserves the right to modify these terms. '
+          'Updated terms will be published in the app.\n\n'
+          '7. Contact\n\nsupport@3dkadastr.uz',
+    ),
+  };
+
+  static const _privacy = {
+    'uz': (
+      title: 'Maxfiylik siyosati',
+      content:
+          '1. To\'planadigan ma\'lumotlar\n\n'
+          'Biz quyidagi ma\'lumotlarni to\'playmiz: telefon raqami, to\'liq ism, '
+          'elektron pochta (ixtiyoriy), skanerlangan obyekt rasmlari va '
+          'joylashuv ma\'lumotlari.\n\n'
+          '2. Ma\'lumotlardan foydalanish\n\n'
+          'Ma\'lumotlar faqat xizmat ko\'rsatish, baholash natijalari tayyorlash '
+          'va bildirishnomalar yuborish uchun ishlatiladi.\n\n'
+          '3. Ma\'lumotlarni saqlash\n\n'
+          'Barcha ma\'lumotlar shifrlangan holda O\'zbekistondagi serverlarimizda '
+          'saqlanadi. Uchinchi shaxslarga sotilmaydi.\n\n'
+          '4. Foydalanuvchi huquqlari\n\n'
+          'Siz o\'z ma\'lumotlaringizga kirish, o\'zgartirish yoki o\'chirish huquqiga '
+          'egasiz. Buning uchun support@3dkadastr.uz manziliga murojaat qiling.\n\n'
+          '5. Kuzatish va analitika\n\n'
+          'Ilova faqat texnik ishlash uchun zarur bo\'lgan minimal analitikadan '
+          'foydalanadi.\n\n'
+          '6. Aloqa\n\nprivacy@3dkadastr.uz',
+    ),
+    'ru': (
+      title: 'Политика конфиденциальности',
+      content:
+          '1. Собираемые данные\n\n'
+          'Мы собираем: номер телефона, полное имя, email (необязательно), '
+          'изображения сканируемых объектов и данные о местоположении.\n\n'
+          '2. Использование данных\n\n'
+          'Данные используются исключительно для предоставления услуг, '
+          'подготовки результатов оценки и отправки уведомлений.\n\n'
+          '3. Хранение данных\n\n'
+          'Все данные хранятся в зашифрованном виде на наших серверах '
+          'в Узбекистане и не продаются третьим лицам.\n\n'
+          '4. Права пользователя\n\n'
+          'Вы вправе получить доступ к своим данным, изменить или удалить их. '
+          'Обратитесь по адресу support@3dkadastr.uz.\n\n'
+          '5. Аналитика\n\n'
+          'Приложение использует минимальную аналитику, необходимую для '
+          'технического функционирования.\n\n'
+          '6. Контакты\n\nprivacy@3dkadastr.uz',
+    ),
+    'en': (
+      title: 'Privacy Policy',
+      content:
+          '1. Data We Collect\n\n'
+          'We collect: phone number, full name, email (optional), '
+          'scanned object images, and location data.\n\n'
+          '2. How We Use Data\n\n'
+          'Data is used solely for providing services, preparing valuation '
+          'results, and sending notifications.\n\n'
+          '3. Data Storage\n\n'
+          'All data is stored encrypted on our servers in Uzbekistan and '
+          'is not sold to third parties.\n\n'
+          '4. Your Rights\n\n'
+          'You have the right to access, modify, or delete your data. '
+          'Contact support@3dkadastr.uz.\n\n'
+          '5. Analytics\n\n'
+          'The app uses minimal analytics required for technical operation.\n\n'
+          '6. Contact\n\nprivacy@3dkadastr.uz',
+    ),
+  };
+}
+
+class _LegalCache {
+  static ({String title, String content})? terms;
+  static ({String title, String content})? privacy;
+}
+
+class _LegalContentSheet extends StatefulWidget {
+  const _LegalContentSheet({required this.locale, required this.type});
+  final Locale locale;
+  final String type;
+
+  @override
+  State<_LegalContentSheet> createState() => _LegalContentSheetState();
+}
+
+class _LegalContentSheetState extends State<_LegalContentSheet> {
+  String? _title;
+  String? _content;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    final cached = widget.type == 'terms' ? _LegalCache.terms : _LegalCache.privacy;
+    if (cached != null) {
+      if (mounted) setState(() { _title = cached.title; _content = cached.content; _loading = false; });
+      return;
+    }
+    try {
+      final res = await http
+          .get(Uri.parse('${ApiConfig.baseUrl}/legal/${widget.type}?lang=${widget.locale.languageCode}'))
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        final title = body['title'] as String;
+        final content = body['content'] as String;
+        if (widget.type == 'terms') {
+          _LegalCache.terms = (title: title, content: content);
+        } else {
+          _LegalCache.privacy = (title: title, content: content);
+        }
+        if (mounted) setState(() { _title = title; _content = content; _loading = false; });
+        return;
+      }
+    } catch (_) {
+      // fall through to static fallback
+    }
+    // API unavailable — show static fallback content
+    final fallback = _LegalFallback.get(widget.type, widget.locale.languageCode);
+    if (mounted) setState(() { _title = fallback.title; _content = fallback.content; _loading = false; });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    return Container(
+      height: MediaQuery.sizeOf(context).height * 0.85,
+      decoration: BoxDecoration(
+        color: ColorTokens.cardBg(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 12, bottom: 16),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: ColorTokens.secondaryText(context).withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          if (_loading)
+            const Expanded(child: Center(child: CircularProgressIndicator()))
+          else if (_error != null)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.wifi_off_rounded, size: 32, color: ColorTokens.secondaryText(context)),
+                    const SizedBox(height: 12),
+                    TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); unawaited(_load()); }, child: const Text('Qayta urinish')),
+                  ],
+                ),
+              ),
+            )
+          else ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+              child: Text(
+                _title ?? '',
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 20,
+                  color: ColorTokens.primaryText(context),
+                ),
+              ),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + safeBottom),
+                child: Text(
+                  _content ?? '',
+                  style: TextStyle(
+                    fontFamily: 'MTSText',
+                    fontSize: 14,
+                    height: 1.6,
+                    color: ColorTokens.primaryText(context),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel({required this.text});
 
@@ -646,9 +921,10 @@ class _SectionLabel extends StatelessWidget {
 }
 
 class _ValueChip extends StatelessWidget {
-  const _ValueChip({required this.text});
+  const _ValueChip({required this.text, this.showChevron = true});
 
   final String text;
+  final bool showChevron;
 
   @override
   Widget build(BuildContext context) {
@@ -664,12 +940,14 @@ class _ValueChip extends StatelessWidget {
             color: ColorTokens.secondaryText(context),
           ),
         ),
-        const SizedBox(width: 4),
-        Icon(
-          Icons.chevron_right_rounded,
-          size: 18,
-          color: ColorTokens.tertiaryText(context),
-        ),
+        if (showChevron) ...[
+          const SizedBox(width: 4),
+          Icon(
+            Icons.chevron_right_rounded,
+            size: 18,
+            color: ColorTokens.tertiaryText(context),
+          ),
+        ],
       ],
     );
   }
@@ -810,11 +1088,11 @@ class _S {
     'en' => 'Notifications',
     _ => 'Bildirishnomalar',
   };
-  static String biometric(Locale l) => switch (l.languageCode) {
-    'ru' => 'Биометрический вход',
-    'en' => 'Biometric login',
-    _ => 'Biometrik kirish',
-  };
+  // static String biometric(Locale l) => switch (l.languageCode) {
+  //   'ru' => 'Биометрический вход',
+  //   'en' => 'Biometric login',
+  //   _ => 'Biometrik kirish',
+  // };
   static String changePhone(Locale l) => switch (l.languageCode) {
     'ru' => 'Сменить номер',
     'en' => 'Change phone',
