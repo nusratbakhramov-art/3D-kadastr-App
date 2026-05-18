@@ -16,14 +16,30 @@
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchBackground" translatesAutoresizingMaskIntoConstraints="NO" id="bg-img-001"/>
+                            <!-- Top-right pattern: square = screen width -->
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchPatternTR" translatesAutoresizingMaskIntoConstraints="NO" id="ptr-aa-001"/>
+                            <!-- Bottom-left pattern: square = screen width -->
+                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchPatternBL" translatesAutoresizingMaskIntoConstraints="NO" id="pbl-bb-002"/>
+                            <!-- Logo: fixed 217x217pt (matches Flutter _logoSizePx * _logoStartScale) -->
+                            <imageView opaque="NO" contentMode="scaleAspectFit" image="LaunchImage" translatesAutoresizingMaskIntoConstraints="NO" id="YRO-k0-Ey4"/>
                         </subviews>
                         <color key="backgroundColor" red="0" green="0.882352941" blue="0.207843137" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
-                            <constraint firstItem="bg-img-001" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="bg-top"/>
-                            <constraint firstItem="bg-img-001" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="bg-bot"/>
-                            <constraint firstItem="bg-img-001" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="bg-lead"/>
-                            <constraint firstAttribute="trailing" secondItem="bg-img-001" secondAttribute="trailing" id="bg-trail"/>
+                            <!-- Pattern TR -->
+                            <constraint firstItem="ptr-aa-001" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="ptr-top"/>
+                            <constraint firstAttribute="trailing" secondItem="ptr-aa-001" secondAttribute="trailing" id="ptr-trail"/>
+                            <constraint firstItem="ptr-aa-001" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" id="ptr-w"/>
+                            <constraint firstItem="ptr-aa-001" firstAttribute="height" secondItem="ptr-aa-001" secondAttribute="width" id="ptr-h"/>
+                            <!-- Pattern BL -->
+                            <constraint firstItem="pbl-bb-002" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="pbl-bot"/>
+                            <constraint firstItem="pbl-bb-002" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="pbl-lead"/>
+                            <constraint firstItem="pbl-bb-002" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" id="pbl-w"/>
+                            <constraint firstItem="pbl-bb-002" firstAttribute="height" secondItem="pbl-bb-002" secondAttribute="width" id="pbl-h"/>
+                            <!-- Logo: centered, fixed 217x217pt -->
+                            <constraint firstItem="YRO-k0-Ey4" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="logo-cx"/>
+                            <constraint firstItem="YRO-k0-Ey4" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="logo-cy"/>
+                            <constraint firstItem="YRO-k0-Ey4" firstAttribute="width" constant="217" id="logo-w"/>
+                            <constraint firstItem="YRO-k0-Ey4" firstAttribute="height" constant="217" id="logo-h"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -33,6 +49,8 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchBackground" width="390" height="844"/>
+        <image name="LaunchImage" width="217" height="217"/>
+        <image name="LaunchPatternTR" width="1404" height="1404"/>
+        <image name="LaunchPatternBL" width="1500" height="1396"/>
     </resources>
 </document>

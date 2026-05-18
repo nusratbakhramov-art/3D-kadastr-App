@@ -58,52 +58,78 @@ class ListingCard extends StatelessWidget {
                 clipBehavior: Clip.hardEdge,
                 child: AspectRatio(
                   aspectRatio: 4 / 3,
-                  child: Hero(
-                    tag: 'listing.${listing.id}',
-                    child: _ListingImage(url: listing.imageUrl),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Hero(
+                        tag: 'listing.${listing.id}',
+                        child: _ListingImage(url: listing.imageUrl),
+                      ),
+                      if (listing.priceUzs <= 0)
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.splashGreen,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Text(
+                              'Bepul',
+                              style: TextStyle(
+                                fontFamily: 'MTSCompact',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                                height: 1.2,
+                                color: Color(0xFF011606),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _PriceLine(price: listing.priceUzs, color: titleColor),
-                      Text(
-                        listing.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'MTSCompact',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          height: 1.2,
-                          color: titleColor,
-                        ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _PriceLine(price: listing.priceUzs, color: titleColor),
+                    Text(
+                      listing.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        height: 1.2,
+                        color: titleColor,
                       ),
-                      const SizedBox(height: 6),
-                      _MetaRow(
-                        iconAsset: 'assets/icons/map.svg',
-                        text: listing.district,
-                        color: metaColor,
-                      ),
-                      const SizedBox(height: 2),
-                      _MetaRow(
-                        iconAsset: 'assets/icons/ruler-triangle.svg',
-                        text: '${listing.areaM2} m²',
-                        color: metaColor,
-                      ),
-                      const Spacer(),
-                      _BatafsilButton(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          onTap(listing);
-                        },
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 6),
+                    _MetaRow(
+                      iconAsset: 'assets/icons/map.svg',
+                      text: listing.district,
+                      color: metaColor,
+                    ),
+                    const SizedBox(height: 2),
+                    _MetaRow(
+                      iconAsset: 'assets/icons/ruler-triangle.svg',
+                      text: '${listing.areaM2} m²',
+                      color: metaColor,
+                    ),
+                    const SizedBox(height: 10),
+                    _BatafsilButton(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        onTap(listing);
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -122,6 +148,8 @@ class _PriceLine extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (price <= 0) return const SizedBox.shrink();
+
     return RichText(
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
@@ -184,7 +212,7 @@ class _MetaRow extends StatelessWidget {
         Expanded(
           child: Text(
             text,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontFamily: 'MTSCompact',

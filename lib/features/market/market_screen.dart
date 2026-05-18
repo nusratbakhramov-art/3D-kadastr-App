@@ -11,6 +11,8 @@ import 'listing_detail_screen.dart';
 import 'market_controller.dart';
 import 'models/market_filters.dart';
 import 'models/market_listing.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+
 import 'widgets/category_chips.dart';
 import 'widgets/filter_sheet.dart';
 import 'widgets/listing_card.dart';
@@ -357,16 +359,14 @@ class _BodySliver extends StatelessWidget {
 
   Widget _grid({
     required int childCount,
-    required NullableIndexedWidgetBuilder builder,
+    required IndexedWidgetBuilder builder,
   }) {
-    return SliverGrid(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        childAspectRatio: 0.56,
-      ),
-      delegate: SliverChildBuilderDelegate(builder, childCount: childCount),
+    return SliverMasonryGrid.count(
+      crossAxisCount: 2,
+      mainAxisSpacing: 12,
+      crossAxisSpacing: 12,
+      childCount: childCount,
+      itemBuilder: builder,
     );
   }
 }

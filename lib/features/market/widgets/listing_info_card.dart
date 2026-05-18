@@ -32,16 +32,35 @@ class ListingInfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '${_formatPrice(priceUzs)} UZS',
-            style: TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w700,
-              fontSize: 18,
-              height: 1.3,
-              color: fg,
+          if (priceUzs <= 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+              decoration: BoxDecoration(
+                color: AppColors.splashGreen,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Text(
+                'Bepul',
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  height: 1.2,
+                  color: Color(0xFF011606),
+                ),
+              ),
+            )
+          else
+            Text(
+              '${_formatPrice(priceUzs)} UZS',
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                height: 1.3,
+                color: fg,
+              ),
             ),
-          ),
           const SizedBox(height: 12),
           Divider(height: 1, color: fg.withValues(alpha: 0.08)),
           const SizedBox(height: 14),

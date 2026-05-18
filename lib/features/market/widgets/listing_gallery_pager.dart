@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import 'fullscreen_gallery.dart';
 
 class ListingGalleryPager extends StatefulWidget {
   const ListingGalleryPager({
@@ -70,7 +72,16 @@ class _ListingGalleryPagerState extends State<ListingGalleryPager> {
                 itemCount: widget.images.length,
                 onPageChanged: (i) => setState(() => _index = i),
                 itemBuilder: (context, i) {
-                  return Image.network(
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      openFullscreenGallery(
+                        context,
+                        images: widget.images,
+                        initialIndex: i,
+                      );
+                    },
+                    child: Image.network(
                     widget.images[i],
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => ColoredBox(
@@ -97,6 +108,7 @@ class _ListingGalleryPagerState extends State<ListingGalleryPager> {
                         ),
                       );
                     },
+                  ),
                   );
                 },
               ),

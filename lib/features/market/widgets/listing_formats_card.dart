@@ -60,6 +60,7 @@ class ListingFormatsCard extends StatelessWidget {
               for (final f in files)
                 _FormatChip(
                   label: _formatLabel(f.format),
+                  size: _sizeLabel(f.fileSize),
                   loading: downloadingFileId == f.id,
                   onTap: () {
                     if (downloadingFileId != null) return;
@@ -79,17 +80,30 @@ class ListingFormatsCard extends StatelessWidget {
     final u = raw.toUpperCase();
     return u == 'GLTF' ? 'glTF' : u;
   }
+
+  static String _sizeLabel(int bytes) {
+    if (bytes <= 0) return '';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).round()} KB';
+    if (bytes < 1024 * 1024 * 1024) {
+      final mb = bytes / (1024 * 1024);
+      return '${mb < 10 ? mb.toStringAsFixed(1) : mb.round()} MB';
+    }
+    final gb = bytes / (1024 * 1024 * 1024);
+    return '${gb.toStringAsFixed(1)} GB';
+  }
 }
 
 class _FormatChip extends StatelessWidget {
   const _FormatChip({
     required this.label,
+    required this.size,
     required this.loading,
     required this.onTap,
     required this.fg,
   });
 
   final String label;
+  final String size;
   final bool loading;
   final VoidCallback onTap;
   final Color fg;
@@ -132,16 +146,33 @@ class _FormatChip extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
               ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  height: 1.2,
-                  letterSpacing: 0.2,
-                  color: textColor,
-                ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      height: 1.2,
+                      letterSpacing: 0.2,
+                      color: textColor,
+                    ),
+                  ),
+                  if (size.isNotEmpty)
+                    Text(
+                      size,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w400,
+                        fontSize: 10,
+                        height: 1.3,
+                        color: textColor.withValues(alpha: 0.6),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
