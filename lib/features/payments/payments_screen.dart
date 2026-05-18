@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../theme/color_tokens.dart';
@@ -6,6 +8,7 @@ import '../../widgets/app_header_back.dart';
 import '../../widgets/app_reveal.dart';
 import '../ratings/valuation_model.dart' show formatSum;
 import '../settings/settings_state.dart';
+import 'api_payments_service.dart';
 import 'payment_model.dart';
 
 class PaymentsScreen extends StatefulWidget {
@@ -20,12 +23,33 @@ class _PaymentsScreenState extends State<PaymentsScreen>
   @override
   int get currentToken => 1;
 
+  final _service = ApiPaymentsService();
+  List<Payment> _items = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_load());
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      final items = await _service.fetchPayments();
+      if (mounted) setState(() { _items = items; _loading = false; });
+    } catch (e) {
+      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Locale>(
       valueListenable: localeNotifier,
       builder: (context, locale, _) {
-        final items = mockPayments;
+        final items = _items;
         final total = items.fold<int>(0, (s, p) => s + p.amount);
         final groups = _groupByMonth(items, locale);
 
@@ -65,7 +89,11 @@ class _PaymentsScreenState extends State<PaymentsScreen>
                         ),
                       ),
                       const SizedBox(height: 20),
-                      if (items.isEmpty)
+                      if (_loading)
+                        const Center(child: CircularProgressIndicator())
+                      else if (_error != null)
+                        _ErrorState(onRetry: _load)
+                      else if (items.isEmpty)
                         _EmptyState(
                           title: _S.emptyTitle(locale),
                           message: _S.emptyMessage(locale),
@@ -380,6 +408,29 @@ class _PaymentTile extends StatelessWidget {
 
   String _dayMonth(DateTime d) =>
       '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}';
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.wifi_off_rounded, size: 40, color: ColorTokens.secondaryText(context)),
+          const SizedBox(height: 12),
+          Text('Xatolik yuz berdi', textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: 'MTSCompact', fontWeight: FontWeight.w700, fontSize: 16, color: ColorTokens.primaryText(context))),
+          const SizedBox(height: 12),
+          TextButton(onPressed: onRetry, child: const Text('Qayta urinish')),
+        ],
+      ),
+    );
+  }
 }
 
 class _EmptyState extends StatelessWidget {
