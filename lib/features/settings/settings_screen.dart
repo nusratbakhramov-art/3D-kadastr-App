@@ -1,4 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:in_app_review/in_app_review.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../core/api_config.dart';
+import '../auth/auth_http_client.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
@@ -9,6 +17,10 @@ import '../../widgets/app_reveal.dart';
 import '../../widgets/app_toast.dart';
 import 'locale_storage.dart';
 import 'settings_state.dart';
+
+const _kTermsUrl = 'https://3dkadastr.uz/terms';
+const _kPrivacyUrl = 'https://3dkadastr.uz/privacy';
+const _kAppStoreId = '6744487945';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.onLogoutConfirmed});
@@ -178,19 +190,44 @@ class _SettingsScreenState extends State<SettingsScreen>
         AppMenuRow(
           icon: Icons.phone_iphone_rounded,
           label: _S.changePhone(locale),
-          onTap: () {},
+          onTap: () => _openChangePhone(context, locale),
         ),
         AppMenuRow(
           icon: Icons.description_outlined,
           label: _S.terms(locale),
-          onTap: () {},
+          onTap: () => _launchUrl(_kTermsUrl),
         ),
         AppMenuRow(
           icon: Icons.shield_outlined,
           label: _S.privacyPolicy(locale),
-          onTap: () {},
+          onTap: () => _launchUrl(_kPrivacyUrl),
         ),
       ],
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _openRateApp() async {
+    final review = InAppReview.instance;
+    if (await review.isAvailable()) {
+      await review.requestReview();
+    } else {
+      await review.openStoreListing(appStoreId: _kAppStoreId);
+    }
+  }
+
+  Future<void> _openChangePhone(BuildContext context, Locale locale) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ChangePhoneSheet(locale: locale),
     );
   }
 
@@ -200,12 +237,12 @@ class _SettingsScreenState extends State<SettingsScreen>
         AppMenuRow(
           icon: Icons.star_outline_rounded,
           label: _S.rateApp(locale),
-          onTap: () {},
+          onTap: _openRateApp,
         ),
         AppMenuRow(
           icon: Icons.info_outline_rounded,
           label: _S.version(locale),
-          trailing: const _ValueChip(text: '1.0.0'),
+          trailing: const _ValueChip(text: '1.0.0 (3)'),
           onTap: null,
         ),
         AppMenuRow(
@@ -415,6 +452,171 @@ class _SheetButton extends StatelessWidget {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Change Phone Bottom Sheet
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ChangePhoneSheet extends StatefulWidget {
+  const _ChangePhoneSheet({required this.locale});
+  final Locale locale;
+
+  @override
+  State<_ChangePhoneSheet> createState() => _ChangePhoneSheetState();
+}
+
+class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
+  final _phoneCtrl = TextEditingController();
+  final _otpCtrl = TextEditingController();
+  bool _otpSent = false;
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    _otpCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendOtp() async {
+    final phone = _phoneCtrl.text.trim();
+    if (phone.isEmpty) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/auth/send-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'phone': phone}),
+      ).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        setState(() { _otpSent = true; _loading = false; });
+      } else {
+        setState(() { _error = 'Xatolik yuz berdi'; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  Future<void> _confirm() async {
+    final phone = _phoneCtrl.text.trim();
+    final otp = _otpCtrl.text.trim();
+    if (phone.isEmpty || otp.isEmpty) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final client = AuthHttpClient();
+      final res = await client.post(
+        Uri.parse('${ApiConfig.baseUrl}/profile/change-phone'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'new_phone': phone, 'otp_code': otp}),
+      ).timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        if (mounted) {
+          Navigator.pop(context);
+          showAppToast(context, 'Telefon raqam yangilandi');
+        }
+      } else {
+        final body = jsonDecode(res.body) as Map<String, dynamic>;
+        setState(() { _error = (body['detail'] as String?) ?? 'Xatolik yuz berdi'; _loading = false; });
+      }
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: ColorTokens.secondaryText(context).withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Telefon raqamni o\'zgartirish',
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              enabled: !_otpSent,
+              decoration: InputDecoration(
+                hintText: '+998 XX XXX XX XX',
+                filled: true,
+                fillColor: ColorTokens.iconBg(context),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+            if (_otpSent) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _otpCtrl,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: InputDecoration(
+                  hintText: 'OTP kodi',
+                  counterText: '',
+                  filled: true,
+                  fillColor: ColorTokens.iconBg(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+            ],
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loading ? null : (_otpSent ? _confirm : _sendOtp),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.splashGreen,
+                foregroundColor: const Color(0xFF011606),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: _loading
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(
+                      _otpSent ? 'Tasdiqlash' : 'OTP yuborish',
+                      style: const TextStyle(fontFamily: 'MTSCompact', fontWeight: FontWeight.w700, fontSize: 15),
+                    ),
+            ),
+          ],
         ),
       ),
     );
