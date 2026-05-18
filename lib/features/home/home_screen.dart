@@ -1,13 +1,19 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../market/market_controller.dart';
+import '../market/models/market_listing.dart';
+import '../market/listing_detail_screen.dart';
+import '../market/widgets/featured_carousel.dart';
 import '../onboarding/onboarding_page_data.dart';
 import 'user_profile.dart';
 import 'widgets/home_card.dart';
 import 'widgets/home_cta.dart';
 import 'widgets/home_header.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({
     super.key,
     this.locale = AppLocale.uz,
@@ -34,12 +40,75 @@ class HomeScreen extends StatelessWidget {
   final VoidCallback? onOpenNotifications;
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late final MarketController _marketController;
+
+  @override
+  void initState() {
+    super.initState();
+    _marketController = sharedMarketController(
+      locale: widget.locale.languageCode,
+    );
+    unawaited(_marketController.initialize());
+  }
+
+  void _onListingTap(MarketListing listing) {
+    final isIos = Theme.of(context).platform == TargetPlatform.iOS;
+    Navigator.of(context).push(
+      isIos
+          ? PageRouteBuilder<void>(
+              pageBuilder: (_, __, ___) =>
+                  ListingDetailScreen(listing: listing),
+              transitionsBuilder: (_, animation, __, child) {
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1, 0),
+                    end: Offset.zero,
+                  ).animate(
+                    CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                  child: child,
+                );
+              },
+            )
+          : PageRouteBuilder<void>(
+              transitionDuration: const Duration(milliseconds: 360),
+              reverseTransitionDuration: const Duration(milliseconds: 280),
+              pageBuilder: (_, __, ___) =>
+                  ListingDetailScreen(listing: listing),
+              transitionsBuilder: (_, animation, __, child) {
+                final curved = CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                  reverseCurve: Curves.easeInCubic,
+                );
+                return FadeTransition(
+                  opacity: curved,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, 0.06),
+                      end: Offset.zero,
+                    ).animate(curved),
+                    child: child,
+                  ),
+                );
+              },
+            ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final date = today ?? DateTime.now();
+    final date = widget.today ?? DateTime.now();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = isDark
-        ? AppColors.greenBlack
-        : AppColors.lightBackground;
+    final backgroundColor =
+        isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -51,8 +120,10 @@ class HomeScreen extends StatelessWidget {
             showPattern: !isDark,
           ),
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            bottom: false,
+            child: SingleChildScrollView(
+              clipBehavior: Clip.none,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -65,11 +136,11 @@ class HomeScreen extends StatelessWidget {
                           return HomeHeader(
                             profile: profile,
                             unreadCount: unread,
-                            locale: locale,
+                            locale: widget.locale,
                             today: date,
-                            onLoginTap: onLoginTap,
-                            onAvatarTap: onOpenProfile,
-                            onBellTap: onOpenNotifications,
+                            onLoginTap: widget.onLoginTap,
+                            onAvatarTap: widget.onOpenProfile,
+                            onBellTap: widget.onOpenNotifications,
                           );
                         },
                       );
@@ -77,11 +148,11 @@ class HomeScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 20),
                   _CardsGrid(
-                    locale: locale,
-                    onOpenKadastr3d: onOpenKadastr3d,
-                    onOpenAiValuation: onOpenAiValuation,
-                    onOpenCalculator: onOpenCalculator,
-                    onOpenMarket: onOpenMarket,
+                    locale: widget.locale,
+                    onOpenKadastr3d: widget.onOpenKadastr3d,
+                    onOpenAiValuation: widget.onOpenAiValuation,
+                    onOpenCalculator: widget.onOpenCalculator,
+                    onOpenMarket: widget.onOpenMarket,
                   ),
                   const SizedBox(height: 12),
                   ValueListenableBuilder<UserProfile?>(
@@ -89,11 +160,21 @@ class HomeScreen extends StatelessWidget {
                     builder: (context, profile, _) {
                       return HomeCta(
                         isGuest: profile == null,
-                        locale: locale,
-                        onLoginTap: onLoginTap,
-                        onOrderTap: onOpenOrder,
+                        locale: widget.locale,
+                        onLoginTap: widget.onLoginTap,
+                        onOrderTap: widget.onOpenOrder,
                       );
                     },
+                  ),
+                  const SizedBox(height: 24),
+                  _SectionHeader(
+                    title: _sectionTitle(widget.locale),
+                    onSeeAll: widget.onOpenMarket,
+                  ),
+                  const SizedBox(height: 12),
+                  FeaturedCarousel(
+                    controller: _marketController,
+                    onTap: _onListingTap,
                   ),
                 ],
               ),
@@ -101,6 +182,52 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  static String _sectionTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Топ модели',
+        'en' => 'Top models',
+        _ => 'Top modellar',
+      };
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, this.onSeeAll});
+  final String title;
+  final VoidCallback? onSeeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    final linkColor = AppColors.splashGreen;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: titleColor,
+            ),
+          ),
+        ),
+        if (onSeeAll != null)
+          GestureDetector(
+            onTap: onSeeAll,
+            child: Text(
+              'Barchasi →',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: linkColor,
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -234,6 +361,5 @@ class _CardStrings {
   static String calculator(Locale l) =>
       _pick(l, 'Kalkulyator', 'Калькулятор', 'Calculator');
 
-  static String market(Locale l) =>
-      _pick(l, 'Market', 'Маркет', 'Market');
+  static String market(Locale l) => _pick(l, 'Market', 'Маркет', 'Market');
 }
