@@ -519,7 +519,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
       if (res.statusCode == 200) {
         if (mounted) {
           Navigator.pop(context);
-          showAppToast(context, 'Telefon raqam yangilandi');
+          AppToast.success(context, 'Telefon raqam yangilandi');
         }
       } else {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
