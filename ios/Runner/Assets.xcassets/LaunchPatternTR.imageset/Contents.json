@@ -1,0 +1,6 @@
+{
+  "images": [
+    { "idiom": "universal", "filename": "LaunchPatternTR.png", "scale": "3x" }
+  ],
+  "info": { "author": "xcode", "version": 1 }
+}

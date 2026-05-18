@@ -32,7 +32,6 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   static const Cubic _crispOut = Cubic(0.16, 1.0, 0.3, 1.0);
 
   late final AnimationController _controller;
-  late final Animation<double> _rotationT;
   late final Animation<double> _scaleT;
   late final Animation<double> _logoSlideT;
   late final Animation<double> _textSlideT;
@@ -52,11 +51,6 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2800),
-    );
-
-    _rotationT = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.321, 0.571, curve: _settleCurve),
     );
 
     _scaleT = CurvedAnimation(
@@ -123,15 +117,9 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
               _logoEndScale,
               _scaleT.value,
             )!;
-            // The splash SVG has a built-in rotate(-15) on its rounded
-            // container, so at no additional rotation the logo already reads
-            // as tilted. To level it out, we rotate it back to +15° over the
-            // course of the SETTLE beat.
-            final tilt = lerpDouble(
-              0,
-              _logoStartTiltDeg * math.pi / 180,
-              _rotationT.value,
-            )!;
+            // The splash SVG has a built-in rotate(-15) baked in.
+            // Apply a constant +15° offset so the logo is always upright.
+            const tilt = _logoStartTiltDeg * math.pi / 180;
             final logoDx = lerpDouble(0.0, _logoEndOffsetX, _logoSlideT.value)!;
             final textDx = lerpDouble(
               _textStartOffsetX,

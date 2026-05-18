@@ -69,11 +69,13 @@ class MarketController extends ChangeNotifier {
     try {
       final remote = await svc.fetchCategories();
       if (_disposed) return;
+      final apiSlugs = remote.map((c) => c.slug).toSet();
       _categories = [
         const MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
-        ...remote.map(
-          (c) => MarketCategory(id: c.slug, label: c.name),
-        ),
+        // Always show Non-residential chip; skip if API already returns it
+        if (!apiSlugs.contains('nonresidential'))
+          const MarketCategory(id: 'nonresidential', label: "No'turar"),
+        ...remote.map((c) => MarketCategory(id: c.slug, label: c.name)),
       ];
       _notify();
     } catch (_) {
