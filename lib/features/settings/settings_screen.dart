@@ -243,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         AppMenuRow(
           icon: Icons.info_outline_rounded,
           label: _S.version(locale),
-          trailing: const _ValueChip(text: '1.0.0 (3)', showChevron: false),
+          trailing: const _ValueChip(text: '1.0.0 (4)', showChevron: false),
           onTap: null,
         ),
         AppMenuRow(
