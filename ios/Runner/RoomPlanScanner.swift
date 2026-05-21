@@ -2981,8 +2981,9 @@ final class HybridUploadCoordinator: NSObject {
         }
 
         // poses.json (ARKit camera transforms) — agar mavjud bo'lsa qo'shamiz.
-        // AWS GPU pipeline buni topganda COLMAP SfM bosqichini o'tkazib
-        // yuboradi va ARKit pose'laridan to'g'ridan-to'g'ri foydalanadi.
+        // GPU pipeline buni topganda COLMAP SfM bosqichini butunlay o'tkazib
+        // yuboradi va ARKit pose'laridan to'g'ridan-to'g'ri foydalanadi
+        // (yangi pipeline'da COLMAP umuman ishlatilmaydi).
         let posesURL = folder.appendingPathComponent("poses.json")
         if FileManager.default.fileExists(atPath: posesURL.path) {
             writeStr("--\(boundary)\r\n")
@@ -2993,6 +2994,45 @@ final class HybridUploadCoordinator: NSObject {
             }
             writeStr("\r\n")
         }
+
+        // LiDAR depth fayllar (depth_NNNN.bin) — splatfacto uchun OLTIN.
+        // Pipeline ulardan sparse_pc.ply yaratadi (random init dan 5-10× yaxshi)
+        // va depth supervision aktivlashtiradi (floaters keskin kamayadi).
+        // Har depth fayl ~150-500 KB, jami ~100 MB qo'shimcha 300 kadr uchun.
+        let depthFiles = files.filter {
+            $0.lastPathComponent.hasPrefix("depth_") && $0.pathExtension.lowercased() == "bin"
+        }.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
+        for url in depthFiles {
+            writeStr("--\(boundary)\r\n")
+            writeStr("Content-Disposition: form-data; name=\"depths\"; filename=\"\(url.lastPathComponent)\"\r\n")
+            writeStr("Content-Type: application/octet-stream\r\n\r\n")
+            guard let inFh = try? FileHandle(forReadingFrom: url) else { continue }
+            while autoreleasepool(invoking: {
+                let chunk = inFh.readData(ofLength: 256 * 1024)  // 256 KB
+                if chunk.isEmpty { return false }
+                bodyHandle.write(chunk)
+                return true
+            }) {}
+            try? inFh.close()
+            writeStr("\r\n")
+        }
+
+        // Gravity vektorlari (gravity_NNNN.json) — har biri ~50 bayt.
+        // Kelajakdagi PhotogrammetrySession integratsiyasi va to'g'ri
+        // orientatsiya validatsiyasi uchun zaxirada saqlanadi.
+        let gravityFiles = files.filter {
+            $0.lastPathComponent.hasPrefix("gravity_") && $0.pathExtension.lowercased() == "json"
+        }.sorted(by: { $0.lastPathComponent < $1.lastPathComponent })
+        for url in gravityFiles {
+            writeStr("--\(boundary)\r\n")
+            writeStr("Content-Disposition: form-data; name=\"gravities\"; filename=\"\(url.lastPathComponent)\"\r\n")
+            writeStr("Content-Type: application/json\r\n\r\n")
+            if let data = try? Data(contentsOf: url) {
+                bodyHandle.write(data)
+            }
+            writeStr("\r\n")
+        }
+
         writeStr("--\(boundary)--\r\n")
         try? bodyHandle.synchronize()
         try? bodyHandle.close()

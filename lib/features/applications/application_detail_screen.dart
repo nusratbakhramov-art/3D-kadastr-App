@@ -9,24 +9,27 @@ import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_http_client.dart';
+import '../scans/splat_viewer_screen.dart';
 import '../services/api_photogrammetry_service.dart';
 import '../services/data/room_plan_scanner.dart';
 import '../services/widgets/segmented_tabs.dart';
 import 'application_model.dart';
 
-/// Stream the .usdz to disk with progress callbacks.
+/// Stream the 3D result file (.usdz or .splat) to disk with progress.
 ///
+/// `format` ("usdz" yoki "splat") fayl kengaytmasini hal qiladi.
 /// [onProgress] is called with `(received, total)` byte counts; `total` is
 /// -1 if the server didn't send Content-Length.
-Future<String> _ensureUsdzCached({
+Future<String> _ensureResultCached({
   required int jobId,
   required String downloadUrl,
+  required String format, // 'usdz' | 'splat'
   void Function(int received, int total)? onProgress,
 }) async {
   final dir = await getApplicationDocumentsDirectory();
   final scansDir = Directory('${dir.path}/scans');
   if (!scansDir.existsSync()) scansDir.createSync(recursive: true);
-  final filePath = '${scansDir.path}/photo_$jobId.usdz';
+  final filePath = '${scansDir.path}/photo_$jobId.$format';
   final file = File(filePath);
   if (await file.exists() && await file.length() > 0) {
     onProgress?.call(await file.length(), await file.length());
@@ -546,10 +549,12 @@ class _ModelCardState extends State<_ModelCard> {
         return;
       }
 
-      // 2. USDZ'ni cache'dan olish yoki yuklab olish
-      final filePath = await _ensureUsdzCached(
+      // 2. Faylni cache'dan olish yoki yuklab olish (auth bilan)
+      final format = job.resultFormat ?? 'usdz';
+      final filePath = await _ensureResultCached(
         jobId: jobId,
         downloadUrl: job.downloadUrl!,
+        format: format,
         onProgress: (received, total) {
           if (!mounted) return;
           setState(() {
@@ -560,9 +565,22 @@ class _ModelCardState extends State<_ModelCard> {
         },
       );
 
-      // 3. QuickLook orqali ochish
+      // 3. Format'ga qarab viewer'ni tanlash:
+      //    - splat → Flutter WebView (Gaussian Splatting, mkkellogg/GS3D)
+      //    - usdz  → iOS QuickLook (eski mesh, native AR Quick Look)
       if (!mounted) return;
-      await RoomPlanScanner.preview(filePath);
+      if (format == 'splat') {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SplatViewerScreen(
+              splatFilePath: filePath,
+              title: '3D skan #$jobId',
+            ),
+          ),
+        );
+      } else {
+        await RoomPlanScanner.preview(filePath);
+      }
     } on PhotogrammetryApiException catch (e) {
       if (!mounted) return;
       AppToast.error(context, e.message);
@@ -796,13 +814,28 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
         AppToast.success(context, '3D model hali tayyor emas');
         return;
       }
-      final filePath = await _ensureUsdzCached(
+      final format = job.resultFormat ?? 'usdz';
+      final filePath = await _ensureResultCached(
         jobId: jobId,
         downloadUrl: job.downloadUrl!,
+        format: format,
       );
       if (!mounted) return;
-      // QuickLook AR rejimda ham ochadi (Object/AR toggle)
-      await RoomPlanScanner.preview(filePath);
+      // Splat format hozircha AR'da ko'rsatilmaydi (Gaussian Splatting AR
+      // standart emas). USDZ → QuickLook AR mode, splat → WebView fallback.
+      if (format == 'splat') {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => SplatViewerScreen(
+              splatFilePath: filePath,
+              title: '3D skan #$jobId',
+            ),
+          ),
+        );
+      } else {
+        // QuickLook AR rejimda ham ochadi (Object/AR toggle)
+        await RoomPlanScanner.preview(filePath);
+      }
     } on HttpException catch (e) {
       if (!mounted) return;
       AppToast.error(context, e.message);
