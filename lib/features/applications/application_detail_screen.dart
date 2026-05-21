@@ -569,7 +569,7 @@ class _ModelCardState extends State<_ModelCard> {
       //    - splat → Flutter WebView (Gaussian Splatting, mkkellogg/GS3D)
       //    - usdz  → iOS QuickLook (eski mesh, native AR Quick Look)
       if (!mounted) return;
-      if (format == 'splat') {
+      if (format == 'splat' || format == 'ksplat') {
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => SplatViewerScreen(
@@ -823,7 +823,7 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
       if (!mounted) return;
       // Splat format hozircha AR'da ko'rsatilmaydi (Gaussian Splatting AR
       // standart emas). USDZ → QuickLook AR mode, splat → WebView fallback.
-      if (format == 'splat') {
+      if (format == 'splat' || format == 'ksplat') {
         await Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => SplatViewerScreen(

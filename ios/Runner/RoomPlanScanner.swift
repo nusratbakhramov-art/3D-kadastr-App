@@ -2776,6 +2776,7 @@ final class HybridUploadCoordinator: NSObject {
         authToken: String,
         provider: String = "local_mac",
         algorithm: String = "3dgs",
+        quality: String = "balanced",
         result: @escaping FlutterResult,
     ) {
         if pendingResult != nil {
@@ -2801,6 +2802,9 @@ final class HybridUploadCoordinator: NSObject {
         self.authToken = authToken
         self.provider = provider
         self.algorithm = algorithm
+        // Quality default'i yangilanadi — TexturedScanViewController photo
+        // qabul qilgach `onPhotosReady` orqali handlePhotosReady'ga uzatadi.
+        self.selectedQuality = quality
 
         let vc = TexturedScanViewController()
         vc.uploadMode = true
@@ -2845,9 +2849,18 @@ final class HybridUploadCoordinator: NSObject {
     }
 
     private func handlePhotosReady(folder: URL, count: Int, quality: String) {
-        // Capture VC ni yopib, upload progress ekraniga o'tamiz
+        // Capture VC ni yopib, upload progress ekraniga o'tamiz.
+        // Eslatma: `quality` — bu capture VC'ning ichki quality field'i
+        // (eski "standard"/"high" capture preset'lari). Flutter'dan kelgan
+        // training quality preset (draft/balanced/max) ustuvor — start()'da
+        // o'rnatilgan `self.selectedQuality` ni saqlaymiz.
         guard let presenter = presentingController else { return }
-        self.selectedQuality = quality
+        // Eski capture quality faqat agar Flutter explicit quality bermagan
+        // bo'lsa ishlatamiz. Hozir Flutter doim default "balanced" yuboradi,
+        // shuning uchun bu nadeshda no-op:
+        if self.selectedQuality == "standard" {
+            self.selectedQuality = quality
+        }
         captureVC?.dismiss(animated: true) { [weak self] in
             guard let self = self else { return }
             self.captureVC = nil

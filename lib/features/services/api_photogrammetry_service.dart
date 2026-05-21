@@ -70,7 +70,10 @@ class PhotogrammetryJobSummary {
   bool get isInProgress =>
       status == 'pending' || status == 'processing';
   bool get isCompleted => status == 'completed';
-  bool get isSplat => resultFormat == 'splat';
+  /// Gaussian Splatting natija — `.splat` (uncompressed) yoki
+  /// `.ksplat` (compressed). Flutter WebView viewer ikkalasini ham o'qiydi.
+  bool get isSplat =>
+      resultFormat == 'splat' || resultFormat == 'ksplat';
 }
 
 class PhotogrammetryApiService {

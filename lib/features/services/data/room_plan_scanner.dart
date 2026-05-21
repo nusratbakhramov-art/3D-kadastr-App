@@ -238,6 +238,7 @@ class RoomPlanScanner {
     required String token,
     String provider = 'polycam',
     String algorithm = '3dgs',
+    String quality = 'balanced', // 'draft' | 'balanced' | 'max' — aws_gpu uchun
     Locale? locale,
   }) async {
     final l = locale ?? const Locale('uz');
@@ -249,6 +250,7 @@ class RoomPlanScanner {
           'token': token,
           'provider': provider,
           'algorithm': algorithm,
+          'quality': quality,
         },
       );
       if (raw == null) return null;

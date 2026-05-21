@@ -4,6 +4,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/app_toast.dart';
 import '../onboarding/onboarding_page_data.dart';
 import 'models/service_item.dart';
+import 'screens/ai_scan_screen.dart';
 import 'screens/kadastr_3d_screen.dart';
 import 'widgets/service_card.dart';
 
@@ -197,6 +198,12 @@ class _ServicesScreenState extends State<ServicesScreen>
           MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()),
         );
       case ServiceId.aiValuation:
+        // AI Baholash — to'liq flow:
+        // 1) Foto'lar yig'iladi, 2) ArxitekturaTzWizard 9 stepda metadata,
+        // 3) AiResultScreen real natija ko'rsatadi.
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const AiScanScreen()),
+        );
       case ServiceId.calculator:
         AppToast.success(context, AppLocale.comingSoonLabel(widget.locale));
     }

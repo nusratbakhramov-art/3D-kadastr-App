@@ -45,6 +45,15 @@ class _AiScanScreenState extends State<AiScanScreen> {
     final selectedProvider = await _pickProvider();
     if (selectedProvider == null) return;  // foydalanuvchi bekor qildi
 
+    // aws_gpu (splatfacto) uchun quality preset tanlash —
+    // Tez / Standart / Maksimal.
+    String quality = 'balanced';
+    if (selectedProvider == 'aws_gpu') {
+      final pickedQuality = await _pickQuality();
+      if (pickedQuality == null) return;  // bekor qildi
+      quality = pickedQuality;
+    }
+
     // Auth token kerak (server processing)
     final session = await const AuthStorage().loadSession();
     final token = session.token;
@@ -61,7 +70,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
     try {
       // Provider'ga qarab algoritm avtomatik tanlanadi:
       //   polycam — server-side WASM USDZ (30-60 daq)
-      //   aws_gpu — kadastr COLMAP+OpenMVS+USDZ, ARKit poses bilan tezroq
+      //   aws_gpu — kadastr splatfacto + LiDAR (15-90 daq, quality'ga qarab)
       //   kiri_engine — Kiri cloud, 3DGS algoritmi (5-20 daq, $1/scan)
       final algorithm = selectedProvider == 'kiri_engine' ? '3dgs' : '';
       final hybrid = await RoomPlanScanner.startHybridScan(
@@ -69,6 +78,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
         token: token,
         provider: selectedProvider,
         algorithm: algorithm,
+        quality: quality,
       );
       if (!mounted) return;
       if (hybrid == null) {
@@ -107,6 +117,17 @@ class _AiScanScreenState extends State<AiScanScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) => _ProviderPickerSheet(),
+    );
+  }
+
+  /// Splatfacto quality preset tanlash (faqat aws_gpu uchun).
+  /// 'draft' (10 daq) | 'balanced' (30 daq) | 'max' (90 daq)
+  Future<String?> _pickQuality() async {
+    return showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => _QualityPickerSheet(),
     );
   }
 
@@ -677,6 +698,213 @@ class _ProviderPickerSheet extends StatelessWidget {
                       const SizedBox(width: 4),
                       Text(
                         eta,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: Colors.white24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Splatfacto quality preset tanlash uchun bottom sheet (aws_gpu uchun).
+/// 'draft' (tez, ~10 daq), 'balanced' (~30 daq, default), 'max' (~90 daq).
+class _QualityPickerSheet extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 44,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Text(
+              'Sifat darajasini tanlang',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tezlik va sifat orasidagi balans',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white60,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 18),
+            _qualityCard(
+              context,
+              id: 'draft',
+              title: 'Tez',
+              subtitle: 'Tezkor preview, oddiy sifat',
+              eta: '~10 daqiqa',
+              quality: '60% sifat',
+              icon: Icons.bolt,
+              color: const Color(0xFF60A5FA),
+            ),
+            const SizedBox(height: 12),
+            _qualityCard(
+              context,
+              id: 'balanced',
+              title: 'Standart',
+              subtitle: 'Tezlik va sifat balansi (tavsiya)',
+              eta: '~25-40 daqiqa',
+              quality: '80% sifat',
+              icon: Icons.tune,
+              color: const Color(0xFFFF9900),
+              recommended: true,
+            ),
+            const SizedBox(height: 12),
+            _qualityCard(
+              context,
+              id: 'max',
+              title: 'Maksimal',
+              subtitle: 'Foto-realistic, LiDAR depth bilan',
+              eta: '~90-150 daqiqa',
+              quality: '95-100% sifat',
+              icon: Icons.diamond,
+              color: const Color(0xFFE85A4F),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Bekor qilish'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _qualityCard(
+    BuildContext context, {
+    required String id,
+    required String title,
+    required String subtitle,
+    required String eta,
+    required String quality,
+    required IconData icon,
+    required Color color,
+    bool recommended = false,
+  }) {
+    return InkWell(
+      onTap: () => Navigator.of(context).pop(id),
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: recommended ? color : Colors.white12,
+            width: recommended ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      if (recommended) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Tavsiya',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white60,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, size: 11, color: Colors.white38),
+                      const SizedBox(width: 3),
+                      Text(
+                        eta,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Icon(Icons.star, size: 11, color: Colors.white38),
+                      const SizedBox(width: 3),
+                      Text(
+                        quality,
                         style: const TextStyle(
                           fontSize: 11,
                           color: Colors.white54,
