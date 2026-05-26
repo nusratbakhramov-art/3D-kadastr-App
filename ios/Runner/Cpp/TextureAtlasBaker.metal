@@ -155,23 +155,50 @@ kernel void normalizeAtlas(
         return;
     }
 
-    // No camera contribution. Try voxel color fallback (Polycam-style).
+    // Phase 3.1: voxel color fallback with TRILINEAR interpolation.
+    // Nearest sampling → trilinear (8-corner weighted average) silliqroq
+    // textures beradi voxel-fallback regionlarda. Quality close to Polycam
+    // smooth coverage. Sample-or-fail per corner: agar 8 korner'dan birortasi
+    // colored bo'lsa, contribution oladi.
     if (vparams.hasVoxelColor != 0) {
         float3 worldPos = posTexel.xyz;
         float3 origin = float3(vparams.originX, vparams.originY, vparams.originZ);
-        float3 local = (worldPos - origin) / vparams.voxelSize;
-        int vx = int(round(local.x));
-        int vy = int(round(local.y));
-        int vz = int(round(local.z));
-        if (vx >= 0 && vx < int(vparams.gridX) &&
-            vy >= 0 && vy < int(vparams.gridY) &&
-            vz >= 0 && vz < int(vparams.gridZ)) {
-            uint vidx = uint(vx) + uint(vy) * vparams.gridX + uint(vz) * vparams.gridX * vparams.gridY;
-            float4 vc = voxelColor[vidx];
-            if (vc.a > 0.5) {
-                atlasOut.write(float4(saturate(vc.rgb), 1.0), gid);
-                return;
+        float3 local = (worldPos - origin) / vparams.voxelSize - 0.5;
+        int x0 = int(floor(local.x));
+        int y0 = int(floor(local.y));
+        int z0 = int(floor(local.z));
+        float fx = local.x - float(x0);
+        float fy = local.y - float(y0);
+        float fz = local.z - float(z0);
+
+        float3 colorSum = float3(0.0);
+        float weightSum = 0.0;
+        // 8 corner trilinear weighted accumulation. Faqat colored voxel'lar
+        // (alpha > 0.5) hissa qo'shadi → bo'sh voxel'lar gravity beermaydi.
+        for (int dz = 0; dz < 2; ++dz) {
+            for (int dy = 0; dy < 2; ++dy) {
+                for (int dx = 0; dx < 2; ++dx) {
+                    int vx = x0 + dx;
+                    int vy = y0 + dy;
+                    int vz = z0 + dz;
+                    if (vx < 0 || vx >= int(vparams.gridX) ||
+                        vy < 0 || vy >= int(vparams.gridY) ||
+                        vz < 0 || vz >= int(vparams.gridZ)) continue;
+                    uint vidx = uint(vx) + uint(vy) * vparams.gridX + uint(vz) * vparams.gridX * vparams.gridY;
+                    float4 vc = voxelColor[vidx];
+                    if (vc.a <= 0.5) continue;
+                    float wx = (dx == 0) ? (1.0 - fx) : fx;
+                    float wy = (dy == 0) ? (1.0 - fy) : fy;
+                    float wz = (dz == 0) ? (1.0 - fz) : fz;
+                    float w = wx * wy * wz;
+                    colorSum += vc.rgb * w;
+                    weightSum += w;
+                }
             }
+        }
+        if (weightSum > 0.05) {
+            atlasOut.write(float4(saturate(colorSum / weightSum), 1.0), gid);
+            return;
         }
     }
 

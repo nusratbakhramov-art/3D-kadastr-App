@@ -1799,12 +1799,13 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 }
             }
 
-            // Variant A: Streaming TSDF integration — har 5-chi frame (12 fps).
-            // Polycam-style continuous fusion. Capture davomida voxel grid
-            // depth'lar bilan to'ldiriladi → coverage muammosi yo'q.
+            // Phase 3.1: Streaming TSDF integration — har 3-chi frame (~20 fps).
+            // Polycam-style continuous fusion. 5 → 3 frame cadence: 67% ko'proq
+            // sample/voxel, color buffer richer. Performance hali ham OK (Metal
+            // kernel ~1.5M voxel × few ALU ops).
             if #available(iOS 14.0, *) {
                 tsdfFrameTick &+= 1
-                if tsdfFrameTick % 5 == 0 {
+                if tsdfFrameTick % 3 == 0 {
                     streamingTSDF?.integrate(frame: frame)
                 }
             }
