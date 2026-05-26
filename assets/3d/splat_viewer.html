@@ -63,17 +63,18 @@
     <script type="importmap">
     {
       "imports": {
-        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
-        "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"
+        "three": "/lib/three.module.js",
+        "@mkkellogg/gaussian-splats-3d": "/lib/gaussian-splats-3d.module.js"
       }
     }
     </script>
 
     <script type="module">
-        // Flutter Dart kodi `?splat=<url>` parametrini beradi.
+        // Splat fayl yo'li: Flutter `?splat=<filename>` query parametri orqali
+        // beradi. Local HTTP server (loopback) hamma resurslarni serve qiladi —
+        // file:// CORS muammosi yo'q.
         const params = new URLSearchParams(window.location.search);
-        const splatUrl = params.get('splat');
+        const splatUrl = window.__SPLAT_FILE__ || params.get('splat');
 
         const $loading = document.getElementById('loading');
         const $error = document.getElementById('error');
@@ -101,23 +102,22 @@
 
                     const viewer = new Viewer({
                         'rootElement': document.getElementById('viewer'),
-                        'cameraUp': [0, -1, 0],
-                        'initialCameraPosition': [0, 0, 3],
+                        'cameraUp': [0, 1, 0],
+                        'initialCameraPosition': [0, 1, 5],
                         'initialCameraLookAt': [0, 0, 0],
                         'sharedMemoryForWorkers': false,
-                        'gpuAcceleratedSort': true,
-                        'enableSIMDInSort': true,
+                        'gpuAcceleratedSort': false,
+                        'enableSIMDInSort': false,
                         'sphericalHarmonicsDegree': 0,
-                        // Mobile uchun yaxshi default sozlamalar
                         'antialiased': true,
                         'webXRMode': 0,
+                        'useBuiltInControls': true,
                     });
 
-                    // Format auto-detect: URL kengaytmasidan formatni aniqlash.
-                    // 0 = .splat (antimatter15), 1 = .ksplat (mkkellogg compressed),
-                    // 2 = .ply, 3 = .spz
+                    // Format auto-detect URL kengaytmasidan.
+                    // 0 = .splat, 1 = .ksplat, 2 = .ply, 3 = .spz
                     const lowerUrl = splatUrl.toLowerCase().split('?')[0];
-                    let format = 0;  // default .splat
+                    let format = 0;
                     if (lowerUrl.endsWith('.ksplat')) format = 1;
                     else if (lowerUrl.endsWith('.ply')) format = 2;
                     else if (lowerUrl.endsWith('.spz')) format = 3;
@@ -126,7 +126,7 @@
                     await viewer.addSplatScene(splatUrl, {
                         'progressiveLoad': true,
                         'format': format,
-                        'onProgress': (percent, message) => {
+                        'onProgress': (percent) => {
                             const pct = Math.round(percent);
                             if (pct !== lastPct) {
                                 lastPct = pct;
@@ -135,6 +135,27 @@
                             }
                         },
                     });
+
+                    // Auto-fit kamera: splat scene bounding sphere'iga moslashtirish.
+                    // Hech bo'lmasa kamera scene tashqarisida turishini ta'minlaydi.
+                    try {
+                        const sm = viewer.splatMesh;
+                        if (sm && sm.geometry) {
+                            if (!sm.geometry.boundingSphere) sm.geometry.computeBoundingSphere();
+                            const bs = sm.geometry.boundingSphere;
+                            if (bs && isFinite(bs.radius) && bs.radius > 0 && viewer.camera) {
+                                const c = bs.center;
+                                const dist = Math.max(1, bs.radius * 2.5);
+                                viewer.camera.position.set(c.x, c.y + bs.radius * 0.5, c.z + dist);
+                                viewer.camera.lookAt(c.x, c.y, c.z);
+                                viewer.camera.updateProjectionMatrix();
+                                if (viewer.controls && viewer.controls.target) {
+                                    viewer.controls.target.set(c.x, c.y, c.z);
+                                    if (viewer.controls.update) viewer.controls.update();
+                                }
+                            }
+                        }
+                    } catch (_) { /* auto-fit ixtiyoriy */ }
 
                     $loading.style.display = 'none';
                     viewer.start();

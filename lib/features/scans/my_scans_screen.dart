@@ -1,15 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_reveal.dart';
-import '../ratings/valuation_model.dart' show formatSum, formatShortDate;
 import '../settings/settings_state.dart';
-import 'api_scan_service.dart';
-import 'scan_model.dart';
+import 'local_scan_service.dart';
 
 class MyScansScreen extends StatefulWidget {
   const MyScansScreen({super.key});
@@ -23,10 +22,11 @@ class _MyScansScreenState extends State<MyScansScreen>
   @override
   int get currentToken => 1;
 
-  final _service = ApiScanService();
-  List<ScanItem> _items = [];
+  static const _previewChannel = MethodChannel('kadastr/room_plan_scanner');
+
+  final _service = LocalScanService();
+  List<LocalScanItem> _items = [];
   bool _loading = true;
-  String? _error;
 
   @override
   void initState() {
@@ -35,13 +35,58 @@ class _MyScansScreenState extends State<MyScansScreen>
   }
 
   Future<void> _load() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      final items = await _service.fetchScans();
-      if (mounted) setState(() { _items = items; _loading = false; });
-    } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+    setState(() => _loading = true);
+    final items = await _service.list();
+    if (mounted) setState(() { _items = items; _loading = false; });
+  }
+
+  Future<void> _openScan(LocalScanItem item) async {
+    final path = await _service.getPath(item.id);
+    if (path == null) {
+      _showSnackBar('Fayl topilmadi');
+      return;
     }
+    try {
+      await _previewChannel.invokeMethod('previewModel', {'filePath': path});
+    } on PlatformException catch (e) {
+      _showSnackBar('Ochishda xatolik: ${e.message}');
+    }
+  }
+
+  Future<void> _deleteScan(LocalScanItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Skanni o\'chirish'),
+        content: Text('"${item.name}" ni o\'chirishni tasdiqlaysizmi?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Bekor qilish'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('O\'chirish'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await _service.delete(item.id);
+    if (ok) {
+      _showSnackBar('Skan o\'chirildi');
+      await _load();
+    } else {
+      _showSnackBar('Xatolik');
+    }
+  }
+
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), duration: const Duration(seconds: 2)),
+    );
   }
 
   @override
@@ -49,7 +94,6 @@ class _MyScansScreenState extends State<MyScansScreen>
     return ValueListenableBuilder<Locale>(
       valueListenable: localeNotifier,
       builder: (context, locale, _) {
-        final items = _items;
         return Scaffold(
           backgroundColor: ColorTokens.scaffoldBg(context),
           body: Stack(
@@ -57,44 +101,49 @@ class _MyScansScreenState extends State<MyScansScreen>
             children: [
               const AppGlowBackground(),
               SafeArea(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      AppReveal(
-                        controller: entryController,
-                        interval: const Interval(
-                          0.0,
-                          0.4,
-                          curve: Curves.easeOutCubic,
-                        ),
-                        child: AppHeaderBack(title: _S.title(locale)),
-                      ),
-                      const SizedBox(height: 16),
-                      if (_loading)
-                        const Center(child: CircularProgressIndicator())
-                      else if (_error != null)
-                        _ErrorState(onRetry: _load)
-                      else if (items.isEmpty)
-                        _EmptyState(
-                          title: _S.emptyTitle(locale),
-                          message: _S.emptyMessage(locale),
-                        )
-                      else
-                        for (var i = 0; i < items.length; i++) ...[
-                          AppReveal(
-                            controller: entryController,
-                            interval: Interval(
-                              (0.1 + i * 0.06).clamp(0.0, 0.9),
-                              (0.6 + i * 0.06).clamp(0.0, 1.0),
-                              curve: Curves.easeOutCubic,
-                            ),
-                            child: _ScanCard(item: items[i], locale: locale),
+                child: RefreshIndicator(
+                  onRefresh: _load,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        AppReveal(
+                          controller: entryController,
+                          interval: const Interval(
+                            0.0, 0.4, curve: Curves.easeOutCubic,
                           ),
-                          if (i != items.length - 1) const SizedBox(height: 12),
-                        ],
-                    ],
+                          child: AppHeaderBack(title: _S.title(locale)),
+                        ),
+                        const SizedBox(height: 16),
+                        if (_loading)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 80),
+                            child: Center(child: CircularProgressIndicator()),
+                          )
+                        else if (_items.isEmpty)
+                          _EmptyState(locale: locale)
+                        else
+                          for (var i = 0; i < _items.length; i++) ...[
+                            AppReveal(
+                              controller: entryController,
+                              interval: Interval(
+                                (0.1 + i * 0.05).clamp(0.0, 0.9),
+                                (0.6 + i * 0.05).clamp(0.0, 1.0),
+                                curve: Curves.easeOutCubic,
+                              ),
+                              child: _LocalScanCard(
+                                item: _items[i],
+                                onTap: () => _openScan(_items[i]),
+                                onDelete: () => _deleteScan(_items[i]),
+                              ),
+                            ),
+                            if (i != _items.length - 1)
+                              const SizedBox(height: 12),
+                          ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -106,11 +155,16 @@ class _MyScansScreenState extends State<MyScansScreen>
   }
 }
 
-class _ScanCard extends StatelessWidget {
-  const _ScanCard({required this.item, required this.locale});
+class _LocalScanCard extends StatelessWidget {
+  const _LocalScanCard({
+    required this.item,
+    required this.onTap,
+    required this.onDelete,
+  });
 
-  final ScanItem item;
-  final Locale locale;
+  final LocalScanItem item;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -119,72 +173,71 @@ class _ScanCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: onTap,
+        onLongPress: onDelete,
         child: Padding(
           padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  _StatusBadge(status: item.status, locale: locale),
-                  const Spacer(),
-                  Text(
-                    formatShortDate(item.at),
-                    style: TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w400,
-                      fontSize: 12,
-                      color: ColorTokens.secondaryText(context),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: ColorTokens.iconBg(context),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.view_in_ar,
+                  size: 28,
+                  color: ColorTokens.brandPrimary(context),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: ColorTokens.primaryText(context),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                item.address,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  height: 1.3,
-                  color: ColorTokens.primaryText(context),
+                    const SizedBox(height: 4),
+                    Text(
+                      _formatDate(item.createdAt),
+                      style: TextStyle(
+                        fontFamily: 'MTSText',
+                        fontWeight: FontWeight.w400,
+                        fontSize: 12,
+                        color: ColorTokens.secondaryText(context),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        if (item.areaSqm > 0.01)
+                          _Chip('${item.areaSqm.toStringAsFixed(1)} m²'),
+                        if (item.photoCount > 0)
+                          _Chip('${item.photoCount} foto'),
+                        _Chip(item.sizeFormatted),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${_S.cadastreNo(locale)}: ${item.cadastreNo}',
-                style: TextStyle(
-                  fontFamily: 'MTSText',
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  color: ColorTokens.secondaryText(context),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _MetaChip(
-                    label: _S.objectType(locale),
-                    value: item.objectType,
-                  ),
-                  _MetaChip(
-                    label: _S.area(locale),
-                    value: '${_fmt(item.totalAreaSqm)} m²',
-                  ),
-                  _MetaChip(
-                    label: _S.accuracy(locale),
-                    value: '${item.accuracyCm.toStringAsFixed(1)} sm',
-                  ),
-                  _MetaChip(
-                    label: _S.cadastreValue(locale),
-                    value: formatSum(item.cadastreValueUzs),
-                  ),
-                ],
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 20),
+                color: Colors.red.withValues(alpha: 0.7),
+                onPressed: onDelete,
+                tooltip: 'O\'chirish',
               ),
             ],
           ),
@@ -193,137 +246,60 @@ class _ScanCard extends StatelessWidget {
     );
   }
 
-  String _fmt(double v) =>
-      v == v.truncateToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.status, required this.locale});
-
-  final ScanStatus status;
-  final Locale locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final (text, color) = switch (status) {
-      ScanStatus.uploaded => (
-        _S.statusUploaded(locale),
-        const Color(0xFF6B7280),
-      ),
-      ScanStatus.processing => (
-        _S.statusProcessing(locale),
-        const Color(0xFFF59E0B),
-      ),
-      ScanStatus.valued => (_S.statusValued(locale), const Color(0xFF10B981)),
-    };
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              color: color,
-            ),
-          ),
-        ],
-      ),
-    );
+  String _formatDate(DateTime d) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dayOfScan = DateTime(d.year, d.month, d.day);
+    final diff = today.difference(dayOfScan).inDays;
+    final timeStr = '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    if (diff == 0) return 'Bugun, $timeStr';
+    if (diff == 1) return 'Kecha, $timeStr';
+    return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}, $timeStr';
   }
 }
 
-class _MetaChip extends StatelessWidget {
-  const _MetaChip({required this.label, required this.value});
-
-  final String label;
-  final String value;
+class _Chip extends StatelessWidget {
+  const _Chip(this.text);
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: ColorTokens.iconBg(context),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(6),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w400,
-              fontSize: 12,
-              color: ColorTokens.secondaryText(context),
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              color: ColorTokens.primaryText(context),
-            ),
-          ),
-        ],
+      child: Text(
+        text,
+        style: TextStyle(
+          fontFamily: 'MTSText',
+          fontSize: 11,
+          color: ColorTokens.secondaryText(context),
+        ),
       ),
     );
   }
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.title, required this.message});
-
-  final String title;
-  final String message;
+  const _EmptyState({required this.locale});
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 32),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: ColorTokens.cardBg(context),
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: ColorTokens.shadow(context),
-                  blurRadius: 12,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: Icon(
-              Icons.crop_free_rounded,
-              size: 28,
-              color: ColorTokens.primaryText(context),
-            ),
+          Icon(
+            Icons.view_in_ar_outlined,
+            size: 64,
+            color: ColorTokens.secondaryText(context).withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           Text(
-            title,
+            _S.emptyTitle(locale),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSCompact',
@@ -332,9 +308,9 @@ class _EmptyState extends StatelessWidget {
               color: ColorTokens.primaryText(context),
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
-            message,
+            _S.emptyMessage(locale),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSText',
@@ -348,85 +324,26 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.onRetry});
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.wifi_off_rounded, size: 40, color: ColorTokens.secondaryText(context)),
-          const SizedBox(height: 12),
-          Text('Xatolik yuz berdi', textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'MTSCompact', fontWeight: FontWeight.w700, fontSize: 16, color: ColorTokens.primaryText(context))),
-          const SizedBox(height: 12),
-          TextButton(onPressed: onRetry, child: const Text('Qayta urinish')),
-        ],
-      ),
-    );
-  }
-}
-
 class _S {
-  const _S._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мои сканирования',
-    'en' => 'My scans',
-    _ => 'Mening skanerlarim',
-  };
-  static String cadastreNo(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастровый №',
-    'en' => 'Cadastre №',
-    _ => 'Kadastr №',
-  };
-  static String objectType(Locale l) => switch (l.languageCode) {
-    'ru' => 'Тип',
-    'en' => 'Type',
-    _ => 'Turi',
-  };
-  static String area(Locale l) => switch (l.languageCode) {
-    'ru' => 'Площадь',
-    'en' => 'Area',
-    _ => 'Maydon',
-  };
-  static String accuracy(Locale l) => switch (l.languageCode) {
-    'ru' => 'Точность',
-    'en' => 'Accuracy',
-    _ => 'Aniqlik',
-  };
-  static String cadastreValue(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастр. стоимость',
-    'en' => 'Cadastre value',
-    _ => 'Kadastr qiymati',
-  };
-  static String statusUploaded(Locale l) => switch (l.languageCode) {
-    'ru' => 'Загружено',
-    'en' => 'Uploaded',
-    _ => 'Yuklandi',
-  };
-  static String statusProcessing(Locale l) => switch (l.languageCode) {
-    'ru' => 'Обрабатывается',
-    'en' => 'Processing',
-    _ => 'Qayta ishlanmoqda',
-  };
-  static String statusValued(Locale l) => switch (l.languageCode) {
-    'ru' => 'Оценено',
-    'en' => 'Valued',
-    _ => 'Baholandi',
-  };
-  static String emptyTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сканирований пока нет',
-    'en' => 'No scans yet',
-    _ => 'Hali skaner yo‘q',
-  };
-  static String emptyMessage(Locale l) => switch (l.languageCode) {
-    'ru' => 'Запустите 3D-сканирование объекта в разделе «Услуги».',
-    'en' => 'Start a 3D scan from Services to populate this list.',
-    _ => '«Xizmatlar» bo‘limidan birinchi 3D skanerni boshlang.',
-  };
+  static String title(Locale l) {
+    switch (l.languageCode) {
+      case 'ru': return 'Мои сканы';
+      case 'en': return 'My scans';
+      default:   return 'Skanlarim';
+    }
+  }
+  static String emptyTitle(Locale l) {
+    switch (l.languageCode) {
+      case 'ru': return 'Сканов пока нет';
+      case 'en': return 'No scans yet';
+      default:   return 'Hozircha skan yo\'q';
+    }
+  }
+  static String emptyMessage(Locale l) {
+    switch (l.languageCode) {
+      case 'ru': return 'Создайте свой первый 3D скан комнаты';
+      case 'en': return 'Create your first 3D room scan';
+      default:   return 'Birinchi 3D xona skanini yarating';
+    }
+  }
 }

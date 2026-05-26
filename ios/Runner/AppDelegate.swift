@@ -188,6 +188,63 @@ import RoomPlan
           result(FlutterMethodNotImplemented)
         }
       }
+
+      // Local skanlar API — Documents/scans/ dagi numbered USDZ'lar.
+      // Auth talab qilmaydi, to'liq local.
+      let localScansChannel = FlutterMethodChannel(
+        name: "kadastr/local_scans",
+        binaryMessenger: controller.binaryMessenger
+      )
+      localScansChannel.setMethodCallHandler { call, result in
+        switch call.method {
+        case "list":
+          let scans = LocalScanIndex.listScans()
+          let json: [[String: Any]] = scans.map { e in
+            [
+              "id": e.id,
+              "name": e.name,
+              "fileName": e.fileName,
+              "createdAt": e.createdAt,
+              "sizeBytes": e.sizeBytes,
+              "areaSqm": e.areaSqm,
+              "photoCount": e.photoCount,
+            ]
+          }
+          result(json)
+
+        case "getPath":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int else {
+            result(FlutterError(code: "ARGS", message: "id kerak", details: nil))
+            return
+          }
+          if let url = LocalScanIndex.scanURL(forId: id) {
+            result(url.path)
+          } else {
+            result(nil)
+          }
+
+        case "delete":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int else {
+            result(FlutterError(code: "ARGS", message: "id kerak", details: nil))
+            return
+          }
+          result(LocalScanIndex.deleteScan(id: id))
+
+        case "rename":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int,
+                let newName = args["name"] as? String else {
+            result(FlutterError(code: "ARGS", message: "id va name kerak", details: nil))
+            return
+          }
+          result(LocalScanIndex.renameScan(id: id, newName: newName))
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)

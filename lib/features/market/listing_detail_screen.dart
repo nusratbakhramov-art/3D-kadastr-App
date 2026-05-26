@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -9,6 +10,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_storage.dart';
 import 'api_marketplace_service.dart';
+import 'listing_3d_viewer_screen.dart';
 import 'models/market_listing.dart';
 import 'widgets/listing_formats_card.dart';
 import 'widgets/listing_gallery_pager.dart';
@@ -42,6 +44,26 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
   }
 
   void _close() => Navigator.of(context).maybePop();
+
+  bool get _has3DViewable {
+    for (final f in widget.listing.files) {
+      final fmt = f.format.toUpperCase();
+      if (fmt == 'GLB' || fmt == 'GLTF') return true;
+    }
+    return false;
+  }
+
+  void _open3DViewer() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Listing3DViewerScreen(
+          listing: widget.listing,
+          api: _api,
+          authStorage: widget.authStorage,
+        ),
+      ),
+    );
+  }
 
   void _share() {
     final l = widget.listing;
@@ -160,6 +182,13 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
                 description: listing.description,
               ),
             ),
+            if (_has3DViewable) ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _View3DButton(onTap: _open3DViewer),
+              ),
+            ],
             if (listing.files.isNotEmpty) ...[
               const SizedBox(height: 16),
               Padding(
@@ -173,6 +202,50 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
             ],
             const SizedBox(height: 24),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _View3DButton extends StatelessWidget {
+  const _View3DButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = AppColors.splashGreen;
+    final fg = AppColors.buttonTextBlack;
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          HapticFeedback.lightImpact();
+          onTap();
+        },
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.view_in_ar_rounded, size: 22, color: fg),
+              const SizedBox(width: 10),
+              Text(
+                '3D modelni ko‘rish',
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15,
+                  height: 1.2,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

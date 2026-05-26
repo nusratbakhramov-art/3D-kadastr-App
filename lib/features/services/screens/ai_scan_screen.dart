@@ -41,37 +41,57 @@ class _AiScanScreenState extends State<AiScanScreen> {
       return;
     }
 
-    // 3D pipeline tanlash — Polycam (default), AWS GPU (skip-COLMAP), Kiri 3DGS
-    final selectedProvider = await _pickProvider();
-    if (selectedProvider == null) return;  // foydalanuvchi bekor qildi
+    // Provider picker olib tashlandi — kadastr 3D scan'ning yagona yo'li:
+    // on-device ARKit + LiDAR (`startTexturedScan` → custom mesh export →
+    // USDZ). Internet, server, token kerak emas.
+    setState(() => _state = ScanCardState.scanning);
+    try {
+      final result = await RoomPlanScanner.startTexturedScan();
+      if (!mounted) return;
+      if (result == null) {
+        setState(() => _state = ScanCardState.idle);
+        return;
+      }
+      setState(() => _state = ScanCardState.done);
+      await RoomPlanScanner.preview(result.filePath);
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        '3D model tayyor — iPhone\'da saqlandi (${(result.fileSize / 1048576).toStringAsFixed(1)} MB)',
+      );
+    } on RoomPlanScannerException catch (e) {
+      if (!mounted) return;
+      setState(() => _state = ScanCardState.idle);
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _state = ScanCardState.idle);
+      AppToast.error(context, 'Skan xatosi: $e');
+    }
+    return;
+  }
 
-    // aws_gpu (splatfacto) uchun quality preset tanlash —
-    // Tez / Standart / Maksimal.
+  // ignore: unused_element
+  Future<void> _startScanLegacy() async {
+    // Eski multi-provider flow — vaqtincha o'chirilgan, kelajakda kerakli
+    // bo'lsa qaytariladi. Hozircha faqat custom on-device pipeline.
+    final selectedProvider = await _pickProvider();
+    if (selectedProvider == null) return;
     String quality = 'balanced';
     if (selectedProvider == 'aws_gpu') {
       final pickedQuality = await _pickQuality();
-      if (pickedQuality == null) return;  // bekor qildi
+      if (pickedQuality == null) return;
       quality = pickedQuality;
     }
-
-    // Auth token kerak (server processing)
     final session = await const AuthStorage().loadSession();
     final token = session.token;
     if (token == null || token.isEmpty) {
       if (!mounted) return;
-      AppToast.error(
-        context,
-        'Skan uchun avval tizimga kiring',
-      );
+      AppToast.error(context, 'Skan uchun avval tizimga kiring');
       return;
     }
-
     setState(() => _state = ScanCardState.scanning);
     try {
-      // Provider'ga qarab algoritm avtomatik tanlanadi:
-      //   polycam — server-side WASM USDZ (30-60 daq)
-      //   aws_gpu — kadastr splatfacto + LiDAR (15-90 daq, quality'ga qarab)
-      //   kiri_engine — Kiri cloud, 3DGS algoritmi (5-20 daq, $1/scan)
       final algorithm = selectedProvider == 'kiri_engine' ? '3dgs' : '';
       final hybrid = await RoomPlanScanner.startHybridScan(
         baseUrl: ApiConfig.serverBaseUrl,
@@ -573,6 +593,18 @@ class _ProviderPickerSheet extends StatelessWidget {
             const SizedBox(height: 18),
             _providerCard(
               context,
+              id: 'object_capture',
+              title: 'iPhone Object Capture',
+              subtitle:
+                  'On-device LiDAR + ARKit. Internet kerak emas, iPhone\'da saqlanadi.',
+              eta: '3-5 daqiqa',
+              icon: Icons.phone_iphone,
+              color: const Color(0xFF34C759),
+              recommended: true,
+            ),
+            const SizedBox(height: 12),
+            _providerCard(
+              context,
               id: 'polycam',
               title: 'Polycam',
               subtitle: 'Web UI orqali, sifat baland (mesh-based USDZ)',
@@ -589,7 +621,6 @@ class _ProviderPickerSheet extends StatelessWidget {
               eta: '15-30 daqiqa',
               icon: Icons.memory,
               color: const Color(0xFFFF9900),
-              recommended: true,
             ),
             const SizedBox(height: 12),
             _providerCard(
