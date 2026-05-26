@@ -2862,6 +2862,63 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         }
         NSLog("KADASTR Pre-atlas: \(globalVerts.count) vert, \(globalTris.count) tri")
 
+        // Phase 3.2: light bundle adjustment via depth→mesh ICP. Har photo'ning
+        // pose'ini cleaned mesh'ga moslaymiz, ARKit drift'ini kompensatsiya
+        // qilamiz. Bu atlas seam'larni kamaytiradi.
+        await MainActor.run {
+            self.processingStatusLabel.text = "Refining poses (light BA)…"
+            self.progressView.setProgress(0.36, animated: true)
+        }
+        let photoSamples: [PhotoDepthSample] = cameras.compactMap { cam in
+            let depthURL = cam.imageURL.deletingLastPathComponent()
+                .appendingPathComponent(String(format: "depth_%04d.bin", cam.index))
+            guard FileManager.default.fileExists(atPath: depthURL.path) else { return nil }
+            return PhotoDepthSample(
+                index: cam.index,
+                pose: cam.transform,
+                intrinsics: cam.intrinsics,
+                depthURL: depthURL,
+                depthWidth: cam.depthW > 0 ? cam.depthW : 256,
+                depthHeight: cam.depthH > 0 ? cam.depthH : 192,
+                imageWidth: cam.imageW,
+                imageHeight: cam.imageH,
+            )
+        }
+        let refinedPoses: [simd_float4x4]
+        if photoSamples.count >= 8 && globalVerts.count > 500 {
+            refinedPoses = await PoseRefiner.refinePosesViaICP(
+                photos: photoSamples,
+                meshVertices: globalVerts,
+                voxelSize: 0.05,
+                iterations: 3,
+                maxCorrespondenceDistance: 0.10,
+                dampingFactor: 0.6,
+                progress: { p, msg in
+                    Task { @MainActor in
+                        self.processingStatusLabel.text = msg
+                        self.progressView.setProgress(0.36 + p * 0.03, animated: false)
+                    }
+                },
+            )
+            // Diagnostic: o'rtacha translation delta
+            var totalDelta: Float = 0
+            for (i, sample) in photoSamples.enumerated() {
+                let oldT = SIMD3<Float>(sample.pose.columns.3.x, sample.pose.columns.3.y, sample.pose.columns.3.z)
+                let newT = SIMD3<Float>(refinedPoses[i].columns.3.x, refinedPoses[i].columns.3.y, refinedPoses[i].columns.3.z)
+                totalDelta += simd_distance(oldT, newT)
+            }
+            let avgDelta = totalDelta / Float(max(photoSamples.count, 1))
+            NSLog("KADASTR PoseRefiner: \(photoSamples.count) photos, avg drift \(String(format: "%.1f", avgDelta * 1000)) mm")
+        } else {
+            refinedPoses = photoSamples.map { $0.pose }
+            NSLog("KADASTR PoseRefiner: skipped (\(photoSamples.count) photos, \(globalVerts.count) vert)")
+        }
+        // Refined pose mapping by camera index → o'lcham/order o'zgarmaydi.
+        var refinedByIndex: [Int: simd_float4x4] = [:]
+        for (i, sample) in photoSamples.enumerated() {
+            refinedByIndex[sample.index] = refinedPoses[i]
+        }
+
         // 2-3. MetalAtlasBaker — xatlas UV unwrap + Metal compute per-pixel atlas baking.
         //      Patchwork va blur ikkalasini hal qiladi. Polycam darajasiga yaqin.
         await MainActor.run {
@@ -2870,12 +2927,14 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         }
 
         // CameraView → AtlasBakeInputCamera. Depth URL = photo'ning yonida.
+        // Phase 3.2: refined pose mavjud bo'lsa, original ARKit pose o'rniga.
         let bakeCameras: [AtlasBakeInputCamera] = cameras.map { cam in
             let depthURL = cam.imageURL.deletingLastPathComponent()
                 .appendingPathComponent(String(format: "depth_%04d.bin", cam.index))
             let depthExists = FileManager.default.fileExists(atPath: depthURL.path)
+            let pose = refinedByIndex[cam.index] ?? cam.transform
             return AtlasBakeInputCamera(
-                transform: cam.transform,
+                transform: pose,
                 intrinsics: cam.intrinsics,
                 imageURL: cam.imageURL,
                 imageWidth: cam.imageW,
