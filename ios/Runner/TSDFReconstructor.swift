@@ -218,6 +218,25 @@ final class TSDFReconstructor {
     }
 }
 
+extension TSDFReconstructor {
+    /// StreamingTSDF uchun public wrapper. Marching cubes ichki private,
+    /// streaming class uchun safe wrapper.
+    static func marchingCubesPublic(
+        sdf: UnsafeBufferPointer<Float>,
+        weight: UnsafeBufferPointer<Float>,
+        gridX: Int, gridY: Int, gridZ: Int,
+        origin: SIMD3<Float>, voxelSize: Float,
+    ) -> (vertices: [SIMD3<Float>], normals: [SIMD3<Float>], triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)]) {
+        let r = marchingCubes(
+            sdf: sdf, weight: weight,
+            gridX: gridX, gridY: gridY, gridZ: gridZ,
+            origin: origin, voxelSize: voxelSize,
+            progress: { _ in },
+        )
+        return (vertices: r.vertices, normals: r.normals, triangles: r.triangles)
+    }
+}
+
 // MARK: - Marching cubes (CPU)
 
 private struct MCResult {

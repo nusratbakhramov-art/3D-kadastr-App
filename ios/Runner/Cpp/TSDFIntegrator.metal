@@ -71,6 +71,76 @@ kernel void integrateDepth(
     weightVolume[idx] = newW;
 }
 
+// integrateDepthColor — depth + RGB joint integration. Polycam-style continuous
+// fusion uchun. Har voxel'ga SDF, weight, color (RGB), colorWeight saqlanadi.
+// Atlas baker'da gray fallback o'rniga voxel color ishlatilishi mumkin.
+//
+// ARFrame.capturedImage YUV (NV12) sifatida ikki tekstura: Y va CbCr planes.
+// Shader ichida YUV→RGB conversion.
+kernel void integrateDepthColor(
+    device float  *sdfVolume    [[buffer(0)]],
+    device float  *weightVolume [[buffer(1)]],
+    device float4 *colorVolume  [[buffer(2)]],  // .rgb = accumulated color, .a = colorWeight
+    constant TSDFParams &params [[buffer(3)]],
+    constant TSDFCamera &cam    [[buffer(4)]],
+    texture2d<float, access::sample> depthMap [[texture(0)]],
+    texture2d<float, access::sample> imageY   [[texture(1)]],   // Y plane (luma)
+    texture2d<float, access::sample> imageCbCr [[texture(2)]],  // CbCr plane (chroma)
+    uint3 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= params.gridX || gid.y >= params.gridY || gid.z >= params.gridZ) return;
+
+    float3 origin = float3(params.originX, params.originY, params.originZ);
+    float3 worldPos = origin + (float3(gid) + 0.5) * params.voxelSize;
+
+    float4 camSpace = cam.invTransform * float4(worldPos, 1.0);
+    float depthVoxel = -camSpace.z;
+    if (depthVoxel <= 0.05 || depthVoxel > params.maxIntegrationDepth) return;
+
+    float3 proj = cam.intrinsics * float3(camSpace.x, -camSpace.y, depthVoxel);
+    float pu = proj.x / proj.z;
+    float pv = proj.y / proj.z;
+    if (pu < 0 || pv < 0 || pu >= cam.imageSize.x || pv >= cam.imageSize.y) return;
+
+    constexpr sampler s(coord::normalized, filter::nearest, address::clamp_to_edge);
+    constexpr sampler sl(coord::normalized, filter::linear, address::clamp_to_edge);
+    float u = pu / cam.imageSize.x;
+    float v = pv / cam.imageSize.y;
+    float depthObs = depthMap.sample(s, float2(u, v)).r;
+    if (depthObs <= 0.05) return;
+
+    float sdf = depthObs - depthVoxel;
+    if (sdf < -params.truncation) return;
+    sdf = clamp(sdf, -params.truncation, params.truncation) / params.truncation;
+
+    uint idx = gid.x + gid.y * params.gridX + gid.z * params.gridX * params.gridY;
+    float prevSDF = sdfVolume[idx];
+    float prevW = weightVolume[idx];
+    float newW = prevW + 1.0;
+    sdfVolume[idx] = (prevSDF * prevW + sdf) / newW;
+    weightVolume[idx] = newW;
+
+    // Color: faqat voxel surface'ga yaqin bo'lsa rang qabul qilamiz (|sdf| < 0.5
+    // truncated). Aks holda voxel "havo" yoki "uzoq orqa" — rang ma'nosiz.
+    if (abs(sdf) > 0.5) return;
+
+    // YUV→RGB conversion (BT.601 limited range)
+    float Y = imageY.sample(sl, float2(u, v)).r;
+    float2 CbCr = imageCbCr.sample(sl, float2(u, v)).rg - 0.5;
+    float3 rgb = float3(
+        Y + 1.402 * CbCr.y,
+        Y - 0.344136 * CbCr.x - 0.714136 * CbCr.y,
+        Y + 1.772 * CbCr.x
+    );
+    rgb = saturate(rgb);
+
+    float4 prevC = colorVolume[idx];
+    float prevCW = prevC.a;
+    float newCW = prevCW + 1.0;
+    float3 newRGB = (prevC.rgb * prevCW + rgb) / newCW;
+    colorVolume[idx] = float4(newRGB, newCW);
+}
+
 // Optional smoothing kernel — 3x3x3 weighted average (Gaussian-like)
 // Voxel'lar orasidagi shovqinni kamaytirish uchun marching cubes'dan oldin.
 kernel void smoothSDF(

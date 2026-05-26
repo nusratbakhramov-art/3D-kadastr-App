@@ -101,10 +101,21 @@ kernel void bakeAtlasBatch(
     weightAccum[idx] = wSum;
 }
 
-// Final normalize: accumulated sums → RGBA8 atlas pixel
+// Voxel grid params (matches StreamingTSDF layout). Used for color fallback.
+struct VoxelParams {
+    float originX, originY, originZ, voxelSize;
+    uint  gridX, gridY, gridZ, hasVoxelColor;  // hasVoxelColor: 0/1 flag
+};
+
+// Final normalize: accumulated sums → RGBA8 atlas pixel.
+// Variant A Phase 2 — agar atlas piksel hech qaysi cameradan rang olmagan
+// (wt=0), StreamingTSDF voxel grid'dan rang olishga harakat qilamiz. Gray
+// fallback faqat voxel ham bo'sh bo'lsa.
 kernel void normalizeAtlas(
-    device const float4 *colorAccum  [[buffer(0)]],
-    device const float  *weightAccum [[buffer(1)]],
+    device const float4 *colorAccum   [[buffer(0)]],
+    device const float  *weightAccum  [[buffer(1)]],
+    device const float4 *voxelColor   [[buffer(2)]],  // optional voxel color
+    constant VoxelParams &vparams     [[buffer(3)]],  // voxel grid params
     texture2d<float, access::read>  positionTex [[texture(0)]],
     texture2d<float, access::write> atlasOut    [[texture(1)]],
     uint2 gid [[thread_position_in_grid]]
@@ -125,10 +136,31 @@ kernel void normalizeAtlas(
     if (wt > 0.0001) {
         float3 c = colorAccum[idx].rgb / wt;
         atlasOut.write(float4(saturate(c), 1.0), gid);
-    } else {
-        // Triangle ichida, lekin hech qaysi cameradan ko'rinmagan → kulrang
-        atlasOut.write(float4(0.5, 0.5, 0.5, 1.0), gid);
+        return;
     }
+
+    // No camera contribution. Try voxel color fallback (Polycam-style).
+    if (vparams.hasVoxelColor != 0) {
+        float3 worldPos = posTexel.xyz;
+        float3 origin = float3(vparams.originX, vparams.originY, vparams.originZ);
+        float3 local = (worldPos - origin) / vparams.voxelSize;
+        int vx = int(round(local.x));
+        int vy = int(round(local.y));
+        int vz = int(round(local.z));
+        if (vx >= 0 && vx < int(vparams.gridX) &&
+            vy >= 0 && vy < int(vparams.gridY) &&
+            vz >= 0 && vz < int(vparams.gridZ)) {
+            uint vidx = uint(vx) + uint(vy) * vparams.gridX + uint(vz) * vparams.gridX * vparams.gridY;
+            float4 vc = voxelColor[vidx];
+            if (vc.a > 0.5) {
+                atlasOut.write(float4(saturate(vc.rgb), 1.0), gid);
+                return;
+            }
+        }
+    }
+
+    // Hech narsa topilmadi — kulrang fallback
+    atlasOut.write(float4(0.5, 0.5, 0.5, 1.0), gid);
 }
 
 // Dilate pass — chartlar chetlarini "bleed" qilish (bilinear filtering bilan

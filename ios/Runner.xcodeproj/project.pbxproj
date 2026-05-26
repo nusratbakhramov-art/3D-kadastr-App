@@ -25,6 +25,7 @@
 		99D322D3CC3E19002C4131A8 /* MeshHoleFiller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118DE27624D9632CD5CC770E /* MeshHoleFiller.swift */; };
 		AA01AECEF85AAF2094A18FC2 /* TSDFIntegrator.metal in Sources */ = {isa = PBXBuildFile; fileRef = 007386094BD73F6F526C4323 /* TSDFIntegrator.metal */; };
 		B947406B657556A6B1467D3B /* MetalAtlasBaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2F6CF0C9411BA24EFBEE5D /* MetalAtlasBaker.swift */; };
+		BA7B0B60052DEC614178159C /* StreamingTSDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1280F1A5DE6E92E674AA399E /* StreamingTSDF.swift */; };
 		C17C222DE5363BF12028B012 /* HybridMeshBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D248C50DFE57C389A949AD /* HybridMeshBuilder.swift */; };
 		C640DB99A9EC41B5149B2D34 /* PoseRefiner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6F616916D4C4B0C8E14AE13 /* PoseRefiner.swift */; };
 		D2522B2E52DC5F6FBB5B0568 /* TSDFReconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F86190F99F40BDF908D4F21 /* TSDFReconstructor.swift */; };
@@ -59,6 +60,7 @@
 		06EF290EAFD478F199F29615 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		074AE24E965FC1115F45B42A /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		118DE27624D9632CD5CC770E /* MeshHoleFiller.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshHoleFiller.swift; sourceTree = "<group>"; };
+		1280F1A5DE6E92E674AA399E /* StreamingTSDF.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreamingTSDF.swift; sourceTree = "<group>"; };
 		1411E667E068CC2A68E4D392 /* xatlas.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = xatlas.h; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
@@ -212,6 +214,7 @@
 				D6F616916D4C4B0C8E14AE13 /* PoseRefiner.swift */,
 				645A2ACEB2DB629F7C6E1AD1 /* MeshCleaner.swift */,
 				2D0784215623EA4509A1D6BC /* LocalScanIndex.swift */,
+				1280F1A5DE6E92E674AA399E /* StreamingTSDF.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -443,6 +446,7 @@
 				C640DB99A9EC41B5149B2D34 /* PoseRefiner.swift in Sources */,
 				558D2A0B08E3FBA514524864 /* MeshCleaner.swift in Sources */,
 				29BB92C3B6AA5576D34D1A84 /* LocalScanIndex.swift in Sources */,
+				BA7B0B60052DEC614178159C /* StreamingTSDF.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

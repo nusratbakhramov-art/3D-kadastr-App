@@ -1052,6 +1052,11 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     private var anchorCoverage: [UUID: Int] = [:]
     private var frameVisibilityTick: UInt64 = 0  // Frame-based coverage tracker
 
+    // Variant A: Streaming TSDF — har frame'da depth voxel grid'ga integrate qilinadi.
+    // Capture davomida tirik qoladi, oxirida mesh ekstraktsiya qilinadi.
+    private var streamingTSDF: StreamingTSDF?
+    private var tsdfFrameTick: UInt64 = 0  // har 5-chi frame'da integrate (12 fps)
+
     // RoomPlan integratsiya — devor/eshik/oyna detect qiladi (glass/metal'da
     // LiDAR yetmagan joylarni planar surface bilan to'ldirish uchun).
     // iOS 17+ uchun RoomCaptureSession(arSession:) bor.
@@ -1666,6 +1671,17 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         }
         arView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
+        // Variant A: Streaming TSDF — initial bbox camera atrofida (8m × 4m × 8m).
+        // Tracking initialize bo'lgach (1-2 sek), birinchi frame'da camera pose
+        // bilan center'lanadi. Hozircha origin = world (0,0,0) atrofida.
+        if streamingTSDF == nil {
+            streamingTSDF = StreamingTSDF(
+                centerWorld: SIMD3<Float>(0, 0, 0),
+                extents: SIMD3<Float>(8, 4, 8),
+                voxelSize: 0.05,
+            )
+        }
+
         // RoomPlan integratsiya o'chirildi — RoomCaptureSession.run() bizning
         // ARSession konfiguratsiyasini qayta yozar edi (mesh + depth o'chib
         // qolar edi). Plane fill keyinroq alohida usul bilan qo'shamiz.
@@ -1780,6 +1796,16 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                     DispatchQueue.main.async { [weak self] in
                         self?.refreshAnchorVisualizations(anchorIds: newlyCovered)
                     }
+                }
+            }
+
+            // Variant A: Streaming TSDF integration — har 5-chi frame (12 fps).
+            // Polycam-style continuous fusion. Capture davomida voxel grid
+            // depth'lar bilan to'ldiriladi → coverage muammosi yo'q.
+            if #available(iOS 14.0, *) {
+                tsdfFrameTick &+= 1
+                if tsdfFrameTick % 5 == 0 {
+                    streamingTSDF?.integrate(frame: frame)
                 }
             }
         }
@@ -2705,23 +2731,46 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         var hybridNormals = rawNormals
         var hybridTris = rawTris
 
-        if !tsdfCameras.isEmpty {
+        // Variant A: streaming TSDF (capture davomida real-time accumulated) ni
+        // ishlatamiz batch TSDF o'rniga. Capture davomida ~12 fps integration
+        // bo'lib turgan, mesh kvalitati ARKit anchor mesh'idan ham yaxshi.
+        // Fallback: streaming TSDF mavjud emas yoki bo'sh bo'lsa, batch TSDF.
+        await MainActor.run {
+            self.processingStatusLabel.text = "Refining depth maps…"
+            self.progressView.setProgress(0.20, animated: true)
+        }
+        let streamFrames = streamingTSDF?.integratedFrameCount ?? 0
+        NSLog("KADASTR StreamingTSDF: \(streamFrames) frames integrated during capture")
+
+        if let streamMesh = streamingTSDF?.extractMesh(), streamMesh.vertices.count > 100 {
+            NSLog("KADASTR StreamingTSDF mesh: \(streamMesh.vertices.count) vert, \(streamMesh.triangles.count) tri")
+            // Hybrid: ARKit + streaming TSDF (TSDF hole-fill rolida)
+            let hybrid = HybridMeshBuilder.combine(
+                arkitVerts: rawVerts, arkitNormals: rawNormals, arkitTris: rawTris,
+                tsdfVerts: streamMesh.vertices, tsdfNormals: streamMesh.normals,
+                tsdfTris: streamMesh.triangles,
+                minDistanceFromArkit: 0.06,
+            )
+            hybridVerts = hybrid.vertices
+            hybridNormals = hybrid.normals
+            hybridTris = hybrid.triangles
+            NSLog("KADASTR hybrid (streaming): \(hybrid.arkitCount) ARKit + \(hybrid.fillCount) stream = \(hybrid.triangles.count) total")
+        } else if !tsdfCameras.isEmpty {
+            // Fallback: eski batch TSDF
             do {
                 let tsdfResult = try TSDFReconstructor.reconstruct(
                     boundingMin: bMin, boundingMax: bMax, cameras: tsdfCameras,
-                    voxelSize: 0.04,        // 4 sm — yumshoq fill (sifati ARKit'dan kichikroq)
+                    voxelSize: 0.04,
                     truncation: 0.10,
                     maxIntegrationDepth: 4.0,
-                    progress: { p, msg in
+                    progress: { p, _ in
                         Task { @MainActor in
                             self.processingStatusLabel.text = "Refining depth maps…"
                             self.progressView.setProgress(0.18 + p * 0.12, animated: false)
                         }
                     },
                 )
-                NSLog("KADASTR TSDF for hole-fill: \(tsdfResult.vertices.count) vert, \(tsdfResult.triangles.count) tri")
-
-                // Hybrid combine: ARKit + filtered TSDF hole fill
+                NSLog("KADASTR batch TSDF: \(tsdfResult.vertices.count) vert, \(tsdfResult.triangles.count) tri")
                 let hybrid = HybridMeshBuilder.combine(
                     arkitVerts: rawVerts, arkitNormals: rawNormals, arkitTris: rawTris,
                     tsdfVerts: tsdfResult.vertices, tsdfNormals: tsdfResult.normals,
@@ -2731,7 +2780,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 hybridVerts = hybrid.vertices
                 hybridNormals = hybrid.normals
                 hybridTris = hybrid.triangles
-                NSLog("KADASTR hybrid done: \(hybrid.arkitCount) ARKit + \(hybrid.fillCount) fill = \(hybrid.triangles.count) total")
+                NSLog("KADASTR hybrid (batch): \(hybrid.arkitCount) ARKit + \(hybrid.fillCount) fill = \(hybrid.triangles.count) total")
             } catch {
                 NSLog("KADASTR TSDF failed (skip hole fill): \(error.localizedDescription)")
             }
@@ -2833,6 +2882,18 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
         let bakeResult: AtlasBakeResult
         do {
+            // Variant A Phase 2: voxel color fallback — capture davomida
+            // accumulated voxel grid'dan rang olib, gray fallback'ni almashtiradi.
+            let voxelVolume: MetalAtlasBaker.VoxelColorVolume? = streamingTSDF.flatMap { s in
+                MetalAtlasBaker.VoxelColorVolume(
+                    buffer: s.colorBuffer,
+                    origin: s.origin,
+                    voxelSize: s.voxelSize,
+                    gridX: s.gridX,
+                    gridY: s.gridY,
+                    gridZ: s.gridZ,
+                )
+            }
             bakeResult = try MetalAtlasBaker.bake(
                 positions: globalVerts,
                 normals: globalNormals,
@@ -2841,6 +2902,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 atlasResolution: 4096,           // 4K atlas (memory safe; 6K → OOM crash)
                 cameraBatchSize: 4,              // hi-res 12MP × 4 = ~196 MB per batch
                 downsampleFactor: 1,             // full source (4032×3024 hi-res)
+                voxelColor: voxelVolume,         // Phase 2: gray patches → voxel color
                 progress: { p, msg in
                     Task { @MainActor in
                         self.processingStatusLabel.text = msg

@@ -57,6 +57,17 @@ enum AtlasBakeError: LocalizedError {
 }
 
 final class MetalAtlasBaker {
+    /// Voxel color fallback uchun StreamingTSDF ma'lumotlari. Atlas piksel
+    /// hech qaysi cameradan rang olmagan bo'lsa, world pos → voxel rang.
+    struct VoxelColorVolume {
+        let buffer: MTLBuffer            // float4 per voxel (rgb + colorWeight in .a)
+        let origin: SIMD3<Float>
+        let voxelSize: Float
+        let gridX: Int
+        let gridY: Int
+        let gridZ: Int
+    }
+
     static func bake(
         positions: [SIMD3<Float>],
         normals: [SIMD3<Float>],
@@ -65,6 +76,7 @@ final class MetalAtlasBaker {
         atlasResolution: Int = 2048,
         cameraBatchSize: Int = 16,
         downsampleFactor: Int = 2,  // 1920×1440 → 960×720
+        voxelColor: VoxelColorVolume? = nil,  // Variant A Phase 2: voxel color fallback
         progress: ((Float, String) -> Void)? = nil,
     ) throws -> AtlasBakeResult {
         // ────────────────────────────────────────────────────────────────────
@@ -346,6 +358,45 @@ final class MetalAtlasBaker {
         )
         _ = normParams
 
+        // Variant A Phase 2: voxel color fallback uchun buffer/params. Mavjud
+        // bo'lsa atlas piksel gray fallback o'rniga voxel rang qabul qiladi.
+        struct VoxelParamsLayout {
+            var originX: Float; var originY: Float; var originZ: Float; var voxelSize: Float
+            var gridX: UInt32; var gridY: UInt32; var gridZ: UInt32; var hasVoxelColor: UInt32
+        }
+        // Always need a buffer at index 2 (shader can't conditionally bind). If
+        // no voxel color provided, use a dummy 1-element buffer (hasVoxelColor=0).
+        let voxelBufToBind: MTLBuffer
+        let voxelParamsBuf: MTLBuffer
+        if let vc = voxelColor {
+            voxelBufToBind = vc.buffer
+            var vp = VoxelParamsLayout(
+                originX: vc.origin.x, originY: vc.origin.y, originZ: vc.origin.z,
+                voxelSize: vc.voxelSize,
+                gridX: UInt32(vc.gridX), gridY: UInt32(vc.gridY), gridZ: UInt32(vc.gridZ),
+                hasVoxelColor: 1,
+            )
+            guard let pBuf = device.makeBuffer(bytes: &vp, length: MemoryLayout<VoxelParamsLayout>.stride, options: .storageModeShared) else {
+                throw AtlasBakeError.metalSetup("voxel params buffer")
+            }
+            voxelParamsBuf = pBuf
+        } else {
+            // Dummy buffer (1 float4 of zeros, hasVoxelColor=0 → shader skips)
+            guard let dummy = device.makeBuffer(length: MemoryLayout<SIMD4<Float>>.stride, options: .storageModeShared) else {
+                throw AtlasBakeError.metalSetup("voxel dummy buffer")
+            }
+            memset(dummy.contents(), 0, MemoryLayout<SIMD4<Float>>.stride)
+            voxelBufToBind = dummy
+            var vp = VoxelParamsLayout(
+                originX: 0, originY: 0, originZ: 0, voxelSize: 1,
+                gridX: 1, gridY: 1, gridZ: 1, hasVoxelColor: 0,
+            )
+            guard let pBuf = device.makeBuffer(bytes: &vp, length: MemoryLayout<VoxelParamsLayout>.stride, options: .storageModeShared) else {
+                throw AtlasBakeError.metalSetup("voxel params buffer")
+            }
+            voxelParamsBuf = pBuf
+        }
+
         do {
             guard let cmdBuf = cmdQueue.makeCommandBuffer(),
                   let enc = cmdBuf.makeComputeCommandEncoder() else {
@@ -354,6 +405,8 @@ final class MetalAtlasBaker {
             enc.setComputePipelineState(normState)
             enc.setBuffer(colorBuf, offset: 0, index: 0)
             enc.setBuffer(weightBuf, offset: 0, index: 1)
+            enc.setBuffer(voxelBufToBind, offset: 0, index: 2)
+            enc.setBuffer(voxelParamsBuf, offset: 0, index: 3)
             enc.setTexture(posTexture, index: 0)
             enc.setTexture(atlasTex, index: 1)
             let tgSize = MTLSize(width: 16, height: 16, depth: 1)
