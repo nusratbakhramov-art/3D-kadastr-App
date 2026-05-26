@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/remote_image.dart';
 import '../market_controller.dart';
 import '../models/market_listing.dart';
 
@@ -107,13 +108,10 @@ class _FeaturedCard extends StatelessWidget {
             // Image
             Positioned.fill(
               bottom: 85,
-              child: listing.imageUrl.isNotEmpty
-                  ? Image.network(
-                      listing.imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => _Placeholder(dark: isDark),
-                    )
-                  : _Placeholder(dark: isDark),
+              child: RemoteImage(
+                url: listing.imageUrl,
+                memCacheWidth: 720,
+              ),
             ),
             // Bottom info
             Positioned(
@@ -175,25 +173,6 @@ class _FeaturedCard extends StatelessWidget {
       buf.write(s[i]);
     }
     return buf.toString();
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.dark});
-  final bool dark;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: dark ? const Color(0xFF1E2324) : const Color(0xFFF3F4F6),
-      child: Icon(
-        Icons.view_in_ar_rounded,
-        size: 40,
-        color: dark
-            ? Colors.white.withValues(alpha: 0.15)
-            : Colors.black.withValues(alpha: 0.1),
-      ),
-    );
   }
 }
 

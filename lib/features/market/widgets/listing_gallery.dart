@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/remote_image.dart';
 import 'fullscreen_gallery.dart';
 
 class ListingGallery extends StatefulWidget {
@@ -106,18 +107,7 @@ class _GalleryImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFEEF1F4),
-      child: Image.network(
-        url,
-        fit: BoxFit.cover,
-        cacheWidth: 1200,
-        gaplessPlayback: true,
-        errorBuilder: (_, _, _) => const Center(
-          child: Icon(Icons.image_outlined, size: 44, color: Color(0xFFB4B9BF)),
-        ),
-      ),
-    );
+    return RemoteImage(url: url, memCacheWidth: 1200);
   }
 }
 

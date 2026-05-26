@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/remote_image.dart';
 import '../models/market_listing.dart';
 
 class ListingCard extends StatelessWidget {
@@ -277,26 +278,6 @@ class _ListingImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFEEF1F4),
-      child: Image.network(
-        url,
-        fit: BoxFit.cover,
-        cacheWidth: 480,
-        gaplessPlayback: true,
-        frameBuilder: (context, child, frame, wasSync) {
-          if (wasSync) return child;
-          return AnimatedOpacity(
-            opacity: frame == null ? 0 : 1,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            child: child,
-          );
-        },
-        errorBuilder: (context, _, _) => const Center(
-          child: Icon(Icons.image_outlined, size: 28, color: Color(0xFFB4B9BF)),
-        ),
-      ),
-    );
+    return RemoteImage(url: url, memCacheWidth: 480);
   }
 }
