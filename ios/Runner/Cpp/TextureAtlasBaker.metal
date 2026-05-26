@@ -15,7 +15,10 @@ struct AtlasCamera {
     float2 depthSize;        // 8 (unused but reserved)
     float3 position;         // 16 (12 + 4 pad)
     float3 forward;          // 16
-    // Total: 160 bytes (aligned)
+    // Phase 3.3 view-dependent blending: per-photo sharpness [0..1]
+    // + 12 bytes pad to keep 16-byte alignment.
+    float sharpness;         // 4
+    float pad0, pad1, pad2;  // 12 pad → total camera struct 176 bytes
 };
 
 struct AtlasParams {
@@ -86,13 +89,26 @@ kernel void bakeAtlasBatch(
         float2 imgUV = float2(pu / cam.imageSize.x, pv / cam.imageSize.y);
         float3 color = imageArray.sample(linearSampler, imgUV, i).rgb;
 
+        // Phase 3.3: glare/specular detection. Agar pixel deyarli oq (RGB
+        // ham yuqori, ham balanced) — bu mat yuza emas, ko'zgu/spekulyar.
+        // luma = max channel. Saturate'ga yaqin bo'lsa, weight kamayadi.
+        // Diffuse oq devor ham bo'lishi mumkin — shu sababli butunlay
+        // tashlamaymiz, faqat weight'ni yumshatamiz (0.3x at full glare).
+        float luma = max(color.r, max(color.g, color.b));
+        float glareReduction = 1.0 - 0.7 * smoothstep(0.92, 0.99, luma);
+
         // POWER weighting — best camera (yaqin + perpendikulyar) MASSIVELY
-        // dominate qiladi. Power 8: top camera ~256x kuchliroq → 2-chi camera
-        // ta'siri ~0.4%. Faktik top-1 sampling, lekin transitions yumshoq.
+        // dominate qiladi. Power 6: top camera ~64x kuchliroq → 2-chi camera
+        // ta'siri ~1.5%. Faktik top-1 sampling, lekin transitions biroz
+        // yumshoqroq (specular ghost'ni kamaytirish uchun power 8 → 6).
         float baseWeight = (camAlign + 0.1) * (faceDot + 0.1) / max(dist * dist, 0.25);
+        // Phase 3.3: sharpness term (blurry photos contribute less). 0.1 epsilon
+        // — zero sharpness ham hech bo'lmaganda minimal hissa qoldirsin.
+        baseWeight *= (cam.sharpness + 0.1);
+        baseWeight *= glareReduction;
         float w2 = baseWeight * baseWeight;
         float w4 = w2 * w2;
-        float weight = w4 * w4;  // power 8
+        float weight = w4 * w2;  // power 6
         colorSum += color * weight;
         wSum += weight;
     }

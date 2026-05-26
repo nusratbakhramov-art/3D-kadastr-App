@@ -30,6 +30,9 @@ struct AtlasBakeInputCamera {
     let depthURL: URL?                // LiDAR depth (depth_NNNN.bin)
     let depthWidth: Int               // 256 odatda
     let depthHeight: Int              // 192 odatda
+    // Phase 3.3: variance-of-Laplacian sharpness [0..1] — 0=blurry, 1=sharp.
+    // Bake kernel weight'ga ko'paytiriladi: motion-blur foto'lar kamroq hissa.
+    var sharpness: Float = 0.5
 }
 
 struct AtlasBakeResult {
@@ -517,6 +520,10 @@ private struct MetalAtlasCamera {
     var depthSize: SIMD2<Float>       // 8
     var position: SIMD3<Float>        // 16 (SIMD3 = 16 bytes)
     var forward: SIMD3<Float>         // 16
+    // Phase 3.3: variance-of-Laplacian sharpness [0..1] + 12 bytes pad to keep
+    // 16-byte alignment. Metal AtlasCamera struct must match.
+    var sharpness: Float              // 4
+    var pad0: Float = 0; var pad1: Float = 0; var pad2: Float = 0  // 12 pad
 }
 
 private struct AtlasParams {
@@ -543,6 +550,7 @@ private func makeMetalCam(_ cam: AtlasBakeInputCamera) -> MetalAtlasCamera {
         depthSize: SIMD2<Float>(Float(cam.depthWidth), Float(cam.depthHeight)),
         position: pos,
         forward: fwd,
+        sharpness: cam.sharpness,
     )
 }
 

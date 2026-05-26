@@ -2106,6 +2106,11 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                     CGImageDestinationAddImage(dest, hiResImg, opts as CFDictionary)
                     CGImageDestinationFinalize(dest)
                 }
+                // Phase 3.3: per-photo sharpness (variance of Laplacian, downsampled
+                // grayscale). Atlas baker view-dependent blending uchun ishlatadi —
+                // blurry foto'lar weight kamayadi.
+                let sharpness = ImageQuality.sharpness(of: hiResImg)
+                NSLog("KADASTR hi-res #\(idx) sharpness=\(String(format: "%.3f", sharpness))")
                 // CRITICAL: hi-res frame'ning O'Z depth'ini saqlash (overwrite
                 // low-res depth). Aks holda depth (T0) va image (T0+200ms) turli
                 // pose'larda olingan → atlas baker occlusion noto'g'ri ishlaydi
@@ -2146,6 +2151,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                         self.capturedPoses[i]["image_width"] = Int(resolution.width)
                         self.capturedPoses[i]["image_height"] = Int(resolution.height)
                         self.capturedPoses[i]["timestamp"] = hiResTs
+                        self.capturedPoses[i]["sharpness"] = sharpness
                     }
                 }
                 NSLog("KADASTR hi-res #\(idx) OK \(hiResImg.width)×\(hiResImg.height)")
@@ -2877,6 +2883,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 depthURL: depthExists ? depthURL : nil,
                 depthWidth: cam.depthW > 0 ? cam.depthW : 256,
                 depthHeight: cam.depthH > 0 ? cam.depthH : 192,
+                sharpness: cam.sharpness,  // Phase 3.3: view-dependent blending
             )
         }
 
@@ -3645,6 +3652,9 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         let depthMap: [Float]?
         let depthW: Int
         let depthH: Int
+        // Phase 3.3: variance-of-Laplacian sharpness [0..1], 0=blurry, 1=sharp.
+        // Atlas baker view-dependent blending'da weight'ga ko'paytiriladi.
+        let sharpness: Float
     }
 
     @MainActor
@@ -3788,11 +3798,24 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 }
             }
 
+            // Phase 3.3: sharpness — pose dict'dan o'qiladi. Eski photos uchun
+            // (sharpness yo'q) → 0.5 neutral default (boshqa camera'larga nisbatan
+            // bias bermaslik uchun).
+            let sharp: Float
+            if let s = entry["sharpness"] as? Double {
+                sharp = Float(s)
+            } else if let s = entry["sharpness"] as? Float {
+                sharp = s
+            } else {
+                sharp = 0.5
+            }
+
             cams.append(CameraView(
                 index: idx, transform: t, depthTransform: depthT, intrinsics: k,
                 imageW: Float(w), imageH: Float(h),
                 imageURL: imgURL, position: pos, forward: fwd,
                 depthMap: depthMap, depthW: depthW, depthH: depthH,
+                sharpness: sharp,
             ))
         }
         return cams
