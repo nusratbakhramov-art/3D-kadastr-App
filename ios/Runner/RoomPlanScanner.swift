@@ -3024,6 +3024,24 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // gray joylar bo'lishi mumkin (texture yo'q joylarda).
         let filteredResult = bakeResult
 
+        // Phase 6.1: Real-ESRGAN super-resolution + deblur. Atlas'dagi blur
+        // (Phase 5 Taubin smoothing va multi-cam blending'dan qolgan) AI bilan
+        // kompensatsiya qilinadi. Tile-by-tile inference Neural Engine'da,
+        // ~16 tile × 500ms = ~8s. Model bundle'da yo'q bo'lsa skip.
+        await MainActor.run {
+            self.processingStatusLabel.text = "AI super-resolution (Real-ESRGAN)…"
+            self.progressView.setProgress(0.91, animated: true)
+        }
+        let enhancedAtlas: UIImage = MLAtlasEnhancer.enhance(
+            atlas: bakeResult.atlas,
+            progress: { p, msg in
+                Task { @MainActor in
+                    self.processingStatusLabel.text = msg
+                    self.progressView.setProgress(0.91 + p * 0.06, animated: false)
+                }
+            },
+        ) ?? bakeResult.atlas
+
         // Build SCNGeometry from xatlas-unwrapped mesh + atlas texture.
         let geom = Self.buildSubMeshGeometry(
             vertices: filteredResult.vertices,
@@ -3031,11 +3049,11 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             uvs: filteredResult.uvs,
             indices: filteredResult.indices,
         )
-        NSLog("KADASTR atlas attached: \(bakeResult.atlasWidth)×\(bakeResult.atlasHeight)")
+        NSLog("KADASTR atlas attached: \(bakeResult.atlasWidth)×\(bakeResult.atlasHeight) (enhanced: \(Int(enhancedAtlas.size.width))×\(Int(enhancedAtlas.size.height)))")
         let mat = SCNMaterial()
         mat.lightingModel = .constant
         mat.isDoubleSided = true
-        mat.diffuse.contents = bakeResult.atlas
+        mat.diffuse.contents = enhancedAtlas
         mat.diffuse.magnificationFilter = .nearest  // sharp pixels (no bilinear blur)
         mat.diffuse.minificationFilter = .linear    // smooth zoom-out
         mat.diffuse.mipFilter = .none
