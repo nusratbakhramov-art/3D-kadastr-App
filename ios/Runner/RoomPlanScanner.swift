@@ -2850,9 +2850,10 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             minSizeRatio: 0.10,   // 0.40 → 0.10: faqat juda kichik isolated parchalar drop
         )
 
-        // Phase 4.2: Taubin λ/μ smoothing — 5cm voxel stair-step va ARKit
-        // anchor edge seam'larini silliqlashtirish. λ=0.5, μ=-0.53, 3 iter.
-        // Detail (sofa burchaklari, table legs) saqlanadi.
+        // Phase 5: Taubin smoothing — 3 iter → 1 iter, λ 0.5 → 0.35.
+        // Phase 4 over-smoothing edge'lar va keyboard kabi fine detail'larni
+        // yutib yubordi. Bitta yengil iter — eng kuchli stair-step yumshatadi,
+        // detail saqlaydi.
         await MainActor.run {
             self.processingStatusLabel.text = "Smoothing mesh…"
             self.progressView.setProgress(0.35, animated: true)
@@ -2861,9 +2862,9 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             vertices: lccFiltered.vertices,
             normals: lccFiltered.normals,
             triangles: lccFiltered.triangles,
-            lambda: 0.5,
-            mu: -0.53,
-            iterations: 3,
+            lambda: 0.35,
+            mu: -0.38,
+            iterations: 1,
         )
         let globalVerts = smoothed.vertices
         let globalNormals = smoothed.normals

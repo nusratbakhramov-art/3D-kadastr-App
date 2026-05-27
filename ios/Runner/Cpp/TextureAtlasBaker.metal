@@ -97,16 +97,15 @@ kernel void bakeAtlasBatch(
         float luma = max(color.r, max(color.g, color.b));
         float glareReduction = 1.0 - 0.7 * smoothstep(0.92, 0.99, luma);
 
-        // Phase 4.3: POWER weighting 6 → 4. Top camera ~16x kuchliroq → 2-chi
-        // camera ta'siri ~6%, 3-chi ~2%. Ko'proq cameralar hissa qo'shadi,
-        // transitions smoother → overlap seam'lar ko'rinmaydigan bo'ladi
-        // (top-1 dominant emas, weighted blend).
+        // Phase 5: POWER weighting 4 → 5 (compromise — oldin 6 sharp lekin seam,
+        // 4 smooth lekin blur). Top camera ~32x dominate, 2-chi ~3%. Sharpness
+        // qaytadi, seam'lar Gaussian smoothing kerakmasdan kamayadi.
         float baseWeight = (camAlign + 0.1) * (faceDot + 0.1) / max(dist * dist, 0.25);
-        // Phase 3.3: sharpness term (blurry photos contribute less).
         baseWeight *= (cam.sharpness + 0.1);
         baseWeight *= glareReduction;
         float w2 = baseWeight * baseWeight;
-        float weight = w2 * w2;  // power 4
+        float w4 = w2 * w2;
+        float weight = w4 * baseWeight;  // power 5
         colorSum += color * weight;
         wSum += weight;
     }

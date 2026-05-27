@@ -422,32 +422,17 @@ final class MetalAtlasBaker {
             cmdBuf.waitUntilCompleted()
         }
 
-        // Phase 4.3: Bilateral Gaussian smoothing — multi-view overlap seam'larini
-        // sezilmaydigan qilish. 3x3 weighted blend, chart boundary'lardan cross
-        // qilmaydi (alpha=0 pixel'lar skip). 2 iter — ozgina yumshatadi, detail
-        // saqlanadi.
+        // Phase 5: Atlas Gaussian smoothing O'CHIRILDI — Phase 4'da blur sabab
+        // bo'lgan. Power weighting 5 va sharpness gating multi-view seam'larni
+        // o'zi yumshatadi, Gaussian kerakmas.
+        // _ = smoothState  // unused but kept for future
+
+        // Dilate — Phase 5: 6 → 3 passes (compromise). 2 oldindan kam edi (gap),
+        // 6 atlas bleed sababli textura aralashtirgan. 3 — kichik gap'lar fill +
+        // bleed kontrol.
         var src = atlasTex
         var dst = dilatedTex
-        for _ in 0..<2 {
-            guard let cmdBuf = cmdQueue.makeCommandBuffer(),
-                  let enc = cmdBuf.makeComputeCommandEncoder() else { break }
-            enc.setComputePipelineState(smoothState)
-            enc.setTexture(src, index: 0)
-            enc.setTexture(dst, index: 1)
-            let tgSize = MTLSize(width: 16, height: 16, depth: 1)
-            let tgCount = MTLSize(width: (atlasW + 15) / 16, height: (atlasH + 15) / 16, depth: 1)
-            enc.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
-            enc.endEncoding()
-            cmdBuf.commit()
-            cmdBuf.waitUntilCompleted()
-            swap(&src, &dst)
-        }
-
-        // Dilate — Phase 4.1: 2 → 6 passes. Kichik qoraytirilgan patch'larni
-        // (atlas pixel hech qaysi camera + voxel ham bermagan) qo'shni textured
-        // pixel'lar bilan to'ldiradi. 6 pixel ~3 mm atlas-space, real surface'da
-        // ~1-2 sm gap → ko'rinmas qoladi.
-        for _ in 0..<6 {
+        for _ in 0..<3 {
             guard let cmdBuf = cmdQueue.makeCommandBuffer(),
                   let enc = cmdBuf.makeComputeCommandEncoder() else { break }
             enc.setComputePipelineState(dilState)
