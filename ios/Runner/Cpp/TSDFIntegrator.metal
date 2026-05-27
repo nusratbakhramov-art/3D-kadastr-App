@@ -120,9 +120,11 @@ kernel void integrateDepthColor(
     sdfVolume[idx] = (prevSDF * prevW + sdf) / newW;
     weightVolume[idx] = newW;
 
-    // Color: faqat voxel surface'ga yaqin bo'lsa rang qabul qilamiz (|sdf| < 0.5
-    // truncated). Aks holda voxel "havo" yoki "uzoq orqa" — rang ma'nosiz.
-    if (abs(sdf) > 0.5) return;
+    // Color: Phase 4.1 — surface yaqinlik threshold 0.5 → 0.85.
+    // Ko'proq voxel rang qabul qiladi (front of surface band), gray patch'lar
+    // kamayadi. Faqat juda uzoq orqasidagi (sdf < -0.85) voxel'lar skip — bu
+    // "ekran orqasi" havo, rang ma'nosiz.
+    if (sdf < -0.85) return;
 
     // YUV→RGB conversion (BT.601 limited range)
     float Y = imageY.sample(sl, float2(u, v)).r;

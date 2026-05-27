@@ -355,6 +355,95 @@ enum MeshCleaner {
         return CleanedMesh(vertices: outV, normals: outN, triangles: outT)
     }
 
+    // MARK: - Laplacian smoothing (Phase 4.2)
+
+    /// Taubin λ/μ smoothing — Laplacian o'rniga, mesh hajmi va detail
+    /// saqlanadi (oddiy Laplacian uzoq iter'larda mesh'ni "shrink" qiladi).
+    ///
+    /// Iter har bosqichida ikki pass:
+    ///   1. Positive λ (smoothing): v ← v + λ(L(v))
+    ///   2. Negative μ (anti-shrink): v ← v + μ(L(v))   (μ < -λ)
+    ///
+    /// Standart qiymatlar: λ=0.5, μ=-0.53, iter=3 → silliq surface,
+    /// detail (sofa edges, table legs) saqlanadi. 5cm voxel stair-step'i
+    /// va ARKit anchor seam'lari deyarli yo'qoladi.
+    static func taubinSmooth(
+        vertices: [SIMD3<Float>],
+        normals: [SIMD3<Float>],
+        triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+        lambda: Float = 0.5,
+        mu: Float = -0.53,
+        iterations: Int = 3,
+    ) -> CleanedMesh {
+        if vertices.count < 4 || triangles.isEmpty {
+            return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles)
+        }
+
+        // Build vertex adjacency (set of neighbors via shared edges)
+        var adjacency: [Set<UInt32>] = Array(repeating: Set<UInt32>(), count: vertices.count)
+        for t in triangles {
+            adjacency[Int(t.v0)].insert(t.v1); adjacency[Int(t.v0)].insert(t.v2)
+            adjacency[Int(t.v1)].insert(t.v0); adjacency[Int(t.v1)].insert(t.v2)
+            adjacency[Int(t.v2)].insert(t.v0); adjacency[Int(t.v2)].insert(t.v1)
+        }
+
+        var verts = vertices
+        for _ in 0..<iterations {
+            // Pass 1: λ smoothing
+            verts = laplacianPass(verts: verts, adjacency: adjacency, weight: lambda)
+            // Pass 2: μ anti-shrink
+            verts = laplacianPass(verts: verts, adjacency: adjacency, weight: mu)
+        }
+
+        // Recompute vertex normals from final positions (smoothed mesh →
+        // need re-normalized normals for atlas baker face-dot rejection).
+        var newNormals = [SIMD3<Float>](repeating: SIMD3<Float>(0, 1, 0), count: vertices.count)
+        var counts = [Int](repeating: 0, count: vertices.count)
+        for t in triangles {
+            let v0 = verts[Int(t.v0)]
+            let v1 = verts[Int(t.v1)]
+            let v2 = verts[Int(t.v2)]
+            let n = simd_cross(v1 - v0, v2 - v0)
+            let len = simd_length(n)
+            if len < 1e-9 { continue }
+            let nn = n / len
+            newNormals[Int(t.v0)] += nn; counts[Int(t.v0)] += 1
+            newNormals[Int(t.v1)] += nn; counts[Int(t.v1)] += 1
+            newNormals[Int(t.v2)] += nn; counts[Int(t.v2)] += 1
+        }
+        for i in 0..<newNormals.count {
+            if counts[i] > 0 {
+                let avg = newNormals[i] / Float(counts[i])
+                let len = simd_length(avg)
+                newNormals[i] = len > 1e-9 ? avg / len : normals[i]
+            } else {
+                newNormals[i] = normals[i]
+            }
+        }
+        NSLog("KADASTR taubinSmooth: \(iterations) iter, \(vertices.count) vert")
+        return CleanedMesh(vertices: verts, normals: newNormals, triangles: triangles)
+    }
+
+    private static func laplacianPass(
+        verts: [SIMD3<Float>],
+        adjacency: [Set<UInt32>],
+        weight: Float,
+    ) -> [SIMD3<Float>] {
+        var out = verts
+        for i in 0..<verts.count {
+            let neighbors = adjacency[i]
+            if neighbors.isEmpty { continue }
+            var sum = SIMD3<Float>(0, 0, 0)
+            for n in neighbors {
+                sum += verts[Int(n)]
+            }
+            let centroid = sum / Float(neighbors.count)
+            let delta = centroid - verts[i]
+            out[i] = verts[i] + delta * weight
+        }
+        return out
+    }
+
     // MARK: - 3. Drop small connected components
 
     private static func dropSmallComponents(

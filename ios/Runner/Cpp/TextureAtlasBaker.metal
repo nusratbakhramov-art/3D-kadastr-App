@@ -97,18 +97,16 @@ kernel void bakeAtlasBatch(
         float luma = max(color.r, max(color.g, color.b));
         float glareReduction = 1.0 - 0.7 * smoothstep(0.92, 0.99, luma);
 
-        // POWER weighting — best camera (yaqin + perpendikulyar) MASSIVELY
-        // dominate qiladi. Power 6: top camera ~64x kuchliroq → 2-chi camera
-        // ta'siri ~1.5%. Faktik top-1 sampling, lekin transitions biroz
-        // yumshoqroq (specular ghost'ni kamaytirish uchun power 8 → 6).
+        // Phase 4.3: POWER weighting 6 → 4. Top camera ~16x kuchliroq → 2-chi
+        // camera ta'siri ~6%, 3-chi ~2%. Ko'proq cameralar hissa qo'shadi,
+        // transitions smoother → overlap seam'lar ko'rinmaydigan bo'ladi
+        // (top-1 dominant emas, weighted blend).
         float baseWeight = (camAlign + 0.1) * (faceDot + 0.1) / max(dist * dist, 0.25);
-        // Phase 3.3: sharpness term (blurry photos contribute less). 0.1 epsilon
-        // — zero sharpness ham hech bo'lmaganda minimal hissa qoldirsin.
+        // Phase 3.3: sharpness term (blurry photos contribute less).
         baseWeight *= (cam.sharpness + 0.1);
         baseWeight *= glareReduction;
         float w2 = baseWeight * baseWeight;
-        float w4 = w2 * w2;
-        float weight = w4 * w2;  // power 6
+        float weight = w2 * w2;  // power 4
         colorSum += color * weight;
         wSum += weight;
     }
@@ -204,6 +202,54 @@ kernel void normalizeAtlas(
 
     // Hech narsa topilmadi — kulrang fallback
     atlasOut.write(float4(0.5, 0.5, 0.5, 1.0), gid);
+}
+
+// Phase 4.3: Bilateral Gaussian smoothing — atlas pixel'larini qo'shnilar
+// bilan blend qiladi, lekin chart boundary'larida (alpha = 0) cross qilmaydi.
+// Multi-view overlap seam'larini sezilmaydigan qilish. 3x3 Gaussian kernel,
+// faqat alpha=1 pixel'lar hissa qo'shadi (chart cross-bleed yo'q).
+kernel void smoothAtlas(
+    texture2d<float, access::read>  atlasIn  [[texture(0)]],
+    texture2d<float, access::write> atlasOut [[texture(1)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    uint w = atlasIn.get_width();
+    uint h = atlasIn.get_height();
+    if (gid.x >= w || gid.y >= h) return;
+
+    float4 center = atlasIn.read(gid);
+    if (center.a < 0.5) {
+        // Outside chart — leave as-is (dilate already filled neighbors).
+        atlasOut.write(center, gid);
+        return;
+    }
+
+    // 3x3 Gaussian kernel (sum=16):
+    //   1 2 1
+    //   2 4 2
+    //   1 2 1
+    const float gw[9] = {1, 2, 1,
+                         2, 4, 2,
+                         1, 2, 1};
+    float3 sum = float3(0.0);
+    float wSum = 0.0;
+    for (int dy = -1; dy <= 1; ++dy) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            int nx = int(gid.x) + dx;
+            int ny = int(gid.y) + dy;
+            if (nx < 0 || nx >= int(w) || ny < 0 || ny >= int(h)) continue;
+            float4 n = atlasIn.read(uint2(uint(nx), uint(ny)));
+            if (n.a < 0.5) continue;  // skip chart boundary
+            float kw = gw[(dy + 1) * 3 + (dx + 1)];
+            sum += n.rgb * kw;
+            wSum += kw;
+        }
+    }
+    if (wSum > 0.0) {
+        atlasOut.write(float4(sum / wSum, 1.0), gid);
+    } else {
+        atlasOut.write(center, gid);
+    }
 }
 
 // Dilate pass — chartlar chetlarini "bleed" qilish (bilinear filtering bilan

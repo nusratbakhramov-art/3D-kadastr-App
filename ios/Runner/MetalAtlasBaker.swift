@@ -170,13 +170,15 @@ final class MetalAtlasBaker {
         guard
             let bakeFunc = library.makeFunction(name: "bakeAtlasBatch"),
             let normFunc = library.makeFunction(name: "normalizeAtlas"),
-            let dilFunc = library.makeFunction(name: "dilateAtlas")
+            let dilFunc = library.makeFunction(name: "dilateAtlas"),
+            let smoothFunc = library.makeFunction(name: "smoothAtlas")  // Phase 4.3
         else {
             throw AtlasBakeError.metalSetup("kernel functions not found")
         }
         let bakeState = try device.makeComputePipelineState(function: bakeFunc)
         let normState = try device.makeComputePipelineState(function: normFunc)
         let dilState = try device.makeComputePipelineState(function: dilFunc)
+        let smoothState = try device.makeComputePipelineState(function: smoothFunc)
         guard let cmdQueue = device.makeCommandQueue() else {
             throw AtlasBakeError.metalSetup("command queue")
         }
@@ -420,10 +422,32 @@ final class MetalAtlasBaker {
             cmdBuf.waitUntilCompleted()
         }
 
-        // Dilate (2 passes — boundary'larni biroz kengaytirish)
+        // Phase 4.3: Bilateral Gaussian smoothing — multi-view overlap seam'larini
+        // sezilmaydigan qilish. 3x3 weighted blend, chart boundary'lardan cross
+        // qilmaydi (alpha=0 pixel'lar skip). 2 iter — ozgina yumshatadi, detail
+        // saqlanadi.
         var src = atlasTex
         var dst = dilatedTex
         for _ in 0..<2 {
+            guard let cmdBuf = cmdQueue.makeCommandBuffer(),
+                  let enc = cmdBuf.makeComputeCommandEncoder() else { break }
+            enc.setComputePipelineState(smoothState)
+            enc.setTexture(src, index: 0)
+            enc.setTexture(dst, index: 1)
+            let tgSize = MTLSize(width: 16, height: 16, depth: 1)
+            let tgCount = MTLSize(width: (atlasW + 15) / 16, height: (atlasH + 15) / 16, depth: 1)
+            enc.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
+            enc.endEncoding()
+            cmdBuf.commit()
+            cmdBuf.waitUntilCompleted()
+            swap(&src, &dst)
+        }
+
+        // Dilate — Phase 4.1: 2 → 6 passes. Kichik qoraytirilgan patch'larni
+        // (atlas pixel hech qaysi camera + voxel ham bermagan) qo'shni textured
+        // pixel'lar bilan to'ldiradi. 6 pixel ~3 mm atlas-space, real surface'da
+        // ~1-2 sm gap → ko'rinmas qoladi.
+        for _ in 0..<6 {
             guard let cmdBuf = cmdQueue.makeCommandBuffer(),
                   let enc = cmdBuf.makeComputeCommandEncoder() else { break }
             enc.setComputePipelineState(dilState)

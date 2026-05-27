@@ -1799,13 +1799,13 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 }
             }
 
-            // Phase 3.1: Streaming TSDF integration — har 3-chi frame (~20 fps).
-            // Polycam-style continuous fusion. 5 → 3 frame cadence: 67% ko'proq
-            // sample/voxel, color buffer richer. Performance hali ham OK (Metal
-            // kernel ~1.5M voxel × few ALU ops).
+            // Phase 4.1: Streaming TSDF integration — har 2-chi frame (30 fps).
+            // 3 → 2: 50% ko'proq sample/voxel, coverage hech bir region'da
+            // o'tkazib yuborilmaydi. Metal kernel ~1.5M voxel × few ALU =
+            // ~3 ms/frame, 30fps integration thermal headroom ichida.
             if #available(iOS 14.0, *) {
                 tsdfFrameTick &+= 1
-                if tsdfFrameTick % 3 == 0 {
+                if tsdfFrameTick % 2 == 0 {
                     streamingTSDF?.integrate(frame: frame)
                 }
             }
@@ -2849,9 +2849,25 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             triangles: coverageFiltered.triangles,
             minSizeRatio: 0.10,   // 0.40 → 0.10: faqat juda kichik isolated parchalar drop
         )
-        let globalVerts = lccFiltered.vertices
-        let globalNormals = lccFiltered.normals
-        let globalTris = lccFiltered.triangles
+
+        // Phase 4.2: Taubin λ/μ smoothing — 5cm voxel stair-step va ARKit
+        // anchor edge seam'larini silliqlashtirish. λ=0.5, μ=-0.53, 3 iter.
+        // Detail (sofa burchaklari, table legs) saqlanadi.
+        await MainActor.run {
+            self.processingStatusLabel.text = "Smoothing mesh…"
+            self.progressView.setProgress(0.35, animated: true)
+        }
+        let smoothed = MeshCleaner.taubinSmooth(
+            vertices: lccFiltered.vertices,
+            normals: lccFiltered.normals,
+            triangles: lccFiltered.triangles,
+            lambda: 0.5,
+            mu: -0.53,
+            iterations: 3,
+        )
+        let globalVerts = smoothed.vertices
+        let globalNormals = smoothed.normals
+        let globalTris = smoothed.triangles
         await MainActor.run {
             self.processingStatusLabel.text = "Extracting mesh… \(globalTris.count) tri"
             self.progressView.setProgress(0.34, animated: true)
