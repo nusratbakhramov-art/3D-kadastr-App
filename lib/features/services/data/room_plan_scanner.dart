@@ -47,21 +47,24 @@ class HybridScanResult {
 }
 
 /// Skan natijasi — USDZ yo'li va detected obyektlar statistikasi.
+/// Phase 7: saved_raw mode'da filePath null, faqat savedScanId.
 class RoomScanResult {
   const RoomScanResult({
-    required this.filePath,
-    required this.fileSize,
-    required this.walls,
-    required this.doors,
-    required this.windows,
-    required this.openings,
-    required this.objects,
+    this.filePath,
+    this.fileSize = 0,
+    this.walls = 0,
+    this.doors = 0,
+    this.windows = 0,
+    this.openings = 0,
+    this.objects = 0,
     this.floorAreaSqm,
     this.wallsTotal,
     this.wallsTextured,
+    this.savedScanId,
+    this.mode,
   });
 
-  final String filePath;
+  final String? filePath;
   final int fileSize;
   final int walls;
   final int doors;
@@ -75,6 +78,13 @@ class RoomScanResult {
   final int? wallsTotal;
   final int? wallsTextured;
 
+  /// Phase 7: saved_raw mode'da scanId. Profilda ko'rsatish + qayta ishlash uchun.
+  final int? savedScanId;
+  /// "saved_raw" | "offline_processed" | null (legacy USDZ)
+  final String? mode;
+
+  bool get isSavedRaw => mode == 'saved_raw';
+
   /// Necha devor rasmga olinmadi.
   int? get wallsMissed {
     if (wallsTotal == null || wallsTextured == null) return null;
@@ -82,7 +92,7 @@ class RoomScanResult {
   }
 
   factory RoomScanResult.fromMap(Map<dynamic, dynamic> m) => RoomScanResult(
-        filePath: m['filePath'] as String,
+        filePath: m['filePath'] as String?,
         fileSize: (m['fileSize'] as num?)?.toInt() ?? 0,
         walls: (m['walls'] as num?)?.toInt() ?? 0,
         doors: (m['doors'] as num?)?.toInt() ?? 0,
@@ -92,6 +102,8 @@ class RoomScanResult {
         floorAreaSqm: (m['floorAreaSqm'] as num?)?.toDouble(),
         wallsTotal: (m['wallsTotal'] as num?)?.toInt(),
         wallsTextured: (m['wallsTextured'] as num?)?.toInt(),
+        savedScanId: (m['savedScanId'] as num?)?.toInt(),
+        mode: m['mode'] as String?,
       );
 }
 

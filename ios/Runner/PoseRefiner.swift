@@ -262,14 +262,16 @@ extension PoseRefiner {
                 }
                 refined[i] = pose
 
-                if i % 10 == 0 {
+                // Phase 8: Granular ICP progress — har 5 photoda update.
+                if i % 5 == 0 {
                     let p = 0.05 + 0.93 * Float(i) / Float(max(photos.count, 1))
                     progress?(p, "ICP \(i + 1)/\(photos.count)")
                 }
             }
         }.value
 
-        progress?(1.0, "ICP ✓")
+        // Phase 8: don't emit "ICP ✓" — caller would race with next stage label.
+        // progress?(1.0, "ICP ✓")  // REMOVED
         return refined
     }
 

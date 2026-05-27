@@ -88,16 +88,23 @@ static int XAtlasPrintLog(const char *format, ...) {
         return nil;
     }
 
-    // Atlas options — kompakt pack, qo'shni triangle'lar yaqin, padding bilan
-    // bilinear filtering uchun.
+    // Phase 9.3: Atlas chart parametrlari — KAMROQ lekin KATTAROQ chart'lar.
+    // Eski sozlamada chart'lar juda kichik bo'lib ketadi → renderda fragment
+    // ko'rinishi. Quyidagi tweak'lar bilan algoritm triangle'larni ko'proq
+    // birgalikda guruhlaydi:
     xatlas::ChartOptions chartOptions;
+    chartOptions.maxCost = 8.0f;             // default 2 → 8: yomon-roq chart'lar ham qo'shilsin
+    chartOptions.maxIterations = 3;          // default 1 → 3: charts'larni qayta-qayta birlashtir
+    chartOptions.normalDeviationWeight = 1.0f;  // default 2: normal farqlarga kamroq sezgir
+    chartOptions.normalSeamWeight = 2.0f;       // default 4: normal seam penalty kamroq
+
     xatlas::PackOptions packOptions;
     packOptions.resolution = atlasResolution;
-    packOptions.padding = 2;       // 2 piksel border har chart atrofida (bleed uchun)
-    packOptions.bilinear = true;   // bilinear filtering safe
+    packOptions.padding = 4;       // 2 → 4: kengroq border, bilinear filtering safe
+    packOptions.bilinear = true;
     packOptions.blockAlign = false;
-    packOptions.bruteForce = false;
-    packOptions.texelsPerUnit = 0; // auto, resolution bo'yicha hisoblanadi
+    packOptions.bruteForce = false; // BURUFORCE 20min+ olardi 200k tri'da
+    packOptions.texelsPerUnit = 0;
 
     xatlas::Generate(atlas, chartOptions, packOptions);
 

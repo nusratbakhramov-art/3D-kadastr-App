@@ -934,6 +934,10 @@ final class TexturedScanCoordinator: NSObject {
 
         let vc = TexturedScanViewController()
         vc.modalPresentationStyle = .fullScreen
+        vc.savingMode = true  // Phase 7: Done → save raw (default)
+        vc.onSavedRaw = { [weak self] scanId in
+            self?.handleSavedRaw(scanId: scanId)
+        }
         vc.onFinished = { [weak self] (url, stats) in
             self?.handleFinish(url: url, stats: stats)
         }
@@ -941,6 +945,87 @@ final class TexturedScanCoordinator: NSObject {
         vc.onError = { [weak self] err in self?.handleError(err) }
         controller.present(vc, animated: true)
         self.sessionVC = vc
+    }
+
+    /// Phase 7: Re-process saqlangan scan. UI = TexturedScanViewController
+    /// offline mode'da, AR session ishga tushirilmaydi.
+    func processSavedScan(
+        scanId: Int,
+        params: [String: String] = [:],
+        from controller: UIViewController,
+        result: @escaping FlutterResult,
+    ) {
+        DebugLog.log("COORD", "processSavedScan called scanId=\(scanId)")
+        if pendingResult != nil {
+            DebugLog.log("COORD", "FAIL: already processing")
+            result(FlutterError(
+                code: "ALREADY_PROCESSING",
+                message: "Boshqa scan jarayoni ketmoqda",
+                details: nil,
+            ))
+            return
+        }
+        guard SavedScanStorage.get(id: scanId) != nil else {
+            DebugLog.log("COORD", "FAIL: scan not found in storage")
+            result(FlutterError(
+                code: "NOT_FOUND",
+                message: "Scan #\(scanId) topilmadi",
+                details: nil,
+            ))
+            return
+        }
+
+        self.presentingController = controller
+        self.pendingResult = result
+
+        let vc = TexturedScanViewController()
+        vc.modalPresentationStyle = .fullScreen
+        vc.offlineScanId = scanId
+        vc.offlineParams = params
+        vc.onOfflineFinished = { [weak self] (url, version) in
+            DebugLog.log("COORD", "onOfflineFinished v=\(version)")
+            self?.handleOfflineFinished(url: url, version: version, scanId: scanId)
+        }
+        vc.onError = { [weak self] err in
+            DebugLog.log("COORD", "onError: \(err.localizedDescription)")
+            self?.handleError(err)
+        }
+        vc.onCancel = { [weak self] in
+            DebugLog.log("COORD", "onCancel")
+            self?.handleCancel()
+        }
+        DebugLog.log("COORD", "presenting VC offline")
+        controller.present(vc, animated: true) {
+            DebugLog.log("COORD", "VC presentation completed")
+        }
+        self.sessionVC = vc
+    }
+
+    private func handleSavedRaw(scanId: Int) {
+        guard let result = pendingResult else { return }
+        pendingResult = nil
+        sessionVC?.dismiss(animated: true)
+        sessionVC = nil
+        result([
+            "savedScanId": scanId,
+            "mode": "saved_raw",
+        ])
+    }
+
+    private func handleOfflineFinished(url: URL, version: Int, scanId: Int) {
+        guard let result = pendingResult else { return }
+        pendingResult = nil
+        sessionVC?.dismiss(animated: true)
+        sessionVC = nil
+        let attrs = try? FileManager.default.attributesOfItem(atPath: url.path)
+        let fileSize = (attrs?[.size] as? Int) ?? 0
+        result([
+            "scanId": scanId,
+            "version": version,
+            "filePath": url.path,
+            "fileSize": fileSize,
+            "mode": "offline_processed",
+        ])
     }
 
     private func handleFinish(url: URL, stats: TexturedScanStats) {
@@ -1088,6 +1173,22 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     // keyin ishlaydi. Initial state false — capture boshlanmagan, shutter ▶ play.
     private var isCapturing: Bool = false
 
+    // Phase 7: Save raw mode + offline reprocess.
+    /// Default true: Done → save raw data → exit (no immediate texturing).
+    /// Foydalanuvchi profile'da scan'ni ochib "Process" bosadi → texturing.
+    var savingMode: Bool = true
+    /// Set when VC opens to re-process an already-saved scan. No AR session
+    /// is started; viewDidAppear loads data from SavedScanStorage and runs
+    /// texturing pipeline. onOfflineFinished returns the output URL.
+    var offlineScanId: Int?
+    /// Re-process params (optional, future: Taubin/power/ESRGAN overrides).
+    var offlineParams: [String: String] = [:]
+    /// Called after raw data is saved (savingMode = true flow).
+    var onSavedRaw: ((Int) -> Void)?
+    /// Called after offline processing completes (offlineScanId set).
+    /// Returns: output URL + version number registered in SavedScanStorage.
+    var onOfflineFinished: ((URL, Int) -> Void)?
+
     // Capture state
     private var photoFolder: URL!
     private var captureCount = 0
@@ -1099,7 +1200,9 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     private let minRotationDelta: Float = 0.09    // ~5 degrees
     private let minTimeBetweenCaptures: TimeInterval = 0.20
     private let minRequiredPhotos = 30
-    private let maxAllowedPhotos = 400
+    // Phase 9: silent capture (1920×1440) → har photo ~250 KB, 1000 photo ~250 MB.
+    // Polycam-style continuous scanning uchun 400 → 2000.
+    private let maxAllowedPhotos = 2000
 
     /// ARKit dan har frame uchun camera pose + intrinsics. Capture tugagach
     /// `poses.json` ga yoziladi va serverga foto'lar bilan birga yuboriladi.
@@ -1111,10 +1214,25 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     // Processing state
     private var processingTask: Task<Void, Never>?
     private var isProcessing = false
+    /// Phase 7: offline reprocess — runCustomMeshExport extractAnchorData
+    /// o'rniga shu listni ishlatadi (arView yo'q).
+    fileprivate var offlineAnchorOverride: [AnchorRaw]?
 
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+
+        // Phase 7: Offline reprocess mode — saved scan'ni qayta texturing.
+        // AR session ishga tushirilmaydi, faqat processing overlay ko'rinadi.
+        if let scanId = offlineScanId {
+            DebugLog.log("VC", "viewDidLoad OFFLINE scanId=\(scanId)")
+            setupProcessingOverlay()
+            processingOverlay.isHidden = false
+            processingStatusLabel.text = "Saqlangan ma'lumotlar yuklanmoqda…"
+            return
+        }
+
+        DebugLog.log("VC", "viewDidLoad LIVE")
         setupPhotoFolder()
         setupARView()
         setupCoaching()
@@ -1125,6 +1243,14 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+
+        if let scanId = offlineScanId {
+            DebugLog.log("VC", "viewDidAppear OFFLINE scanId=\(scanId), calling startOfflineProcessing")
+            startOfflineProcessing(scanId: scanId)
+            return
+        }
+
+        DebugLog.log("VC", "viewDidAppear LIVE")
         startSession()
         addBlueOverlayPlane()
     }
@@ -1158,7 +1284,8 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        arView.session.pause()
+        // Phase 7: arView offline reprocess mode'da nil — crashdan saqlanish.
+        arView?.session.pause()
         processingTask?.cancel()
     }
 
@@ -1777,26 +1904,18 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         let limit = uploadMode ? uploadModeMaxPhotos : maxAllowedPhotos
         if captureCount >= limit { return }
 
-        // Frame-based coverage tracking — har 10-chi frame'da ko'ringan anchor'larni
-        // mark qilamiz. Photo capture'sidan mustaqil. ARKit yangi anchor yaratganda,
-        // kamera o'sha joyga qaragan bo'lsa, darrov "captured" bo'lib qoladi.
-        // Faqat capture rejimi faol bo'lganda (isCapturing yoki Manual'da kamida 1 foto).
+        // Phase 9.2: Frame-based coverage O'CHIRILDI — faqat camera qarashidan
+        // anchor "captured" bo'lardi, hatto sharp photo olinmasa ham. Endi
+        // FAQAT sharp (sharpness > 0.2) photo coverage'ni qoplaydi → blue
+        // joylar haqiqatan ham qayta scan kerakligini ko'rsatadi.
         let scanningActive = isCapturing || captureCount > 0
         if scanningActive {
+            // frameVisibilityTick coverage uchun ishlatilmaydi — saqlab qolamiz
+            // boshqa logic uchun (TSDF integration cadence ostida).
             frameVisibilityTick &+= 1
-            if frameVisibilityTick % 10 == 0 {
+            if false {  // disabled — sharpness-only coverage
                 let visIds = computeVisibleAnchorIds(in: frame)
-                var newlyCovered: [UUID] = []
-                for id in visIds {
-                    let prev = anchorCoverage[id] ?? 0
-                    if prev == 0 { newlyCovered.append(id) }
-                    anchorCoverage[id, default: 0] += 1
-                }
-                if !newlyCovered.isEmpty {
-                    DispatchQueue.main.async { [weak self] in
-                        self?.refreshAnchorVisualizations(anchorIds: newlyCovered)
-                    }
-                }
+                _ = visIds
             }
 
             // Phase 4.1: Streaming TSDF integration — har 2-chi frame (30 fps).
@@ -2025,14 +2144,19 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             nil,
         ) else { return }
 
+        // Phase 9.1: Silent capture — captureHighResolutionFrame chaqirilmaydi
+        // (system shutter sound chiqaradi). ARFrame.capturedImage 1920×1440 RGB
+        // pose-accurate (T0 same frame), no async, no sound. Polycam style.
         let opts: [CFString: Any] = [
-            // Hi-res capture overwrite qiladi keyin — bu low-res placeholder.
-            // Agar hi-res fail bo'lsa, low-res 0.95 quality ham ishlatilsa bo'ladi.
-            kCGImageDestinationLossyCompressionQuality: 0.95,
+            kCGImageDestinationLossyCompressionQuality: 0.92,
         ]
         CGImageDestinationAddImage(dest, cgImage, opts as CFDictionary)
         let ok = CGImageDestinationFinalize(dest)
         if !ok { return }
+
+        // Phase 9.2: per-photo sharpness (silent capture'da ham). Atlas baker
+        // view-dep blending + anchor coverage filter uchun.
+        let sharpness = ImageQuality.sharpness(of: cgImage)
 
         // LiDAR depth ma'lumotini saqlash — photogrammetry sifatini keskin oshiradi.
         if let depth = frame.smoothedSceneDepth?.depthMap ?? frame.sceneDepth?.depthMap {
@@ -2044,36 +2168,41 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
         // ARKit camera pose + intrinsics — AWS GPU pipeline COLMAP'ni o'tkazib
         // yuboradi. Capture tugagach bitta `poses.json` faylga yoziladi.
-        recordPose(camera: frame.camera, idx: idx, timestamp: frame.timestamp)
+        recordPose(camera: frame.camera, idx: idx, timestamp: frame.timestamp, sharpness: sharpness)
 
         captureCount += 1
 
         // Coverage update — qaysi anchor'lar ushbu photo'da ko'rinadi.
         // Math'ni sync hisoblaymiz, main thread'da mutation + refresh.
         let visibleIds = computeVisibleAnchorIds(in: frame)
+        // Phase 9.2: faqat sharp photo'lar coverage'ga ko'shilsin (sharp > 0.2).
+        // Blurry rasm anchor'ni green qilmasin — user shu joyni qayta scan qilishi kerak.
+        let isSharp = sharpness > 0.20
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.captureHaptic.impactOccurred(intensity: 0.55)  // Polycam-style light tick
+            // Phase 9.1: haptic chiqaramiz silent indicator sifatida (sound o'rniga).
+            self.captureHaptic.impactOccurred(intensity: 0.55)
             self.captureHaptic.prepare()
             self.photoPill.text = "\(self.captureCount) foto"
-            self.updateHintVisibility()  // birinchi fotodan keyin hint yashirin
+            self.updateHintVisibility()
             if self.captureCount < self.minRequiredPhotos {
-                self.statusLabel.text = "Foto: \(self.captureCount) / \(self.minRequiredPhotos) (kamida)"
+                let blurMark = isSharp ? "" : " ⚠️ xira"
+                self.statusLabel.text = "Foto: \(self.captureCount) / \(self.minRequiredPhotos)\(blurMark)"
             } else {
-                self.statusLabel.text = "Foto: \(self.captureCount) — Tugatishni bosing yoki davom eting"
+                let blurMark = isSharp ? "" : " ⚠️ xira — sekinroq harakat"
+                self.statusLabel.text = "Foto: \(self.captureCount)\(blurMark)"
             }
 
-            // Coverage counters + visualization refresh
-            for id in visibleIds {
-                self.anchorCoverage[id, default: 0] += 1
+            // Coverage counters: faqat sharp photo'lar hisobga olinadi.
+            if isSharp {
+                for id in visibleIds {
+                    self.anchorCoverage[id, default: 0] += 1
+                }
             }
             self.refreshAnchorVisualizations(anchorIds: visibleIds)
         }
-
-        // Hi-res 12 MP capture — async, qaytgan ARFrame'ning O'Z pose'i bilan
-        // overwrite qiladi. ~200ms keyin tugaydi, pose-image sinx kafolatlangan.
-        triggerHiResCapture(idx: idx)
+        // Phase 9.1: triggerHiResCapture chaqirilmaydi (sound + async drift).
     }
 
     private func triggerHiResCapture(idx: Int) {
@@ -2280,7 +2409,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     /// ARKit kamera pose + intrinsics + image resolution'ni xotirada to'playdi.
     /// Capture tugagach `writePosesJson()` chaqiriladi va bitta JSON faylga
     /// dump qilinadi. Format AWS GPU pipeline `pose_relay`'iga mos.
-    private func recordPose(camera: ARCamera, idx: Int, timestamp: TimeInterval) {
+    private func recordPose(camera: ARCamera, idx: Int, timestamp: TimeInterval, sharpness: Float = 0.5) {
         // 4x4 transform — ARKit kamerasi koordinatalarida (camera-to-world).
         // Row-major JSON ([4][4]). Frame-based capture'da image va depth
         // bir vaqtda olinadi — alohida `depth_transform_matrix` kerak emas.
@@ -2305,6 +2434,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             "image_width": Int(resolution.width),
             "image_height": Int(resolution.height),
             "timestamp": timestamp,
+            "sharpness": sharpness,  // Phase 9.2: capture-time sharpness
         ]
         capturedPoses.append(entry)
     }
@@ -2405,8 +2535,15 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         review.localProcessingMode = true  // quality picker yashir, "Process" btn
         review.modalPresentationStyle = .overFullScreen
         review.onConfirm = { [weak self] _ in
-            // Process bosildi — lokal pipeline boshlanadi.
-            self?.startProcessing()
+            // Phase 7: savingMode true → raw data save + exit, texturing yo'q
+            // (foydalanuvchi profilda Process bossa to'liq pipeline boshlanadi).
+            // savingMode false → eski flow: startProcessing.
+            guard let self = self else { return }
+            if self.savingMode {
+                self.saveRawDataAndExit()
+            } else {
+                self.startProcessing()
+            }
         }
         review.onRetake = { [weak self] in
             self?.dismiss(animated: true)
@@ -2425,7 +2562,12 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         if isProcessing {
             processingTask?.cancel()
         }
-        cleanupTempFolder()
+        // Phase 7: offline mode'da photoFolder = SavedScanStorage'dagi saqlangan
+        // folder. cleanupTempFolder uni o'chirib yuboradi → data loss! Faqat
+        // live capture flow'da tmp folder cleanup qilamiz.
+        if offlineScanId == nil {
+            cleanupTempFolder()
+        }
         onCancel?()
     }
 
@@ -2504,6 +2646,329 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
     // MARK: - Processing
 
+    // Phase 7.6: Offline TSDF voxel color reconstruction.
+    /// Saqlangan anchors+poses+photos+depths'dan streaming TSDF qurib qaytaradi.
+    /// Atlas baker voxel color fallback uchun ishlatadi → gray patches yo'qoladi.
+    private func buildOfflineVoxelTSDF(
+        anchors: [AnchorRaw],
+        poses: [[String: Any]],
+        photoFolder: URL,
+        progress: ((Float) -> Void)? = nil,
+    ) -> StreamingTSDF? {
+        // 1. Mesh bounding box hisoblash → voxel grid center+extents
+        guard let firstAnchor = anchors.first, !firstAnchor.worldVertices.isEmpty else {
+            return nil
+        }
+        var bMin = firstAnchor.worldVertices[0]
+        var bMax = bMin
+        for anchor in anchors {
+            for v in anchor.worldVertices {
+                bMin = simd_min(bMin, v)
+                bMax = simd_max(bMax, v)
+            }
+        }
+        let center = (bMin + bMax) * 0.5
+        let size = bMax - bMin
+        // Padding: 1m on each side so cameras outside mesh bbox can still see in
+        let extents = SIMD3<Float>(
+            max(4, size.x + 2),
+            max(3, size.y + 2),
+            max(4, size.z + 2),
+        )
+
+        // 2. StreamingTSDF init
+        guard let tsdf = StreamingTSDF(
+            centerWorld: center,
+            extents: extents,
+            voxelSize: 0.05,
+            truncation: 0.12,
+            maxIntegrationDepth: 4.0,
+        ) else {
+            return nil
+        }
+
+        // 3. Iterate poses → integrate har photo
+        let total = poses.count
+        var skippedNoFields = 0
+        for (i, pose) in poses.enumerated() {
+            guard let idx = pose["index"] as? Int,
+                  let tRows = Self.parseFloatMatrix(pose["transform_matrix"], rows: 4, cols: 4),
+                  let kRows = Self.parseFloatMatrix(pose["intrinsics"], rows: 3, cols: 3)
+            else { skippedNoFields += 1; continue }
+            let imgW: Int
+            let imgH: Int
+            if let n = pose["image_width"] as? NSNumber { imgW = n.intValue }
+            else if let i = pose["image_width"] as? Int { imgW = i } else { skippedNoFields += 1; continue }
+            if let n = pose["image_height"] as? NSNumber { imgH = n.intValue }
+            else if let i = pose["image_height"] as? Int { imgH = i } else { skippedNoFields += 1; continue }
+            let imgURL = photoFolder.appendingPathComponent(String(format: "photo_%04d.jpg", idx))
+            let depthURL = photoFolder.appendingPathComponent(String(format: "depth_%04d.bin", idx))
+            guard FileManager.default.fileExists(atPath: imgURL.path),
+                  FileManager.default.fileExists(atPath: depthURL.path)
+            else { continue }
+
+            // Load depth bin (header: Int32 w, Int32 h, then float32 array)
+            guard let depthData = try? Data(contentsOf: depthURL), depthData.count >= 8 else { continue }
+            let dw = Int(depthData.withUnsafeBytes { $0.load(fromByteOffset: 0, as: Int32.self) })
+            let dh = Int(depthData.withUnsafeBytes { $0.load(fromByteOffset: 4, as: Int32.self) })
+            let pixCount = dw * dh
+            guard pixCount > 0, depthData.count >= 8 + pixCount * 4 else { continue }
+            var depth = [Float](repeating: 0, count: pixCount)
+            depth.withUnsafeMutableBufferPointer { buf in
+                depthData.withUnsafeBytes { raw in
+                    let src = raw.baseAddress!.advanced(by: 8).assumingMemoryBound(to: Float.self)
+                    memcpy(buf.baseAddress, src, pixCount * 4)
+                }
+            }
+
+            // Build matrices
+            let t = simd_float4x4(rows: [
+                SIMD4<Float>(tRows[0][0], tRows[0][1], tRows[0][2], tRows[0][3]),
+                SIMD4<Float>(tRows[1][0], tRows[1][1], tRows[1][2], tRows[1][3]),
+                SIMD4<Float>(tRows[2][0], tRows[2][1], tRows[2][2], tRows[2][3]),
+                SIMD4<Float>(tRows[3][0], tRows[3][1], tRows[3][2], tRows[3][3]),
+            ])
+            let k = simd_float3x3(rows: [
+                SIMD3<Float>(kRows[0][0], kRows[0][1], kRows[0][2]),
+                SIMD3<Float>(kRows[1][0], kRows[1][1], kRows[1][2]),
+                SIMD3<Float>(kRows[2][0], kRows[2][1], kRows[2][2]),
+            ])
+
+            tsdf.integrateOffline(
+                depth: depth, depthW: dw, depthH: dh,
+                imageURL: imgURL,
+                cameraTransform: t,
+                intrinsics: k,
+                imageWidth: Float(imgW),
+                imageHeight: Float(imgH),
+            )
+            // Progress har 10 photoda
+            if i % 10 == 0 {
+                progress?(Float(i) / Float(max(total, 1)))
+            }
+        }
+        if skippedNoFields > 0 {
+            NSLog("KADASTR buildOfflineVoxelTSDF: skipped \(skippedNoFields)/\(total) frames due to missing/invalid fields")
+        }
+        progress?(1.0)
+        return tsdf
+    }
+
+    // Phase 7: Save raw data (Done bossa, texturing'siz exit).
+    /// Hi-res photolarni kutadi → poses.json yozadi → anchor mesh'ni serialize
+    /// qiladi → SavedScanStorage'ga ko'chiradi → onSavedRaw chaqiradi.
+    private func saveRawDataAndExit() {
+        if isProcessing { return }
+        isProcessing = true
+        processingOverlay.isHidden = false
+        progressView.progress = 0
+        processingStatusLabel.text = "Hi-res fotolarni saqlash…"
+        DebugLog.log("SAVE", "saveRawDataAndExit started")
+
+        processingTask = Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else { return }
+            // 1. Pending hi-res tugashini kutamiz (max 60s — Done bosildi, lekin
+            //    asinx 12 MP captures hali ham tugamagan bo'lishi mumkin)
+            DebugLog.log("SAVE", "waiting for pending hi-res")
+            await self.waitForPendingHiRes(timeoutSeconds: 60)
+
+            // 2. poses.json yozish (main thread'da capturedPoses access)
+            await MainActor.run {
+                self.writePosesJson()
+                self.processingStatusLabel.text = "ARKit mesh saqlash…"
+                self.progressView.setProgress(0.5, animated: true)
+            }
+
+            // 3. Anchor mesh serialize (main thread'da arView access)
+            let anchorData: [AnchorRaw] = await MainActor.run {
+                Self.extractAnchorData(arView: self.arView)
+            }
+            let serialized = anchorData.map { $0.toSerialized() }
+            let anchorsBin = AnchorSerializer.serialize(serialized)
+            DebugLog.log("SAVE", "anchors: \(anchorData.count), bin size: \(anchorsBin.count)")
+
+            // 4. Photo'larni sanab ko'rish — qancha haqiqatda diskda bor
+            let photoCount = await MainActor.run { self.captureCount }
+            let area = await MainActor.run { self.totalMeshAreaM2 }
+            let srcFolder = await MainActor.run { self.photoFolder! }
+            let actualPhotos = (try? FileManager.default.contentsOfDirectory(
+                at: srcFolder, includingPropertiesForKeys: nil,
+            ))?.filter { $0.pathExtension == "jpg" }.count ?? 0
+            DebugLog.log("SAVE", "photos: counter=\(photoCount), actual=\(actualPhotos), folder=\(srcFolder.path)")
+
+            // 5. SavedScanStorage'ga ko'chirish — actualPhotos ishlatamiz
+            let scanId = SavedScanStorage.saveScan(
+                sourcePhotoFolder: srcFolder,
+                anchorsData: anchorsBin,
+                photoCount: actualPhotos,
+                areaSqm: Double(area),
+            )
+            DebugLog.log("SAVE", "saved as scan #\(scanId)")
+
+            // 6. Cleanup tmp + callback
+            await MainActor.run {
+                self.cleanupTempFolder()
+                self.processingStatusLabel.text = "Saqlandi (#\(scanId))"
+                self.progressView.setProgress(1.0, animated: true)
+                self.onSavedRaw?(scanId)
+            }
+        }
+    }
+
+    // Phase 7: Offline reprocess — saqlangan scan'dan texturing.
+    /// Loads anchors + poses + photos from SavedScanStorage, runs the same
+    /// runCustomMeshExport pipeline, va outputni storage'ga ro'yxatdan
+    /// o'tkazadi. onOfflineFinished(URL, version) chaqiriladi.
+    private func startOfflineProcessing(scanId: Int) {
+        DebugLog.log("OFFLINE", "START scanId=\(scanId), isProcessing=\(isProcessing)")
+        if isProcessing { return }
+        isProcessing = true
+        processingOverlay.isHidden = false
+        progressView.progress = 0
+        processingStatusLabel.text = "Boshlanmoqda…"
+
+        processingTask = Task.detached(priority: .userInitiated) { [weak self] in
+            guard let self = self else {
+                DebugLog.log("OFFLINE", "self deallocated")
+                return
+            }
+            do {
+                DebugLog.log("OFFLINE", "step 1: loading anchors")
+                await MainActor.run {
+                    self.processingStatusLabel.text = "Anchor mesh yuklanmoqda…"
+                    self.progressView.setProgress(0.05, animated: true)
+                }
+                guard let anchorsData = SavedScanStorage.loadAnchorsData(id: scanId) else {
+                    DebugLog.log("OFFLINE", "FAIL: anchors.bin not found for scanId=\(scanId)")
+                    throw NSError(
+                        domain: "OfflineProcess", code: 10,
+                        userInfo: [NSLocalizedDescriptionKey: "Anchor mesh topilmadi"],
+                    )
+                }
+                DebugLog.log("OFFLINE", "anchors.bin size: \(anchorsData.count) bytes")
+
+                let serialized = AnchorSerializer.deserialize(anchorsData)
+                DebugLog.log("OFFLINE", "deserialized \(serialized.count) anchors")
+                let anchors: [AnchorRaw] = serialized.map { AnchorRaw.fromSerialized($0) }
+                guard !anchors.isEmpty else {
+                    DebugLog.log("OFFLINE", "FAIL: empty anchor array")
+                    throw NSError(
+                        domain: "OfflineProcess", code: 11,
+                        userInfo: [NSLocalizedDescriptionKey: "Anchor data bo'sh"],
+                    )
+                }
+                let totalTri = anchors.reduce(0) { $0 + $1.indices.count / 3 }
+                DebugLog.log("OFFLINE", "anchors: \(anchors.count) anchors, \(totalTri) tri")
+
+                DebugLog.log("OFFLINE", "step 2: loading poses.json")
+                let photoFolder = SavedScanStorage.photoFolder(id: scanId)
+                let posesURL = photoFolder.appendingPathComponent("poses.json")
+                guard let data = try? Data(contentsOf: posesURL) else {
+                    DebugLog.log("OFFLINE", "FAIL: poses.json read at \(posesURL.path)")
+                    throw NSError(
+                        domain: "OfflineProcess", code: 12,
+                        userInfo: [NSLocalizedDescriptionKey: "poses.json topilmadi"],
+                    )
+                }
+                guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    DebugLog.log("OFFLINE", "FAIL: poses.json JSON parse")
+                    throw NSError(
+                        domain: "OfflineProcess", code: 12,
+                        userInfo: [NSLocalizedDescriptionKey: "poses.json noto'g'ri JSON"],
+                    )
+                }
+                guard let poses = root["frames"] as? [[String: Any]] else {
+                    DebugLog.log("OFFLINE", "FAIL: poses.json no 'frames' field")
+                    throw NSError(
+                        domain: "OfflineProcess", code: 12,
+                        userInfo: [NSLocalizedDescriptionKey: "poses.json frames yo'q"],
+                    )
+                }
+                DebugLog.log("OFFLINE", "poses loaded: \(poses.count) frames")
+
+                // 3. State'ni inject
+                DebugLog.log("OFFLINE", "step 3: injecting state")
+                await MainActor.run {
+                    self.photoFolder = photoFolder
+                    self.capturedPoses = poses
+                    self.captureCount = poses.count
+                }
+
+                // 3b. Phase 7.6: voxel color reconstruction from saved photos.
+                // Live mode'da streamingTSDF capture vaqtida har frame'da rang
+                // to'playdi. Offline mode'da uni saqlangan photo+depth+pose
+                // dan re-build qilamiz → atlas baker'da voxel fallback ishlaydi
+                // → gray patches yo'qoladi.
+                DebugLog.log("OFFLINE", "step 3b: reconstructing voxel colors from \(poses.count) frames")
+                await MainActor.run {
+                    self.processingStatusLabel.text = "Voxel ranglar tiklanmoqda…"
+                    self.progressView.setProgress(0.05, animated: true)
+                }
+                let tsdfStart = Date()
+                if let voxelTSDF = self.buildOfflineVoxelTSDF(
+                    anchors: anchors,
+                    poses: poses,
+                    photoFolder: photoFolder,
+                    progress: { p in
+                        Task { @MainActor in
+                            self.progressView.setProgress(0.05 + p * 0.10, animated: false)
+                            self.processingStatusLabel.text = "Voxel ranglar: \(Int(p * 100))%"
+                        }
+                    },
+                ) {
+                    let elapsed = Date().timeIntervalSince(tsdfStart)
+                    DebugLog.log("OFFLINE", String(format: "voxel TSDF built in %.1fs (%d frames)", elapsed, voxelTSDF.integratedFrameCount))
+                    await MainActor.run {
+                        self.streamingTSDF = voxelTSDF
+                    }
+                } else {
+                    DebugLog.log("OFFLINE", "voxel TSDF build SKIPPED")
+                }
+
+                let tmpOutput = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("offline_\(scanId)_\(UUID().uuidString).usdz")
+                DebugLog.log("OFFLINE", "step 4: output URL = \(tmpOutput.lastPathComponent)")
+
+                self.offlineAnchorOverride = anchors
+                DebugLog.log("OFFLINE", "step 5: starting runCustomMeshExport")
+
+                try await self.runCustomMeshExport(output: tmpOutput)
+                DebugLog.log("OFFLINE", "step 6: mesh export ✓")
+
+                let params = self.offlineParams
+                guard let version = SavedScanStorage.addOutput(
+                    scanId: scanId, sourceUsdzURL: tmpOutput, params: params,
+                ) else {
+                    DebugLog.log("OFFLINE", "FAIL: addOutput")
+                    throw NSError(
+                        domain: "OfflineProcess", code: 13,
+                        userInfo: [NSLocalizedDescriptionKey: "Output saqlanmadi"],
+                    )
+                }
+                guard let outURL = SavedScanStorage.outputURL(scanId: scanId, version: version) else {
+                    DebugLog.log("OFFLINE", "FAIL: outputURL not found")
+                    throw NSError(
+                        domain: "OfflineProcess", code: 14,
+                        userInfo: [NSLocalizedDescriptionKey: "Output URL topilmadi"],
+                    )
+                }
+                DebugLog.log("OFFLINE", "DONE scanId=\(scanId), v=\(version)")
+                await MainActor.run {
+                    self.onOfflineFinished?(outURL, version)
+                }
+            } catch {
+                if Task.isCancelled {
+                    DebugLog.log("OFFLINE", "cancelled")
+                    return
+                }
+                DebugLog.log("OFFLINE", "EXCEPTION: \(error.localizedDescription)")
+                await MainActor.run {
+                    self.onError?(error)
+                }
+            }
+        }
+    }
+
     private func startProcessing() {
         isProcessing = true
         arView.session.pause()
@@ -2577,17 +3042,30 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     /// USDZ format vertex color qo'llab-quvvatlamaydi — texture image + UV
     /// majburiy. Shu sababli per-anchor texture mapping.
     private func runCustomMeshExport(output: URL) async throws {
+        DebugLog.log("MESH", "runCustomMeshExport ENTER output=\(output.lastPathComponent)")
         await MainActor.run {
             self.processingStatusLabel.text = "Extracting mesh…"
             self.progressView.setProgress(0.10, animated: true)
         }
 
-        // MainActor'da ARMeshAnchor'larni extract qilamiz.
-        let anchorData: [AnchorRaw] = await MainActor.run {
-            Self.extractAnchorData(arView: self.arView)
+        // Phase 7: offline mode'da anchor data oldindan inject qilingan
+        // (saqlangan binary fayldan). Aks holda live ARKit dan extract.
+        DebugLog.log("MESH", "runCustomMeshExport: offlineAnchorOverride.isNil=\(offlineAnchorOverride == nil)")
+        let anchorData: [AnchorRaw]
+        if let injected = offlineAnchorOverride {
+            anchorData = injected
+            DebugLog.log("MESH", "using \(injected.count) injected anchors")
+        } else {
+            anchorData = await MainActor.run {
+                Self.extractAnchorData(arView: self.arView)
+            }
+            DebugLog.log("MESH", "extracted \(anchorData.count) live anchors")
         }
+        DebugLog.log("MESH", "step a: reading poses + folder")
         let poses: [[String: Any]] = await MainActor.run { self.capturedPoses }
+        DebugLog.log("MESH", "poses array size = \(poses.count)")
         let folder: URL = await MainActor.run { self.photoFolder! }
+        DebugLog.log("MESH", "photoFolder = \(folder.lastPathComponent)")
 
         guard !anchorData.isEmpty else {
             throw NSError(
@@ -2598,8 +3076,11 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         }
 
         // Pose'larni structured form'da o'qish.
+        DebugLog.log("MESH", "step b: parseCameras")
         let cameras = Self.parseCameras(poses: poses, folder: folder)
+        DebugLog.log("MESH", "parseCameras → \(cameras.count) cameras")
         guard !cameras.isEmpty else {
+            DebugLog.log("MESH", "FAIL: cameras empty")
             throw NSError(
                 domain: "TexturedScan", code: 102,
                 userInfo: [NSLocalizedDescriptionKey:
@@ -2607,33 +3088,16 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             )
         }
 
-        // Phase 4.1: Loop closure detection (diagnostic only — pose'lar
-        // o'zgartirilmaydi). ARKit pose drift'ni quantify qiladi.
+        // Phase 4.1: Loop closure detection OLIB TASHLANDI.
+        // - Diagnostic only (pose'larni o'zgartirmaydi)
+        // - 24+ photo bilan Vision framework memory'da 1+ GB egallaydi → crash
+        // - Phase 3.2 (Light BA) drift kompensatsiyasi shu ish qilyapti
+        DebugLog.log("MESH", "step c: skipping loop closure detection (was crashing)")
         await MainActor.run {
             self.processingStatusLabel.text = "Refining cameras…"
             self.progressView.setProgress(0.10, animated: true)
         }
-        let poseSamples = cameras.map { cam in
-            PhotoPoseSample(index: cam.index, imageURL: cam.imageURL, pose: cam.transform)
-        }
-        let loopClosures = await PoseRefiner.detectLoopClosures(
-            photos: poseSamples,
-            minIndexGap: 30,
-            maxArkitDistance: 1.5,
-            maxVisualDistance: 1.0,
-            progress: { p, msg in
-                Task { @MainActor in
-                    self.processingStatusLabel.text = msg
-                    self.progressView.setProgress(0.10 + p * 0.10, animated: false)
-                }
-            },
-        )
-        NSLog("KADASTR Phase 4.1 — \(PoseRefiner.driftDiagnostic(loopClosures))")
-        for loop in loopClosures.prefix(10) {
-            NSLog(String(format: "KADASTR loop #%d↔#%d vis=%.2f drift=%.1fcm gap=%d",
-                  loop.photoA, loop.photoB, loop.visualDistance,
-                  loop.arkitPositionDelta * 100, loop.indexGap))
-        }
+        DebugLog.log("MESH", "step d: loop closure skipped")
 
         await MainActor.run {
             self.processingStatusLabel.text =
@@ -2904,6 +3368,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         }
         let refinedPoses: [simd_float4x4]
         if photoSamples.count >= 8 && globalVerts.count > 500 {
+            // Phase 8: ICP progress range widened 0.36→0.55 (uzoq bosqich, 3% emas, 19%)
             refinedPoses = await PoseRefiner.refinePosesViaICP(
                 photos: photoSamples,
                 meshVertices: globalVerts,
@@ -2914,7 +3379,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 progress: { p, msg in
                     Task { @MainActor in
                         self.processingStatusLabel.text = msg
-                        self.progressView.setProgress(0.36 + p * 0.03, animated: false)
+                        self.progressView.setProgress(0.36 + p * 0.19, animated: false)
                     }
                 },
             )
@@ -2940,13 +3405,23 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // 2-3. MetalAtlasBaker — xatlas UV unwrap + Metal compute per-pixel atlas baking.
         //      Patchwork va blur ikkalasini hal qiladi. Polycam darajasiga yaqin.
         await MainActor.run {
-            self.processingStatusLabel.text = "Texturing mesh…"
-            self.progressView.setProgress(0.40, animated: true)
+            self.processingStatusLabel.text = "Texturing — xatlas UV unwrap (uzoq bo'lishi mumkin)…"
+            self.progressView.setProgress(0.55, animated: true)
         }
+
+        // Phase 8 iter5: faqat hi-res cameralarni atlas baker'ga uzatamiz.
+        // Low-res (1920×1440) cameralar `recordPose`'dan kelgan stale ARKit
+        // pose bilan ishlaydi → atlas baker'da ghosting/transparency artifacts.
+        // Hi-res (2016+ width) cameralar `triggerHiResCapture` ichida update
+        // bo'lgan, pose accurate.
+        let hiResThreshold: Float = 2000
+        let hiResCameras = cameras.filter { $0.imageW >= hiResThreshold }
+        let usedCameras = hiResCameras.count >= 30 ? hiResCameras : cameras
+        NSLog("KADASTR atlas bake: \(usedCameras.count)/\(cameras.count) cameras (hi-res filter: w≥\(Int(hiResThreshold)))")
 
         // CameraView → AtlasBakeInputCamera. Depth URL = photo'ning yonida.
         // Phase 3.2: refined pose mavjud bo'lsa, original ARKit pose o'rniga.
-        let bakeCameras: [AtlasBakeInputCamera] = cameras.map { cam in
+        let bakeCameras: [AtlasBakeInputCamera] = usedCameras.map { cam in
             let depthURL = cam.imageURL.deletingLastPathComponent()
                 .appendingPathComponent(String(format: "depth_%04d.bin", cam.index))
             let depthExists = FileManager.default.fileExists(atPath: depthURL.path)
@@ -2987,10 +3462,12 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 cameraBatchSize: 4,              // hi-res 12MP × 4 = ~196 MB per batch
                 downsampleFactor: 1,             // full source (4032×3024 hi-res)
                 voxelColor: voxelVolume,         // Phase 2: gray patches → voxel color
+                useCubeProjectionUV: true,       // Phase 9.4: xatlas o'rniga — fragment yo'q
                 progress: { p, msg in
                     Task { @MainActor in
                         self.processingStatusLabel.text = msg
-                        self.progressView.setProgress(0.40 + p * 0.50, animated: false)
+                        // Phase 8: atlas baking 0.55-0.90 (after ICP).
+                        self.progressView.setProgress(0.55 + p * 0.35, animated: false)
                     }
                 },
             )
@@ -3024,10 +3501,10 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // gray joylar bo'lishi mumkin (texture yo'q joylarda).
         let filteredResult = bakeResult
 
-        // Phase 6.1: Real-ESRGAN super-resolution + deblur. Atlas'dagi blur
-        // (Phase 5 Taubin smoothing va multi-cam blending'dan qolgan) AI bilan
-        // kompensatsiya qilinadi. Tile-by-tile inference Neural Engine'da,
-        // ~16 tile × 500ms = ~8s. Model bundle'da yo'q bo'lsa skip.
+        // Phase 6.1 (iter10): Real-ESRGAN ENDI YOQILGAN.
+        // Rank-3 fix: MLAtlasEnhancer.runSR ichida imageBufferValue nil bo'lsa
+        // multiArrayValue → CGImage manual conversion qilinadi (Phase 6.1a).
+        // Atlas 4096×4096 → 4×4 tile of 512×512 → ESRGAN → 8192×8192 → cap 4096.
         await MainActor.run {
             self.processingStatusLabel.text = "AI super-resolution (Real-ESRGAN)…"
             self.progressView.setProgress(0.91, animated: true)
@@ -3730,6 +4207,25 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         let worldVertices: [SIMD3<Float>]    // world-space (pre-computed)
         let worldNormals: [SIMD3<Float>]     // world-space
         let indices: [UInt32]
+
+        // Phase 7: SerializedAnchor (Codable, SavedScanStorage uchun) konvertorlar.
+        func toSerialized() -> SerializedAnchor {
+            return SerializedAnchor(
+                transform: transform, center: center,
+                vertices: vertices, normals: normals,
+                worldVertices: worldVertices, worldNormals: worldNormals,
+                indices: indices,
+            )
+        }
+
+        static func fromSerialized(_ s: SerializedAnchor) -> AnchorRaw {
+            return AnchorRaw(
+                transform: s.transform, center: s.center,
+                vertices: s.vertices, normals: s.normals,
+                worldVertices: s.worldVertices, worldNormals: s.worldNormals,
+                indices: s.indices,
+            )
+        }
     }
 
     /// Camera frame metadata.
@@ -3825,18 +4321,62 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         return out
     }
 
+    /// Phase 7.6 bugfix: JSON dan re-parse qilinganda `[[Float]]` cast fail
+    /// bo'ladi (JSONSerialization NSNumber+Double saqlaydi). NSNumber-tolerant
+    /// helper.
+    fileprivate static func parseFloatMatrix(_ any: Any?, rows: Int, cols: Int) -> [[Float]]? {
+        guard let outerArr = any as? [Any], outerArr.count == rows else { return nil }
+        var out: [[Float]] = []
+        out.reserveCapacity(rows)
+        for row in outerArr {
+            guard let inner = row as? [Any], inner.count == cols else { return nil }
+            var floatRow: [Float] = []
+            floatRow.reserveCapacity(cols)
+            for v in inner {
+                if let n = v as? NSNumber {
+                    floatRow.append(n.floatValue)
+                } else if let d = v as? Double {
+                    floatRow.append(Float(d))
+                } else if let f = v as? Float {
+                    floatRow.append(f)
+                } else {
+                    return nil
+                }
+            }
+            out.append(floatRow)
+        }
+        return out
+    }
+
     fileprivate static func parseCameras(poses: [[String: Any]], folder: URL) -> [CameraView] {
         var cams: [CameraView] = []
+        var skipReasons: [String: Int] = [:]
         for entry in poses {
-            guard
-                let idx = entry["index"] as? Int,
-                let tRows = entry["transform_matrix"] as? [[Float]], tRows.count == 4,
-                let kRows = entry["intrinsics"] as? [[Float]], kRows.count == 3,
-                let w = entry["image_width"] as? Int,
-                let h = entry["image_height"] as? Int
-            else { continue }
+            guard let idx = entry["index"] as? Int else {
+                skipReasons["no_idx", default: 0] += 1; continue
+            }
+            // Phase 7.6: NSNumber-tolerant matrix parsing
+            guard let tRows = parseFloatMatrix(entry["transform_matrix"], rows: 4, cols: 4) else {
+                skipReasons["bad_transform", default: 0] += 1; continue
+            }
+            guard let kRows = parseFloatMatrix(entry["intrinsics"], rows: 3, cols: 3) else {
+                skipReasons["bad_intrinsics", default: 0] += 1; continue
+            }
+            // image_width/height ham NSNumber bo'lishi mumkin — tolerant cast
+            let w: Int
+            let h: Int
+            if let n = entry["image_width"] as? NSNumber { w = n.intValue }
+            else if let i = entry["image_width"] as? Int { w = i } else {
+                skipReasons["no_width", default: 0] += 1; continue
+            }
+            if let n = entry["image_height"] as? NSNumber { h = n.intValue }
+            else if let i = entry["image_height"] as? Int { h = i } else {
+                skipReasons["no_height", default: 0] += 1; continue
+            }
             let imgURL = folder.appendingPathComponent(String(format: "photo_%04d.jpg", idx))
-            guard FileManager.default.fileExists(atPath: imgURL.path) else { continue }
+            guard FileManager.default.fileExists(atPath: imgURL.path) else {
+                skipReasons["no_photo_file", default: 0] += 1; continue
+            }
             // recordPose row-major: rowI = [col0[I], col1[I], col2[I], col3[I]]
             // simd_float4x4 columns-major — har row mat'ning row sifatida ishlaydi.
             let t = simd_float4x4(rows: [
@@ -3848,7 +4388,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             // Depth uchun alohida pose (low-res frame'da olingan). Agar yo'q bo'lsa
             // (eski format) — image transform'ni ishlatamiz (backward compat).
             let depthT: simd_float4x4
-            if let dRows = entry["depth_transform_matrix"] as? [[Float]], dRows.count == 4 {
+            if let dRows = parseFloatMatrix(entry["depth_transform_matrix"], rows: 4, cols: 4) {
                 depthT = simd_float4x4(rows: [
                     SIMD4<Float>(dRows[0][0], dRows[0][1], dRows[0][2], dRows[0][3]),
                     SIMD4<Float>(dRows[1][0], dRows[1][1], dRows[1][2], dRows[1][3]),
@@ -3912,6 +4452,10 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 depthMap: depthMap, depthW: depthW, depthH: depthH,
                 sharpness: sharp,
             ))
+        }
+        // Phase 7.6: skip diagnostic
+        if !skipReasons.isEmpty {
+            NSLog("KADASTR parseCameras skipped: \(skipReasons), kept \(cams.count)/\(poses.count)")
         }
         return cams
     }

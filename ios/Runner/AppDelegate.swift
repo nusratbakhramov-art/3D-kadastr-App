@@ -13,6 +13,16 @@ import RoomPlan
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
 
+    // Phase 8.1: Auto-process scan from env var (simulator iteration uchun).
+    // Misol: xcrun simctl launch booted uz.kadastr.kadastr --setenv KADASTR_AUTO_PROCESS=3 \
+    //              --setenv KADASTR_AUTO_OUT=/tmp/result.usdz
+    if #available(iOS 17.0, *), let scanIdStr = ProcessInfo.processInfo.environment["KADASTR_AUTO_PROCESS"],
+       let scanId = Int(scanIdStr) {
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        AutoProcessRunner.run(scanId: scanId)
+      }
+    }
+
     if let controller = window?.rootViewController as? FlutterViewController {
       let probeChannel = FlutterMethodChannel(
         name: "kadastr/scan_capability",
@@ -183,6 +193,136 @@ import RoomPlan
             from: controller,
             result: result,
           )
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      // Phase 7: Saved raw scans API — Documents/saved_scans/ dagi raw data
+      // (photos, depth, poses, anchors) va outputs (USDZ history).
+      let savedScansChannel = FlutterMethodChannel(
+        name: "kadastr/saved_scans",
+        binaryMessenger: controller.binaryMessenger
+      )
+      savedScansChannel.setMethodCallHandler { [weak controller] call, result in
+        switch call.method {
+        case "list":
+          let scans = SavedScanStorage.list()
+          let json: [[String: Any]] = scans.map { e in
+            [
+              "id": e.id,
+              "name": e.name,
+              "createdAt": e.createdAt,
+              "photoCount": e.photoCount,
+              "areaSqm": e.areaSqm,
+              "outputs": e.outputs.map { o -> [String: Any] in
+                return [
+                  "version": o.version,
+                  "fileName": o.fileName,
+                  "createdAt": o.createdAt,
+                  "sizeBytes": o.sizeBytes,
+                  "params": o.params,
+                ]
+              },
+            ]
+          }
+          result(json)
+
+        case "get":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int else {
+            result(FlutterError(code: "ARGS", message: "id kerak", details: nil))
+            return
+          }
+          guard let entry = SavedScanStorage.get(id: id) else {
+            result(nil); return
+          }
+          result([
+            "id": entry.id,
+            "name": entry.name,
+            "createdAt": entry.createdAt,
+            "photoCount": entry.photoCount,
+            "areaSqm": entry.areaSqm,
+            "outputs": entry.outputs.map { o -> [String: Any] in
+              return [
+                "version": o.version,
+                "fileName": o.fileName,
+                "createdAt": o.createdAt,
+                "sizeBytes": o.sizeBytes,
+                "params": o.params,
+              ]
+            },
+          ])
+
+        case "process":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int else {
+            result(FlutterError(code: "ARGS", message: "id kerak", details: nil))
+            return
+          }
+          let params = (args["params"] as? [String: String]) ?? [:]
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "VC yo'q", details: nil))
+            return
+          }
+          DebugLog.log("APPDELEGATE", "saved_scans/process id=\(id) params=\(params)")
+          if #available(iOS 17.0, *) {
+            TexturedScanCoordinator.shared.processSavedScan(
+              scanId: id, params: params, from: controller, result: result,
+            )
+          } else {
+            result(FlutterError(code: "UNSUPPORTED", message: "iOS 17+ kerak", details: nil))
+          }
+
+        case "readDebugLog":
+          // Debug log fayl mazmunini qaytaradi (Mac'ga pull qilish uchun).
+          let url = DebugLog.logURL
+          if let data = try? Data(contentsOf: url),
+             let text = String(data: data, encoding: .utf8) {
+            result(text)
+          } else {
+            result("")
+          }
+
+        case "clearDebugLog":
+          DebugLog.reset()
+          result(true)
+
+        case "outputPath":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int,
+                let version = args["version"] as? Int else {
+            result(FlutterError(code: "ARGS", message: "id va version kerak", details: nil))
+            return
+          }
+          result(SavedScanStorage.outputURL(scanId: id, version: version)?.path)
+
+        case "delete":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int else {
+            result(FlutterError(code: "ARGS", message: "id kerak", details: nil))
+            return
+          }
+          result(SavedScanStorage.delete(id: id))
+
+        case "deleteOutput":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int,
+                let version = args["version"] as? Int else {
+            result(FlutterError(code: "ARGS", message: "id va version kerak", details: nil))
+            return
+          }
+          result(SavedScanStorage.deleteOutput(scanId: id, version: version))
+
+        case "rename":
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int,
+                let name = args["name"] as? String else {
+            result(FlutterError(code: "ARGS", message: "id va name kerak", details: nil))
+            return
+          }
+          result(SavedScanStorage.rename(id: id, newName: name))
 
         default:
           result(FlutterMethodNotImplemented)

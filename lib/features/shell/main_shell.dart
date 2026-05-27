@@ -13,7 +13,7 @@ import '../payments/payments_screen.dart';
 import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
-import '../scans/my_scans_screen.dart';
+import '../scans/saved_scans_screen.dart';
 import '../services/screens/ai_scan_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
 import '../services/services_screen.dart';
@@ -142,9 +142,11 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _openScans() async {
+    // Phase 7: SavedScansScreen — raw skanlar + outputs history.
+    // (MyScansScreen eski USDZ-only ekran, hozir foydalanilmaydi.)
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const MyScansScreen()));
+    ).push(MaterialPageRoute<void>(builder: (_) => const SavedScansScreen()));
   }
 
   Future<void> _openPayments() async {

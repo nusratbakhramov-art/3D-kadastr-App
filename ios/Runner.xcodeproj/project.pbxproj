@@ -29,6 +29,10 @@
 		7466B7A4F7B1DBEC90872E7B /* ImageQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */; };
 		887BFDCD711AB83D9C4994C7 /* RealESRGAN.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */; };
 		DF963073C9CE0722E075E6BF /* MLAtlasEnhancer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */; };
+		5475C134280B9D03370FDB78 /* SavedScanStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */; };
+		F8DC9F7558391CB1A830DAB3 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163AE41DB103B31779CDA528 /* DebugLog.swift */; };
+		C48A256C6FDDD6C9B1995FE7 /* AutoProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */; };
+		EE3DEB2DDABF71FA4D3797D3 /* CubeProjectionUV.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */; };
 		C17C222DE5363BF12028B012 /* HybridMeshBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D248C50DFE57C389A949AD /* HybridMeshBuilder.swift */; };
 		C640DB99A9EC41B5149B2D34 /* PoseRefiner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6F616916D4C4B0C8E14AE13 /* PoseRefiner.swift */; };
 		D2522B2E52DC5F6FBB5B0568 /* TSDFReconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F86190F99F40BDF908D4F21 /* TSDFReconstructor.swift */; };
@@ -67,6 +71,10 @@
 		AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageQuality.swift; sourceTree = "<group>"; };
 		F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = "Models/RealESRGAN.mlmodelc"; sourceTree = "<group>"; };
 		C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLAtlasEnhancer.swift; sourceTree = "<group>"; };
+		DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SavedScanStorage.swift; sourceTree = "<group>"; };
+		163AE41DB103B31779CDA528 /* DebugLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
+		444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoProcessRunner.swift; sourceTree = "<group>"; };
+		B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CubeProjectionUV.swift; sourceTree = "<group>"; };
 		1411E667E068CC2A68E4D392 /* xatlas.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = xatlas.h; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
@@ -224,6 +232,10 @@
 				AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */,
 				F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */,
 				C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */,
+				DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */,
+				163AE41DB103B31779CDA528 /* DebugLog.swift */,
+				444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */,
+				B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -459,6 +471,10 @@
 				BA7B0B60052DEC614178159C /* StreamingTSDF.swift in Sources */,
 				7466B7A4F7B1DBEC90872E7B /* ImageQuality.swift in Sources */,
 				DF963073C9CE0722E075E6BF /* MLAtlasEnhancer.swift in Sources */,
+				5475C134280B9D03370FDB78 /* SavedScanStorage.swift in Sources */,
+				F8DC9F7558391CB1A830DAB3 /* DebugLog.swift in Sources */,
+				C48A256C6FDDD6C9B1995FE7 /* AutoProcessRunner.swift in Sources */,
+				EE3DEB2DDABF71FA4D3797D3 /* CubeProjectionUV.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

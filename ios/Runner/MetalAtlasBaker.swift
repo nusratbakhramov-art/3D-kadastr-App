@@ -80,61 +80,89 @@ final class MetalAtlasBaker {
         cameraBatchSize: Int = 16,
         downsampleFactor: Int = 2,  // 1920×1440 → 960×720
         voxelColor: VoxelColorVolume? = nil,  // Variant A Phase 2: voxel color fallback
+        useCubeProjectionUV: Bool = false,  // Phase 9.4: xatlas o'rniga cube UV
         progress: ((Float, String) -> Void)? = nil,
     ) throws -> AtlasBakeResult {
         // ────────────────────────────────────────────────────────────────────
-        // 1. xatlas UV unwrap
+        // 1. UV unwrap — xatlas yoki cube projection
         // ────────────────────────────────────────────────────────────────────
-        progress?(0.0, "xatlas UV unwrap…")
-        let posData = positions.withUnsafeBufferPointer {
-            Data(buffer: UnsafeBufferPointer(start: $0.baseAddress, count: $0.count))
-        }
-        let nrmData = normals.withUnsafeBufferPointer {
-            Data(buffer: UnsafeBufferPointer(start: $0.baseAddress, count: $0.count))
-        }
-        // SIMD3<Float> stride = 16. xatlas C API kutadigan stride = 12 (3 floats).
-        // Pack tightly: rebuild 3-float-packed buffers.
-        let posPacked = packSIMD3(positions)
-        let nrmPacked = packSIMD3(normals)
-        var triFlat: [UInt32] = []
-        triFlat.reserveCapacity(triangles.count * 3)
-        for t in triangles {
-            triFlat.append(t.v0); triFlat.append(t.v1); triFlat.append(t.v2)
-        }
-        let idxData = triFlat.withUnsafeBufferPointer {
-            Data(buffer: UnsafeBufferPointer(start: $0.baseAddress, count: $0.count))
-        }
+        let outPositions: [SIMD3<Float>]
+        let outNormals: [SIMD3<Float>]
+        let outUVs: [SIMD2<Float>]
+        let outIndices: [UInt32]
+        let atlasW: Int
+        let atlasH: Int
 
-        NSLog("KADASTR xatlas input: \(positions.count) vert, \(triangles.count) tri")
-        let xResult: XAtlasResult
-        do {
-            xResult = try XAtlasBridge.unwrapMesh(
-                withPositions: posPacked,
-                normals: nrmPacked,
-                indices: idxData,
-                vertexCount: UInt(positions.count),
-                triangleCount: UInt(triangles.count),
-                atlasResolution: UInt32(atlasResolution),
+        if useCubeProjectionUV {
+            // Phase 9.4: Cube projection — 6 chart only, NO fragment artifacts.
+            progress?(0.0, "Cube projection UV…")
+            NSLog("KADASTR CubeUV input: \(positions.count) vert, \(triangles.count) tri")
+            let result = CubeProjectionUV.unwrap(
+                positions: positions,
+                normals: normals,
+                triangles: triangles,
+                atlasResolution: atlasResolution,
             )
-        } catch let nsErr as NSError {
-            let detail = "code=\(nsErr.code) \(nsErr.localizedDescription) (input: \(positions.count)v/\(triangles.count)t)"
-            NSLog("KADASTR xatlas FAILED: \(detail)")
-            throw AtlasBakeError.xatlasFailed(detail)
+            outPositions = result.positions
+            outNormals = result.normals
+            outUVs = result.uvs
+            outIndices = result.indices
+            atlasW = result.atlasWidth
+            atlasH = result.atlasHeight
+            NSLog("KADASTR CubeUV OK: atlas=\(atlasW)×\(atlasH), \(outPositions.count)v/\(outIndices.count/3)t")
+            progress?(0.10, "Cube UV: \(atlasW)×\(atlasH), \(outPositions.count) vert")
+        } else {
+            // Original: xatlas UV unwrap (chart-based)
+            progress?(0.0, "xatlas UV unwrap…")
+            let posData = positions.withUnsafeBufferPointer {
+                Data(buffer: UnsafeBufferPointer(start: $0.baseAddress, count: $0.count))
+            }
+            let nrmData = normals.withUnsafeBufferPointer {
+                Data(buffer: UnsafeBufferPointer(start: $0.baseAddress, count: $0.count))
+            }
+            let posPacked = packSIMD3(positions)
+            let nrmPacked = packSIMD3(normals)
+            var triFlat: [UInt32] = []
+            triFlat.reserveCapacity(triangles.count * 3)
+            for t in triangles {
+                triFlat.append(t.v0); triFlat.append(t.v1); triFlat.append(t.v2)
+            }
+            let idxData = triFlat.withUnsafeBufferPointer {
+                Data(buffer: UnsafeBufferPointer(start: $0.baseAddress, count: $0.count))
+            }
+
+            NSLog("KADASTR xatlas input: \(positions.count) vert, \(triangles.count) tri")
+            let xResult: XAtlasResult
+            do {
+                xResult = try XAtlasBridge.unwrapMesh(
+                    withPositions: posPacked,
+                    normals: nrmPacked,
+                    indices: idxData,
+                    vertexCount: UInt(positions.count),
+                    triangleCount: UInt(triangles.count),
+                    atlasResolution: UInt32(atlasResolution),
+                )
+            } catch let nsErr as NSError {
+                let detail = "code=\(nsErr.code) \(nsErr.localizedDescription) (input: \(positions.count)v/\(triangles.count)t)"
+                NSLog("KADASTR xatlas FAILED: \(detail)")
+                throw AtlasBakeError.xatlasFailed(detail)
+            }
+            NSLog("KADASTR xatlas OK: atlas=\(xResult.atlasWidth)×\(xResult.atlasHeight), \(xResult.vertexCount)v/\(xResult.indexCount/3)t")
+            _ = posData; _ = nrmData  // silence unused
+
+            let outVC: Int = Int(truncatingIfNeeded: xResult.vertexCount)
+            let outIC: Int = Int(truncatingIfNeeded: xResult.indexCount)
+            atlasW = Int(truncatingIfNeeded: xResult.atlasWidth)
+            atlasH = Int(truncatingIfNeeded: xResult.atlasHeight)
+            progress?(0.10, "Atlas: \(atlasW)×\(atlasH), \(outVC) vert, \(outIC/3) tri")
+
+            outPositions = unpackSIMD3(xResult.positions, count: outVC)
+            outNormals = unpackSIMD3(xResult.normals, count: outVC)
+            outUVs = unpackSIMD2(xResult.uvs, count: outVC)
+            outIndices = unpackUInt32(xResult.indices, count: outIC)
         }
-        NSLog("KADASTR xatlas OK: atlas=\(xResult.atlasWidth)×\(xResult.atlasHeight), \(xResult.vertexCount)v/\(xResult.indexCount/3)t")
-        _ = posData; _ = nrmData  // silence unused
-
-        let outVC: Int = Int(truncatingIfNeeded: xResult.vertexCount)
-        let outIC: Int = Int(truncatingIfNeeded: xResult.indexCount)
-        let atlasW: Int = Int(truncatingIfNeeded: xResult.atlasWidth)
-        let atlasH: Int = Int(truncatingIfNeeded: xResult.atlasHeight)
-        progress?(0.10, "Atlas: \(atlasW)×\(atlasH), \(outVC) vert, \(outIC/3) tri")
-
-        // Unpack output
-        let outPositions = unpackSIMD3(xResult.positions, count: outVC)
-        let outNormals = unpackSIMD3(xResult.normals, count: outVC)
-        let outUVs = unpackSIMD2(xResult.uvs, count: outVC)
-        let outIndices = unpackUInt32(xResult.indices, count: outIC)
+        let outVC = outPositions.count
+        let outIC = outIndices.count
 
         // ────────────────────────────────────────────────────────────────────
         // 2. CPU rasterization → position + normal textures
@@ -422,17 +450,28 @@ final class MetalAtlasBaker {
             cmdBuf.waitUntilCompleted()
         }
 
-        // Phase 5: Atlas Gaussian smoothing O'CHIRILDI — Phase 4'da blur sabab
-        // bo'lgan. Power weighting 5 va sharpness gating multi-view seam'larni
-        // o'zi yumshatadi, Gaussian kerakmas.
-        // _ = smoothState  // unused but kept for future
-
-        // Dilate — Phase 5: 6 → 3 passes (compromise). 2 oldindan kam edi (gap),
-        // 6 atlas bleed sababli textura aralashtirgan. 3 — kichik gap'lar fill +
-        // bleed kontrol.
+        // Phase 8 iter6: Gaussian smoothing 1 iter QAYTARILDI — chart
+        // boundary'larini yumshatish (shattered effect'ni kamaytirish).
         var src = atlasTex
         var dst = dilatedTex
-        for _ in 0..<3 {
+        for _ in 0..<1 {
+            guard let cmdBuf = cmdQueue.makeCommandBuffer(),
+                  let enc = cmdBuf.makeComputeCommandEncoder() else { break }
+            enc.setComputePipelineState(smoothState)
+            enc.setTexture(src, index: 0)
+            enc.setTexture(dst, index: 1)
+            let tgSize = MTLSize(width: 16, height: 16, depth: 1)
+            let tgCount = MTLSize(width: (atlasW + 15) / 16, height: (atlasH + 15) / 16, depth: 1)
+            enc.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
+            enc.endEncoding()
+            cmdBuf.commit()
+            cmdBuf.waitUntilCompleted()
+            swap(&src, &dst)
+        }
+
+        // Dilate — Phase 8 iter6: 3 → 15 passes. Pose drift sabab gray patches
+        // ko'p, qattiq dilate gap'larni neighbor'larga to'ldiradi.
+        for _ in 0..<15 {
             guard let cmdBuf = cmdQueue.makeCommandBuffer(),
                   let enc = cmdBuf.makeComputeCommandEncoder() else { break }
             enc.setComputePipelineState(dilState)

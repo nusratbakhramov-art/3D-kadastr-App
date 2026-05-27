@@ -143,6 +143,63 @@ kernel void integrateDepthColor(
     colorVolume[idx] = float4(newRGB, newCW);
 }
 
+// integrateDepthColorRGB — Phase 7.6 offline reprocess uchun.
+// JPG'dan RGBA texture sifatida yuklanadi (YUV emas). Mantiq aynan
+// integrateDepthColor bilan bir xil, faqat rang sampling RGBA dan to'g'ri.
+kernel void integrateDepthColorRGB(
+    device float  *sdfVolume    [[buffer(0)]],
+    device float  *weightVolume [[buffer(1)]],
+    device float4 *colorVolume  [[buffer(2)]],
+    constant TSDFParams &params [[buffer(3)]],
+    constant TSDFCamera &cam    [[buffer(4)]],
+    texture2d<float, access::sample> depthMap [[texture(0)]],
+    texture2d<float, access::sample> imageRGB [[texture(1)]],
+    uint3 gid [[thread_position_in_grid]]
+) {
+    if (gid.x >= params.gridX || gid.y >= params.gridY || gid.z >= params.gridZ) return;
+
+    float3 origin = float3(params.originX, params.originY, params.originZ);
+    float3 worldPos = origin + (float3(gid) + 0.5) * params.voxelSize;
+
+    float4 camSpace = cam.invTransform * float4(worldPos, 1.0);
+    float depthVoxel = -camSpace.z;
+    if (depthVoxel <= 0.05 || depthVoxel > params.maxIntegrationDepth) return;
+
+    float3 proj = cam.intrinsics * float3(camSpace.x, -camSpace.y, depthVoxel);
+    float pu = proj.x / proj.z;
+    float pv = proj.y / proj.z;
+    if (pu < 0 || pv < 0 || pu >= cam.imageSize.x || pv >= cam.imageSize.y) return;
+
+    constexpr sampler s(coord::normalized, filter::nearest, address::clamp_to_edge);
+    constexpr sampler sl(coord::normalized, filter::linear, address::clamp_to_edge);
+    float u = pu / cam.imageSize.x;
+    float v = pv / cam.imageSize.y;
+    float depthObs = depthMap.sample(s, float2(u, v)).r;
+    if (depthObs <= 0.05) return;
+
+    float sdf = depthObs - depthVoxel;
+    if (sdf < -params.truncation) return;
+    sdf = clamp(sdf, -params.truncation, params.truncation) / params.truncation;
+
+    uint idx = gid.x + gid.y * params.gridX + gid.z * params.gridX * params.gridY;
+    float prevSDF = sdfVolume[idx];
+    float prevW = weightVolume[idx];
+    float newW = prevW + 1.0;
+    sdfVolume[idx] = (prevSDF * prevW + sdf) / newW;
+    weightVolume[idx] = newW;
+
+    if (sdf < -0.85) return;
+
+    float3 rgb = imageRGB.sample(sl, float2(u, v)).rgb;
+    rgb = saturate(rgb);
+
+    float4 prevC = colorVolume[idx];
+    float prevCW = prevC.a;
+    float newCW = prevCW + 1.0;
+    float3 newRGB = (prevC.rgb * prevCW + rgb) / newCW;
+    colorVolume[idx] = float4(newRGB, newCW);
+}
+
 // Optional smoothing kernel — 3x3x3 weighted average (Gaussian-like)
 // Voxel'lar orasidagi shovqinni kamaytirish uchun marching cubes'dan oldin.
 kernel void smoothSDF(

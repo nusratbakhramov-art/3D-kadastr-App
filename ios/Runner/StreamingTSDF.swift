@@ -24,6 +24,8 @@ final class StreamingTSDF {
     private let cmdQueue: MTLCommandQueue
     private let integrateState: MTLComputePipelineState
     private let integrateColorState: MTLComputePipelineState?
+    // Phase 7.6: offline RGB variant — JPG'dan RGBA texture sample qiladi
+    private let integrateColorRGBState: MTLComputePipelineState?
 
     let origin: SIMD3<Float>
     let voxelSize: Float
@@ -86,6 +88,12 @@ final class StreamingTSDF {
             self.integrateColorState = try? device.makeComputePipelineState(function: colorFn)
         } else {
             self.integrateColorState = nil
+        }
+        // Phase 7.6: offline RGB variant
+        if let colorRGBFn = library.makeFunction(name: "integrateDepthColorRGB") {
+            self.integrateColorRGBState = try? device.makeComputePipelineState(function: colorRGBFn)
+        } else {
+            self.integrateColorRGBState = nil
         }
 
         // Texture cache for zero-copy YUV planes
@@ -245,6 +253,194 @@ final class StreamingTSDF {
         // while previous finishes. Light pressure since kernel is fast.
 
         integratedFrameCount += 1
+    }
+
+    // MARK: - Phase 7.6: Offline integration (from saved data)
+
+    /// Saqlangan photo + depth + pose'lardan voxel grid'ga depth+color integrate
+    /// qiladi (offline reprocess mode). Live `integrate(frame:)` o'rniga
+    /// foydalanuvchi profilda Process bossa shu chaqiriladi.
+    ///
+    /// - Parameters:
+    ///   - depth: row-major Float32 array (W×H), meters
+    ///   - depthW, depthH: depth resolution (odatda 256×192)
+    ///   - imageURL: JPG file URL
+    ///   - cameraTransform: camera→world transform (poses.json'dan)
+    ///   - intrinsics: pixel intrinsics scaled to image resolution
+    ///   - imageWidth, imageHeight: image dimensions (Float)
+    func integrateOffline(
+        depth: [Float], depthW: Int, depthH: Int,
+        imageURL: URL,
+        cameraTransform: simd_float4x4,
+        intrinsics: simd_float3x3,
+        imageWidth: Float, imageHeight: Float,
+    ) {
+        // RGB color integration (offline'da YUV o'rniga RGBA texture)
+        guard let colorRGBState = self.integrateColorRGBState else {
+            // Fallback: faqat depth (rang yo'q)
+            integrateOfflineDepthOnly(
+                depth: depth, depthW: depthW, depthH: depthH,
+                cameraTransform: cameraTransform, intrinsics: intrinsics,
+                imageWidth: imageWidth, imageHeight: imageHeight,
+            )
+            return
+        }
+
+        // 1. Depth → texture (R32Float)
+        if depthTexture == nil || self.depthW != depthW || self.depthH != depthH {
+            let desc = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .r32Float, width: depthW, height: depthH, mipmapped: false,
+            )
+            desc.usage = MTLTextureUsage.shaderRead
+            desc.storageMode = MTLStorageMode.shared
+            depthTexture = device.makeTexture(descriptor: desc)
+            self.depthW = depthW
+            self.depthH = depthH
+        }
+        guard let depthTex = depthTexture else { return }
+        depth.withUnsafeBufferPointer { buf in
+            guard let base = buf.baseAddress else { return }
+            depthTex.replace(
+                region: MTLRegionMake2D(0, 0, depthW, depthH),
+                mipmapLevel: 0,
+                withBytes: base,
+                bytesPerRow: depthW * 4,
+            )
+        }
+
+        // 2. Image JPG → RGBA texture
+        let imgW = Int(imageWidth)
+        let imgH = Int(imageHeight)
+        // Downsample for speed (full hi-res not needed for voxel color, 5cm sample)
+        let targetW = min(imgW, 1024)
+        let targetH = max(192, Int(Float(targetW) * Float(imgH) / max(1.0, Float(imgW))))
+        guard let rgbTex = loadImageAsTexture(url: imageURL, width: targetW, height: targetH) else {
+            NSLog("KADASTR offline integrate: image load FAILED \(imageURL.lastPathComponent)")
+            return
+        }
+
+        // 3. Camera params
+        var camLayout = CameraLayout(
+            invTransform: cameraTransform.inverse,
+            intrinsics: intrinsics,
+            imageSize: SIMD2<Float>(imageWidth, imageHeight),
+        )
+        memcpy(cameraBuffer.contents(), &camLayout, MemoryLayout<CameraLayout>.stride)
+
+        // 4. Dispatch
+        guard let cmdBuf = cmdQueue.makeCommandBuffer(),
+              let enc = cmdBuf.makeComputeCommandEncoder() else { return }
+        enc.setComputePipelineState(colorRGBState)
+        enc.setBuffer(sdfBuffer, offset: 0, index: 0)
+        enc.setBuffer(weightBuffer, offset: 0, index: 1)
+        enc.setBuffer(colorBuffer, offset: 0, index: 2)
+        enc.setBuffer(paramsBuffer, offset: 0, index: 3)
+        enc.setBuffer(cameraBuffer, offset: 0, index: 4)
+        enc.setTexture(depthTex, index: 0)
+        enc.setTexture(rgbTex, index: 1)
+
+        let tgSize = MTLSize(width: 4, height: 4, depth: 4)
+        let tgCount = MTLSize(
+            width: (gridX + 3) / 4,
+            height: (gridY + 3) / 4,
+            depth: (gridZ + 3) / 4,
+        )
+        enc.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
+        enc.endEncoding()
+        cmdBuf.commit()
+        cmdBuf.waitUntilCompleted()
+
+        integratedFrameCount += 1
+    }
+
+    /// Fallback: faqat depth integration (rangsiz).
+    private func integrateOfflineDepthOnly(
+        depth: [Float], depthW: Int, depthH: Int,
+        cameraTransform: simd_float4x4,
+        intrinsics: simd_float3x3,
+        imageWidth: Float, imageHeight: Float,
+    ) {
+        if depthTexture == nil || self.depthW != depthW || self.depthH != depthH {
+            let desc = MTLTextureDescriptor.texture2DDescriptor(
+                pixelFormat: .r32Float, width: depthW, height: depthH, mipmapped: false,
+            )
+            desc.usage = MTLTextureUsage.shaderRead
+            desc.storageMode = MTLStorageMode.shared
+            depthTexture = device.makeTexture(descriptor: desc)
+            self.depthW = depthW
+            self.depthH = depthH
+        }
+        guard let depthTex = depthTexture else { return }
+        depth.withUnsafeBufferPointer { buf in
+            guard let base = buf.baseAddress else { return }
+            depthTex.replace(
+                region: MTLRegionMake2D(0, 0, depthW, depthH),
+                mipmapLevel: 0,
+                withBytes: base,
+                bytesPerRow: depthW * 4,
+            )
+        }
+        var camLayout = CameraLayout(
+            invTransform: cameraTransform.inverse,
+            intrinsics: intrinsics,
+            imageSize: SIMD2<Float>(imageWidth, imageHeight),
+        )
+        memcpy(cameraBuffer.contents(), &camLayout, MemoryLayout<CameraLayout>.stride)
+        guard let cmdBuf = cmdQueue.makeCommandBuffer(),
+              let enc = cmdBuf.makeComputeCommandEncoder() else { return }
+        enc.setComputePipelineState(integrateState)
+        enc.setBuffer(sdfBuffer, offset: 0, index: 0)
+        enc.setBuffer(weightBuffer, offset: 0, index: 1)
+        enc.setBuffer(paramsBuffer, offset: 0, index: 2)
+        enc.setBuffer(cameraBuffer, offset: 0, index: 3)
+        enc.setTexture(depthTex, index: 0)
+        let tgSize = MTLSize(width: 4, height: 4, depth: 4)
+        let tgCount = MTLSize(
+            width: (gridX + 3) / 4, height: (gridY + 3) / 4, depth: (gridZ + 3) / 4,
+        )
+        enc.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
+        enc.endEncoding()
+        cmdBuf.commit()
+        cmdBuf.waitUntilCompleted()
+        integratedFrameCount += 1
+    }
+
+    /// JPG fayl → BGRA8 Metal texture (downsampled to width×height).
+    private func loadImageAsTexture(url: URL, width: Int, height: Int) -> MTLTexture? {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil)
+        else { return nil }
+        let cs = CGColorSpaceCreateDeviceRGB()
+        let info = CGImageAlphaInfo.premultipliedLast.rawValue
+            | CGImageByteOrderInfo.order32Big.rawValue
+        let bpr = width * 4
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let ok: Bool = pixels.withUnsafeMutableBufferPointer { buf -> Bool in
+            guard let ctx = CGContext(
+                data: buf.baseAddress, width: width, height: height,
+                bitsPerComponent: 8, bytesPerRow: bpr,
+                space: cs, bitmapInfo: info,
+            ) else { return false }
+            ctx.interpolationQuality = .medium
+            ctx.draw(cg, in: CGRect(x: 0, y: 0, width: width, height: height))
+            return true
+        }
+        guard ok else { return nil }
+        let desc = MTLTextureDescriptor.texture2DDescriptor(
+            pixelFormat: .rgba8Unorm, width: width, height: height, mipmapped: false,
+        )
+        desc.usage = MTLTextureUsage.shaderRead
+        desc.storageMode = MTLStorageMode.shared
+        guard let tex = device.makeTexture(descriptor: desc) else { return nil }
+        pixels.withUnsafeBytes { raw in
+            tex.replace(
+                region: MTLRegionMake2D(0, 0, width, height),
+                mipmapLevel: 0,
+                withBytes: raw.baseAddress!,
+                bytesPerRow: bpr,
+            )
+        }
+        return tex
     }
 
     /// Sample voxel color at a world position (trilinear nearest). Returns nil

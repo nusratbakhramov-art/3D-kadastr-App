@@ -53,12 +53,26 @@ class _AiScanScreenState extends State<AiScanScreen> {
         return;
       }
       setState(() => _state = ScanCardState.done);
-      await RoomPlanScanner.preview(result.filePath);
-      if (!mounted) return;
-      AppToast.success(
-        context,
-        '3D model tayyor — iPhone\'da saqlandi (${(result.fileSize / 1048576).toStringAsFixed(1)} MB)',
-      );
+
+      // Phase 7: saved_raw mode (default) — texturing'siz saqlangan.
+      // Foydalanuvchi profilga kirib qayta ishlash tugmasini bosadi.
+      if (result.isSavedRaw) {
+        AppToast.success(
+          context,
+          'Skan saqlandi (#${result.savedScanId}) — Profil → Mening skanlarim',
+        );
+      } else {
+        // Legacy: filePath bilan kelgan (offline_processed yoki eski flow).
+        final path = result.filePath;
+        if (path != null && path.isNotEmpty) {
+          await RoomPlanScanner.preview(path);
+          if (!mounted) return;
+          AppToast.success(
+            context,
+            '3D model tayyor — iPhone\'da saqlandi (${(result.fileSize / 1048576).toStringAsFixed(1)} MB)',
+          );
+        }
+      }
     } on RoomPlanScannerException catch (e) {
       if (!mounted) return;
       setState(() => _state = ScanCardState.idle);
