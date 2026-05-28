@@ -141,6 +141,7 @@ import RoomPlan
           }
           let provider = (args["provider"] as? String) ?? "local_mac"
           let algorithm = (args["algorithm"] as? String) ?? "3dgs"
+          let quality = (args["quality"] as? String) ?? "balanced"
           if #available(iOS 17.0, *) {
             HybridUploadCoordinator.shared.start(
               from: controller,
@@ -148,6 +149,7 @@ import RoomPlan
               authToken: token,
               provider: provider,
               algorithm: algorithm,
+              quality: quality,
               result: result,
             )
           } else {

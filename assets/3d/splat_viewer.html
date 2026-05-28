@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>3D Skan</title>
+    <style>
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        html, body { margin: 0; padding: 0; overflow: hidden; background: #1a1a1a; height: 100%; width: 100%; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif; color: white; }
+        canvas { display: block; touch-action: none; }
+        #viewer { position: fixed; top: 0; left: 0; right: 0; bottom: 0; }
+
+        .overlay {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center; pointer-events: none;
+        }
+        #loading { display: block; }
+        #loading .spinner {
+            width: 48px; height: 48px; margin: 0 auto 16px;
+            border: 3px solid rgba(255,255,255,0.2);
+            border-top-color: #fff; border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #loading .progress { font-size: 14px; opacity: 0.8; }
+        #loading .progress-bar {
+            margin-top: 12px; width: 200px; height: 4px;
+            background: rgba(255,255,255,0.12); border-radius: 2px; overflow: hidden;
+        }
+        #loading .progress-fill {
+            height: 100%; width: 0%; background: #fff;
+            transition: width 0.3s ease;
+        }
+
+        #error { display: none; color: #ff6b6b; padding: 20px; max-width: 80vw; line-height: 1.4; }
+
+        .hint {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            color: white; padding: 10px 18px; border-radius: 999px;
+            font-size: 13px; opacity: 0; transition: opacity 0.3s;
+            pointer-events: none; white-space: nowrap;
+        }
+        .hint.visible { opacity: 1; }
+    </style>
+</head>
+<body>
+    <div id="viewer"></div>
+
+    <div id="loading" class="overlay">
+        <div class="spinner"></div>
+        <div class="progress"><span id="progress-text">Yuklanmoqda...</span></div>
+        <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+    </div>
+
+    <div id="error" class="overlay"></div>
+
+    <div id="hint" class="hint">Bir barmoq — aylantirish · Ikki barmoq — masshtablash</div>
+
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+        "@mkkellogg/gaussian-splats-3d": "https://cdn.jsdelivr.net/npm/@mkkellogg/gaussian-splats-3d@0.4.7/build/gaussian-splats-3d.module.js"
+      }
+    }
+    </script>
+
+    <script type="module">
+        // Flutter Dart kodi `?splat=<url>` parametrini beradi.
+        const params = new URLSearchParams(window.location.search);
+        const splatUrl = params.get('splat');
+
+        const $loading = document.getElementById('loading');
+        const $error = document.getElementById('error');
+        const $progressText = document.getElementById('progress-text');
+        const $progressFill = document.getElementById('progress-fill');
+        const $hint = document.getElementById('hint');
+
+        function showError(msg) {
+            $loading.style.display = 'none';
+            $error.style.display = 'block';
+            $error.textContent = msg;
+        }
+
+        function showHint() {
+            $hint.classList.add('visible');
+            setTimeout(() => $hint.classList.remove('visible'), 4000);
+        }
+
+        if (!splatUrl) {
+            showError("URL parametri 'splat' ko'rsatilmagan");
+        } else {
+            (async () => {
+                try {
+                    const { Viewer } = await import('@mkkellogg/gaussian-splats-3d');
+
+                    const viewer = new Viewer({
+                        'rootElement': document.getElementById('viewer'),
+                        'cameraUp': [0, -1, 0],
+                        'initialCameraPosition': [0, 0, 3],
+                        'initialCameraLookAt': [0, 0, 0],
+                        'sharedMemoryForWorkers': false,
+                        'gpuAcceleratedSort': true,
+                        'enableSIMDInSort': true,
+                        'sphericalHarmonicsDegree': 0,
+                        // Mobile uchun yaxshi default sozlamalar
+                        'antialiased': true,
+                        'webXRMode': 0,
+                    });
+
+                    // Format auto-detect: URL kengaytmasidan formatni aniqlash.
+                    // 0 = .splat (antimatter15), 1 = .ksplat (mkkellogg compressed),
+                    // 2 = .ply, 3 = .spz
+                    const lowerUrl = splatUrl.toLowerCase().split('?')[0];
+                    let format = 0;  // default .splat
+                    if (lowerUrl.endsWith('.ksplat')) format = 1;
+                    else if (lowerUrl.endsWith('.ply')) format = 2;
+                    else if (lowerUrl.endsWith('.spz')) format = 3;
+
+                    let lastPct = 0;
+                    await viewer.addSplatScene(splatUrl, {
+                        'progressiveLoad': true,
+                        'format': format,
+                        'onProgress': (percent, message) => {
+                            const pct = Math.round(percent);
+                            if (pct !== lastPct) {
+                                lastPct = pct;
+                                $progressText.textContent = pct + '% yuklandi';
+                                $progressFill.style.width = pct + '%';
+                            }
+                        },
+                    });
+
+                    $loading.style.display = 'none';
+                    viewer.start();
+                    showHint();
+                } catch (err) {
+                    console.error('Splat viewer error:', err);
+                    showError("Xato yuz berdi:\n" + (err.message || err));
+                }
+            })();
+        }
+    </script>
+</body>
+</html>

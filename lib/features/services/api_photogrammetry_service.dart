@@ -33,6 +33,7 @@ class PhotogrammetryJobSummary {
     required this.createdAt,
     this.errorMessage,
     this.downloadUrl,
+    this.resultFormat,
     this.completedAt,
   });
 
@@ -43,6 +44,7 @@ class PhotogrammetryJobSummary {
       photoCount: (json['photo_count'] as num? ?? 0).toInt(),
       errorMessage: json['error_message'] as String?,
       downloadUrl: json['download_url'] as String?,
+      resultFormat: json['result_format'] as String?,
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.now(),
       completedAt: json['completed_at'] == null
@@ -56,12 +58,22 @@ class PhotogrammetryJobSummary {
   final int photoCount;
   final String? errorMessage;
   final String? downloadUrl;
+
+  /// Natija fayl formati — backend'dan keladi:
+  ///   'splat' — yangi Gaussian Splatting (Flutter WebView orqali ko'rsatiladi)
+  ///   'usdz'  — eski mesh (iOS QuickLook orqali ko'rsatiladi)
+  /// `null` bo'lsa default `usdz` deb hisoblash mumkin (backward compat).
+  final String? resultFormat;
   final DateTime createdAt;
   final DateTime? completedAt;
 
   bool get isInProgress =>
       status == 'pending' || status == 'processing';
   bool get isCompleted => status == 'completed';
+  /// Gaussian Splatting natija — `.splat` (uncompressed) yoki
+  /// `.ksplat` (compressed). Flutter WebView viewer ikkalasini ham o'qiydi.
+  bool get isSplat =>
+      resultFormat == 'splat' || resultFormat == 'ksplat';
 }
 
 class PhotogrammetryApiService {

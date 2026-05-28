@@ -14,6 +14,7 @@ import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
 import '../scans/my_scans_screen.dart';
+import '../services/screens/ai_scan_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
@@ -158,8 +159,10 @@ class _MainShellState extends State<MainShell> {
     ).push(MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()));
   }
 
-  void _openAiValuation() {
-    AppToast.success(context, AppLocale.comingSoonLabel(widget.locale));
+  Future<void> _openAiValuation() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const AiScanScreen()));
   }
 
   void _openCalculator() {
