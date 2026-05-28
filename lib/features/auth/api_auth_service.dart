@@ -65,7 +65,7 @@ class ApiAuthService implements AuthService {
     } on AuthException {
       rethrow;
     } catch (e) {
-      throw AuthException("Tarmoq xatosi: $e");
+      throw AuthException("Tarmoq xatosi: $e", cause: e);
     }
   }
 
@@ -94,7 +94,7 @@ class ApiAuthService implements AuthService {
     } on AuthException {
       rethrow;
     } catch (e) {
-      throw AuthException("Tarmoq xatosi: $e");
+      throw AuthException("Tarmoq xatosi: $e", cause: e);
     }
   }
 
@@ -120,7 +120,7 @@ class ApiAuthService implements AuthService {
     } on AuthException {
       rethrow;
     } catch (e) {
-      throw AuthException("Tarmoq xatosi: $e");
+      throw AuthException("Tarmoq xatosi: $e", cause: e);
     }
   }
 
@@ -147,7 +147,7 @@ class ApiAuthService implements AuthService {
     } on AuthException {
       rethrow;
     } catch (e) {
-      throw AuthException("Tarmoq xatosi: $e");
+      throw AuthException("Tarmoq xatosi: $e", cause: e);
     }
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../auth_service.dart';
 import '../widgets/auth_scaffold.dart';
@@ -76,6 +77,13 @@ class _OtpStepState extends State<OtpStep> {
         _boxState = OtpBoxState.error;
         _loading = false;
       });
+      final shown = await NetworkErrorHandler.maybeShow(
+        context,
+        e,
+        onRetry: _verify,
+      );
+      if (!mounted) return;
+      if (shown) return;
       AuthToasts.show(
         context,
         message: e.message,
@@ -97,6 +105,13 @@ class _OtpStepState extends State<OtpStep> {
       );
     } on AuthException catch (e) {
       if (!mounted) return;
+      final shown = await NetworkErrorHandler.maybeShow(
+        context,
+        e,
+        onRetry: _resend,
+      );
+      if (!mounted) return;
+      if (shown) return;
       AuthToasts.show(
         context,
         message: e.message,

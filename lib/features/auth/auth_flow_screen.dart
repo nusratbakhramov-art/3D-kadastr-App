@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/network_error_handler.dart';
 import '../../widgets/app_toast.dart';
 import '../home/user_profile.dart' as home;
 import 'api_auth_service.dart';
@@ -60,6 +61,13 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
+      final shown = await NetworkErrorHandler.maybeShow(
+        context,
+        e,
+        onRetry: () => _handlePhoneSubmit(phone),
+      );
+      if (!mounted) return;
+      if (shown) return;
       AppToast.error(context, e.message);
     }
   }
@@ -125,6 +133,13 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
+      final shown = await NetworkErrorHandler.maybeShow(
+        context,
+        e,
+        onRetry: () => _handleProfileSubmit(profile),
+      );
+      if (!mounted) return;
+      if (shown) return;
       AppToast.error(context, e.message);
     }
   }
