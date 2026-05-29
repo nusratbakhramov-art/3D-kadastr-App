@@ -30,11 +30,31 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   CadastreLookupResult? _info;
   String? _errorMsg;
   int _lookupRequestId = 0;
+  List<String> _recent = const [];
 
   @override
   void initState() {
     super.initState();
     _cadastreController.addListener(_onCadastreChanged);
+    _loadRecent();
+  }
+
+  Future<void> _loadRecent() async {
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null) return;
+    final list = await CadastreApiService().recent(token: token);
+    if (!mounted) return;
+    setState(() => _recent = list);
+  }
+
+  void _useRecent(String number) {
+    _cadastreController.value = TextEditingValue(
+      text: number,
+      selection: TextSelection.collapsed(offset: number.length),
+    );
+    // Filling the field to full length triggers _onCadastreChanged → lookup,
+    // which now hits the backend cache first (instant for recents).
   }
 
   @override
@@ -159,6 +179,20 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                           ),
                           const SizedBox(height: 10),
                           _HelperLine(isDark: isDark),
+                          if (_status == _LoadStatus.idle &&
+                              _recent.isNotEmpty &&
+                              _cadastreController.text.length <
+                                  _fullMaskLength) ...[
+                            const SizedBox(height: 16),
+                            _SectionLabel('Oxirgi qidiruvlar',
+                                color: labelColor),
+                            const SizedBox(height: 10),
+                            _RecentChips(
+                              numbers: _recent,
+                              isDark: isDark,
+                              onTap: _useRecent,
+                            ),
+                          ],
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 240),
                             switchInCurve: Curves.easeOut,
@@ -248,6 +282,70 @@ class _SectionLabel extends StatelessWidget {
         height: 1.25,
         color: color,
       ),
+    );
+  }
+}
+
+/// Quick-pick chips of the user's recent kadastr numbers. Tapping one fills
+/// the field (which then resolves instantly from the backend cache).
+class _RecentChips extends StatelessWidget {
+  const _RecentChips({
+    required this.numbers,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final List<String> numbers;
+  final bool isDark;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final n in numbers)
+          GestureDetector(
+            onTap: () => onTap(n),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF1F2426)
+                    : const Color(0xFFF1F3F5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF2C3133)
+                      : const Color(0xFFE3E5E8),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    size: 14,
+                    color: isDark
+                        ? Colors.white70
+                        : const Color(0xFF8A9097),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    n,
+                    style: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontSize: 13,
+                      color: isDark ? Colors.white : AppColors.textBlack,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

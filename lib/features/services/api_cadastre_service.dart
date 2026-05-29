@@ -8,9 +8,12 @@
 /// cadastre input screens didn't need to be rewritten.
 library;
 
+import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
+import '../auth/auth_http_client.dart';
 import 'data/davreestr_client.dart';
 
 class CadastreLookupResult {
@@ -72,6 +75,29 @@ class CadastreApiService {
       // Only dispose if we created the http client internally — caller-owned
       // clients are the caller's responsibility.
       if (_backendClient == null) scraper.dispose();
+    }
+  }
+
+  /// The user's recently-looked-up kadastr numbers, newest first. Powers the
+  /// quick-pick chips on the entry screen. Fails soft to an empty list.
+  Future<List<String>> recent({required String token}) async {
+    final client = _backendClient ?? AuthHttpClient();
+    try {
+      final uri = Uri.parse('$_backendBaseUrl/davreestr/recent');
+      final res = await client.get(
+        uri,
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return const [];
+      final list = jsonDecode(res.body) as List<dynamic>;
+      return list.map((e) => e.toString()).toList(growable: false);
+    } catch (_) {
+      return const [];
+    } finally {
+      if (_backendClient == null) client.close();
     }
   }
 }

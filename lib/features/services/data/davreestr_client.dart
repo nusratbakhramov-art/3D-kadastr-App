@@ -109,7 +109,21 @@ class DavreestrClient {
     'obyekt turi:',
   ];
 
-  Future<DavreestrLookupResult> lookup(String cadastreNumber) async {
+  /// Resolve a cadastre number to property data.
+  ///
+  /// Fast path: the backend cache (`GET /davreestr/lookup`) — a prior
+  /// successful lookup by ANY user means we skip the slow captcha/OCR/scrape
+  /// entirely. On a miss (or [forceRefresh]) we scrape on-device and upload
+  /// the result so the next lookup is instant.
+  Future<DavreestrLookupResult> lookup(
+    String cadastreNumber, {
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh) {
+      final cached = await _fetchCached(cadastreNumber);
+      if (cached != null) return cached;
+    }
+
     final httpClient = HttpClient()
       ..connectionTimeout = _timeout
       ..idleTimeout = _timeout;
@@ -194,7 +208,10 @@ class DavreestrClient {
         }
 
         // Success path.
-        return _parseResultHtml(searchBody, cadastreNumber);
+        final parsed = _parseResultHtml(searchBody, cadastreNumber);
+        // Cache for next time (fire-and-forget — never block/fail on this).
+        unawaited(_storeCached(parsed));
+        return parsed;
       }
 
       throw DavreestrLookupException(
@@ -217,6 +234,61 @@ class DavreestrClient {
 
   void dispose() {
     _backendClient.close();
+  }
+
+  // ─── Backend lookup cache ───────────────────────────────────────────
+  // Both calls go through AuthHttpClient (auth token attached automatically)
+  // and fail soft: a cache miss/error just means we scrape on-device.
+
+  String get _backendRoot => backendBaseUrl.replaceAll(RegExp(r'/+$'), '');
+
+  Future<DavreestrLookupResult?> _fetchCached(String cadastreNumber) async {
+    try {
+      final uri = Uri.parse(
+        '$_backendRoot/davreestr/lookup'
+        '?cadastre_number=${Uri.encodeQueryComponent(cadastreNumber)}',
+      );
+      final res = await _backendClient
+          .get(uri, headers: {'Accept': 'application/json'})
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return null; // 404 → not cached / stale
+      final j = jsonDecode(res.body) as Map<String, dynamic>;
+      return DavreestrLookupResult(
+        cadastreNumber: (j['cadastre_number'] as String?) ?? cadastreNumber,
+        address: j['address'] as String?,
+        objectTypeHint: j['object_type_hint'] as String?,
+        totalArea: (j['total_area'] as num?)?.toDouble(),
+        livingArea: (j['living_area'] as num?)?.toDouble(),
+        cadastreValue: (j['cadastre_value'] as num?)?.toDouble(),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _storeCached(DavreestrLookupResult r) async {
+    try {
+      final uri = Uri.parse('$_backendRoot/davreestr/lookup');
+      await _backendClient
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({
+              'cadastre_number': r.cadastreNumber,
+              'address': r.address,
+              'object_type_hint': r.objectTypeHint,
+              'total_area': r.totalArea,
+              'living_area': r.livingArea,
+              'cadastre_value': r.cadastreValue,
+            }),
+          )
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // best-effort cache write — ignore failures
+    }
   }
 
   // ─── HTTP helpers ──────────────────────────────────────────────────
