@@ -14,7 +14,6 @@ import 'package:flutter/services.dart';
 
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
-import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../api_ai_valuation_job_service.dart';
@@ -455,14 +454,14 @@ class _ResultView extends StatelessWidget {
     final low = _asDouble(result['range_low']);
     final high = _asDouble(result['range_high']);
     final confidence = _asDouble(result['confidence']) ?? 0.0;
-    final comps = (result['comparables_preview'] as List?) ?? const [];
     final pois = (result['pois'] as Map?)?.cast<String, dynamic>() ?? const {};
-    final method = result['method']?.toString();
-    final compsCount = (result['comparables_count'] as int?) ?? 0;
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+    return Column(
       children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
         const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
@@ -499,34 +498,27 @@ class _ResultView extends StatelessWidget {
           confidence: confidence,
           isDark: isDark,
         ),
-        const SizedBox(height: 18),
-        _MethodCard(
-          method: method,
-          comparablesCount: compsCount,
-          poisCount: pois.values.fold<int>(
-            0,
-            (acc, v) => acc + (v is List ? v.length : 0),
+              // Method/counts block removed per product: no engine name and
+              // no raw comparable counts — just value, confidence, amenities.
+              // Nearby-listings list also stays hidden (low-quality data); the
+              // comparables still feed the estimate server-side.
+              if (pois.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                _SectionTitle('Yaqin atrofdagi obyektlar', isDark: isDark),
+                const SizedBox(height: 8),
+                _PoiSummary(pois: pois, isDark: isDark),
+              ],
+            ],
           ),
-          isDark: isDark,
         ),
-        if (comps.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          _SectionTitle('Yaqin atrofdagi e\'lonlar', isDark: isDark),
-          const SizedBox(height: 8),
-          for (final c in comps.take(6))
-            _ComparableTile(data: c as Map, isDark: isDark),
-        ],
-        if (pois.isNotEmpty) ...[
-          const SizedBox(height: 18),
-          _SectionTitle('Yaqin atrofdagi obyektlar', isDark: isDark),
-          const SizedBox(height: 8),
-          _PoiSummary(pois: pois, isDark: isDark),
-        ],
-        const SizedBox(height: 24),
-        ListingCtaButton(
-          label: 'Asosiy sahifa',
-          enabled: true,
-          onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+        // Fixed bottom CTA — always reachable without scrolling.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: ListingCtaButton(
+            label: 'Asosiy sahifa',
+            enabled: true,
+            onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+          ),
         ),
       ],
     );
@@ -687,114 +679,6 @@ class _ConfidenceBar extends StatelessWidget {
   }
 }
 
-class _MethodCard extends StatelessWidget {
-  const _MethodCard({
-    required this.method,
-    required this.comparablesCount,
-    required this.poisCount,
-    required this.isDark,
-  });
-
-  final String? method;
-  final int comparablesCount;
-  final int poisCount;
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final text = isDark ? Colors.white : AppColors.textBlack;
-    final sub = isDark
-        ? Colors.white.withValues(alpha: 0.6)
-        : const Color(0xFF8A9097);
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (method != null && method!.isNotEmpty) ...[
-            Text(
-              method!,
-              style: TextStyle(
-                fontFamily: 'MTSText',
-                fontSize: 13,
-                height: 1.4,
-                color: text,
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              _Pill(
-                icon: Icons.home_work_outlined,
-                label: '$comparablesCount ta e\'lon',
-                isDark: isDark,
-              ),
-              const SizedBox(width: 8),
-              _Pill(
-                icon: Icons.place_outlined,
-                label: '$poisCount ta obyekt',
-                isDark: isDark,
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // Internal alignment with `sub` palette for cohesion.
-          Text(
-            ' ',
-            style: TextStyle(fontSize: 0, color: sub),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({
-    required this.icon,
-    required this.label,
-    required this.isDark,
-  });
-  final IconData icon;
-  final String label;
-  final bool isDark;
-  @override
-  Widget build(BuildContext context) {
-    final fill =
-        AppColors.splashGreen.withValues(alpha: isDark ? 0.18 : 0.12);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: fill,
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: AppColors.splashGreen, size: 14),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              color: AppColors.splashGreen,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text, {required this.isDark});
   final String text;
@@ -810,90 +694,6 @@ class _SectionTitle extends StatelessWidget {
         color: isDark ? Colors.white : AppColors.textBlack,
       ),
     );
-  }
-}
-
-class _ComparableTile extends StatelessWidget {
-  const _ComparableTile({required this.data, required this.isDark});
-  final Map data;
-  final bool isDark;
-  @override
-  Widget build(BuildContext context) {
-    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final text = isDark ? Colors.white : AppColors.textBlack;
-    final sub = isDark
-        ? Colors.white.withValues(alpha: 0.6)
-        : const Color(0xFF8A9097);
-    final price = (data['price_uzs'] as num?)?.toDouble();
-    final area = (data['area_sqm'] as num?)?.toDouble();
-    final distance = (data['distance_km'] as num?)?.toDouble();
-    final addr = data['address']?.toString();
-    final url = data['url']?.toString();
-
-    return GestureDetector(
-      onTap: url == null ? null : () => _open(context, url),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: fill,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    price == null
-                        ? '—'
-                        : '${_PriceCard._formatUzs(price)} so\'m'
-                            '${area == null ? '' : ' · ${area.toStringAsFixed(0)} m²'}',
-                    style: TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      color: text,
-                    ),
-                  ),
-                  if (addr != null && addr.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      addr,
-                      style: TextStyle(
-                        fontFamily: 'MTSText',
-                        fontSize: 12,
-                        color: sub,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            if (distance != null) ...[
-              const SizedBox(width: 10),
-              Text(
-                '${distance.toStringAsFixed(1)} km',
-                style: TextStyle(
-                  fontFamily: 'MTSText',
-                  fontSize: 12,
-                  color: sub,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _open(BuildContext context, String url) {
-    // Just toast the URL for now — Market detail screen is the natural
-    // landing, but plumbing that is out of scope for this status screen.
-    AppToast.success(context, url);
   }
 }
 
