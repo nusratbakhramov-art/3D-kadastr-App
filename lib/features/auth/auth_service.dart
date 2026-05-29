@@ -1,8 +1,14 @@
 import 'models/user_profile.dart';
 
 class AuthException implements Exception {
-  const AuthException(this.message);
+  const AuthException(this.message, {this.cause});
   final String message;
+
+  /// Original underlying error (e.g. SocketException) when this was thrown
+  /// wrapping a transport-layer failure. UI layers can inspect this to
+  /// distinguish "no internet" from real auth failures.
+  final Object? cause;
+
   @override
   String toString() => 'AuthException: $message';
 }

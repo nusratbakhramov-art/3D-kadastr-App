@@ -44,6 +44,7 @@ class MarketController extends ChangeNotifier {
   String _searchQuery = '';
   MarketFilters _filters = MarketFilters.empty;
   String? _error;
+  Object? _lastErrorObject;
   bool _hasMore = true;
   bool _isLoadingMore = false;
 
@@ -53,6 +54,7 @@ class MarketController extends ChangeNotifier {
   String get searchInput => _searchInput;
   MarketFilters get filters => _filters;
   String? get error => _error;
+  Object? get lastErrorObject => _lastErrorObject;
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
   int get totalCount => _totalCount;
@@ -149,10 +151,11 @@ class MarketController extends ChangeNotifier {
       _totalCount = page.totalCount;
       _isLoadingMore = false;
       _notify();
-    } catch (_) {
+    } catch (e) {
       if (_disposed || token != _requestToken) return;
       _isLoadingMore = false;
       _error = 'Yana yuklashda xatolik.';
+      _lastErrorObject = e;
       _notify();
     }
   }
@@ -186,10 +189,11 @@ class MarketController extends ChangeNotifier {
       _totalCount = page.totalCount;
       _status = MarketStatus.success;
       _notify();
-    } catch (_) {
+    } catch (e) {
       if (_disposed || token != _requestToken) return;
       _status = MarketStatus.error;
       _error = 'Ma\'lumotlarni yuklab bo\'lmadi.';
+      _lastErrorObject = e;
       _notify();
     }
   }

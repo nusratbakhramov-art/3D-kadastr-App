@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/network_error_handler.dart';
 import '../../theme/app_colors.dart';
 import '../settings/settings_state.dart';
 import 'listing_detail_screen.dart';
@@ -52,6 +53,7 @@ class _MarketScreenState extends State<MarketScreen> {
     _scroll = ScrollController()..addListener(_onScroll);
     _searchText = TextEditingController(text: _controller.searchInput);
     _controller.addListener(_syncSearchText);
+    _controller.addListener(_handleControllerError);
     _headerDelegate = _StickyHeaderDelegate(
       height: 60,
       scrolled: _headerScrolled,
@@ -59,6 +61,22 @@ class _MarketScreenState extends State<MarketScreen> {
     );
     // Idempotent — only fetches on the very first open.
     unawaited(_controller.initialize());
+  }
+
+  Object? _lastSeenError;
+  void _handleControllerError() {
+    final err = _controller.lastErrorObject;
+    if (err == null || identical(err, _lastSeenError)) return;
+    _lastSeenError = err;
+    // Only surface the sheet when there's no cached list to show — keeps
+    // background "loadMore" failures silent if user already sees items.
+    if (_controller.items.isNotEmpty) return;
+    if (!mounted) return;
+    NetworkErrorHandler.maybeShow(
+      context,
+      err,
+      onRetry: _controller.retry,
+    );
   }
 
   void _syncSearchText() {
@@ -156,6 +174,7 @@ class _MarketScreenState extends State<MarketScreen> {
     // Do NOT dispose the shared controller — it lives for the app lifetime
     // so data persists across tab switches.
     _controller.removeListener(_syncSearchText);
+    _controller.removeListener(_handleControllerError);
     _scroll
       ..removeListener(_onScroll)
       ..dispose();

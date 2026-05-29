@@ -6,7 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../auth/auth_storage.dart';
-import '../services/api_ai_valuation_service.dart';
+import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_architecture_order_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import 'application_detail_screen.dart';
@@ -186,11 +186,14 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         )
         .catchError((_) => <ApplicationItem>[]);
 
-    final confirmationsFuture = AiValuationApiService()
-        .listConfirmations()
+    // AI Baholash arizalari = async valuation JOBS (`GET /ai-valuations`).
+    // Eski kod `/valuations/ai/confirmations` (admin tasdiqlash arizalari)
+    // ni o'qigan — bu boshqa jadval, shuning uchun oddiy AI baholash hech
+    // qachon ko'rinmasdi. Endi foydalanuvchining baholash job'larini olamiz.
+    final aiJobsFuture = AiValuationJobService()
+        .list(token: token)
         .then(
-          (list) =>
-              list.map(_confirmationToApplicationItem).toList(growable: false),
+          (list) => list.map(_aiJobToApplicationItem).toList(growable: false),
         )
         .catchError((_) => <ApplicationItem>[]);
 
@@ -204,7 +207,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
 
     final results = await Future.wait([
       ordersFuture,
-      confirmationsFuture,
+      aiJobsFuture,
       photogrammetryFuture,
     ]);
     final combined = <ApplicationItem>[
@@ -234,20 +237,21 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     );
   }
 
-  static ApplicationItem _confirmationToApplicationItem(
-    AiConfirmationSummary c,
-  ) {
+  static ApplicationItem _aiJobToApplicationItem(AiJobSummary j) {
+    final hasValue = j.estimatedValue != null;
     return ApplicationItem(
-      id: 'aival_${c.id}',
+      id: 'aival_${j.id}',
       serviceId: 'ai_eval',
       serviceLabel: 'AI Baholash',
-      statusGroup: _confirmationStatusToGroup(c.status),
-      addressLabel: 'Taxminiy qiymat',
-      addressValue: _formatUzs(c.aiEstimatedValue),
+      statusGroup: _aiJobStatusToGroup(j.status),
+      addressLabel: hasValue ? 'Taxminiy qiymat' : 'Kadastr raqami',
+      addressValue: hasValue
+          ? _formatUzs(j.estimatedValue!)
+          : (j.cadastreNumber ?? '—'),
       dateLabel: 'Ariza sanasi',
-      dateValue: _formatDate(c.createdAt),
-      typeLabel: c.finalValue != null ? 'Tasdiqlangan qiymat' : null,
-      typeValue: c.finalValue != null ? _formatUzs(c.finalValue!) : null,
+      dateValue: _formatDate(j.createdAt),
+      typeLabel: hasValue && j.cadastreNumber != null ? 'Kadastr' : null,
+      typeValue: hasValue ? j.cadastreNumber : null,
       timeline: const <ApplicationTimelineStep>[],
     );
   }
@@ -260,10 +264,10 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     };
   }
 
-  static ApplicationStatusGroup _confirmationStatusToGroup(String status) {
-    return switch (status) {
-      'approved' || 'adjusted' => ApplicationStatusGroup.completed,
-      'rejected' => ApplicationStatusGroup.cancelled,
+  static ApplicationStatusGroup _aiJobStatusToGroup(AiJobStatus s) {
+    return switch (s) {
+      AiJobStatus.completed => ApplicationStatusGroup.completed,
+      AiJobStatus.failed => ApplicationStatusGroup.cancelled,
       _ => ApplicationStatusGroup.inProgress,
     };
   }

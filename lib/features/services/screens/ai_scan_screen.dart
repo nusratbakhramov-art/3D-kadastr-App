@@ -266,7 +266,7 @@ class _AiScanScreenState extends State<AiScanScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 4, activeIndex: 0),
+                      child: const StepProgressBar(count: 4, activeIndex: 1),
                     ),
                     Expanded(
                       child: ListView(

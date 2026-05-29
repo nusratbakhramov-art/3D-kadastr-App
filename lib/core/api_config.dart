@@ -9,6 +9,11 @@ class ApiConfig {
   /// API prefix — versioned REST endpoints live here.
   static const String baseUrl = '$serverBaseUrl/api/v1';
 
+  /// Yandex Geocoder API key. Empty by default — the [GeocoderClient]
+  /// then falls back to OpenStreetMap Nominatim (free, works for UZ
+  /// addresses). Drop a real key here when you have one.
+  static const String yandexGeocoderApiKey = '';
+
   /// Resolve a possibly-relative URL returned by the backend (e.g.
   /// `/static/...`) into an absolute URL the device can fetch. Absolute URLs
   /// are returned untouched.
