@@ -22,6 +22,8 @@ import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../../auth/auth_http_client.dart';
+
 /// Successful davreestr.uz lookup. Shape matches the existing
 /// `CadastreLookupResult` so the rest of the app needs no changes.
 class DavreestrLookupResult {
@@ -65,7 +67,7 @@ class DavreestrClient {
           RegExp(r'/+$'),
           '',
         ),
-        _backendClient = backendClient ?? http.Client();
+        _backendClient = backendClient ?? AuthHttpClient();
 
   /// Backend root (e.g. `https://api.3dkadastr.uz/api/v1`) — used only for
   /// the captcha-solve call.
@@ -418,39 +420,61 @@ class DavreestrClient {
       .replaceAll('&gt;', '>')
       .replaceAll('&nbsp;', ' ');
 
+  // davreestr.uz natija sahifasi — server-render qilingan Laravel HTML jadval.
+  // Tuzilishi (2026-05 holatiga ko'ra):
+  //   <tr><td><b>LABEL (m<sup>2</sup>):</b></td>
+  //       <td class="text-right"><span>VALUE</span></td></tr>
+  // Manzil esa alohida: <p class="location-color">VALUE</p>.
+  // Eski parser label'ni to'g'ridan-to'g'ri <td> ichida kutardi va qiymatni
+  // `[^<]+` bilan olardi — `<b>`/`<span>`/`<sup>` o'ramlari tufayli hech narsa
+  // topa olmasdi (barcha maydonlar bo'sh chiqardi).
   static DavreestrLookupResult _parseResultHtml(
     String html,
     String cadastreNumber,
   ) {
-    String? grab(List<String> labels) {
+    // Ko'p qatorli <td> bloklari ishonchli mos kelishi uchun bo'shliqlarni
+    // bitta probelga keltiramiz.
+    final flat = html.replaceAll(RegExp(r'\s+'), ' ');
+
+    String stripTags(String s) => _htmlUnescape(
+          s.replaceAll(RegExp(r'<[^>]+>'), ' '),
+        ).replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    // Jadval qatori: LABEL (ehtimol <b> ichida, ichki <sup> bilan) → keyingi
+    // <td> qiymat katakchasi. Label'dan keyin katakcha yopilishigacha (</td>)
+    // sakraymiz, so'ng qiymat katakchasidagi barcha matnni olamiz.
+    String? grabRow(List<String> labels) {
       for (final label in labels) {
-        final escaped = RegExp.escape(label);
-        // Pattern A: `>LABEL</tag>...<tag>VALUE<`
-        final patternA = RegExp(
-          '(?:$escaped)\\s*[:\\-]?\\s*</[^>]+>\\s*<[^>]+>\\s*([^<]{1,200})\\s*<',
+        final re = RegExp(
+          '${RegExp.escape(label)}.{0,60}?</td>\\s*<td[^>]*>(.*?)</td>',
           caseSensitive: false,
+          dotAll: true,
         );
-        final mA = patternA.firstMatch(html);
-        if (mA != null) {
-          final val = mA.group(1)?.trim();
-          if (val != null && val.isNotEmpty) return val;
-        }
-        // Pattern B: `<td>LABEL</td><td>VALUE</td>`
-        final patternB = RegExp(
-          '<td[^>]*>\\s*$escaped\\s*</td>\\s*<td[^>]*>\\s*([^<]+)\\s*</td>',
-          caseSensitive: false,
-        );
-        final mB = patternB.firstMatch(html);
-        if (mB != null) {
-          final val = mB.group(1)?.trim();
-          if (val != null && val.isNotEmpty) return val;
+        final m = re.firstMatch(flat);
+        if (m != null) {
+          final val = stripTags(m.group(1) ?? '');
+          if (val.isNotEmpty) return val;
         }
       }
       return null;
     }
 
+    // Manzil — <p class="location-color">...</p> ichida.
+    String? grabAddress() {
+      final re = RegExp(
+        r'class="location-color"[^>]*>(.*?)</p>',
+        caseSensitive: false,
+        dotAll: true,
+      );
+      final m = re.firstMatch(flat);
+      if (m == null) return null;
+      final val = stripTags(m.group(1) ?? '');
+      return val.isEmpty ? null : val;
+    }
+
     double? toDecimal(String? s) {
       if (s == null || s.isEmpty) return null;
+      // Birliklarni (so'm, m2, *) tashlab, faqat raqam/ajratgichlarni qoldiramiz.
       final cleaned =
           s.replaceAll(RegExp(r'[^0-9,\.]'), '').replaceAll(',', '.');
       if (cleaned.isEmpty) return null;
@@ -459,13 +483,21 @@ class DavreestrClient {
 
     return DavreestrLookupResult(
       cadastreNumber: cadastreNumber,
-      address: grab(const ['Manzil', 'Address', 'Адрес']),
-      objectTypeHint: grab(const ['Obyekt turi', 'Object type', 'Тип объекта']),
-      totalArea: toDecimal(
-          grab(const ['Umumiy maydon', 'Total area', 'Общая площадь'])),
-      livingArea: toDecimal(
-          grab(const ['Yashash maydoni', 'Living area', 'Жилая площадь'])),
-      cadastreValue: toDecimal(grab(const [
+      address: grabAddress() ?? grabRow(const ['Manzil', 'Address', 'Адрес']),
+      objectTypeHint: grabRow(const ['Obyekt turi', 'Object type', 'Тип объекта']),
+      // "Umumiy foydali maydoni" — bino umumiy foydali maydoni (m2).
+      totalArea: toDecimal(grabRow(const [
+        'Umumiy foydali maydoni',
+        'Umumiy maydon',
+        'Total area',
+        'Общая площадь',
+      ])),
+      livingArea: toDecimal(grabRow(const [
+        'Yashash maydoni',
+        'Living area',
+        'Жилая площадь',
+      ])),
+      cadastreValue: toDecimal(grabRow(const [
         'Kadastr qiymati',
         'Cadastre value',
         'Кадастровая стоимость',
