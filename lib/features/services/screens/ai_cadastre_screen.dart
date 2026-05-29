@@ -514,27 +514,31 @@ class _PropertyInfoCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      '${rows[i].$1}:',
-                      style: TextStyle(
-                        fontFamily: 'MTSText',
-                        fontSize: 14,
-                        height: 1.25,
-                        color: labelColor,
-                      ),
-                    ),
-                  ),
                   Text(
-                    rows[i].$2,
-                    textAlign: TextAlign.right,
+                    '${rows[i].$1}:',
                     style: TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w700,
+                      fontFamily: 'MTSText',
                       fontSize: 14,
                       height: 1.25,
-                      color: valueColor,
+                      color: labelColor,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Qiymat — qolgan joyni egallaydi va uzun matn (masalan to'liq
+                  // manzil) bir necha qatorga o'raladi, satrdan toshib ketmaydi.
+                  Expanded(
+                    child: Text(
+                      rows[i].$2,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        height: 1.25,
+                        color: valueColor,
+                      ),
                     ),
                   ),
                 ],

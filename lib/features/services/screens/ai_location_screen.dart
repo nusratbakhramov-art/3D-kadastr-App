@@ -49,6 +49,10 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
   Timer? _searchDebounce;
   int _searchRequestId = 0;
   bool _searching = false;
+  // True while we programmatically set the search text from a tapped
+  // suggestion — stops the controller listener from re-running the search and
+  // reopening the dropdown (which otherwise forced a second tap).
+  bool _suppressSearch = false;
 
   // Reverse-geocode state.
   String? _addressText;
@@ -81,6 +85,7 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
   // ── Search (autocomplete) ────────────────────────────────────────────
 
   void _onSearchChanged() {
+    if (_suppressSearch) return;
     _searchDebounce?.cancel();
     final q = _searchCtrl.text.trim();
     if (q.length < 3) {
@@ -121,8 +126,20 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
   void _pickSuggestion(GeoSuggestion s) {
     HapticFeedback.selectionClick();
     FocusScope.of(context).unfocus();
+    // Cancel any pending/in-flight autocomplete so a late response can't
+    // repopulate the dropdown after we've made a selection.
+    _searchDebounce?.cancel();
+    _searchRequestId++;
+    // Set the text WITHOUT retriggering the search listener, and place the
+    // caret at the end (avoids the iOS select-all / replace-suggestion glitch
+    // that the bare `.text =` setter caused).
+    _suppressSearch = true;
+    _searchCtrl.value = TextEditingValue(
+      text: s.name,
+      selection: TextSelection.collapsed(offset: s.name.length),
+    );
+    _suppressSearch = false;
     setState(() {
-      _searchCtrl.text = s.name;
       _suggestions = const [];
       _center = LatLng(s.lat, s.lng);
       _addressText = s.description.isEmpty ? s.name : '${s.name}, ${s.description}';

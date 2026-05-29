@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../home/user_profile.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
@@ -44,13 +45,27 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
   @override
   void initState() {
     super.initState();
-    // Pre-fill if user is coming back from a later step.
     final c = widget.bundle.client;
     if (c != null) {
+      // Coming back from a later step — restore what was entered.
       _nameCtrl.text = c.name;
       _stirCtrl.text = c.stir;
-      _phoneCtrl.text = c.phone;
+      _phoneCtrl.text =
+          c.phone.isEmpty ? '' : _formatPhoneForDisplay(c.phone);
       _emailCtrl.text = c.email;
+    } else {
+      // First visit — prefill from the logged-in user's account (editable).
+      // davreestr only exposes the property OWNER's name, not the orderer's
+      // contact details, so Ism/Telefon come from the user's profile instead.
+      // Email isn't collected anywhere in the app, so it stays blank.
+      final p = userProfileNotifier.value;
+      if (p != null) {
+        if (p.name.trim().isNotEmpty) _nameCtrl.text = p.name.trim();
+        final phoneDigits = (p.phone ?? '').replaceAll(RegExp(r'\D'), '');
+        if (phoneDigits.isNotEmpty) {
+          _phoneCtrl.text = _formatPhoneForDisplay(p.phone!);
+        }
+      }
     }
     for (final c in [_nameCtrl, _stirCtrl, _phoneCtrl, _emailCtrl]) {
       c.addListener(_onChanged);
@@ -188,7 +203,7 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                             errorText: _phoneErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel('Email', isDark: isDark),
+                          _FieldLabel('Email (ixtiyoriy)', isDark: isDark),
                           const SizedBox(height: 8),
                           _AppTextField(
                             controller: _emailCtrl,
@@ -250,7 +265,8 @@ String? _validatePhone(String raw) {
 
 String? _validateEmail(String raw) {
   final v = raw.trim();
-  if (v.isEmpty) return 'Email kerak';
+  // Email ixtiyoriy — bo'sh bo'lsa ruxsat. Kiritilgan bo'lsa formatni tekshiramiz.
+  if (v.isEmpty) return null;
   if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
     return 'Email noto\'g\'ri';
   }
@@ -260,6 +276,22 @@ String? _validateEmail(String raw) {
 String _normalizePhone(String raw) {
   final digits = raw.replaceAll(RegExp(r'\D'), '');
   return digits.length == 9 ? '998$digits' : digits;
+}
+
+/// Formats a raw/normalized UZ phone (`998XXXXXXXXX` or 9-digit operator part)
+/// into the `+998 XX XXX-XX-XX` display form used by [_PhoneMaskFormatter], so
+/// programmatic pre-fill matches what the mask would produce on typing.
+String _formatPhoneForDisplay(String raw) {
+  var digits = raw.replaceAll(RegExp(r'\D'), '');
+  if (digits.startsWith('998')) digits = digits.substring(3);
+  if (digits.length > 9) digits = digits.substring(0, 9);
+  final buf = StringBuffer('+998 ');
+  for (var i = 0; i < digits.length; i++) {
+    if (i == 2) buf.write(' ');
+    if (i == 5 || i == 7) buf.write('-');
+    buf.write(digits[i]);
+  }
+  return buf.toString();
 }
 
 // ── UI bits ─────────────────────────────────────────────────────────────
