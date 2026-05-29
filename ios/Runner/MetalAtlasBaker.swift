@@ -198,6 +198,8 @@ final class MetalAtlasBaker {
         guard
             let bakeFunc = library.makeFunction(name: "bakeAtlasBatch"),
             let normFunc = library.makeFunction(name: "normalizeAtlas"),
+            let normBestFunc = library.makeFunction(name: "normalizeBest"),       // Multi-band
+            let combineFunc = library.makeFunction(name: "multiBandCombine"),     // Multi-band
             let dilFunc = library.makeFunction(name: "dilateAtlas"),
             let smoothFunc = library.makeFunction(name: "smoothAtlas")  // Phase 4.3
         else {
@@ -205,6 +207,8 @@ final class MetalAtlasBaker {
         }
         let bakeState = try device.makeComputePipelineState(function: bakeFunc)
         let normState = try device.makeComputePipelineState(function: normFunc)
+        let normBestState = try device.makeComputePipelineState(function: normBestFunc)
+        let combineState = try device.makeComputePipelineState(function: combineFunc)
         let dilState = try device.makeComputePipelineState(function: dilFunc)
         let smoothState = try device.makeComputePipelineState(function: smoothFunc)
         guard let cmdQueue = device.makeCommandQueue() else {
@@ -215,8 +219,11 @@ final class MetalAtlasBaker {
         let pixCount = atlasW * atlasH
         let colorBuf = device.makeBuffer(length: pixCount * 16, options: .storageModeShared)!
         let weightBuf = device.makeBuffer(length: pixCount * 4, options: .storageModeShared)!
+        // Multi-band: best-view accumulator (rgb=bestColor, a=bestScore).
+        let bestBuf = device.makeBuffer(length: pixCount * 16, options: .storageModeShared)!
         memset(colorBuf.contents(), 0, pixCount * 16)
         memset(weightBuf.contents(), 0, pixCount * 4)
+        memset(bestBuf.contents(), 0, pixCount * 16)
 
         // Upload position/normal textures
         let posTexDesc = MTLTextureDescriptor.texture2DDescriptor(
@@ -256,8 +263,15 @@ final class MetalAtlasBaker {
         )
         outTexDesc.usage = MTLTextureUsage([.shaderRead, .shaderWrite])
         outTexDesc.storageMode = MTLStorageMode.shared
-        let atlasTex = device.makeTexture(descriptor: outTexDesc)!
+        let atlasTex = device.makeTexture(descriptor: outTexDesc)!     // AVG (low-freq base)
         let dilatedTex = device.makeTexture(descriptor: outTexDesc)!
+        // Multi-band textures.
+        let bestTex = device.makeTexture(descriptor: outTexDesc)!      // BEST-VIEW (high-freq)
+        let combineTex = device.makeTexture(descriptor: outTexDesc)!   // multi-band output
+        let avgScratchA = device.makeTexture(descriptor: outTexDesc)!  // avg blur ping-pong
+        let avgScratchB = device.makeTexture(descriptor: outTexDesc)!
+        let bestScratchA = device.makeTexture(descriptor: outTexDesc)! // best blur ping-pong
+        let bestScratchB = device.makeTexture(descriptor: outTexDesc)!
 
         // ────────────────────────────────────────────────────────────────────
         // 4. Batched camera processing
@@ -350,7 +364,10 @@ final class MetalAtlasBaker {
                 minCamAlign: 0.05,  // 0.15→0.05: ko'proq kamera contribute qiladi
                 minFaceDot: 0.05,  // 0.18→0.05 (~87°): yon angle'lar ham qabul
                 maxDistance: 8.0,  // 6→8 m: uzoq devor/pol uchun
-                occlusionTolerance: 100.0,  // ~disabled — diagnostic: ko'p gray sabab occlusion emasligini bilish
+                occlusionTolerance: 0.20,  // 0.10→0.20m: 0.10 juda qattiq edi — pose drift
+                // 64mm (~10cm depth xato) tekis yuzalarni noto'g'ri rad etib teshik/voxel
+                // katakchalar berardi. 0.20 o'zini-o'zi to'sishni toleratsiya qiladi, lekin
+                // xalta (>20cm oldinda) hali to'silган deb rad etiladi.
                 pad: 0,
             )
             let paramBuf = device.makeBuffer(bytes: &params, length: MemoryLayout<AtlasParams>.stride, options: .storageModeShared)!
@@ -363,6 +380,7 @@ final class MetalAtlasBaker {
             enc.setBuffer(weightBuf, offset: 0, index: 1)
             enc.setBuffer(camBuf, offset: 0, index: 2)
             enc.setBuffer(paramBuf, offset: 0, index: 3)
+            enc.setBuffer(bestBuf, offset: 0, index: 4)  // Multi-band best accumulator
             enc.setTexture(posTexture, index: 0)
             enc.setTexture(nrmTexture, index: 1)
             enc.setTexture(imgArr, index: 2)
@@ -450,41 +468,77 @@ final class MetalAtlasBaker {
             cmdBuf.waitUntilCompleted()
         }
 
-        // Phase 8 iter6: Gaussian smoothing 1 iter QAYTARILDI — chart
-        // boundary'larini yumshatish (shattered effect'ni kamaytirish).
-        var src = atlasTex
-        var dst = dilatedTex
-        for _ in 0..<1 {
+        // ── Multi-band: BEST-VIEW atlas (yuqori chastota detail manbasi) → bestTex ──
+        do {
             guard let cmdBuf = cmdQueue.makeCommandBuffer(),
-                  let enc = cmdBuf.makeComputeCommandEncoder() else { break }
-            enc.setComputePipelineState(smoothState)
-            enc.setTexture(src, index: 0)
-            enc.setTexture(dst, index: 1)
-            let tgSize = MTLSize(width: 16, height: 16, depth: 1)
-            let tgCount = MTLSize(width: (atlasW + 15) / 16, height: (atlasH + 15) / 16, depth: 1)
-            enc.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
+                  let enc = cmdBuf.makeComputeCommandEncoder() else {
+                throw AtlasBakeError.metalSetup("normalizeBest encoder")
+            }
+            enc.setComputePipelineState(normBestState)
+            enc.setBuffer(bestBuf, offset: 0, index: 0)
+            enc.setBuffer(voxelBufToBind, offset: 0, index: 2)
+            enc.setBuffer(voxelParamsBuf, offset: 0, index: 3)
+            enc.setTexture(posTexture, index: 0)
+            enc.setTexture(bestTex, index: 1)
+            let tg = MTLSize(width: 16, height: 16, depth: 1)
+            let tc = MTLSize(width: (atlasW + 15) / 16, height: (atlasH + 15) / 16, depth: 1)
+            enc.dispatchThreadgroups(tc, threadsPerThreadgroup: tg)
             enc.endEncoding()
             cmdBuf.commit()
             cmdBuf.waitUntilCompleted()
-            swap(&src, &dst)
         }
 
-        // Dilate — Phase 8 iter6: 3 → 15 passes. Pose drift sabab gray patches
-        // ko'p, qattiq dilate gap'larni neighbor'larga to'ldiradi.
-        for _ in 0..<15 {
+        // Single-texture pass helper (smooth/dilate: texture0 → texture1).
+        let tgSize = MTLSize(width: 16, height: 16, depth: 1)
+        let tgCount = MTLSize(width: (atlasW + 15) / 16, height: (atlasH + 15) / 16, depth: 1)
+        let runPass: (MTLComputePipelineState, MTLTexture, MTLTexture) -> Void = { state, inTex, outTex in
+            guard let cb = cmdQueue.makeCommandBuffer(), let e = cb.makeComputeCommandEncoder() else { return }
+            e.setComputePipelineState(state)
+            e.setTexture(inTex, index: 0)
+            e.setTexture(outTex, index: 1)
+            e.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
+            e.endEncoding()
+            cb.commit()
+            cb.waitUntilCompleted()
+        }
+        // Gaussian blur `passes` marta; input preserved; natija tutgan texture'ni qaytaradi.
+        func gaussBlur(_ input: MTLTexture, _ a: MTLTexture, _ b: MTLTexture, _ passes: Int) -> MTLTexture {
+            guard passes > 0 else { return input }
+            runPass(smoothState, input, a)   // pass 1: input → a (input faqat o'qiladi)
+            var s = a, d = b
+            for _ in 1..<passes { runPass(smoothState, s, d); swap(&s, &d) }
+            return s
+        }
+
+        // Multi-band combine: final = blur(avg) + (best − blur(best)).
+        // blur(avg) = seamless past-chastota base; (best − blur(best)) = sharp detail.
+        progress?(0.90, "Multi-band blend…")
+        let blurPasses = 16
+        let avgLow = gaussBlur(atlasTex, avgScratchA, avgScratchB, blurPasses)
+        let bestLow = gaussBlur(bestTex, bestScratchA, bestScratchB, blurPasses)
+        do {
             guard let cmdBuf = cmdQueue.makeCommandBuffer(),
-                  let enc = cmdBuf.makeComputeCommandEncoder() else { break }
-            enc.setComputePipelineState(dilState)
-            enc.setTexture(src, index: 0)
-            enc.setTexture(dst, index: 1)
-            let tgSize = MTLSize(width: 16, height: 16, depth: 1)
-            let tgCount = MTLSize(width: (atlasW + 15) / 16, height: (atlasH + 15) / 16, depth: 1)
+                  let enc = cmdBuf.makeComputeCommandEncoder() else {
+                throw AtlasBakeError.metalSetup("combine encoder")
+            }
+            enc.setComputePipelineState(combineState)
+            enc.setTexture(avgLow, index: 0)
+            enc.setTexture(bestTex, index: 1)   // sharp, preserved
+            enc.setTexture(bestLow, index: 2)
+            enc.setTexture(combineTex, index: 3)
             enc.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
             enc.endEncoding()
             cmdBuf.commit()
             cmdBuf.waitUntilCompleted()
-            swap(&src, &dst)
         }
+
+        // Dilate combine natijasi — cube UV / rasterizatsiya bo'shliqlari va
+        // occlusion teshiklarini sharp qo'shni rang bilan to'ldirish (4→12 pass).
+        // MUHIM: dilate rangli (alpha>0.5) piksellarni TEGMAYDI — faqat bo'sh
+        // joyni to'ldiradi → tiniqlikka zarari yo'q, blur bermaydi.
+        var src = combineTex
+        var dst = dilatedTex
+        for _ in 0..<24 { runPass(dilState, src, dst); swap(&src, &dst) }
         let finalTex = src
 
         // ────────────────────────────────────────────────────────────────────

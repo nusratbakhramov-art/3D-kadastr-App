@@ -39,6 +39,7 @@ kernel void bakeAtlasBatch(
     device float  *weightAccum  [[buffer(1)]],
     constant AtlasCamera *cameras [[buffer(2)]],
     constant AtlasParams &params  [[buffer(3)]],
+    device float4 *bestAccum    [[buffer(4)]],  // Multi-band: rgb=bestColor, a=bestScore
     texture2d<float, access::read> positionTex   [[texture(0)]],
     texture2d<float, access::read> normalTex     [[texture(1)]],
     texture2d_array<float, access::sample> imageArray [[texture(2)]],
@@ -57,8 +58,17 @@ kernel void bakeAtlasBatch(
     constexpr sampler linearSampler(coord::normalized, filter::linear, address::clamp_to_edge);
 
     uint idx = gid.y * params.atlasW + gid.x;
-    float3 colorSum = colorAccum[idx].rgb;
-    float wSum = weightAccum[idx];
+    // Multi-band: ikkala akkumulyatsiya bir vaqtda —
+    //  (1) O'RTACHA (past chastota base, seamless): colorAccum=Σ(c·w), weightAccum=Σw.
+    //      Ko'p kamera o'rtalanadi → exposure/rang silliq, seam yo'q (lekin blur).
+    //  (2) BEST-VIEW (yuqori chastota detail, sharp): bestAccum rgb=eng yaxshi
+    //      kamera rangi, a=eng katta score. Bitta sharp kamera → tiniq detail.
+    // Combine bosqichida: final = blur(avg) + (best − blur(best)).
+    float3 avgSum = colorAccum[idx].rgb;
+    float avgW = weightAccum[idx];
+    float4 bestPrev = bestAccum[idx];
+    float bestScore = bestPrev.a;
+    float3 bestColor = bestPrev.rgb;
 
     for (uint i = 0; i < params.cameraCount; ++i) {
         AtlasCamera cam = cameras[i];
@@ -80,10 +90,15 @@ kernel void bakeAtlasBatch(
         float pv = proj.y / proj.z;
         if (pu < 4 || pu >= cam.imageSize.x - 4 || pv < 4 || pv >= cam.imageSize.y - 4) continue;
 
-        // Depth occlusion check
+        // Depth occlusion — to'liq rad etish O'RNIGA og'ir penalty. Non-occluded
+        // kamera 50x g'olib; lekin agar texel'ni FAQAT occluded kameralar ko'rsa,
+        // eng yaxshi occluded rang olinadi (qora teshik/voxel o'rniga).
         float2 depthUV = float2(pu / cam.imageSize.x, pv / cam.imageSize.y);
         float sampledDepth = depthArray.sample(nearestSampler, depthUV, i).r;
-        if (sampledDepth > 0.05 && depth > sampledDepth + params.occlusionTolerance) continue;
+        float occlPenalty = 1.0;
+        if (sampledDepth > 0.05 && depth > sampledDepth + params.occlusionTolerance) {
+            occlPenalty = 0.02;
+        }
 
         // Sample image (bilinear)
         float2 imgUV = float2(pu / cam.imageSize.x, pv / cam.imageSize.y);
@@ -97,20 +112,28 @@ kernel void bakeAtlasBatch(
         float luma = max(color.r, max(color.g, color.b));
         float glareReduction = 1.0 - 0.7 * smoothstep(0.92, 0.99, luma);
 
-        // Phase 8 iter6: POWER weighting 5 (qaytarish). Power 7 patchwork
-        // artifacts berdi (har piksel boshqa camera tanladi). 5 — balanced.
-        float baseWeight = (camAlign + 0.1) * (faceDot + 0.1) / max(dist * dist, 0.25);
-        baseWeight *= (cam.sharpness + 0.1);
-        baseWeight *= glareReduction;
-        float w2 = baseWeight * baseWeight;
-        float w4 = w2 * w2;
-        float weight = w4 * baseWeight;  // power 5
-        colorSum += color * weight;
-        wSum += weight;
+        // Selection score — qaysi kamera bu nuqtani "eng yaxshi" ko'radi:
+        // face-on (camAlign·faceDot), yaqin (1/dist²), sharp, glare'siz.
+        float score = (camAlign + 0.1) * (faceDot + 0.1) / max(dist * dist, 0.25);
+        score *= (cam.sharpness + 0.1);
+        score *= glareReduction;
+        score *= occlPenalty;  // occluded → 50x kichik, lekin >0 (teshik to'ldiriladi)
+
+        // (1) O'rtacha base uchun — power 2 weight (seamless, exposure averaged).
+        float wBase = score * score;
+        avgSum += color * wBase;
+        avgW += wBase;
+
+        // (2) Best-view detail uchun — eng katta score'li kamerani saqlash (argmax).
+        if (score > bestScore) {
+            bestScore = score;
+            bestColor = color;
+        }
     }
 
-    colorAccum[idx] = float4(colorSum, 0.0);
-    weightAccum[idx] = wSum;
+    colorAccum[idx] = float4(avgSum, 0.0);
+    weightAccum[idx] = avgW;
+    bestAccum[idx] = float4(bestColor, bestScore);
 }
 
 // Voxel grid params (matches StreamingTSDF layout). Used for color fallback.
@@ -118,6 +141,60 @@ struct VoxelParams {
     float originX, originY, originZ, voxelSize;
     uint  gridX, gridY, gridZ, hasVoxelColor;  // hasVoxelColor: 0/1 flag
 };
+
+// Voxel color fallback — TRILINEAR (8-corner) interpolation. Atlas piksel hech
+// qaysi cameradan rang olmaganda StreamingTSDF voxel grid'dan rang oladi.
+// outColor'ga rang yozadi va true qaytaradi; voxel ham bo'sh bo'lsa false.
+static bool sampleVoxelColor(device const float4 *voxelColor,
+                             constant VoxelParams &vparams,
+                             float3 worldPos,
+                             thread float3 &outColor) {
+    if (vparams.hasVoxelColor == 0) return false;
+    float3 origin = float3(vparams.originX, vparams.originY, vparams.originZ);
+    float3 local = (worldPos - origin) / vparams.voxelSize - 0.5;
+    int x0 = int(floor(local.x));
+    int y0 = int(floor(local.y));
+    int z0 = int(floor(local.z));
+    float fx = local.x - float(x0);
+    float fy = local.y - float(y0);
+    float fz = local.z - float(z0);
+
+    float3 colorSum = float3(0.0);
+    float weightSum = 0.0;
+    for (int dz = 0; dz < 2; ++dz) {
+        for (int dy = 0; dy < 2; ++dy) {
+            for (int dx = 0; dx < 2; ++dx) {
+                int vx = x0 + dx;
+                int vy = y0 + dy;
+                int vz = z0 + dz;
+                if (vx < 0 || vx >= int(vparams.gridX) ||
+                    vy < 0 || vy >= int(vparams.gridY) ||
+                    vz < 0 || vz >= int(vparams.gridZ)) continue;
+                uint vidx = uint(vx) + uint(vy) * vparams.gridX + uint(vz) * vparams.gridX * vparams.gridY;
+                float4 vc = voxelColor[vidx];
+                if (vc.a <= 0.5) continue;
+                float wx = (dx == 0) ? (1.0 - fx) : fx;
+                float wy = (dy == 0) ? (1.0 - fy) : fy;
+                float wz = (dz == 0) ? (1.0 - fz) : fz;
+                float w = wx * wy * wz;
+                colorSum += vc.rgb * w;
+                weightSum += w;
+            }
+        }
+    }
+    if (weightSum > 0.05) {
+        float3 c = saturate(colorSum / weightSum);
+        // Voxel TSDF ko'k artefakt (depth edge/noise integration) → neytral kulrang.
+        // Real ssenada to'yingan ko'k yo'q (devor oq, divan jigarrang, pol kulrang),
+        // shuning uchun b>>r,g voxel = artefakt, real rang emas.
+        if (c.b > c.r + 0.12 && c.b > c.g + 0.10) {
+            c = float3(dot(c, float3(0.299, 0.587, 0.114)));
+        }
+        outColor = c;
+        return true;
+    }
+    return false;
+}
 
 // Final normalize: accumulated sums → RGBA8 atlas pixel.
 // Variant A Phase 2 — agar atlas piksel hech qaysi cameradan rang olmagan
@@ -146,60 +223,90 @@ kernel void normalizeAtlas(
 
     float wt = weightAccum[idx];
     if (wt > 0.0001) {
+        // Multi-band: o'rtacha base (past chastota uchun) — Σ(c·w)/Σw. Seamless.
         float3 c = colorAccum[idx].rgb / wt;
         atlasOut.write(float4(saturate(c), 1.0), gid);
         return;
     }
 
-    // Phase 3.1: voxel color fallback with TRILINEAR interpolation.
-    // Nearest sampling → trilinear (8-corner weighted average) silliqroq
-    // textures beradi voxel-fallback regionlarda. Quality close to Polycam
-    // smooth coverage. Sample-or-fail per corner: agar 8 korner'dan birortasi
-    // colored bo'lsa, contribution oladi.
-    if (vparams.hasVoxelColor != 0) {
-        float3 worldPos = posTexel.xyz;
-        float3 origin = float3(vparams.originX, vparams.originY, vparams.originZ);
-        float3 local = (worldPos - origin) / vparams.voxelSize - 0.5;
-        int x0 = int(floor(local.x));
-        int y0 = int(floor(local.y));
-        int z0 = int(floor(local.z));
-        float fx = local.x - float(x0);
-        float fy = local.y - float(y0);
-        float fz = local.z - float(z0);
-
-        float3 colorSum = float3(0.0);
-        float weightSum = 0.0;
-        // 8 corner trilinear weighted accumulation. Faqat colored voxel'lar
-        // (alpha > 0.5) hissa qo'shadi → bo'sh voxel'lar gravity beermaydi.
-        for (int dz = 0; dz < 2; ++dz) {
-            for (int dy = 0; dy < 2; ++dy) {
-                for (int dx = 0; dx < 2; ++dx) {
-                    int vx = x0 + dx;
-                    int vy = y0 + dy;
-                    int vz = z0 + dz;
-                    if (vx < 0 || vx >= int(vparams.gridX) ||
-                        vy < 0 || vy >= int(vparams.gridY) ||
-                        vz < 0 || vz >= int(vparams.gridZ)) continue;
-                    uint vidx = uint(vx) + uint(vy) * vparams.gridX + uint(vz) * vparams.gridX * vparams.gridY;
-                    float4 vc = voxelColor[vidx];
-                    if (vc.a <= 0.5) continue;
-                    float wx = (dx == 0) ? (1.0 - fx) : fx;
-                    float wy = (dy == 0) ? (1.0 - fy) : fy;
-                    float wz = (dz == 0) ? (1.0 - fz) : fz;
-                    float w = wx * wy * wz;
-                    colorSum += vc.rgb * w;
-                    weightSum += w;
-                }
-            }
-        }
-        if (weightSum > 0.05) {
-            atlasOut.write(float4(saturate(colorSum / weightSum), 1.0), gid);
-            return;
-        }
+    // Camera coverage yo'q — voxel color fallback (trilinear).
+    float3 voxColor;
+    if (sampleVoxelColor(voxelColor, vparams, posTexel.xyz, voxColor)) {
+        atlasOut.write(float4(voxColor, 1.0), gid);
+        return;
     }
 
     // Hech narsa topilmadi — kulrang fallback
     atlasOut.write(float4(0.5, 0.5, 0.5, 1.0), gid);
+}
+
+// Multi-band: BEST-VIEW atlas — bestAccum (eng yaxshi kamera rangi) → RGBA8.
+// Yuqori chastota (sharp detail) manbasi. Coverage yo'q joyda voxel fallback.
+kernel void normalizeBest(
+    device const float4 *bestAccum    [[buffer(0)]],  // rgb=color, a=score
+    device const float4 *voxelColor   [[buffer(2)]],
+    constant VoxelParams &vparams     [[buffer(3)]],
+    texture2d<float, access::read>  positionTex [[texture(0)]],
+    texture2d<float, access::write> atlasOut    [[texture(1)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    uint w = atlasOut.get_width();
+    uint h = atlasOut.get_height();
+    if (gid.x >= w || gid.y >= h) return;
+    uint idx = gid.y * w + gid.x;
+
+    float4 posTexel = positionTex.read(gid);
+    if (posTexel.w < 0.5) {
+        atlasOut.write(float4(0.0, 0.0, 0.0, 0.0), gid);
+        return;
+    }
+
+    float4 best = bestAccum[idx];
+    if (best.a > 0.0001) {
+        atlasOut.write(float4(saturate(best.rgb), 1.0), gid);
+        return;
+    }
+
+    float3 voxColor;
+    if (sampleVoxelColor(voxelColor, vparams, posTexel.xyz, voxColor)) {
+        atlasOut.write(float4(voxColor, 1.0), gid);
+        return;
+    }
+    atlasOut.write(float4(0.5, 0.5, 0.5, 1.0), gid);
+}
+
+// Multi-band combine — past chastota (seamless) + yuqori chastota (sharp).
+//   final = blur(avg) + (best − blur(best))
+// blur(avg): exposure/rang silliq base (seam yo'q). (best − blur(best)): faqat
+// yuqori chastota detail (yozuv, plitka chizig'i) — sharp kameradan. best'ning
+// past-chastota seam'i (best − blur(best)) da bekor bo'ladi.
+kernel void multiBandCombine(
+    texture2d<float, access::read> avgLow   [[texture(0)]],  // blur(avg)
+    texture2d<float, access::read> bestTex  [[texture(1)]],  // best (sharp)
+    texture2d<float, access::read> bestLow  [[texture(2)]],  // blur(best)
+    texture2d<float, access::write> outTex  [[texture(3)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    uint w = outTex.get_width();
+    uint h = outTex.get_height();
+    if (gid.x >= w || gid.y >= h) return;
+
+    float4 b = bestTex.read(gid);
+    if (b.a < 0.5) {
+        // Chart tashqarisi — transparent qoldiramiz (dilate keyin to'ldiradi).
+        outTex.write(float4(0.0, 0.0, 0.0, 0.0), gid);
+        return;
+    }
+    float3 a = avgLow.read(gid).rgb;
+    float3 bl = bestLow.read(gid).rgb;
+    float3 high = b.rgb - bl;          // yuqori chastota detail (lumin + chroma)
+    // Chromatik high-freq = turli kamera WB/exposure farqi → rangli seam + ko'k
+    // overshoot. Luminance high-freq = haqiqiy detail (qirra/tekstura). Faqat
+    // luminance'ni to'liq, chroma'ni 0.3x saqlaymiz: seam yo'qoladi, detail qoladi.
+    // (Real ssenada chroma detail kam — devor oq, divan bir xil jigarrang.)
+    float highLum = dot(high, float3(0.299, 0.587, 0.114));
+    float3 final = a + highLum + (high - highLum) * 0.3;
+    outTex.write(float4(saturate(final), 1.0), gid);
 }
 
 // Phase 4.3: Bilateral Gaussian smoothing — atlas pixel'larini qo'shnilar

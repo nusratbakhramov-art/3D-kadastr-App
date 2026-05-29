@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import ARKit
+import SceneKit
 #if canImport(RoomPlan)
 import RoomPlan
 #endif
@@ -255,6 +256,26 @@ import RoomPlan
             },
           ])
 
+        case "viewLidarMesh":
+          // Xom LiDAR mesh (anchors.bin) → flat clay USDZ. Pipeline'siz, tez.
+          // SceneKit viewer bilan ko'rsatamiz (simulatorда ham ishlaydi, AR yo'q).
+          guard let args = call.arguments as? [String: Any],
+                let id = args["id"] as? Int else {
+            result(FlutterError(code: "ARGS", message: "id kerak", details: nil))
+            return
+          }
+          guard let url = LidarMeshExporter.exportRawMesh(scanId: id) else {
+            result(FlutterError(code: "LIDAR_MESH_FAILED", message: "LiDAR mesh topilmadi", details: nil))
+            return
+          }
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "VC yo'q", details: nil))
+            return
+          }
+          let viewer = SceneKitModelViewerController(url: url)
+          viewer.modalPresentationStyle = .fullScreen
+          controller.present(viewer, animated: true) { result(url.path) }
+
         case "process":
           guard let args = call.arguments as? [String: Any],
                 let id = args["id"] as? Int else {
@@ -424,4 +445,129 @@ import RoomPlan
       return partial + String(UnicodeScalar(UInt8(value)))
     }
   }
+}
+
+// MARK: - LidarMeshExporter
+// Xom ARKit LiDAR mesh (anchors.bin) ni hech qanday pipeline'siz (TSDF/clean/
+// taubin/atlas YO'Q) to'g'ridan-to'g'ri flat clay USDZ sifatida eksport qiladi.
+// Foydalanuvchi sensor xom geometriyasini "shunchaki" ko'rishi uchun — tez.
+enum LidarMeshExporter {
+  static func exportRawMesh(scanId: Int) -> URL? {
+    guard let data = SavedScanStorage.loadAnchorsData(id: scanId) else {
+      NSLog("KADASTR LidarMeshExporter: anchors.bin topilmadi scan=\(scanId)")
+      return nil
+    }
+    let anchors = AnchorSerializer.deserialize(data)
+    guard !anchors.isEmpty else {
+      NSLog("KADASTR LidarMeshExporter: 0 anchor")
+      return nil
+    }
+
+    // Barcha anchor world-mesh'larini bitta geometriyaga birlashtirish.
+    var verts: [SIMD3<Float>] = []
+    var norms: [SIMD3<Float>] = []
+    var idxs: [UInt32] = []
+    for a in anchors {
+      let base = UInt32(verts.count)
+      verts.append(contentsOf: a.worldVertices)
+      norms.append(contentsOf: a.worldNormals)
+      for i in a.indices { idxs.append(base + i) }
+    }
+    guard !verts.isEmpty, idxs.count >= 3 else { return nil }
+    NSLog("KADASTR LidarMeshExporter: \(anchors.count) anchor → \(verts.count) vert, \(idxs.count / 3) tri")
+
+    let vData = verts.withUnsafeBufferPointer { Data(buffer: $0) }
+    let nData = norms.withUnsafeBufferPointer { Data(buffer: $0) }
+    let iData = idxs.withUnsafeBufferPointer { Data(buffer: $0) }
+    let vSrc = SCNGeometrySource(
+      data: vData, semantic: .vertex, vectorCount: verts.count,
+      usesFloatComponents: true, componentsPerVector: 3,
+      bytesPerComponent: MemoryLayout<Float>.size, dataOffset: 0,
+      dataStride: MemoryLayout<SIMD3<Float>>.stride,
+    )
+    let nSrc = SCNGeometrySource(
+      data: nData, semantic: .normal, vectorCount: norms.count,
+      usesFloatComponents: true, componentsPerVector: 3,
+      bytesPerComponent: MemoryLayout<Float>.size, dataOffset: 0,
+      dataStride: MemoryLayout<SIMD3<Float>>.stride,
+    )
+    let elem = SCNGeometryElement(
+      data: iData, primitiveType: .triangles,
+      primitiveCount: idxs.count / 3, bytesPerIndex: MemoryLayout<UInt32>.size,
+    )
+    let geom = SCNGeometry(sources: [vSrc, nSrc], elements: [elem])
+    let mat = SCNMaterial()
+    mat.lightingModel = .physicallyBased
+    mat.diffuse.contents = UIColor(white: 0.74, alpha: 1.0)
+    mat.roughness.contents = 0.9
+    mat.metalness.contents = 0.0
+    mat.isDoubleSided = true
+    geom.materials = [mat]
+
+    let scene = SCNScene()
+    scene.rootNode.addChildNode(SCNNode(geometry: geom))
+    let out = FileManager.default.temporaryDirectory
+      .appendingPathComponent("lidar_mesh_\(scanId)_\(UUID().uuidString).usdz")
+    let ok = scene.write(to: out, options: nil, delegate: nil, progressHandler: nil)
+    return ok ? out : nil
+  }
+}
+
+// MARK: - SceneKitModelViewerController
+// USDZ/SCN model'ni SceneKit (SCNView) bilan ko'rsatadi — QLPreviewController
+// dan farqli, SIMULATORda ham ishlaydi (QLPreview USDZ 3D'ni sim'da render
+// qilmaydi). AR yo'q — shunchaki orbit/zoom bilan model.
+final class SceneKitModelViewerController: UIViewController {
+  private let url: URL
+  init(url: URL) { self.url = url; super.init(nibName: nil, bundle: nil) }
+  required init?(coder: NSCoder) { fatalError("init(coder:) ishlatilmaydi") }
+
+  override func viewDidLoad() {
+    super.viewDidLoad()
+    let bg = UIColor(white: 0.13, alpha: 1.0)
+    view.backgroundColor = bg
+
+    let scnView = SCNView(frame: view.bounds)
+    scnView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+    scnView.allowsCameraControl = true            // orbit / pan / zoom
+    scnView.autoenablesDefaultLighting = true     // clay material yoritilsin
+    scnView.antialiasingMode = .multisampling4X
+    scnView.backgroundColor = bg
+    if let scene = try? SCNScene(url: url, options: [.checkConsistency: false]) {
+      scnView.scene = scene
+      // Kamerani mesh bounding box markaziga qaratamiz — xom LiDAR mesh world
+      // koordinatasi origin'dan uzoq bo'lishi mumkin, aks holda bo'sh ko'rinadi.
+      let (minV, maxV) = scene.rootNode.boundingBox
+      let cx = (minV.x + maxV.x) / 2
+      let cy = (minV.y + maxV.y) / 2
+      let cz = (minV.z + maxV.z) / 2
+      let radius = max(maxV.x - minV.x, max(maxV.y - minV.y, maxV.z - minV.z))
+      let camNode = SCNNode()
+      camNode.camera = SCNCamera()
+      camNode.camera!.zNear = 0.01
+      camNode.camera!.zFar = Double(radius) * 12 + 20
+      let d = max(radius, 0.5) * 1.8
+      camNode.position = SCNVector3(cx + d * 0.6, cy + d * 0.5, cz + d * 0.9)
+      camNode.look(at: SCNVector3(cx, cy, cz))
+      scene.rootNode.addChildNode(camNode)
+      scnView.pointOfView = camNode
+    } else {
+      NSLog("KADASTR SceneKitModelViewer: SCNScene yuklanmadi \(url.lastPathComponent)")
+    }
+    scnView.defaultCameraController.interactionMode = .orbitTurntable
+    view.addSubview(scnView)
+
+    let close = UIButton(type: .system)
+    close.setTitle("✕", for: .normal)
+    close.setTitleColor(.white, for: .normal)
+    close.titleLabel?.font = .systemFont(ofSize: 26, weight: .bold)
+    close.backgroundColor = UIColor(white: 0.0, alpha: 0.35)
+    close.layer.cornerRadius = 22
+    close.frame = CGRect(x: view.bounds.width - 60, y: 52, width: 44, height: 44)
+    close.autoresizingMask = [.flexibleLeftMargin, .flexibleBottomMargin]
+    close.addTarget(self, action: #selector(closeTapped), for: .touchUpInside)
+    view.addSubview(close)
+  }
+
+  @objc private func closeTapped() { dismiss(animated: true) }
 }

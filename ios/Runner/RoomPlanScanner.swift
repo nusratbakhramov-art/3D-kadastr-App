@@ -15,6 +15,7 @@ import ModelIO  // SCNScene → MDLAsset → USDZ export
 import simd
 import ImageIO
 import CoreGraphics
+import CoreImage
 import VideoToolbox
 import UniformTypeIdentifiers
 import RealityKit
@@ -1195,10 +1196,13 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     private var lastCapturePos: SIMD3<Float>?
     private var lastCaptureRot: simd_quatf?
     private var lastCaptureTime: TimeInterval = 0
-    // Polycam-style zich foto coverage: 5sm/5° (Polycam'ga yaqin)
-    private let minPositionDelta: Float = 0.05    // 5 cm
-    private let minRotationDelta: Float = 0.09    // ~5 degrees
-    private let minTimeBetweenCaptures: TimeInterval = 0.20
+    // Best-view + multi-band uchun: KAMROQ, lekin yaxshi joylashgan foto'lar.
+    // Avval 5cm/5° edi → xona uchun ~400 foto (juda ko'p, ortiqcha+xira frame'lar
+    // rekonstruksiyani chalkashtirardi). 15cm/~8.5° → ~3x kam (~130-150 foto),
+    // best-view har yuza uchun yetarli sharp ko'rinish topadi.
+    private let minPositionDelta: Float = 0.15    // 15 cm
+    private let minRotationDelta: Float = 0.15    // ~8.5 degrees
+    private let minTimeBetweenCaptures: TimeInterval = 0.35
     private let minRequiredPhotos = 30
     // Phase 9: silent capture (1920×1440) → har photo ~250 KB, 1000 photo ~250 MB.
     // Polycam-style continuous scanning uchun 400 → 2000.
@@ -2677,11 +2681,15 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         )
 
         // 2. StreamingTSDF init
+        // Phase 11: voxelSize 0.05 → 0.025 (2x maydaroq). Divan kabi yumshoq/mayda
+        // mebel qiya burchakdan olinganda 5cm voxel yupqa/chala yuza berardi.
+        // 2.5cm voxel detail va hole-fill geometriyani yaxshilaydi (8x voxel,
+        // ~120-190MB — offline reprocess'da xotira yetarli).
         guard let tsdf = StreamingTSDF(
             centerWorld: center,
             extents: extents,
-            voxelSize: 0.05,
-            truncation: 0.12,
+            voxelSize: 0.025,
+            truncation: 0.08,
             maxIntegrationDepth: 4.0,
         ) else {
             return nil
@@ -3215,17 +3223,26 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
         if let streamMesh = streamingTSDF?.extractMesh(), streamMesh.vertices.count > 100 {
             NSLog("KADASTR StreamingTSDF mesh: \(streamMesh.vertices.count) vert, \(streamMesh.triangles.count) tri")
-            // Hybrid: ARKit + streaming TSDF (TSDF hole-fill rolida)
-            let hybrid = HybridMeshBuilder.combine(
-                arkitVerts: rawVerts, arkitNormals: rawNormals, arkitTris: rawTris,
-                tsdfVerts: streamMesh.vertices, tsdfNormals: streamMesh.normals,
-                tsdfTris: streamMesh.triangles,
-                minDistanceFromArkit: 0.06,
-            )
-            hybridVerts = hybrid.vertices
-            hybridNormals = hybrid.normals
-            hybridTris = hybrid.triangles
-            NSLog("KADASTR hybrid (streaming): \(hybrid.arkitCount) ARKit + \(hybrid.fillCount) stream = \(hybrid.triangles.count) total")
+            if ProcessInfo.processInfo.environment["KADASTR_TSDF_ONLY"] == "1" {
+                // DEBUG: ARKit'ni butunlay chetlab, faqat TSDF mesh — divan TSDF'da
+                // yaxshiroqmi tekshirish uchun.
+                hybridVerts = streamMesh.vertices
+                hybridNormals = streamMesh.normals
+                hybridTris = streamMesh.triangles
+                NSLog("KADASTR TSDF-ONLY mode: \(streamMesh.triangles.count) tri (ARKit chetlandi)")
+            } else {
+                // Hybrid: ARKit + streaming TSDF (TSDF hole-fill rolida)
+                let hybrid = HybridMeshBuilder.combine(
+                    arkitVerts: rawVerts, arkitNormals: rawNormals, arkitTris: rawTris,
+                    tsdfVerts: streamMesh.vertices, tsdfNormals: streamMesh.normals,
+                    tsdfTris: streamMesh.triangles,
+                    minDistanceFromArkit: 0.06,
+                )
+                hybridVerts = hybrid.vertices
+                hybridNormals = hybrid.normals
+                hybridTris = hybrid.triangles
+                NSLog("KADASTR hybrid (streaming): \(hybrid.arkitCount) ARKit + \(hybrid.fillCount) stream = \(hybrid.triangles.count) total")
+            }
         } else if !tsdfCameras.isEmpty {
             // Fallback: eski batch TSDF
             do {
@@ -3314,10 +3331,11 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             minSizeRatio: 0.10,   // 0.40 → 0.10: faqat juda kichik isolated parchalar drop
         )
 
-        // Phase 5: Taubin smoothing — 3 iter → 1 iter, λ 0.5 → 0.35.
-        // Phase 4 over-smoothing edge'lar va keyboard kabi fine detail'larni
-        // yutib yubordi. Bitta yengil iter — eng kuchli stair-step yumshatadi,
-        // detail saqlaydi.
+        // Phase 11: Taubin smoothing 5 iter (λ=0.35 yengil, µ=-0.38 shrink-free band-pass).
+        // Yuqori-chastotali ARKit LiDAR noise'ni tekislaydi; divan tufting kabi katta
+        // xususiyatlar saqlanadi. Eslatma: devorning PAST-chastotali to'lqini (LiDAR
+        // depth drift) Taubin bilan ketmaydi — buning uchun planar fit kerak (kelajak).
+        // Sinaб ko'rildi: 10 iter ham past-chastota to'lqinni o'zgartirmadi → 5 yetarli.
         await MainActor.run {
             self.processingStatusLabel.text = "Smoothing mesh…"
             self.progressView.setProgress(0.35, animated: true)
@@ -3328,7 +3346,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             triangles: lccFiltered.triangles,
             lambda: 0.35,
             mu: -0.38,
-            iterations: 1,
+            iterations: 5,
         )
         let globalVerts = smoothed.vertices
         let globalNormals = smoothed.normals
@@ -3336,6 +3354,40 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         await MainActor.run {
             self.processingStatusLabel.text = "Extracting mesh… \(globalTris.count) tri"
             self.progressView.setProgress(0.34, animated: true)
+        }
+
+        // CLAY rejim: faqat geometriya (textura'siz). Atlas bake + ESRGAN
+        // o'tkazib yuboriladi → tez. Foydalanuvchi mesh shaklini ko'rishi uchun.
+        if self.offlineParams["clay"] == "1" {
+            NSLog("KADASTR CLAY mode: atlas bake o'tkazildi, flat material")
+            await MainActor.run {
+                self.processingStatusLabel.text = "Clay mesh (geometriya)…"
+                self.progressView.setProgress(0.6, animated: true)
+            }
+            var clayIdx: [UInt32] = []
+            clayIdx.reserveCapacity(globalTris.count * 3)
+            for t in globalTris { clayIdx.append(t.v0); clayIdx.append(t.v1); clayIdx.append(t.v2) }
+            let clayUVs = [SIMD2<Float>](repeating: .zero, count: globalVerts.count)
+            let clayGeom = Self.buildSubMeshGeometry(
+                vertices: globalVerts, normals: globalNormals, uvs: clayUVs, indices: clayIdx,
+            )
+            let clayMat = SCNMaterial()
+            clayMat.lightingModel = .physicallyBased
+            clayMat.diffuse.contents = UIColor(white: 0.74, alpha: 1.0)
+            clayMat.roughness.contents = 0.9
+            clayMat.metalness.contents = 0.0
+            clayMat.isDoubleSided = true
+            clayGeom.materials = [clayMat]
+            scene.rootNode.addChildNode(SCNNode(geometry: clayGeom))
+            let okClay = scene.write(to: output, options: nil, delegate: nil, progressHandler: nil)
+            if !okClay {
+                throw NSError(
+                    domain: "TexturedScan", code: 102,
+                    userInfo: [NSLocalizedDescriptionKey: "Clay USDZ saqlash muvaffaqiyatsiz"],
+                )
+            }
+            await MainActor.run { self.progressView.setProgress(1.0, animated: true) }
+            return
         }
 
         await MainActor.run {
@@ -3462,7 +3514,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 cameraBatchSize: 4,              // hi-res 12MP × 4 = ~196 MB per batch
                 downsampleFactor: 1,             // full source (4032×3024 hi-res)
                 voxelColor: voxelVolume,         // Phase 2: gray patches → voxel color
-                useCubeProjectionUV: true,       // Phase 9.4: xatlas o'rniga — fragment yo'q
+                useCubeProjectionUV: false,      // TEST: xatlas — oblik yuzalarni qoplaydimi?
                 progress: { p, msg in
                     Task { @MainActor in
                         self.processingStatusLabel.text = msg
@@ -3501,23 +3553,10 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // gray joylar bo'lishi mumkin (texture yo'q joylarda).
         let filteredResult = bakeResult
 
-        // Phase 6.1 (iter10): Real-ESRGAN ENDI YOQILGAN.
-        // Rank-3 fix: MLAtlasEnhancer.runSR ichida imageBufferValue nil bo'lsa
-        // multiArrayValue → CGImage manual conversion qilinadi (Phase 6.1a).
-        // Atlas 4096×4096 → 4×4 tile of 512×512 → ESRGAN → 8192×8192 → cap 4096.
-        await MainActor.run {
-            self.processingStatusLabel.text = "AI super-resolution (Real-ESRGAN)…"
-            self.progressView.setProgress(0.91, animated: true)
-        }
-        let enhancedAtlas: UIImage = MLAtlasEnhancer.enhance(
-            atlas: bakeResult.atlas,
-            progress: { p, msg in
-                Task { @MainActor in
-                    self.processingStatusLabel.text = msg
-                    self.progressView.setProgress(0.91 + p * 0.06, animated: false)
-                }
-            },
-        ) ?? bakeResult.atlas
+        // ESRGAN bypass (grain/sekin); o'rniga mild CIUnsharpMask. Manba 1920×1440
+        // ultra-wide bo'lgani uchun haqiqiy detail qaytmaydi, lekin qirra/tugma
+        // kontrasti aniqlashadi (halo/grain'siz, Mac'da 1.8/0.5 tasdiqlangan).
+        let enhancedAtlas: UIImage = Self.sharpenAtlas(bakeResult.atlas)
 
         // Build SCNGeometry from xatlas-unwrapped mesh + atlas texture.
         let geom = Self.buildSubMeshGeometry(
@@ -4755,6 +4794,23 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             bytesPerIndex: MemoryLayout<UInt32>.size,
         )
         return SCNGeometry(sources: [vSrc, nSrc, uvSrc], elements: [elem])
+    }
+
+    /// Atlas mild sharpening. Manba rasmlar 1920×1440 ultra-wide (yumshoq optika) —
+    /// yo'qolgan detail qaytmaydi, lekin CIUnsharpMask qirra/tugma kontrastini
+    /// aniqlashtiradi. radius 1.8 / intensity 0.5: halo va grain'siz mild (Mac'da
+    /// solishtirib tanlangan; 2.5/0.7 halo+grain, LUMIN deyarli ta'sirsiz).
+    fileprivate static func sharpenAtlas(_ image: UIImage) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let ci = CIImage(cgImage: cg)
+        guard let f = CIFilter(name: "CIUnsharpMask") else { return image }
+        f.setValue(ci, forKey: kCIInputImageKey)
+        f.setValue(1.8, forKey: kCIInputRadiusKey)
+        f.setValue(0.5, forKey: kCIInputIntensityKey)
+        guard let out = f.outputImage,
+              let outCG = CIContext(options: nil).createCGImage(out, from: ci.extent)
+        else { return image }
+        return UIImage(cgImage: outCG)
     }
 
     /// AnchorRaw'dan SCNGeometry yaratish — vertex (world-space), normal, UV (optional).

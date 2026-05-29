@@ -64,6 +64,28 @@ class _SavedScanDetailScreenState extends State<SavedScanDetailScreen>
     }
   }
 
+  /// Xom LiDAR mesh'ni ko'rish — anchors.bin'dan to'g'ridan-to'g'ri, hech qanday
+  /// pipeline'siz (textura/TSDF/clean yo'q). Tez ochiladi, versiya saqlanmaydi.
+  Future<void> _viewLidarMesh() async {
+    if (_processing) return;
+    setState(() => _processing = true);
+    try {
+      // Native LidarMeshExporter mesh'ni quradi va SceneKit viewer'da ochadi
+      // (simulatorда ham ishlaydi). Alohida preview chaqiruvi kerak emas.
+      final path = await _service.viewLidarMesh(widget.scanId);
+      if (!mounted) return;
+      setState(() => _processing = false);
+      if (path == null) {
+        AppToast.error(context, 'LiDAR mesh topilmadi');
+        return;
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _processing = false);
+      AppToast.error(context, '$e');
+    }
+  }
+
   Future<void> _viewOutput(SavedScanOutput output) async {
     final path = await _service.outputPath(widget.scanId, output.version);
     if (path == null) {
@@ -149,6 +171,15 @@ class _SavedScanDetailScreenState extends State<SavedScanDetailScreen>
                         item: _item!,
                         processing: _processing,
                         onTap: _process,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    AppReveal(
+                      controller: entryController,
+                      interval: const Interval(0.25, 0.75, curve: Curves.easeOutCubic),
+                      child: _ClayButton(
+                        processing: _processing,
+                        onTap: _viewLidarMesh,
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -333,6 +364,53 @@ class _ProcessButton extends StatelessWidget {
   }
 }
 
+class _ClayButton extends StatelessWidget {
+  const _ClayButton({required this.processing, required this.onTap});
+
+  final bool processing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final brand = ColorTokens.brandPrimary(context);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: processing ? null : onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: brand.withValues(alpha: processing ? 0.25 : 0.6),
+              width: 1.4,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.grid_4x4,
+                  color: brand.withValues(alpha: processing ? 0.5 : 1.0), size: 20),
+              const SizedBox(width: 10),
+              Text(
+                'Mesh ko\'rish (LiDAR)',
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: brand.withValues(alpha: processing ? 0.5 : 1.0),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _OutputCard extends StatelessWidget {
   const _OutputCard({
     required this.output,
@@ -415,6 +493,25 @@ class _OutputCard extends StatelessWidget {
                                   fontWeight: FontWeight.w600,
                                   fontSize: 9,
                                   color: Colors.green,
+                                ),
+                              ),
+                            ),
+                          ],
+                          if (output.params['clay'] == '1') ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.brown.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'clay',
+                                style: TextStyle(
+                                  fontFamily: 'MTSText',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 9,
+                                  color: Colors.brown,
                                 ),
                               ),
                             ),

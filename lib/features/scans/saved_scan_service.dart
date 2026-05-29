@@ -161,6 +161,16 @@ class SavedScanService {
     }
   }
 
+  /// Xom LiDAR mesh (anchors.bin) ni textura'siz clay USDZ sifatida eksport
+  /// qiladi va temp yo'lini qaytaradi. Pipeline'siz, tez. Versiya saqlanmaydi.
+  Future<String?> viewLidarMesh(int id) async {
+    try {
+      return await _channel.invokeMethod<String?>('viewLidarMesh', {'id': id});
+    } on PlatformException catch (e) {
+      throw Exception('LiDAR mesh xatosi: ${e.message ?? e.code}');
+    }
+  }
+
   /// Output USDZ ning to'liq qurilma yo'lini qaytaradi.
   Future<String?> outputPath(int id, int version) async {
     try {
