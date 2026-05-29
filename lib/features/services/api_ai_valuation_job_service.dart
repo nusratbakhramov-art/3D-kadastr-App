@@ -75,6 +75,33 @@ class AiJobSnapshot {
       );
 }
 
+/// Lightweight list row from `GET /ai-valuations` — used by the Arizalar
+/// screen. Mirrors `AiValuationJobListItem` on the backend.
+class AiJobSummary {
+  AiJobSummary({
+    required this.id,
+    required this.status,
+    required this.createdAt,
+    this.cadastreNumber,
+    this.estimatedValue,
+  });
+
+  final int id;
+  final AiJobStatus status;
+  final DateTime createdAt;
+  final String? cadastreNumber;
+  final double? estimatedValue;
+
+  factory AiJobSummary.fromJson(Map<String, dynamic> json) => AiJobSummary(
+        id: json['id'] as int,
+        status: AiJobStatus.parse(json['status']?.toString() ?? 'queued'),
+        createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        cadastreNumber: json['cadastre_number'] as String?,
+        estimatedValue: (json['estimated_value'] as num?)?.toDouble(),
+      );
+}
+
 class AiValuationApiException implements Exception {
   AiValuationApiException(this.message, {this.statusCode});
   final String message;
@@ -115,6 +142,33 @@ class AiValuationJobService {
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     return body['id'] as int;
+  }
+
+  /// Current user's AI Baholash jobs, newest-first. Powers the Arizalar list.
+  Future<List<AiJobSummary>> list({
+    required String token,
+    int limit = 100,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations?limit=$limit');
+    final res = await _client
+        .get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      throw AiValuationApiException(
+        _extractDetail(res) ?? 'HTTP ${res.statusCode}',
+        statusCode: res.statusCode,
+      );
+    }
+    final body = jsonDecode(res.body) as List<dynamic>;
+    return body
+        .map((e) => AiJobSummary.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   Future<AiJobSnapshot> get(int id, {required String token}) async {
