@@ -94,7 +94,7 @@ static int XAtlasPrintLog(const char *format, ...) {
     // birgalikda guruhlaydi:
     xatlas::ChartOptions chartOptions;
     chartOptions.maxCost = 8.0f;             // default 2 → 8: yomon-roq chart'lar ham qo'shilsin
-    chartOptions.maxIterations = 3;          // default 1 → 3: charts'larni qayta-qayta birlashtir
+    chartOptions.maxIterations = 1;          // Mac xbench: 2→1 ComputeCharts 45.5s→28.9s (-37%, bottleneck). 2213 chart (2966'dan kam → render fragmentatsiya yaxshiroq). On-device: eshik chartini tekshir (maxIter6 eshikni devorga yutgan edi).
     chartOptions.normalDeviationWeight = 1.0f;  // default 2: normal farqlarga kamroq sezgir
     chartOptions.normalSeamWeight = 2.0f;       // default 4: normal seam penalty kamroq
 

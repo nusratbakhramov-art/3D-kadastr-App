@@ -61,6 +61,21 @@ struct SerializedAnchor {
     let worldVertices: [SIMD3<Float>]   // world-space
     let worldNormals: [SIMD3<Float>]    // world-space
     let indices: [UInt32]
+    let classification: [UInt8]         // Phase 14: per-face semantik (count == indices.count/3), bo'sh = yo'q
+
+    init(transform: simd_float4x4, center: SIMD3<Float>,
+         vertices: [SIMD3<Float>], normals: [SIMD3<Float>],
+         worldVertices: [SIMD3<Float>], worldNormals: [SIMD3<Float>],
+         indices: [UInt32], classification: [UInt8] = []) {
+        self.transform = transform
+        self.center = center
+        self.vertices = vertices
+        self.normals = normals
+        self.worldVertices = worldVertices
+        self.worldNormals = worldNormals
+        self.indices = indices
+        self.classification = classification
+    }
 }
 
 // MARK: - Storage
@@ -306,6 +321,7 @@ enum AnchorSerializer {
     /// SerializedAnchor[] → Data (binary format yuqorida)
     static func serialize(_ anchors: [SerializedAnchor]) -> Data {
         var buf = Data()
+        appendInt32(&buf, -2)                       // Phase 14: format version magic (eski fayl = count >= 0, classification yo'q)
         appendInt32(&buf, Int32(anchors.count))
         for a in anchors {
             // transform (16 floats column-major)
@@ -339,6 +355,9 @@ enum AnchorSerializer {
             for idx in a.indices {
                 appendUInt32(&buf, idx)
             }
+            // Phase 14: per-face classification (UInt8, count == indices.count/3)
+            appendInt32(&buf, Int32(a.classification.count))
+            buf.append(contentsOf: a.classification)
         }
         return buf
     }
@@ -346,7 +365,15 @@ enum AnchorSerializer {
     static func deserialize(_ data: Data) -> [SerializedAnchor] {
         var offset = 0
         var anchors: [SerializedAnchor] = []
-        guard let anchorCount = readInt32(data, &offset) else { return [] }
+        guard let first = readInt32(data, &offset) else { return [] }
+        // Phase 14: -2 magic → yangi format (classification bilan). Aks holda eski format (first = anchor count).
+        let hasClassification = (first == -2)
+        var anchorCount = first
+        if hasClassification {
+            guard let realCount = readInt32(data, &offset) else { return [] }
+            anchorCount = realCount
+        }
+        guard anchorCount >= 0 else { return [] }
         anchors.reserveCapacity(Int(anchorCount))
         for _ in 0..<anchorCount {
             // transform
@@ -402,11 +429,21 @@ enum AnchorSerializer {
                 indices.append(v)
             }
 
+            // Phase 14: per-face classification (faqat yangi formatda)
+            var classif: [UInt8] = []
+            if hasClassification {
+                guard let cCount = readInt32(data, &offset) else { return anchors }
+                if cCount > 0 {
+                    guard let bytes = readBytes(data, &offset, Int(cCount)) else { return anchors }
+                    classif = bytes
+                }
+            }
+
             anchors.append(SerializedAnchor(
                 transform: transform, center: center,
                 vertices: verts, normals: normals,
                 worldVertices: wVerts, worldNormals: wNormals,
-                indices: indices,
+                indices: indices, classification: classif,
             ))
         }
         return anchors
@@ -425,28 +462,41 @@ enum AnchorSerializer {
         var x = v
         withUnsafeBytes(of: &x) { buf.append(contentsOf: $0) }
     }
+    // Alignment-safe 4-byte LE o'qish. Phase 14: classification (variable-length UInt8)
+    // offset'ni 4-baytga tekislanmagan qoldirishi mumkin; deployment target iOS 13 →
+    // loadUnaligned yo'q. copyBytes aligned local'ga ko'chiradi (memcpy, alignmentsiz).
+    @inline(__always)
+    private static func readRawU32(_ data: Data, _ offset: Int) -> UInt32 {
+        var v: UInt32 = 0
+        withUnsafeMutableBytes(of: &v) { dst in
+            data.withUnsafeBytes { src in
+                dst.copyBytes(from: src[offset..<offset + 4])
+            }
+        }
+        return v   // iOS/macOS LE → v allaqachon to'g'ri qiymat
+    }
     private static func readInt32(_ data: Data, _ offset: inout Int) -> Int32? {
         if offset + 4 > data.count { return nil }
-        let v = data.withUnsafeBytes {
-            $0.load(fromByteOffset: offset, as: Int32.self)
-        }
-        offset += 4
-        return Int32(littleEndian: v)
+        let v = readRawU32(data, offset); offset += 4
+        return Int32(bitPattern: v)
     }
     private static func readUInt32(_ data: Data, _ offset: inout Int) -> UInt32? {
         if offset + 4 > data.count { return nil }
-        let v = data.withUnsafeBytes {
-            $0.load(fromByteOffset: offset, as: UInt32.self)
-        }
-        offset += 4
-        return UInt32(littleEndian: v)
+        let v = readRawU32(data, offset); offset += 4
+        return v
     }
     private static func readFloat(_ data: Data, _ offset: inout Int) -> Float? {
         if offset + 4 > data.count { return nil }
-        let v = data.withUnsafeBytes {
-            $0.load(fromByteOffset: offset, as: Float.self)
+        let v = readRawU32(data, offset); offset += 4
+        return Float(bitPattern: v)
+    }
+    private static func readBytes(_ data: Data, _ offset: inout Int, _ count: Int) -> [UInt8]? {
+        if count < 0 || offset + count > data.count { return nil }
+        let bytes = data.withUnsafeBytes { raw -> [UInt8] in
+            let base = raw.baseAddress!.advanced(by: offset).assumingMemoryBound(to: UInt8.self)
+            return [UInt8](UnsafeBufferPointer(start: base, count: count))
         }
-        offset += 4
-        return v
+        offset += count
+        return bytes
     }
 }

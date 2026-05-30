@@ -374,6 +374,8 @@ enum MeshCleaner {
         lambda: Float = 0.5,
         mu: Float = -0.53,
         iterations: Int = 3,
+        edgeSharpness: Float = 0,   // 0 = oddiy Taubin; >0 = edge-aware (qirra saqlash)
+        normalPresmoothIterations: Int = 0,   // >0: edge-normalni qotirishdan oldin tekislash
     ) -> CleanedMesh {
         if vertices.count < 4 || triangles.isEmpty {
             return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles)
@@ -387,23 +389,92 @@ enum MeshCleaner {
             adjacency[Int(t.v2)].insert(t.v0); adjacency[Int(t.v2)].insert(t.v1)
         }
 
+        // Edge-detection normallari. KALIT: xom LiDAR normal 5cm-voxel STAIR-STEP'li
+        // (qo'shni yuza ko'pincha 90° farq) — to'g'ridan edge-aware'ga berilsa har
+        // stair "qirra" deb belgilanib silliqlash bloklanadi (HAQIQIY pipeline'da
+        // edgeSharpness=2 → 3%, presmooth+es12 → faqat 20%). Yechim: pozitsiyani
+        // VAQTINCHA silliqlab (temp mesh, asl verts O'ZGARMAYDI) normalni qayta
+        // hisoblaймиз — voxel-stair yo'qoladi, aniq normal qoladi. Keyin presmooth
+        // bump-shovqinни o'chiradi, strukturaviy qirra (quti/divan/eshik) signalini
+        // saqlaydi. Qotirilгани (iter'da yangilanmas) uchun qirra joyi o'zgarmaydi.
+        var edgeNormals = normals
+        if edgeSharpness > 0 {
+            var tempVerts = vertices
+            let preIters = max(3, normalPresmoothIterations / 3)
+            for _ in 0..<preIters {
+                tempVerts = laplacianPass(verts: tempVerts, normals: normals, adjacency: adjacency, weight: lambda, edgeSharpness: 0)
+                tempVerts = laplacianPass(verts: tempVerts, normals: normals, adjacency: adjacency, weight: mu, edgeSharpness: 0)
+            }
+            let cleanNormals = recomputeVertexNormals(verts: tempVerts, triangles: triangles, fallback: normals)
+            edgeNormals = normalPresmoothIterations > 0
+                ? presmoothNormalField(cleanNormals, adjacency: adjacency, iterations: normalPresmoothIterations)
+                : cleanNormals
+        }
+
         var verts = vertices
         for _ in 0..<iterations {
             // Pass 1: λ smoothing
-            verts = laplacianPass(verts: verts, adjacency: adjacency, weight: lambda)
+            verts = laplacianPass(verts: verts, normals: edgeNormals, adjacency: adjacency, weight: lambda, edgeSharpness: edgeSharpness)
             // Pass 2: μ anti-shrink
-            verts = laplacianPass(verts: verts, adjacency: adjacency, weight: mu)
+            verts = laplacianPass(verts: verts, normals: edgeNormals, adjacency: adjacency, weight: mu, edgeSharpness: edgeSharpness)
         }
 
         // Recompute vertex normals from final positions (smoothed mesh →
         // need re-normalized normals for atlas baker face-dot rejection).
-        var newNormals = [SIMD3<Float>](repeating: SIMD3<Float>(0, 1, 0), count: vertices.count)
-        var counts = [Int](repeating: 0, count: vertices.count)
+        let newNormals = recomputeVertexNormals(verts: verts, triangles: triangles, fallback: normals)
+        NSLog("KADASTR taubinSmooth: \(iterations) iter (preIters \(max(3, normalPresmoothIterations/3))), \(vertices.count) vert")
+        return CleanedMesh(vertices: verts, normals: newNormals, triangles: triangles)
+    }
+
+    private static func laplacianPass(
+        verts: [SIMD3<Float>],
+        normals: [SIMD3<Float>],
+        adjacency: [Set<UInt32>],
+        weight: Float,
+        edgeSharpness: Float,
+    ) -> [SIMD3<Float>] {
+        var out = verts
+        let edgeAware = edgeSharpness > 0
+        for i in 0..<verts.count {
+            let neighbors = adjacency[i]
+            if neighbors.isEmpty { continue }
+            let ni = normals[i]
+            var sum = SIMD3<Float>(0, 0, 0)
+            var wsum: Float = 0
+            for n in neighbors {
+                // Edge-aware vazn: qo'shni vertex normal o'xshashligi (dot). Tekis
+                // yuza (o'xshash normal → vazn≈1) kuchli silliqlanadi; qirra (farqli
+                // normal → vazn≈0) saqlanadi. edgeSharpness pog'onasi qirrani keskin
+                // ajratadi (6 → 30° farq vaznni ~0.3 ga, 60° ni ~0.01 ga tushiradi).
+                let w: Float
+                if edgeAware {
+                    let nd = max(0, simd_dot(ni, normals[Int(n)]))
+                    w = pow(nd, edgeSharpness)
+                } else {
+                    w = 1
+                }
+                sum += verts[Int(n)] * w
+                wsum += w
+            }
+            if wsum < 1e-6 { continue }
+            let centroid = sum / wsum
+            let delta = centroid - verts[i]
+            out[i] = verts[i] + delta * weight
+        }
+        return out
+    }
+
+    /// Vertex normallarini uchburchak yuz-normallari yig'indisidan qayta hisoblaydi
+    /// (area-weighted). counts==0 vertex'lar uchun fallback.
+    private static func recomputeVertexNormals(
+        verts: [SIMD3<Float>],
+        triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+        fallback: [SIMD3<Float>],
+    ) -> [SIMD3<Float>] {
+        var newNormals = [SIMD3<Float>](repeating: SIMD3<Float>(0, 1, 0), count: verts.count)
+        var counts = [Int](repeating: 0, count: verts.count)
         for t in triangles {
-            let v0 = verts[Int(t.v0)]
-            let v1 = verts[Int(t.v1)]
-            let v2 = verts[Int(t.v2)]
-            let n = simd_cross(v1 - v0, v2 - v0)
+            let n = simd_cross(verts[Int(t.v1)] - verts[Int(t.v0)], verts[Int(t.v2)] - verts[Int(t.v0)])
             let len = simd_length(n)
             if len < 1e-9 { continue }
             let nn = n / len
@@ -415,33 +486,401 @@ enum MeshCleaner {
             if counts[i] > 0 {
                 let avg = newNormals[i] / Float(counts[i])
                 let len = simd_length(avg)
-                newNormals[i] = len > 1e-9 ? avg / len : normals[i]
+                newNormals[i] = len > 1e-9 ? avg / len : fallback[i]
             } else {
-                newNormals[i] = normals[i]
+                newNormals[i] = fallback[i]
             }
         }
-        NSLog("KADASTR taubinSmooth: \(iterations) iter, \(vertices.count) vert")
-        return CleanedMesh(vertices: verts, normals: newNormals, triangles: triangles)
+        return newNormals
     }
 
-    private static func laplacianPass(
-        verts: [SIMD3<Float>],
-        adjacency: [Set<UInt32>],
-        weight: Float,
-    ) -> [SIMD3<Float>] {
-        var out = verts
-        for i in 0..<verts.count {
-            let neighbors = adjacency[i]
-            if neighbors.isEmpty { continue }
-            var sum = SIMD3<Float>(0, 0, 0)
-            for n in neighbors {
-                sum += verts[Int(n)]
-            }
-            let centroid = sum / Float(neighbors.count)
-            let delta = centroid - verts[i]
-            out[i] = verts[i] + delta * weight
+    /// Phase 14: RANSAC plane-snap — devor/pol/shiftni TEKIS qiladi. Katta planar
+    /// yuzalarni RANSAC bilan topib (vertex+normal candidate), ±band ichidagi VA
+    /// normali mos vertexlarni planega proyeksiya qiladi. normal-gate mebel/qirra/
+    /// puf'ni saqlaydi (snap qilmaydi). Ref[18] agent tavsiyasi (DL primitive emas —
+    /// oddiy RANSAC, on-device bir necha soniya). Mac prototip (scan_009): 7 plane,
+    /// 69% snap, avg 7.8mm, pol/devor tekis, mebel saqlangan.
+    static func snapToPlanes(
+        vertices: [SIMD3<Float>],
+        normals: [SIMD3<Float>],
+        triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+        band: Float = 0.05,       // 5cm: bumpy devorни (depth noise amplitudasi) to'liq ushlash
+        normalDot: Float = 0.6,   // looser: bumpy devor normali og'ishgan — 0.9 gate ularni rad etardi (tekislamasdi). 0.6 ushlaydi, mebel (qarama-qarshi normal) rad etiladi
+        minInliers: Int = 1200,   // bake mesh decimated (tekis devor=kam vertex) → past chegara
+        maxPlanes: Int = 18,
+        candidates: Int = 220,
+    ) -> CleanedMesh {
+        let nv = vertices.count
+        if nv < minInliers || triangles.isEmpty {
+            return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles)
         }
-        return out
+        let vn = normals
+        var assigned = [Int](repeating: -1, count: nv)
+        var avail = [Bool](repeating: true, count: nv)
+        var planes: [(c: SIMD3<Float>, n: SIMD3<Float>)] = []
+
+        var rng: UInt64 = 0x9E3779B97F4A7C15
+        @inline(__always) func rand(_ bound: Int) -> Int {
+            rng = rng &* 6364136223846793005 &+ 1442695040888963407
+            return Int((rng >> 33) % UInt64(max(bound, 1)))
+        }
+
+        for _ in 0..<maxPlanes {
+            var pool: [Int] = []
+            pool.reserveCapacity(nv)
+            for i in 0..<nv where avail[i] { pool.append(i) }
+            if pool.count < minInliers { break }
+
+            var bestCnt = 0
+            var bestC = SIMD3<Float>(0, 0, 0)
+            var bestN = SIMD3<Float>(0, 1, 0)
+            // candidate counting subsample (stride 2) — tezlik uchun
+            for _ in 0..<candidates {
+                let ci = pool[rand(pool.count)]
+                let pp = vertices[ci]; let pn = vn[ci]
+                var cnt = 0
+                var j = 0
+                while j < pool.count {
+                    let i = pool[j]
+                    if abs(simd_dot(vertices[i] - pp, pn)) < band && simd_dot(vn[i], pn) > normalDot { cnt += 1 }
+                    j += 2
+                }
+                if cnt > bestCnt { bestCnt = cnt; bestC = pp; bestN = pn }
+            }
+            if bestCnt * 2 < minInliers { break }   // *2: subsample kompensatsiyasi
+
+            // refit: inlier markazi + o'rtacha normal (eigen kerak emas — gate normal mos)
+            var sumP = SIMD3<Float>(0, 0, 0); var sumN = SIMD3<Float>(0, 0, 0); var k = 0
+            for i in pool where abs(simd_dot(vertices[i] - bestC, bestN)) < band && simd_dot(vn[i], bestN) > normalDot {
+                sumP += vertices[i]; sumN += vn[i]; k += 1
+            }
+            if k < minInliers {
+                for i in pool where abs(simd_dot(vertices[i] - bestC, bestN)) < band && simd_dot(vn[i], bestN) > normalDot { avail[i] = false }
+                continue
+            }
+            let c = sumP / Float(k)
+            let n = simd_normalize(sumN)
+            let pidx = planes.count
+            for i in pool where abs(simd_dot(vertices[i] - c, n)) < band && simd_dot(vn[i], n) > normalDot {
+                assigned[i] = pidx; avail[i] = false
+            }
+            planes.append((c, n))
+        }
+
+        if planes.isEmpty {
+            return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles)
+        }
+
+        var out = vertices
+        for i in 0..<nv where assigned[i] >= 0 {
+            let (c, n) = planes[assigned[i]]
+            out[i] = vertices[i] - simd_dot(vertices[i] - c, n) * n
+        }
+        // FLIP-PREVENTION: snap ba'zi triangle'ni ag'daradi (single-sided material → qora
+        // teshik). Ag'darilgan triangle vertexlarini originalga qaytaramiz (teshik yo'q,
+        // o'sha joyda kichik bump qoladi). 3 iter (revert qo'shni triangle'ni re-flip qilishi mumkin).
+        @inline(__always) func flipDot(_ t: (v0: UInt32, v1: UInt32, v2: UInt32)) -> Float {
+            let o = simd_cross(vertices[Int(t.v1)] - vertices[Int(t.v0)], vertices[Int(t.v2)] - vertices[Int(t.v0)])
+            let m = simd_cross(out[Int(t.v1)] - out[Int(t.v0)], out[Int(t.v2)] - out[Int(t.v0)])
+            return simd_dot(o, m)
+        }
+        for _ in 0..<3 {
+            var reverted = 0
+            for t in triangles where flipDot(t) < 0 {
+                out[Int(t.v0)] = vertices[Int(t.v0)]
+                out[Int(t.v1)] = vertices[Int(t.v1)]
+                out[Int(t.v2)] = vertices[Int(t.v2)]
+                reverted += 1
+            }
+            if reverted == 0 { break }
+        }
+        var moved = 0
+        for i in 0..<nv where simd_length(out[i] - vertices[i]) > 1e-6 { moved += 1 }
+        let newNormals = recomputeVertexNormals(verts: out, triangles: triangles, fallback: normals)
+        NSLog("KADASTR planeSnap: \(planes.count) plane, snapped \(moved)/\(nv) vert (\(nv > 0 ? moved * 100 / nv : 0)%)")
+        return CleanedMesh(vertices: out, normals: newNormals, triangles: triangles)
+    }
+
+    /// Phase 14: plane-constrained Laplacian — devor/pol/shiftni TEKIS + SILLIQ qiladi.
+    /// RANSAC plane-vertexlariga: umbrella Laplacian (silliq) + planega ASTA tortish
+    /// (flatten). QATTIQ snap EMAS → smoothing patchwork/faceting'ni oldini oladi
+    /// (snapToPlanes faceting yaratardi; bu yo'q). Faqat plane-vert ko'chadi (mebel/quti
+    /// sharp edge SAQLANADI). Mac (scan_009): devor RMS 14.3mm → 2.1mm, faceting yo'q.
+    static func flattenWallsLaplacian(
+        vertices: [SIMD3<Float>],
+        normals: [SIMD3<Float>],
+        triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+        iterations: Int = 15,
+        lambda: Float = 0.5,
+        pull: Float = 0.5,        // kuchliroq: LiDAR horizontal banding'ni to'liq tekislash (Mac: RMS 17.6→1.7mm)
+        band: Float = 0.08,       // 8cm: katta amplitudali bandni ham ushlash
+        normalDot: Float = 0.4,   // looser: band ridge normallari og'ishgan, 0.55 ularni rad etardi
+        minInliers: Int = 2500,
+        maxPlanes: Int = 18,
+        candidates: Int = 200,
+    ) -> CleanedMesh {
+        let nv = vertices.count
+        if nv < minInliers || triangles.isEmpty {
+            return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles)
+        }
+        let vn = normals
+        var assigned = [Int](repeating: -1, count: nv)
+        var avail = [Bool](repeating: true, count: nv)
+        var planes: [(c: SIMD3<Float>, n: SIMD3<Float>)] = []
+        var rng: UInt64 = 0x9E3779B97F4A7C15
+        @inline(__always) func rand(_ b: Int) -> Int {
+            rng = rng &* 6364136223846793005 &+ 1442695040888963407
+            return Int((rng >> 33) % UInt64(max(b, 1)))
+        }
+        for _ in 0..<maxPlanes {
+            var pool: [Int] = []; pool.reserveCapacity(nv)
+            for i in 0..<nv where avail[i] { pool.append(i) }
+            if pool.count < minInliers { break }
+            var bestCnt = 0; var bC = SIMD3<Float>(0, 0, 0); var bN = SIMD3<Float>(0, 1, 0)
+            for _ in 0..<candidates {
+                let ci = pool[rand(pool.count)]; let pp = vertices[ci]; let pn = vn[ci]
+                var cnt = 0; var j = 0
+                while j < pool.count {
+                    let i = pool[j]
+                    if abs(simd_dot(vertices[i] - pp, pn)) < band && simd_dot(vn[i], pn) > normalDot { cnt += 1 }
+                    j += 2
+                }
+                if cnt > bestCnt { bestCnt = cnt; bC = pp; bN = pn }
+            }
+            if bestCnt * 2 < minInliers { break }
+            var sumP = SIMD3<Float>(0, 0, 0); var sumN = SIMD3<Float>(0, 0, 0); var k = 0
+            for i in pool where abs(simd_dot(vertices[i] - bC, bN)) < band && simd_dot(vn[i], bN) > normalDot {
+                sumP += vertices[i]; sumN += vn[i]; k += 1
+            }
+            if k < minInliers {
+                for i in pool where abs(simd_dot(vertices[i] - bC, bN)) < band && simd_dot(vn[i], bN) > normalDot { avail[i] = false }
+                continue
+            }
+            let c = sumP / Float(k); let n = simd_normalize(sumN); let pidx = planes.count
+            for i in pool where abs(simd_dot(vertices[i] - c, n)) < band && simd_dot(vn[i], n) > normalDot {
+                assigned[i] = pidx; avail[i] = false
+            }
+            planes.append((c, n))
+        }
+        if planes.isEmpty {
+            return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles)
+        }
+        // adjacency (precompute neighbor arrays)
+        var adj = [Set<UInt32>](repeating: [], count: nv)
+        for t in triangles {
+            adj[Int(t.v0)].insert(t.v1); adj[Int(t.v0)].insert(t.v2)
+            adj[Int(t.v1)].insert(t.v0); adj[Int(t.v1)].insert(t.v2)
+            adj[Int(t.v2)].insert(t.v0); adj[Int(t.v2)].insert(t.v1)
+        }
+        var nbr = [[Int]](repeating: [], count: nv)
+        for i in 0..<nv { nbr[i] = adj[i].map { Int($0) } }
+        let plv = (0..<nv).filter { assigned[$0] >= 0 }
+        var P = vertices
+        for _ in 0..<iterations {
+            var newP = P
+            for i in plv {
+                let ns = nbr[i]
+                if ns.isEmpty { continue }
+                var avg = SIMD3<Float>(0, 0, 0)
+                for j in ns { avg += P[j] }
+                avg /= Float(ns.count)
+                var p = P[i] + lambda * (avg - P[i])
+                let (c, n) = planes[assigned[i]]
+                p = p - pull * simd_dot(p - c, n) * n
+                newP[i] = p
+            }
+            P = newP
+        }
+        let newNormals = recomputeVertexNormals(verts: P, triangles: triangles, fallback: normals)
+        NSLog("KADASTR flattenLaplacian: \(planes.count) plane, \(plv.count)/\(nv) plane-vert flattened")
+        return CleanedMesh(vertices: P, normals: newNormals, triangles: triangles)
+    }
+
+    /// QEM (Garland-Heckbert) edge-collapse decimation. Planar yuzalarni agressiv
+    /// soddalashtiradi (kamroq tri), keskin qirralarni saqlaydi (quadric error +
+    /// boundary penalty). xatlas UV unwrap tri soniga sezgir (269k→35min); decimate
+    /// 120k ~2x tez. Mac prototip (scan_007): detail to'liq saqlandi, tekis yuza
+    /// tri'lari yarmiga. Hisob-kitob Double (precision), I/O Float.
+    static func decimate(
+        vertices: [SIMD3<Float>],
+        normals: [SIMD3<Float>],
+        triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+        targetTriangles: Int,
+    ) -> CleanedMesh {
+        if triangles.count <= targetTriangles || vertices.count < 4 {
+            return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles)
+        }
+        let nv = vertices.count
+        var verts = vertices.map { SIMD3<Double>(Double($0.x), Double($0.y), Double($0.z)) }
+        var tris = triangles.map { (Int($0.v0), Int($0.v1), Int($0.v2)) }
+
+        var Q = [[Double]](repeating: [Double](repeating: 0, count: 10), count: nv)
+        func addPlaneTo(_ vi: Int, _ p: SIMD4<Double>, _ scale: Double) {
+            let k = [p.x*p.x, p.x*p.y, p.x*p.z, p.x*p.w, p.y*p.y, p.y*p.z, p.y*p.w, p.z*p.z, p.z*p.w, p.w*p.w]
+            for t in 0..<10 { Q[vi][t] += k[t] * scale }
+        }
+        func qadd(_ A: [Double], _ B: [Double]) -> [Double] { var r = A; for t in 0..<10 { r[t] += B[t] }; return r }
+        func qerror(_ q: [Double], _ v: SIMD3<Double>) -> Double {
+            let x = v.x, y = v.y, z = v.z
+            return q[0]*x*x + 2*q[1]*x*y + 2*q[2]*x*z + 2*q[3]*x + q[4]*y*y + 2*q[5]*y*z + 2*q[6]*y + q[7]*z*z + 2*q[8]*z + q[9]
+        }
+        func optimalPos(_ q: [Double], _ fb: SIMD3<Double>) -> SIMD3<Double> {
+            let m = simd_double3x3(rows: [SIMD3<Double>(q[0],q[1],q[2]), SIMD3<Double>(q[1],q[4],q[5]), SIMD3<Double>(q[2],q[5],q[7])])
+            if abs(simd_determinant(m)) < 1e-12 { return fb }
+            return simd_inverse(m) * SIMD3<Double>(-q[3], -q[6], -q[8])
+        }
+        for (i0, i1, i2) in tris {
+            let nrm = simd_cross(verts[i1]-verts[i0], verts[i2]-verts[i0])
+            let len = simd_length(nrm); if len < 1e-12 { continue }
+            let un = nrm/len; let d = -simd_dot(un, verts[i0])
+            addPlaneTo(i0, SIMD4<Double>(un.x, un.y, un.z, d), 1)
+            addPlaneTo(i1, SIMD4<Double>(un.x, un.y, un.z, d), 1)
+            addPlaneTo(i2, SIMD4<Double>(un.x, un.y, un.z, d), 1)
+        }
+        var vertTris = [Set<Int>](repeating: [], count: nv)
+        for (ti, t) in tris.enumerated() { vertTris[t.0].insert(ti); vertTris[t.1].insert(ti); vertTris[t.2].insert(ti) }
+        var triAlive = [Bool](repeating: true, count: tris.count)
+        var vertAlive = [Bool](repeating: true, count: nv)
+        var vertVer = [Int](repeating: 0, count: nv)
+        func ekey(_ i: Int, _ j: Int) -> UInt64 { UInt64(min(i,j)) << 32 | UInt64(max(i,j)) }
+        func triEdges(_ t: (Int,Int,Int)) -> [(Int,Int)] { [(t.0,t.1),(t.1,t.2),(t.0,t.2)] }
+        var edgeCount = [UInt64: Int]()
+        for t in tris { for e in triEdges(t) { edgeCount[ekey(e.0,e.1), default: 0] += 1 } }
+        for (key, cnt) in edgeCount where cnt == 1 {  // boundary edge → saqlash penalty
+            let i = Int(key >> 32), j = Int(key & 0xFFFFFFFF)
+            let edge = verts[j] - verts[i]
+            if let anyTri = vertTris[i].first(where: { triAlive[$0] }) {
+                let t = tris[anyTri]
+                let fn = simd_cross(verts[t.1]-verts[t.0], verts[t.2]-verts[t.0])
+                var perp = simd_cross(edge, fn); let l = simd_length(perp)
+                if l > 1e-12 { perp /= l; let d = -simd_dot(perp, verts[i])
+                    addPlaneTo(i, SIMD4<Double>(perp.x, perp.y, perp.z, d), 1000)
+                    addPlaneTo(j, SIMD4<Double>(perp.x, perp.y, perp.z, d), 1000)
+                }
+            }
+        }
+        struct Cand { let cost: Double; let i: Int; let j: Int; let vi: Int; let vj: Int; let pos: SIMD3<Double> }
+        var heap = [Cand]()
+        func siftUp(_ idx0: Int) { var idx = idx0; while idx > 0 { let p = (idx-1)/2; if heap[idx].cost < heap[p].cost { heap.swapAt(idx,p); idx = p } else { break } } }
+        func siftDown(_ idx0: Int) { var idx = idx0; let cnt = heap.count; while true { var s = idx; let l = 2*idx+1, r = 2*idx+2; if l<cnt && heap[l].cost<heap[s].cost { s=l }; if r<cnt && heap[r].cost<heap[s].cost { s=r }; if s != idx { heap.swapAt(idx,s); idx=s } else { break } } }
+        func push(_ c: Cand) { heap.append(c); siftUp(heap.count-1) }
+        func pop() -> Cand? { if heap.isEmpty { return nil }; let top = heap[0]; heap[0] = heap[heap.count-1]; heap.removeLast(); if !heap.isEmpty { siftDown(0) }; return top }
+        func makeCand(_ i: Int, _ j: Int) -> Cand {
+            let q = qadd(Q[i], Q[j])
+            let mid = (verts[i]+verts[j])*0.5
+            var best = mid; var bestE = Double.infinity
+            for c in [optimalPos(q, mid), mid, verts[i], verts[j]] { let e = qerror(q, c); if e < bestE { bestE = e; best = c } }
+            return Cand(cost: bestE, i: i, j: j, vi: vertVer[i], vj: vertVer[j], pos: best)
+        }
+        var seeded = Set<UInt64>()
+        for t in tris { for e in triEdges(t) { let k = ekey(e.0,e.1); if !seeded.contains(k) { seeded.insert(k); push(makeCand(e.0, e.1)) } } }
+        var aliveTriCount = tris.count
+        func neighbors(_ i: Int) -> Set<Int> {
+            var s = Set<Int>(); for ti in vertTris[i] where triAlive[ti] { let t = tris[ti]; s.insert(t.0); s.insert(t.1); s.insert(t.2) }; s.remove(i); return s
+        }
+        while aliveTriCount > targetTriangles, let c = pop() {
+            if !vertAlive[c.i] || !vertAlive[c.j] || vertVer[c.i] != c.vi || vertVer[c.j] != c.vj { continue }
+            let i = c.i, j = c.j
+            verts[i] = c.pos; Q[i] = qadd(Q[i], Q[j]); vertAlive[j] = false
+            for ti in vertTris[j] where triAlive[ti] {
+                var t = tris[ti]
+                if t.0 == j { t.0 = i }; if t.1 == j { t.1 = i }; if t.2 == j { t.2 = i }
+                if t.0 == t.1 || t.1 == t.2 || t.0 == t.2 { triAlive[ti] = false; aliveTriCount -= 1 }
+                else { tris[ti] = t; vertTris[i].insert(ti) }
+            }
+            vertVer[i] += 1; vertVer[j] += 1
+            for nb in neighbors(i) where vertAlive[nb] { push(makeCand(i, nb)) }
+        }
+        var remap = [Int](repeating: -1, count: nv)
+        var outV = [SIMD3<Float>]()
+        for vi in 0..<nv where vertAlive[vi] { remap[vi] = outV.count; outV.append(SIMD3<Float>(Float(verts[vi].x), Float(verts[vi].y), Float(verts[vi].z))) }
+        var outT = [(v0: UInt32, v1: UInt32, v2: UInt32)]()
+        for (ti, t) in tris.enumerated() where triAlive[ti] {
+            let a = remap[t.0], b = remap[t.1], cc = remap[t.2]
+            if a >= 0 && b >= 0 && cc >= 0 && a != b && b != cc && a != cc { outT.append((UInt32(a), UInt32(b), UInt32(cc))) }
+        }
+        let fallback = [SIMD3<Float>](repeating: SIMD3<Float>(0, 1, 0), count: outV.count)
+        let outNormals = recomputeVertexNormals(verts: outV, triangles: outT, fallback: fallback)
+        NSLog("KADASTR decimate: \(triangles.count) → \(outT.count) tri (\(vertices.count) → \(outV.count) vert)")
+        return CleanedMesh(vertices: outV, normals: outNormals, triangles: outT)
+    }
+
+    /// Speckle removal — floating spike + ragged border vertex'larni qo'shnilar
+    /// markaziga TORTADI (o'chirmaydi → teshik yo'q). Spike: 1-ring o'rtacha masofa
+    /// > mean+1.5σ (mesh yuzasidan chiqib turgan nuqta). Border: boundary edge
+    /// (1 tri) vertex (ragged chekka). Laplacian pull weight 0.7, edge-aware EMAS
+    /// (spike'ni majburiy tortish). Mac (scan_007): ichki speckle ketdi, chekka
+    /// silliqlandi, teshik 0. SOR-o'chirish va erosion teshik berardi — pull bermaydi.
+    static func removeSpeckle(
+        vertices: [SIMD3<Float>],
+        normals: [SIMD3<Float>],
+        triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+        iterations: Int = 5,
+    ) -> CleanedMesh {
+        let nv = vertices.count
+        if nv < 4 || triangles.isEmpty { return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles) }
+        var adj = [Set<UInt32>](repeating: [], count: nv)
+        for t in triangles {
+            adj[Int(t.v0)].insert(t.v1); adj[Int(t.v0)].insert(t.v2)
+            adj[Int(t.v1)].insert(t.v0); adj[Int(t.v1)].insert(t.v2)
+            adj[Int(t.v2)].insert(t.v0); adj[Int(t.v2)].insert(t.v1)
+        }
+        var ringDist = [Float](repeating: 0, count: nv)
+        for i in 0..<nv {
+            let nb = adj[i]; if nb.isEmpty { continue }
+            var s: Float = 0; for n in nb { s += simd_length(vertices[Int(n)] - vertices[i]) }
+            ringDist[i] = s / Float(nb.count)
+        }
+        let valid = ringDist.filter { $0 > 0 }
+        if valid.isEmpty { return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles) }
+        let mean = valid.reduce(0, +) / Float(valid.count)
+        let variance = valid.map { ($0 - mean) * ($0 - mean) }.reduce(0, +) / Float(valid.count)
+        let thr = mean + 1.5 * sqrt(variance)
+        func ek(_ i: Int, _ j: Int) -> UInt64 { UInt64(min(i, j)) << 32 | UInt64(max(i, j)) }
+        var ec = [UInt64: Int]()
+        for t in triangles { for e in [(Int(t.v0), Int(t.v1)), (Int(t.v1), Int(t.v2)), (Int(t.v0), Int(t.v2))] { ec[ek(e.0, e.1), default: 0] += 1 } }
+        var pullMask = (0..<nv).map { ringDist[$0] > thr }
+        for (key, c) in ec where c == 1 { pullMask[Int(key >> 32)] = true; pullMask[Int(key & 0xFFFFFFFF)] = true }
+        var verts = vertices
+        for _ in 0..<iterations {
+            var newV = verts
+            for i in 0..<nv where pullMask[i] {
+                let nb = adj[i]; if nb.isEmpty { continue }
+                var c = SIMD3<Float>(0, 0, 0); for n in nb { c += verts[Int(n)] }
+                newV[i] = verts[i] * 0.3 + (c / Float(nb.count)) * 0.7
+            }
+            verts = newV
+        }
+        let outNormals = recomputeVertexNormals(verts: verts, triangles: triangles, fallback: normals)
+        NSLog("KADASTR removeSpeckle: \(pullMask.filter { $0 }.count)/\(nv) verts pulled (\(iterations) iter)")
+        return CleanedMesh(vertices: verts, normals: outNormals, triangles: triangles)
+    }
+
+    /// Normal field'ni vertex'ga TEGMASDAN Laplacian-tekislaydi (0.4 o'zi + 0.6
+    /// qo'shni o'rta, har iter renormalize). LiDAR bump-shovqinini o'chiradi,
+    /// lekin keskin qirra signalini (yuqori amplituda) saqlaydi. taubinSmooth shu
+    /// natijani qotirib edge-aware vazn uchun ishlatadi.
+    private static func presmoothNormalField(
+        _ normals: [SIMD3<Float>],
+        adjacency: [Set<UInt32>],
+        iterations: Int,
+    ) -> [SIMD3<Float>] {
+        var nrm = normals
+        for _ in 0..<iterations {
+            var out = nrm
+            for i in 0..<nrm.count {
+                let neighbors = adjacency[i]
+                if neighbors.isEmpty { continue }
+                var s = SIMD3<Float>(0, 0, 0)
+                for n in neighbors { s += nrm[Int(n)] }
+                let avg = s / Float(neighbors.count)
+                let blended = nrm[i] * 0.4 + avg * 0.6
+                let len = simd_length(blended)
+                out[i] = len > 1e-6 ? blended / len : nrm[i]
+            }
+            nrm = out
+        }
+        return nrm
     }
 
     // MARK: - 3. Drop small connected components

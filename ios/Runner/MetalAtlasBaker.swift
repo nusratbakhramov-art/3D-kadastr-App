@@ -513,7 +513,7 @@ final class MetalAtlasBaker {
         // Multi-band combine: final = blur(avg) + (best − blur(best)).
         // blur(avg) = seamless past-chastota base; (best − blur(best)) = sharp detail.
         progress?(0.90, "Multi-band blend…")
-        let blurPasses = 16
+        let blurPasses = 6   // 16 → 6: low-freq band torroq, high-freq (sharp detail) ko'proq saqlanadi
         let avgLow = gaussBlur(atlasTex, avgScratchA, avgScratchB, blurPasses)
         let bestLow = gaussBlur(bestTex, bestScratchA, bestScratchB, blurPasses)
         do {
@@ -536,7 +536,12 @@ final class MetalAtlasBaker {
         // occlusion teshiklarini sharp qo'shni rang bilan to'ldirish (4→12 pass).
         // MUHIM: dilate rangli (alpha>0.5) piksellarni TEGMAYDI — faqat bo'sh
         // joyni to'ldiradi → tiniqlikka zarari yo'q, blur bermaydi.
-        var src = combineTex
+        // Multi-band combine BLUR manbai edi (best raw qutilar matnini ko'rsatdi,
+        // multi-band o'qib bo'lmas qildi). DEFAULT: best-view raw (sharp, image
+        // to'g'ridan). Oq devor uniform → exposure seam minimal. KADASTR_MULTIBAND=1
+        // bilan eski multi-band'ga qaytish mumkin.
+        let useMultiBand = ProcessInfo.processInfo.environment["KADASTR_MULTIBAND"] == "1"
+        var src = useMultiBand ? combineTex : bestTex
         var dst = dilatedTex
         for _ in 0..<24 { runPass(dilState, src, dst); swap(&src, &dst) }
         let finalTex = src
@@ -574,7 +579,7 @@ final class MetalAtlasBaker {
         // Texture cap — 4096 USDZ uchun (downscale faqat oshib ketsa).
         let finalCG: CGImage
         var finalW = atlasW, finalH = atlasH
-        let maxTexSize = 4096
+        let maxTexSize = 4096   // 4K atlas (tezlik bottleneck — xatlas pack)
         if atlasW > maxTexSize || atlasH > maxTexSize {
             let scale = Float(maxTexSize) / Float(max(atlasW, atlasH))
             finalW = Int(Float(atlasW) * scale)

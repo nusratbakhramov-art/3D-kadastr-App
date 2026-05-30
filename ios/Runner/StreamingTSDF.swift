@@ -49,6 +49,9 @@ final class StreamingTSDF {
     private var textureCache: CVMetalTextureCache?
 
     private(set) var integratedFrameCount: Int = 0
+    /// Offline reprocess: nechta frame'da confidence data topilib mask qo'llanildi
+    /// (>0 → mesh source TSDF-primary'ga o'tadi). buildOfflineVoxelTSDF o'rnatadi.
+    var confidenceFramesUsed: Int = 0
 
     // Matches TSDFParams flat layout in TSDFIntegrator.metal
     private struct ParamsLayout {

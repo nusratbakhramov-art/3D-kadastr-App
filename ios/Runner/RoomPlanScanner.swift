@@ -1733,7 +1733,9 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             .max(by: { $0.imageResolution.width < $1.imageResolution.width }) {
             config.videoFormat = bestFormat
         }
-        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
+            config.sceneReconstruction = .meshWithClassification  // Phase 14: per-face semantik (window/door/wall/floor) capture test
+        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
             config.sceneReconstruction = .mesh
         }
         if #available(iOS 14.0, *) {
@@ -1794,7 +1796,9 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 self?.statusLabel?.alpha = 1
             }
         }
-        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
+            config.sceneReconstruction = .meshWithClassification  // Phase 14: per-face semantik (window/door/wall/floor) capture test
+        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
             config.sceneReconstruction = .mesh
         }
         if #available(iOS 14.0, *) {
@@ -2163,8 +2167,14 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         let sharpness = ImageQuality.sharpness(of: cgImage)
 
         // LiDAR depth ma'lumotini saqlash — photogrammetry sifatini keskin oshiradi.
-        if let depth = frame.smoothedSceneDepth?.depthMap ?? frame.sceneDepth?.depthMap {
-            saveDepthMap(depth, idx: idx)
+        if let sceneDepth = frame.smoothedSceneDepth ?? frame.sceneDepth {
+            saveDepthMap(sceneDepth.depthMap, idx: idx)
+            // Phase 12: confidence map ham saqlaymiz (ARConfidenceLevel 0/1/2).
+            // Offline confidence-weighted TSDF past-ishonchli (uzoq/qiya yuza) noisy
+            // depth'ni rad etib, manbada bumps'ni kamaytiradi.
+            if let conf = sceneDepth.confidenceMap {
+                saveConfidenceMap(conf, idx: idx)
+            }
         }
 
         // Gravity vektori (kamera koordinatalarida) — to'g'ri orientatsiya uchun.
@@ -2393,6 +2403,39 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             String(format: "depth_%04d.bin", idx),
         )
         try? (header + body).write(to: depthURL)
+    }
+
+    /// LiDAR depth confidence map (ARConfidenceLevel: 0=low, 1=medium, 2=high) —
+    /// 1 byte/piksel, depth bilan bir o'lchamda. Format: header(Int32 w, Int32 h) +
+    /// tightly-packed UInt8 body. Offline confidence-weighted TSDF ishlatadi.
+    private func saveConfidenceMap(_ pixelBuffer: CVPixelBuffer, idx: Int) {
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+
+        let width = CVPixelBufferGetWidth(pixelBuffer)
+        let height = CVPixelBufferGetHeight(pixelBuffer)
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return }
+        let srcRowBytes = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        let dstRowBytes = width   // OneComponent8 → 1 byte/piksel
+        var body = Data(count: dstRowBytes * height)
+        body.withUnsafeMutableBytes { dstRaw in
+            guard let dst = dstRaw.baseAddress else { return }
+            for row in 0..<height {
+                let src = baseAddress.advanced(by: row * srcRowBytes)
+                memcpy(dst.advanced(by: row * dstRowBytes), src, dstRowBytes)
+            }
+        }
+
+        var header = Data()
+        var w = Int32(width).littleEndian
+        var h = Int32(height).littleEndian
+        withUnsafeBytes(of: &w) { header.append(contentsOf: $0) }
+        withUnsafeBytes(of: &h) { header.append(contentsOf: $0) }
+
+        let url = photoFolder.appendingPathComponent(
+            String(format: "conf_%04d.bin", idx),
+        )
+        try? (header + body).write(to: url)
     }
 
     /// Gravity vektori — kamera koordinatalarida (PhotogrammetrySession kutadi).
@@ -2680,6 +2723,11 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             max(4, size.z + 2),
         )
 
+        // Phase 12: confidence threshold (env override; default 1 = medium+high).
+        let minConfidence = UInt8(clamping: ProcessInfo.processInfo.environment["KADASTR_MIN_CONFIDENCE"].flatMap { Int($0) } ?? 1)
+        var confMaskedTotal = 0
+        var confFramesWithData = 0
+
         // 2. StreamingTSDF init
         // Phase 11: voxelSize 0.05 → 0.025 (2x maydaroq). Divan kabi yumshoq/mayda
         // mebel qiya burchakdan olinganda 5cm voxel yupqa/chala yuza berardi.
@@ -2729,6 +2777,31 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 }
             }
 
+            // Phase 12: confidence-weighted — past-ishonchli (noisy) depth piksellarni
+            // INVALID (0) qilamiz. TSDF kernel depthObs<=0.05 ni skip qiladi, shuning
+            // uchun mask = depth'ni 0 qilish (kernel o'zgarmaydi). ARConfidenceLevel:
+            // 0=low, 1=medium, 2=high. minConf=1 → low rad (medium+high qoladi).
+            // Eski skanlarda conf_*.bin yo'q → masking o'tkazib yuboriladi (orqaga mos).
+            if minConfidence > 0 {
+                let confURL = photoFolder.appendingPathComponent(String(format: "conf_%04d.bin", idx))
+                if let confData = try? Data(contentsOf: confURL), confData.count >= 8 {
+                    let cw = Int(confData.withUnsafeBytes { $0.load(fromByteOffset: 0, as: Int32.self) })
+                    let ch = Int(confData.withUnsafeBytes { $0.load(fromByteOffset: 4, as: Int32.self) })
+                    if cw == dw, ch == dh, confData.count >= 8 + cw * ch {
+                        var masked = 0
+                        confData.withUnsafeBytes { raw in
+                            let conf = raw.baseAddress!.advanced(by: 8).assumingMemoryBound(to: UInt8.self)
+                            for p in 0..<pixCount where conf[p] < minConfidence {
+                                depth[p] = 0
+                                masked += 1
+                            }
+                        }
+                        confMaskedTotal += masked
+                        confFramesWithData += 1
+                    }
+                }
+            }
+
             // Build matrices
             let t = simd_float4x4(rows: [
                 SIMD4<Float>(tRows[0][0], tRows[0][1], tRows[0][2], tRows[0][3]),
@@ -2757,6 +2830,12 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         }
         if skippedNoFields > 0 {
             NSLog("KADASTR buildOfflineVoxelTSDF: skipped \(skippedNoFields)/\(total) frames due to missing/invalid fields")
+        }
+        tsdf.confidenceFramesUsed = confFramesWithData
+        if confFramesWithData > 0 {
+            NSLog("KADASTR confidence mask: \(confFramesWithData)/\(total) frames had conf data, \(confMaskedTotal) px rejected (minConf=\(minConfidence))")
+        } else {
+            NSLog("KADASTR confidence mask: NO conf_*.bin found (old scan?) — no confidence filtering applied")
         }
         progress?(1.0)
         return tsdf
@@ -3223,15 +3302,33 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
 
         if let streamMesh = streamingTSDF?.extractMesh(), streamMesh.vertices.count > 100 {
             NSLog("KADASTR StreamingTSDF mesh: \(streamMesh.vertices.count) vert, \(streamMesh.triangles.count) tri")
-            if ProcessInfo.processInfo.environment["KADASTR_TSDF_ONLY"] == "1" {
-                // DEBUG: ARKit'ni butunlay chetlab, faqat TSDF mesh — divan TSDF'da
-                // yaxshiroqmi tekshirish uchun.
+            // Confidence data bor (yangi skan) → TSDF endi ishonchli → TSDF-primary.
+            // confidenceFramesUsed buildOfflineVoxelTSDF'da o'rnatiladi (offline reprocess).
+            let confFrames = streamingTSDF?.confidenceFramesUsed ?? 0
+            let meshSource = ProcessInfo.processInfo.environment["KADASTR_MESH_SOURCE"]
+                ?? (confFrames > 0 ? "tsdf_primary" : "arkit_primary")
+            if meshSource == "tsdf_only" {
+                // DEBUG: ARKit'ni butunlay chetlab, faqat TSDF mesh.
                 hybridVerts = streamMesh.vertices
                 hybridNormals = streamMesh.normals
                 hybridTris = streamMesh.triangles
-                NSLog("KADASTR TSDF-ONLY mode: \(streamMesh.triangles.count) tri (ARKit chetlandi)")
+                NSLog("KADASTR mesh source: TSDF-ONLY \(streamMesh.triangles.count) tri (ARKit chetlandi)")
+            } else if meshSource == "tsdf_primary" {
+                // Phase 12: TSDF ASOSIY + ARKit hole-fill. Confidence-weighted TSDF
+                // (noisy depth rad etilgan) endi ishonchli asos — ARKit'dan silliqroq
+                // va ko'proq detailli. ARKit faqat TSDF ko'rmagan teshiklarni to'ldiradi.
+                // combine() ning "arkit" sloti = primary, "tsdf" sloti = hole-fill.
+                let hybrid = HybridMeshBuilder.combine(
+                    arkitVerts: streamMesh.vertices, arkitNormals: streamMesh.normals, arkitTris: streamMesh.triangles,
+                    tsdfVerts: rawVerts, tsdfNormals: rawNormals, tsdfTris: rawTris,
+                    minDistanceFromArkit: 0.06,
+                )
+                hybridVerts = hybrid.vertices
+                hybridNormals = hybrid.normals
+                hybridTris = hybrid.triangles
+                NSLog("KADASTR mesh source: TSDF-PRIMARY \(hybrid.arkitCount) TSDF + \(hybrid.fillCount) ARKit-fill = \(hybrid.triangles.count) total")
             } else {
-                // Hybrid: ARKit + streaming TSDF (TSDF hole-fill rolida)
+                // Hozirgi (eski skan, confidence yo'q): ARKit asosiy + TSDF hole-fill.
                 let hybrid = HybridMeshBuilder.combine(
                     arkitVerts: rawVerts, arkitNormals: rawNormals, arkitTris: rawTris,
                     tsdfVerts: streamMesh.vertices, tsdfNormals: streamMesh.normals,
@@ -3241,7 +3338,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 hybridVerts = hybrid.vertices
                 hybridNormals = hybrid.normals
                 hybridTris = hybrid.triangles
-                NSLog("KADASTR hybrid (streaming): \(hybrid.arkitCount) ARKit + \(hybrid.fillCount) stream = \(hybrid.triangles.count) total")
+                NSLog("KADASTR mesh source: ARKit-PRIMARY \(hybrid.arkitCount) ARKit + \(hybrid.fillCount) stream = \(hybrid.triangles.count) total")
             }
         } else if !tsdfCameras.isEmpty {
             // Fallback: eski batch TSDF
@@ -3331,26 +3428,75 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             minSizeRatio: 0.10,   // 0.40 → 0.10: faqat juda kichik isolated parchalar drop
         )
 
-        // Phase 11: Taubin smoothing 5 iter (λ=0.35 yengil, µ=-0.38 shrink-free band-pass).
-        // Yuqori-chastotali ARKit LiDAR noise'ni tekislaydi; divan tufting kabi katta
-        // xususiyatlar saqlanadi. Eslatma: devorning PAST-chastotali to'lqini (LiDAR
-        // depth drift) Taubin bilan ketmaydi — buning uchun planar fit kerak (kelajak).
-        // Sinaб ko'rildi: 10 iter ham past-chastota to'lqinni o'zgartirmadi → 5 yetarli.
+        // DEBUG: KADASTR_DUMP_RAW=1 → smoothing'gacha bo'lgan xom (LCC) mesh'ni
+        // /tmp/kadastr_raw.obj ga yozadi. Mac'da smoothing param'larini xom
+        // voxel-mesh'da (haqiqiy holat) tez sinash uchun — sim build/scan'siz.
+        if ProcessInfo.processInfo.environment["KADASTR_DUMP_RAW"] != nil {
+            Self.dumpRawOBJ(verts: lccFiltered.vertices, normals: lccFiltered.normals,
+                            tris: lccFiltered.triangles, path: "/tmp/kadastr_raw.obj")
+        }
+
+        // Phase 11b: PRE-SMOOTHED FROZEN-NORMAL edge-aware Taubin (λ=0.5, µ=-0.53).
+        // Bumpy devor/pol (ARKit LiDAR depth noise) tekislanadi, qirra (quti/shkaf/
+        // divan/eshik) saqlanadi. KALIT: edge-detection normalini bir marta pre-smooth
+        // qilib QOTIRAMIZ (normalPresmoothIterations). Xom LiDAR normal bump-shovqinli —
+        // to'g'ridan ishlatilsa har bump "qirra" deb bloklanardi (eski edgeSharpness=2 →
+        // 3%); iter'da yangilansa qirra erirdi (edgeShift ~17mm + iter12 qora dog').
+        // Pre-smooth bump-shovqinni o'chiradi, strukturaviy qirra signalini saqlaydi.
+        // Mac diagnostika (presmooth 12/es 12/iter 7): ~60% roughness↓, qora dog' 0%,
+        // qirra tex'da saqlangan.
         await MainActor.run {
             self.processingStatusLabel.text = "Smoothing mesh…"
             self.progressView.setProgress(0.35, animated: true)
         }
+        // Phase 14: plane-constrained Laplacian — devor/pol/shiftni TEKIS qiladi (LiDAR
+        // horizontal banding'ni o'ldiradi). XOM mesh'da, taubin'dan OLDIN! — Mac validatsiya
+        // aynan shu bosqichda (RMS 17.6→1.7mm). Taubin edge-aware bandlarni "qirra" deb
+        // SAQLAYDI, shuning uchun flatten AVVAL bo'lishi shart (post-taubin samarasiz edi).
+        // Faqat plane-vert ko'chadi → mebel/quti edge saqlanadi. KADASTR_NO_FLATTEN=1 o'chiradi.
+        let flattened: CleanedMesh
+        if ProcessInfo.processInfo.environment["KADASTR_NO_FLATTEN"] != nil {
+            flattened = lccFiltered
+        } else {
+            flattened = MeshCleaner.flattenWallsLaplacian(
+                vertices: lccFiltered.vertices,
+                normals: lccFiltered.normals,
+                triangles: lccFiltered.triangles,
+            )
+        }
         let smoothed = MeshCleaner.taubinSmooth(
-            vertices: lccFiltered.vertices,
-            normals: lccFiltered.normals,
-            triangles: lccFiltered.triangles,
-            lambda: 0.35,
-            mu: -0.38,
-            iterations: 5,
+            vertices: flattened.vertices,
+            normals: flattened.normals,
+            triangles: flattened.triangles,
+            lambda: 0.5,
+            mu: -0.53,
+            iterations: 7,
+            edgeSharpness: 12,
+            normalPresmoothIterations: 12,
         )
-        let globalVerts = smoothed.vertices
-        let globalNormals = smoothed.normals
-        let globalTris = smoothed.triangles
+        // Phase 12b: speckle removal — floating spike + ragged border'ni qo'shnilar
+        // markaziga tortadi (teshiksiz). Confidence past joylardagi qoldiq noise'ni
+        // tozalaydi.
+        let despeckled = MeshCleaner.removeSpeckle(
+            vertices: smoothed.vertices,
+            normals: smoothed.normals,
+            triangles: smoothed.triangles,
+        )
+        // Phase 12: QEM decimation — xatlas UV unwrap tri soniga sezgir (TSDF-primary
+        // 269k → 35 min). Mesh'ni 130k tri'ga tushiramiz (planar yuza agressiv,
+        // qirra saqlanadi) → xatlas ~2x tez, detail yo'qolmaydi. tri ≤ target → skip.
+        // DIQQAT: plane-snap shu yerda EMAS — u xatlas'ni 6min'ga sekinlashtiradi (snap
+        // sliver/degenerate yaratadi → piecewise param qotади). Snap atlas bake'dan KEYIN
+        // (filteredResult.vertices) — xatlas tez (normal mesh), tekstura UV orqali birga ko'chadi.
+        let decimated = MeshCleaner.decimate(
+            vertices: despeckled.vertices,
+            normals: despeckled.normals,
+            triangles: despeckled.triangles,
+            targetTriangles: 130_000,
+        )
+        let globalVerts = decimated.vertices
+        let globalNormals = decimated.normals
+        let globalTris = decimated.triangles
         await MainActor.run {
             self.processingStatusLabel.text = "Extracting mesh… \(globalTris.count) tri"
             self.progressView.setProgress(0.34, animated: true)
@@ -3510,11 +3656,11 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 normals: globalNormals,
                 triangles: globalTris,
                 cameras: bakeCameras,
-                atlasResolution: 4096,           // 4K atlas (memory safe; 6K → OOM crash)
+                atlasResolution: 4096,           // 4K: xatlas pack 6K'dan 2-3x tez (bottleneck). best-raw tiniqlikni saqlaydi.
                 cameraBatchSize: 4,              // hi-res 12MP × 4 = ~196 MB per batch
                 downsampleFactor: 1,             // full source (4032×3024 hi-res)
                 voxelColor: voxelVolume,         // Phase 2: gray patches → voxel color
-                useCubeProjectionUV: false,      // TEST: xatlas — oblik yuzalarni qoplaydimi?
+                useCubeProjectionUV: false,      // xatlas (sifatli, teshiksiz). Cube UV oblik yuzalarni parchalaydi — yaroqsiz.
                 progress: { p, msg in
                     Task { @MainActor in
                         self.processingStatusLabel.text = msg
@@ -3558,17 +3704,25 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // kontrasti aniqlashadi (halo/grain'siz, Mac'da 1.8/0.5 tasdiqlangan).
         let enhancedAtlas: UIImage = Self.sharpenAtlas(bakeResult.atlas)
 
+        // Phase 12c: ICHKI single-sided ko'rinish. Winding (v1<->v2) + normal flip →
+        // mesh ichki yuzasi front-face bo'ladi. Xona ICHIDAN qaralganda devor ichki
+        // yuzasi + mebel ko'rinadi, tashqi qobiq cull qilinadi (foydalanuvchi virtual
+        // tur — ichki ko'rinishni xohladi, tashqi qobiq kerak emas). Material single-sided.
+        var innerNormals = filteredResult.normals
+        for i in 0..<innerNormals.count { innerNormals[i] = -innerNormals[i] }
+        var innerIndices = filteredResult.indices
+        var fi = 0; while fi + 2 < innerIndices.count { innerIndices.swapAt(fi + 1, fi + 2); fi += 3 }
         // Build SCNGeometry from xatlas-unwrapped mesh + atlas texture.
         let geom = Self.buildSubMeshGeometry(
             vertices: filteredResult.vertices,
-            normals: filteredResult.normals,
+            normals: innerNormals,
             uvs: filteredResult.uvs,
-            indices: filteredResult.indices,
+            indices: innerIndices,
         )
         NSLog("KADASTR atlas attached: \(bakeResult.atlasWidth)×\(bakeResult.atlasHeight) (enhanced: \(Int(enhancedAtlas.size.width))×\(Int(enhancedAtlas.size.height)))")
         let mat = SCNMaterial()
         mat.lightingModel = .constant
-        mat.isDoubleSided = true
+        mat.isDoubleSided = false   // Phase 12c: ichki single-sided (tashqi qobiq cull)
         mat.diffuse.contents = enhancedAtlas
         mat.diffuse.magnificationFilter = .nearest  // sharp pixels (no bilinear blur)
         mat.diffuse.minificationFilter = .linear    // smooth zoom-out
@@ -4246,6 +4400,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         let worldVertices: [SIMD3<Float>]    // world-space (pre-computed)
         let worldNormals: [SIMD3<Float>]     // world-space
         let indices: [UInt32]
+        let classification: [UInt8]          // Phase 14: per-face ARMeshClassification (0=none…7=door), count == indices.count/3; bo'sh = yo'q
 
         // Phase 7: SerializedAnchor (Codable, SavedScanStorage uchun) konvertorlar.
         func toSerialized() -> SerializedAnchor {
@@ -4253,7 +4408,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 transform: transform, center: center,
                 vertices: vertices, normals: normals,
                 worldVertices: worldVertices, worldNormals: worldNormals,
-                indices: indices,
+                indices: indices, classification: classification,
             )
         }
 
@@ -4262,7 +4417,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 transform: s.transform, center: s.center,
                 vertices: s.vertices, normals: s.normals,
                 worldVertices: s.worldVertices, worldNormals: s.worldNormals,
-                indices: s.indices,
+                indices: s.indices, classification: s.classification,
             )
         }
     }
@@ -4347,6 +4502,19 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 }
             }
 
+            // Phase 14: per-face semantik klassifikatsiya (meshWithClassification bo'lsa).
+            // ARGeometrySource UInt8, count == faces.count. Yo'q bo'lsa bo'sh massiv.
+            var classif: [UInt8] = []
+            if let cls = g.classification {
+                let cBuf = cls.buffer.contents()
+                let cStride = cls.stride
+                let cCount = cls.count
+                classif.reserveCapacity(cCount)
+                for i in 0..<cCount {
+                    classif.append(cBuf.advanced(by: i * cStride).assumingMemoryBound(to: UInt8.self).pointee)
+                }
+            }
+
             out.append(AnchorRaw(
                 transform: xform,
                 center: center,
@@ -4355,6 +4523,7 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 worldVertices: world,
                 worldNormals: worldN,
                 indices: indices,
+                classification: classif,
             ))
         }
         return out
@@ -4805,12 +4974,25 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         let ci = CIImage(cgImage: cg)
         guard let f = CIFilter(name: "CIUnsharpMask") else { return image }
         f.setValue(ci, forKey: kCIInputImageKey)
-        f.setValue(1.8, forKey: kCIInputRadiusKey)
-        f.setValue(0.5, forKey: kCIInputIntensityKey)
+        f.setValue(2.2, forKey: kCIInputRadiusKey)    // 1.8 → 2.2: kuchliroq (multi-band blur kamaydi)
+        f.setValue(0.65, forKey: kCIInputIntensityKey) // 0.5 → 0.65: detail kontrasti
         guard let out = f.outputImage,
               let outCG = CIContext(options: nil).createCGImage(out, from: ci.extent)
         else { return image }
         return UIImage(cgImage: outCG)
+    }
+
+    /// DEBUG: mesh'ni Wavefront OBJ (v/vn/f) qilib yozadi. Array.joined → O(n)
+    /// (string concat O(n²) bo'lardi). Faqat smoothing param diagnostikasi uchun.
+    fileprivate static func dumpRawOBJ(verts: [SIMD3<Float>], normals: [SIMD3<Float>],
+                                       tris: [(v0: UInt32, v1: UInt32, v2: UInt32)], path: String) {
+        var lines = [String]()
+        lines.reserveCapacity(verts.count * 2 + tris.count)
+        for v in verts { lines.append("v \(v.x) \(v.y) \(v.z)") }
+        for n in normals { lines.append("vn \(n.x) \(n.y) \(n.z)") }
+        for t in tris { lines.append("f \(t.v0+1)//\(t.v0+1) \(t.v1+1)//\(t.v1+1) \(t.v2+1)//\(t.v2+1)") }
+        try? lines.joined(separator: "\n").write(toFile: path, atomically: true, encoding: .utf8)
+        NSLog("KADASTR DUMP_RAW: \(verts.count) vert, \(tris.count) tri → \(path)")
     }
 
     /// AnchorRaw'dan SCNGeometry yaratish — vertex (world-space), normal, UV (optional).
