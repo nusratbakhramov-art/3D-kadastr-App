@@ -696,6 +696,438 @@ enum MeshCleaner {
         return CleanedMesh(vertices: P, normals: newNormals, triangles: triangles)
     }
 
+    // MARK: - Concave footprint helpers (Phase 15b)
+    // Occupancy-based footprint → har shaklni ushlaydi (L-room, alkov, concave notch).
+    // Mac (wall_complete v1-v5, kadastr_raw.obj L-room) isbotlandi: 6-burchak concave,
+    // watertight ✓, 22.8 m². RANSAC convex (4 burchak quti) o'rniga.
+
+    /// Barcha vertexni XZ ga proyeksiya → occupancy grid (true=band egallangan).
+    private static func occupancyMask(_ V: [SIMD3<Float>], res: Float)
+        -> (mask: [Bool], w: Int, h: Int, minX: Float, minZ: Float) {
+        var minX = Float.greatestFiniteMagnitude, minZ = Float.greatestFiniteMagnitude
+        var maxX = -Float.greatestFiniteMagnitude, maxZ = -Float.greatestFiniteMagnitude
+        for v in V { minX = min(minX, v.x); maxX = max(maxX, v.x); minZ = min(minZ, v.z); maxZ = max(maxZ, v.z) }
+        minX -= 0.3; minZ -= 0.3; maxX += 0.3; maxZ += 0.3
+        let w = max(1, Int(((maxX - minX) / res).rounded(.up)))
+        let h = max(1, Int(((maxZ - minZ) / res).rounded(.up)))
+        var mask = [Bool](repeating: false, count: w * h)
+        for v in V {
+            let gx = min(w - 1, max(0, Int((v.x - minX) / res)))
+            let gz = min(h - 1, max(0, Int((v.z - minZ) / res)))
+            mask[gz * w + gx] = true
+        }
+        return (mask, w, h, minX, minZ)
+    }
+
+    private static func dilateMask(_ m: [Bool], _ w: Int, _ h: Int, _ k: Int) -> [Bool] {
+        var cur = m
+        for _ in 0..<k {
+            var o = cur
+            for y in 0..<h { for x in 0..<w where cur[y * w + x] {
+                for dy in -1...1 { for dx in -1...1 {
+                    let ny = y + dy, nx = x + dx
+                    if ny >= 0 && ny < h && nx >= 0 && nx < w { o[ny * w + nx] = true }
+                } }
+            } }
+            cur = o
+        }
+        return cur
+    }
+
+    private static func erodeMask(_ m: [Bool], _ w: Int, _ h: Int, _ k: Int) -> [Bool] {
+        dilateMask(m.map { !$0 }, w, h, k).map { !$0 }
+    }
+
+    /// Border'dan bo'sh kataklar = tashqari (flood). inside = ~tashqari (occ + ichki teshik).
+    private static func fillInside(_ occ: [Bool], _ w: Int, _ h: Int) -> [Bool] {
+        var outside = [Bool](repeating: false, count: w * h)
+        var stack = [Int]()
+        @inline(__always) func push(_ i: Int) { if !occ[i] && !outside[i] { outside[i] = true; stack.append(i) } }
+        for x in 0..<w { push(x); push((h - 1) * w + x) }
+        for y in 0..<h { push(y * w); push(y * w + w - 1) }
+        while let i = stack.popLast() {
+            let x = i % w, y = i / w
+            if x > 0 { push(i - 1) }; if x < w - 1 { push(i + 1) }
+            if y > 0 { push(i - w) }; if y < h - 1 { push(i + w) }
+        }
+        return (0..<w * h).map { !outside[$0] }
+    }
+
+    private static func largestComponent(_ m: [Bool], _ w: Int, _ h: Int) -> [Bool] {
+        var label = [Int](repeating: 0, count: w * h)
+        var cur = 0, best = 0, bestLabel = 0
+        var stack = [Int]()
+        for s in 0..<w * h where m[s] && label[s] == 0 {
+            cur += 1; var cnt = 0; label[s] = cur; stack.append(s)
+            while let i = stack.popLast() {
+                cnt += 1
+                let x = i % w, y = i / w
+                for dy in -1...1 { for dx in -1...1 {
+                    let ny = y + dy, nx = x + dx
+                    if ny >= 0 && ny < h && nx >= 0 && nx < w {
+                        let j = ny * w + nx
+                        if m[j] && label[j] == 0 { label[j] = cur; stack.append(j) }
+                    }
+                } }
+            }
+            if cnt > best { best = cnt; bestLabel = cur }
+        }
+        return (0..<w * h).map { label[$0] == bestLabel }
+    }
+
+    /// Moore-neighbor boundary trace (8-connectivity). Grid (y,x) ketma-ketligi.
+    private static func mooreTrace(_ m: [Bool], _ w: Int, _ h: Int) -> [(Int, Int)] {
+        var sy = -1, sx = -1
+        outer: for y in 0..<h { for x in 0..<w where m[y * w + x] { sy = y; sx = x; break outer } }
+        if sy < 0 { return [] }
+        let nbr = [(0, -1), (-1, -1), (-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (1, -1)]
+        var cont: [(Int, Int)] = [(sy, sx)]
+        var cy = sy, cx = sx, bd = 0
+        var guardN = 0
+        while guardN < 10 * w * h {
+            guardN += 1
+            var found = false
+            for k in 0..<8 {
+                let di = (bd + k) % 8
+                let (dy, dx) = nbr[di]
+                let ny = cy + dy, nx = cx + dx
+                if ny >= 0 && ny < h && nx >= 0 && nx < w && m[ny * w + nx] {
+                    cont.append((ny, nx)); bd = (di + 6) % 8; cy = ny; cx = nx; found = true; break
+                }
+            }
+            if !found { break }
+            if cy == sy && cx == sx && cont.count > 2 { break }
+        }
+        if cont.count > 1 { cont.removeLast() }
+        return cont
+    }
+
+    private static func douglasPeucker(_ pts: [SIMD2<Float>], _ eps: Float) -> [SIMD2<Float>] {
+        if pts.count < 3 { return pts }
+        let a = pts.first!, b = pts.last!
+        let ab = b - a; let L = simd_length(ab)
+        var maxD: Float = -1; var idx = 0
+        for i in 1..<pts.count - 1 {
+            let p = pts[i] - a
+            let d = L < 1e-9 ? simd_length(pts[i] - a) : abs(p.x * ab.y - p.y * ab.x) / L
+            if d > maxD { maxD = d; idx = i }
+        }
+        if maxD > eps {
+            let left = douglasPeucker(Array(pts[0...idx]), eps)
+            let right = douglasPeucker(Array(pts[idx..<pts.count]), eps)
+            return Array(left.dropLast()) + right
+        }
+        return [a, b]
+    }
+
+    /// Ketma-ket bir xil yo'nalishli (H=0:v const / V=1:u const) edge'larni run'ga
+    /// birlashtir. const = edge-uzunlik og'irlikli o'rtacha.
+    private static func edgeRuns(_ P: [SIMD2<Float>]) -> [(cls: Int, k: Float)]? {
+        let n = P.count
+        if n < 4 { return nil }
+        var ec = [Int](repeating: 0, count: n)
+        var el = [Float](repeating: 0, count: n)
+        for i in 0..<n {
+            let e = P[(i + 1) % n] - P[i]
+            el[i] = simd_length(e)
+            ec[i] = abs(e.x) >= abs(e.y) ? 0 : 1
+        }
+        var s = -1
+        for i in 0..<n where ec[i] != ec[(i + n - 1) % n] { s = i; break }
+        if s < 0 { return nil }
+        var runs: [(cls: Int, num: Float, den: Float)] = []
+        for k in 0..<n {
+            let i = (s + k) % n
+            let c = ec[i]
+            let emid = (P[i] + P[(i + 1) % n]) * 0.5
+            let key = c == 0 ? emid.y : emid.x
+            if var last = runs.last, last.cls == c {
+                last.num += key * el[i]; last.den += el[i]; runs[runs.count - 1] = last
+            } else {
+                runs.append((c, key * el[i], el[i]))
+            }
+        }
+        var R = runs.map { (cls: $0.cls, k: $0.num / max($0.den, 1e-9)) }
+        if R.count > 1 && R[0].cls == R[R.count - 1].cls {
+            R[0].k = (R[0].k + R[R.count - 1].k) / 2; R.removeLast()
+        }
+        return R
+    }
+
+    private static func cornersOfRuns(_ R: [(cls: Int, k: Float)]) -> [SIMD2<Float>] {
+        let m = R.count
+        var C = [SIMD2<Float>]()
+        for k in 0..<m {
+            let a = R[k], b = R[(k + 1) % m]
+            C.append(a.cls == 0 ? SIMD2<Float>(b.k, a.k) : SIMD2<Float>(a.k, b.k))
+        }
+        return C
+    }
+
+    /// Rektilinear regularizatsiya: run-merge + minLen'dan qisqa run'ni iterativ o'chir
+    /// (qo'shni parallel ikki run birlashadi → mebel/shovqin zigzag yo'qoladi).
+    private static func regularizeRect(_ P: [SIMD2<Float>], minLen: Float) -> [SIMD2<Float>] {
+        guard var R = edgeRuns(P) else { return P }
+        var guardN = 0
+        while R.count > 4 && guardN < 200 {
+            guardN += 1
+            let C = cornersOfRuns(R); let m = R.count
+            var minL = Float.greatestFiniteMagnitude; var ki = 0
+            for k in 0..<m {
+                let l = simd_length(C[k] - C[(k + m - 1) % m])
+                if l < minL { minL = l; ki = k }
+            }
+            if minL >= minLen { break }
+            let a = R[(ki + m - 1) % m], b = R[(ki + 1) % m]
+            let merged = (cls: a.cls, k: (a.k + b.k) / 2)
+            var newR = [(cls: Int, k: Float)]()
+            for j in 0..<m {
+                if j == (ki + m - 1) % m { newR.append(merged) }
+                else if j == ki || j == (ki + 1) % m { continue }
+                else { newR.append(R[j]) }
+            }
+            var out = [(cls: Int, k: Float)]()
+            for r in newR {
+                if let last = out.last, last.cls == r.cls { out[out.count - 1].k = (out[out.count - 1].k + r.k) / 2 }
+                else { out.append(r) }
+            }
+            if out.count > 1 && out[0].cls == out[out.count - 1].cls {
+                out[0].k = (out[0].k + out[out.count - 1].k) / 2; out.removeLast()
+            }
+            R = out
+        }
+        return cornersOfRuns(R)
+    }
+
+    /// Ear clipping (CCW polygon). Concave footprint floor/ceiling triangulatsiyasi.
+    /// (Centroid-fan concave'da uchburchakni polygon tashqarisiga chiqaradi — yaramaydi.)
+    private static func earClip(_ P: [SIMD2<Float>]) -> [(Int, Int, Int)] {
+        let n = P.count
+        if n < 3 { return [] }
+        var idx = Array(0..<n)
+        var tris = [(Int, Int, Int)]()
+        @inline(__always) func cross(_ o: SIMD2<Float>, _ a: SIMD2<Float>, _ b: SIMD2<Float>) -> Float {
+            (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+        }
+        func inTri(_ p: SIMD2<Float>, _ a: SIMD2<Float>, _ b: SIMD2<Float>, _ c: SIMD2<Float>) -> Bool {
+            let d1 = cross(p, a, b), d2 = cross(p, b, c), d3 = cross(p, c, a)
+            let neg = d1 < 0 || d2 < 0 || d3 < 0, pos = d1 > 0 || d2 > 0 || d3 > 0
+            return !(neg && pos)
+        }
+        var guardN = 0
+        while idx.count > 3 && guardN < 10 * n {
+            guardN += 1
+            var clipped = false
+            for k in 0..<idx.count {
+                let i0 = idx[(k + idx.count - 1) % idx.count], i1 = idx[k], i2 = idx[(k + 1) % idx.count]
+                let a = P[i0], b = P[i1], c = P[i2]
+                if cross(a, b, c) <= 0 { continue }  // reflex burchak → ear emas
+                var ok = true
+                for j in idx where j != i0 && j != i1 && j != i2 {
+                    if inTri(P[j], a, b, c) { ok = false; break }
+                }
+                if ok { tris.append((i0, i1, i2)); idx.remove(at: k); clipped = true; break }
+            }
+            if !clipped { break }
+        }
+        if idx.count == 3 { tris.append((idx[0], idx[1], idx[2])) }
+        return tris
+    }
+
+    /// Phase 15b: CONCAVE footprint clean-room. θ (vertikal vertex-normal circular mean
+    /// mod 90) → occupancy mask → close → fill → largest CC → Moore kontur → room-frame
+    /// → Douglas-Peucker → rektilinear regularizatsiya → world burchaklar → ear-clip
+    /// floor/ceiling + wall extrude (INWARD normal). nil → caller convex fallback'ga tushadi.
+    static func buildCleanRoomConcave(
+        vertices: [SIMD3<Float>],
+        normals: [SIMD3<Float>],
+        triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+    ) -> CleanedMesh? {
+        let V = vertices, N = normals, nv = V.count
+        if nv < 3000 || triangles.isEmpty { return nil }
+        // θ: vertikal vertex-normallar (|ny|<0.5) circular mean (mod 90 → ×4).
+        var sx: Float = 0, sy: Float = 0
+        for n in N where abs(n.y) < 0.5 {
+            let ang = atan2(n.z, n.x) * 4
+            sx += cos(ang); sy += sin(ang)
+        }
+        let theta = atan2(sy, sx) / 4
+        let ct = cos(theta), st = sin(theta)
+        @inline(__always) func toRoom(_ p: SIMD2<Float>) -> SIMD2<Float> { SIMD2<Float>(ct * p.x + st * p.y, -st * p.x + ct * p.y) }
+        @inline(__always) func toWorld(_ p: SIMD2<Float>) -> SIMD2<Float> { SIMD2<Float>(ct * p.x - st * p.y, st * p.x + ct * p.y) }
+        // Occupancy → solid footprint mask.
+        let res: Float = 0.05
+        let (occ0, w, h, minX, minZ) = occupancyMask(V, res: res)
+        if w < 4 || h < 4 { return nil }
+        let closed = erodeMask(dilateMask(occ0, w, h, 2), w, h, 2)
+        var inside = fillInside(closed, w, h)
+        inside = dilateMask(erodeMask(inside, w, h, 1), w, h, 1)  // open: kichik shovqin
+        let cc = largestComponent(inside, w, h)
+        // Moore kontur → world XZ.
+        let traced = mooreTrace(cc, w, h)
+        if traced.count < 8 { return nil }
+        let contour = traced.map { (yx) -> SIMD2<Float> in
+            SIMD2<Float>(minX + (Float(yx.1) + 0.5) * res, minZ + (Float(yx.0) + 0.5) * res)
+        }
+        // Room-frame → DP → regularize → world burchaklar.
+        var uv = contour.map { toRoom($0) }
+        uv.append(uv[0])
+        var simp = douglasPeucker(uv, 0.05)
+        if simp.count > 1 { simp.removeLast() }
+        let regUV = regularizeRect(simp, minLen: 0.6)
+        if regUV.count < 4 { return nil }
+        var corners = regUV.map { toWorld($0) }
+        // CCW majburla (shoelace > 0).
+        func shoelace(_ P: [SIMD2<Float>]) -> Float {
+            var s: Float = 0; let m = P.count
+            for i in 0..<m { s += P[i].x * P[(i + 1) % m].y - P[(i + 1) % m].x * P[i].y }
+            return 0.5 * s
+        }
+        if shoelace(corners) < 0 { corners.reverse() }
+        let area = abs(shoelace(corners))
+        if area < 1.0 || area > 400.0 { return nil }  // sanity: 1-400 m²
+        // floor/ceil Y.
+        let ys = V.map { $0.y }.sorted()
+        let floorY = ys[ys.count / 100], ceilY = ys[ys.count * 99 / 100]
+        if ceilY - floorY < 1.2 { return nil }
+        // Mesh: shared floor/ceil verts (watertight).
+        let nc = corners.count
+        var outV: [SIMD3<Float>] = []
+        for p in corners { outV.append(SIMD3<Float>(p.x, floorY, p.y)) }   // 0..<nc floor
+        for p in corners { outV.append(SIMD3<Float>(p.x, ceilY, p.y)) }    // nc..<2nc ceil
+        var outT: [(v0: UInt32, v1: UInt32, v2: UInt32)] = []
+        let caps = earClip(corners)
+        if caps.count < nc - 2 { return nil }  // triangulatsiya muvaffaqiyatsiz
+        // Floor caps: inward normal = UP (+Y).
+        for (a, b, c) in caps {
+            let A = outV[a], B = outV[b], C = outV[c]
+            let nrm = simd_cross(B - A, C - A)
+            if nrm.y > 0 { outT.append((UInt32(a), UInt32(b), UInt32(c))) }
+            else { outT.append((UInt32(a), UInt32(c), UInt32(b))) }
+        }
+        // Ceiling caps: inward normal = DOWN (−Y).
+        for (a, b, c) in caps {
+            let A = outV[nc + a], B = outV[nc + b], C = outV[nc + c]
+            let nrm = simd_cross(B - A, C - A)
+            if nrm.y < 0 { outT.append((UInt32(nc + a), UInt32(nc + b), UInt32(nc + c))) }
+            else { outT.append((UInt32(nc + a), UInt32(nc + c), UInt32(nc + b))) }
+        }
+        // Walls: har edge i→i+1. INWARD normal = footprint QIRRA yo'nalishidan (CCW
+        // polygon, shoelace>0 → interior qirraning CHAP tomonida: XZ normal = (-dz, dx)).
+        // DIQQAT: centroid EMAS — concave (L) xonada centroid ba'zi devorning NOTO'G'RI
+        // tomonida bo'lib, o'sha devorni teskari (outward) qilardi (qora/ichkari-tashqari).
+        for i in 0..<nc {
+            let j = (i + 1) % nc
+            let a2 = corners[i], b2 = corners[j]
+            let inward = SIMD3<Float>(-(b2.y - a2.y), 0, b2.x - a2.x)  // CCW interior (XZ; .y=z)
+            var q = [i, nc + i, nc + j, j].map { UInt32($0) }  // fl_i, ce_i, ce_j, fl_j
+            let A = outV[Int(q[0])], B = outV[Int(q[1])], C = outV[Int(q[2])]
+            let fn = simd_cross(B - A, C - A)
+            if simd_dot(fn, inward) < 0 { q = [i, j, nc + j, nc + i].map { UInt32($0) } }
+            outT.append((q[0], q[1], q[2])); outT.append((q[0], q[2], q[3]))
+        }
+        let outN = recomputeVertexNormals(verts: outV, triangles: outT,
+                                          fallback: [SIMD3<Float>](repeating: SIMD3<Float>(0, 1, 0), count: outV.count))
+        NSLog("KADASTR buildCleanRoomConcave: θ=\(Int(theta * 180 / .pi))° \(nc) burchak \(String(format: "%.1f", area))m² → \(outV.count)v \(outT.count)tri")
+        return CleanedMesh(vertices: outV, normals: outN, triangles: outT)
+    }
+
+    /// Phase 15 (wall-completion): messy TSDF mesh o'rniga TOZA WATERTIGHT xona quradi.
+    /// Avval CONCAVE (occupancy) — L-room/alkov ushlaydi. Muvaffaqiyatsiz bo'lsa pastdagi
+    /// RANSAC CONVEX fallback (4-burchak quti). INWARD normal (bake kameralar ichkarida).
+    /// Mac validatsiya: concave 6-burchak/22.8m² watertight, convex 16 tri. Plan topilmasa input.
+    static func buildCleanRoom(
+        vertices: [SIMD3<Float>],
+        normals: [SIMD3<Float>],
+        triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+    ) -> CleanedMesh {
+        let nv = vertices.count
+        if nv < 3000 || triangles.isEmpty { return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles) }
+        // Phase 15b: avval CONCAVE (occupancy) — L-room/alkov/notch ushlaydi. nil bo'lsa
+        // pastdagi RANSAC convex fallback ishlaydi (degradatsiya, crash emas).
+        if let concave = buildCleanRoomConcave(vertices: vertices, normals: normals, triangles: triangles) {
+            return concave
+        }
+        let V = vertices, N = normals
+        let band: Float = 0.08, ndot: Float = 0.5, minIn = 3000, maxP = 16, candN = 250
+        var assigned = [Int](repeating: -1, count: nv)
+        var avail = [Bool](repeating: true, count: nv)
+        var planes: [(c: SIMD3<Float>, n: SIMD3<Float>)] = []
+        var rng: UInt64 = 7
+        @inline(__always) func rnd(_ b: Int) -> Int { rng = rng &* 6364136223846793005 &+ 1442695040888963407; return Int((rng >> 33) % UInt64(max(b, 1))) }
+        for _ in 0..<maxP {
+            var pool: [Int] = []; for i in 0..<nv where avail[i] { pool.append(i) }
+            if pool.count < minIn { break }
+            var bc = 0; var bC = SIMD3<Float>(0, 0, 0); var bN = SIMD3<Float>(0, 1, 0)
+            for _ in 0..<candN {
+                let ci = pool[rnd(pool.count)]; let pp = V[ci]; let pn = N[ci]
+                var cnt = 0; var j = 0
+                while j < pool.count { let i = pool[j]; if abs(simd_dot(V[i] - pp, pn)) < band && simd_dot(N[i], pn) > ndot { cnt += 1 }; j += 2 }
+                if cnt > bc { bc = cnt; bC = pp; bN = pn }
+            }
+            if bc * 2 < minIn { break }
+            var sumP = SIMD3<Float>(0, 0, 0); var sumN = SIMD3<Float>(0, 0, 0); var k = 0
+            for i in pool where abs(simd_dot(V[i] - bC, bN)) < band && simd_dot(N[i], bN) > ndot { sumP += V[i]; sumN += N[i]; k += 1 }
+            if k < minIn { for i in pool where abs(simd_dot(V[i] - bC, bN)) < band && simd_dot(N[i], bN) > ndot { avail[i] = false }; continue }
+            let c = sumP / Float(k); let n = simd_normalize(sumN); let pidx = planes.count
+            for i in pool where abs(simd_dot(V[i] - c, n)) < band && simd_dot(N[i], n) > ndot { assigned[i] = pidx; avail[i] = false }
+            planes.append((c, n))
+        }
+        let ys = V.map { $0.y }.sorted()
+        let floorY = ys[ys.count / 100], ceilY = ys[ys.count * 99 / 100]
+        struct Wall { var n: SIMD2<Float>; var off: Float; var cen: SIMD2<Float>; var ninl: Int }
+        var W: [Wall] = []
+        for (pi, pl) in planes.enumerated() {
+            if abs(pl.n.y) > 0.7 { continue }
+            let nxz = SIMD2<Float>(pl.n.x, pl.n.z); let L = simd_length(nxz)
+            if L < 0.3 { continue }
+            let nn = nxz / L; let cxz = SIMD2<Float>(pl.c.x, pl.c.z)
+            var cc = 0; for v in assigned where v == pi { cc += 1 }
+            W.append(Wall(n: nn, off: simd_dot(cxz, nn), cen: cxz, ninl: cc))
+        }
+        W.sort { $0.ninl > $1.ninl }
+        var merged: [Wall] = []
+        for w in W where !merged.contains(where: { simd_dot($0.n, w.n) > 0.9 }) { merged.append(w) }
+        W = merged
+        if W.count < 3 { return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles) }
+        let ctr = W.reduce(SIMD2<Float>(0, 0)) { $0 + $1.cen } / Float(W.count)
+        W.sort { atan2($0.cen.y - ctr.y, $0.cen.x - ctr.x) < atan2($1.cen.y - ctr.y, $1.cen.x - ctr.x) }
+        func lineInt(_ a: Wall, _ b: Wall) -> SIMD2<Float>? {
+            let det = a.n.x * b.n.y - a.n.y * b.n.x
+            if abs(det) < 1e-6 { return nil }
+            return SIMD2<Float>((a.off * b.n.y - b.off * a.n.y) / det, (a.n.x * b.off - b.n.x * a.off) / det)
+        }
+        var corners: [SIMD2<Float>] = []
+        for i in 0..<W.count { if let p = lineInt(W[i], W[(i + 1) % W.count]) { corners.append(p) } }
+        if corners.count < 3 { return CleanedMesh(vertices: vertices, normals: normals, triangles: triangles) }
+        var outV: [SIMD3<Float>] = []; var outT: [(v0: UInt32, v1: UInt32, v2: UInt32)] = []
+        let mid = SIMD3<Float>(ctr.x, (floorY + ceilY) / 2, ctr.y)
+        func quad(_ p0: SIMD3<Float>, _ p1: SIMD3<Float>, _ p2: SIMD3<Float>, _ p3: SIMD3<Float>) {
+            let b = UInt32(outV.count)
+            var v = [p0, p1, p2, p3]
+            let fn = simd_cross(v[1] - v[0], v[2] - v[0])
+            if simd_dot(fn, mid - (v[0] + v[2]) / 2) < 0 { v = [p0, p3, p2, p1] }
+            outV += v; outT.append((b, b + 1, b + 2)); outT.append((b, b + 2, b + 3))
+        }
+        let nc = corners.count
+        for i in 0..<nc {
+            let a = corners[i], b = corners[(i + 1) % nc]
+            quad(SIMD3<Float>(a.x, floorY, a.y), SIMD3<Float>(b.x, floorY, b.y),
+                 SIMD3<Float>(b.x, ceilY, b.y), SIMD3<Float>(a.x, ceilY, a.y))
+        }
+        let fc = SIMD3<Float>(ctr.x, floorY, ctr.y), cc2 = SIMD3<Float>(ctr.x, ceilY, ctr.y)
+        for i in 0..<nc {
+            let a = corners[i], b = corners[(i + 1) % nc]
+            var b0 = UInt32(outV.count); outV += [fc, SIMD3<Float>(a.x, floorY, a.y), SIMD3<Float>(b.x, floorY, b.y)]
+            if simd_cross(outV[Int(b0) + 1] - outV[Int(b0)], outV[Int(b0) + 2] - outV[Int(b0)]).y < 0 { outT.append((b0, b0 + 2, b0 + 1)) } else { outT.append((b0, b0 + 1, b0 + 2)) }
+            b0 = UInt32(outV.count); outV += [cc2, SIMD3<Float>(a.x, ceilY, a.y), SIMD3<Float>(b.x, ceilY, b.y)]
+            if simd_cross(outV[Int(b0) + 1] - outV[Int(b0)], outV[Int(b0) + 2] - outV[Int(b0)]).y > 0 { outT.append((b0, b0 + 2, b0 + 1)) } else { outT.append((b0, b0 + 1, b0 + 2)) }
+        }
+        let outN = recomputeVertexNormals(verts: outV, triangles: outT, fallback: [SIMD3<Float>](repeating: SIMD3<Float>(0, 1, 0), count: outV.count))
+        NSLog("KADASTR buildCleanRoom: \(W.count) devor, \(corners.count) burchak → \(outV.count)v \(outT.count)tri")
+        return CleanedMesh(vertices: outV, normals: outN, triangles: outT)
+    }
+
     /// QEM (Garland-Heckbert) edge-collapse decimation. Planar yuzalarni agressiv
     /// soddalashtiradi (kamroq tri), keskin qirralarni saqlaydi (quadric error +
     /// boundary penalty). xatlas UV unwrap tri soniga sezgir (269k→35min); decimate

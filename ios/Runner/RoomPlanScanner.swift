@@ -3449,39 +3449,78 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             self.processingStatusLabel.text = "Smoothing mesh…"
             self.progressView.setProgress(0.35, animated: true)
         }
-        // Phase 14: plane-constrained Laplacian — devor/pol/shiftni TEKIS qiladi (LiDAR
-        // horizontal banding'ni o'ldiradi). XOM mesh'da, taubin'dan OLDIN! — Mac validatsiya
-        // aynan shu bosqichda (RMS 17.6→1.7mm). Taubin edge-aware bandlarni "qirra" deb
-        // SAQLAYDI, shuning uchun flatten AVVAL bo'lishi shart (post-taubin samarasiz edi).
-        // Faqat plane-vert ko'chadi → mebel/quti edge saqlanadi. KADASTR_NO_FLATTEN=1 o'chiradi.
-        let flattened: CleanedMesh
-        if ProcessInfo.processInfo.environment["KADASTR_NO_FLATTEN"] != nil {
-            flattened = lccFiltered
+        // Phase 15: wall-completion (KADASTR_CLEAN_ROOM=1) — messy mesh o'rniga TOZA
+        // watertight xona (RANSAC footprint extrusion). Smoothing edge-aware → box saqlanadi;
+        // decimate skip (16 tri); xatlas+bake teksturlaydi → eshik/oyna foto'дан paydo bo'ladi.
+        // Phase 15: wall-completion (KADASTR_CLEAN_ROOM=1) — messy mesh o'rniga TOZA
+        // watertight xona. Smoothing BUTUNLAY o'tkazib yuboriladi (allaqachon toza;
+        // taubin/despeckle 16-tri box'ni degenerate qilib xatlas atlas 0×0 → crash berardi).
+        let despeckled: CleanedMesh
+        if ProcessInfo.processInfo.environment["KADASTR_CLEAN_ROOM"] != nil {
+            // Toza watertight shell (devor/pol/ship) — RANSAC/occupancy footprint extrusion.
+            let shell = MeshCleaner.buildCleanRoom(
+                vertices: lccFiltered.vertices, normals: lccFiltered.normals, triangles: lccFiltered.triangles)
+            // Phase 15c: MEBEL/OBYEKT 3D saqlash. Raw anchor classification'dan structural
+            // BO'LMAGAN face'lar (table=4, seat=5/pufak, + none=0 oraliq-balandlik obyekt) →
+            // shell ichiga qo'shamiz. Devor tekis qoladi, lekin pufak/stol/idish 3D ko'rinadi.
+            // INWARD ARKit worldNormal (dollhouse bilan mos). Mac scan_009: ~49k furniture tri.
+            let ys = lccFiltered.vertices.map { $0.y }.sorted()
+            let floorY = ys.isEmpty ? 0 : ys[ys.count / 100]
+            let ceilY = ys.isEmpty ? 0 : ys[ys.count * 99 / 100]
+            var fV = shell.vertices, fN = shell.normals, fT = shell.triangles
+            let shellTri = shell.triangles.count
+            for a in anchorData {
+                let cls = a.classification
+                var i = 0
+                while i + 2 < a.indices.count {
+                    let c = (i / 3) < cls.count ? cls[i / 3] : 0
+                    let i0 = Int(a.indices[i]), i1 = Int(a.indices[i + 1]), i2 = Int(a.indices[i + 2])
+                    if i0 < a.worldVertices.count, i1 < a.worldVertices.count, i2 < a.worldVertices.count {
+                        let v0 = a.worldVertices[i0], v1 = a.worldVertices[i1], v2 = a.worldVertices[i2]
+                        let cy = (v0.y + v1.y + v2.y) / 3
+                        let isFurn = (c == 4 || c == 5) || (c == 0 && cy > floorY + 0.08 && cy < ceilY - 0.25)
+                        if isFurn {
+                            let base = UInt32(fV.count)
+                            fV.append(v0); fV.append(v1); fV.append(v2)
+                            fN.append(a.worldNormals[i0]); fN.append(a.worldNormals[i1]); fN.append(a.worldNormals[i2])
+                            fT.append((base, base + 1, base + 2))
+                        }
+                    }
+                    i += 3
+                }
+            }
+            NSLog("KADASTR clean-room + mebel: shell \(shellTri)tri + furniture \(fT.count - shellTri)tri = \(fT.count)tri")
+            despeckled = CleanedMesh(vertices: fV, normals: fN, triangles: fT)
         } else {
-            flattened = MeshCleaner.flattenWallsLaplacian(
-                vertices: lccFiltered.vertices,
-                normals: lccFiltered.normals,
-                triangles: lccFiltered.triangles,
+            // Phase 14: plane-constrained Laplacian — devorni TEKIS (LiDAR banding). XOM
+            // mesh'da, taubin'dan OLDIN! Faqat plane-vert ko'chadi → mebel/quti edge saqlanadi.
+            let flattened: CleanedMesh
+            if ProcessInfo.processInfo.environment["KADASTR_NO_FLATTEN"] != nil {
+                flattened = lccFiltered
+            } else {
+                flattened = MeshCleaner.flattenWallsLaplacian(
+                    vertices: lccFiltered.vertices,
+                    normals: lccFiltered.normals,
+                    triangles: lccFiltered.triangles,
+                )
+            }
+            let smoothed = MeshCleaner.taubinSmooth(
+                vertices: flattened.vertices,
+                normals: flattened.normals,
+                triangles: flattened.triangles,
+                lambda: 0.5,
+                mu: -0.53,
+                iterations: 7,
+                edgeSharpness: 12,
+                normalPresmoothIterations: 12,
+            )
+            // Phase 12b: speckle removal — floating spike + ragged border'ni qo'shnilar markaziga.
+            despeckled = MeshCleaner.removeSpeckle(
+                vertices: smoothed.vertices,
+                normals: smoothed.normals,
+                triangles: smoothed.triangles,
             )
         }
-        let smoothed = MeshCleaner.taubinSmooth(
-            vertices: flattened.vertices,
-            normals: flattened.normals,
-            triangles: flattened.triangles,
-            lambda: 0.5,
-            mu: -0.53,
-            iterations: 7,
-            edgeSharpness: 12,
-            normalPresmoothIterations: 12,
-        )
-        // Phase 12b: speckle removal — floating spike + ragged border'ni qo'shnilar
-        // markaziga tortadi (teshiksiz). Confidence past joylardagi qoldiq noise'ni
-        // tozalaydi.
-        let despeckled = MeshCleaner.removeSpeckle(
-            vertices: smoothed.vertices,
-            normals: smoothed.normals,
-            triangles: smoothed.triangles,
-        )
         // Phase 12: QEM decimation — xatlas UV unwrap tri soniga sezgir (TSDF-primary
         // 269k → 35 min). Mesh'ni 130k tri'ga tushiramiz (planar yuza agressiv,
         // qirra saqlanadi) → xatlas ~2x tez, detail yo'qolmaydi. tri ≤ target → skip.
@@ -3708,10 +3747,19 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // mesh ichki yuzasi front-face bo'ladi. Xona ICHIDAN qaralganda devor ichki
         // yuzasi + mebel ko'rinadi, tashqi qobiq cull qilinadi (foydalanuvchi virtual
         // tur — ichki ko'rinishni xohladi, tashqi qobiq kerak emas). Material single-sided.
+        //
+        // DIQQAT (Phase 15 bug fix): bu flip XOM TSDF mesh uchun (outward normal → inward).
+        // Lekin buildCleanRoom (KADASTR_CLEAN_ROOM) ALLAQACHON inward chiqaradi —
+        // quad/floor/ceiling fan'lar mid=xona markazi tomon yo'naltirilgan. Clean-room'da
+        // yana flip qilsak inward→OUTWARD bo'lib, single-sided'da tashqaridan QATTIQ QUTI
+        // ko'rinadi (xona ichi cull). Shuning uchun clean-room rejimda flip O'TKAZIB YUBORILADI.
+        let cleanRoomMode = ProcessInfo.processInfo.environment["KADASTR_CLEAN_ROOM"] != nil
         var innerNormals = filteredResult.normals
-        for i in 0..<innerNormals.count { innerNormals[i] = -innerNormals[i] }
         var innerIndices = filteredResult.indices
-        var fi = 0; while fi + 2 < innerIndices.count { innerIndices.swapAt(fi + 1, fi + 2); fi += 3 }
+        if !cleanRoomMode {
+            for i in 0..<innerNormals.count { innerNormals[i] = -innerNormals[i] }
+            var fi = 0; while fi + 2 < innerIndices.count { innerIndices.swapAt(fi + 1, fi + 2); fi += 3 }
+        }
         // Build SCNGeometry from xatlas-unwrapped mesh + atlas texture.
         let geom = Self.buildSubMeshGeometry(
             vertices: filteredResult.vertices,

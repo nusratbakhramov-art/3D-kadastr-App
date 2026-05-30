@@ -368,7 +368,9 @@ final class MetalAtlasBaker {
                 // 64mm (~10cm depth xato) tekis yuzalarni noto'g'ri rad etib teshik/voxel
                 // katakchalar berardi. 0.20 o'zini-o'zi to'sishni toleratsiya qiladi, lekin
                 // xalta (>20cm oldinda) hali to'silган deb rad etiladi.
-                pad: 0,
+                // pad = hardOcclusion flag: clean room (KADASTR_CLEAN_ROOM)'da mebel devorга
+                // proyeksiya bo'lmasligi uchun occluded kamerani TO'LIQ rad etadi.
+                pad: ProcessInfo.processInfo.environment["KADASTR_CLEAN_ROOM"] != nil ? 1 : 0,
             )
             let paramBuf = device.makeBuffer(bytes: &params, length: MemoryLayout<AtlasParams>.stride, options: .storageModeShared)!
 

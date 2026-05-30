@@ -97,6 +97,9 @@ kernel void bakeAtlasBatch(
         float sampledDepth = depthArray.sample(nearestSampler, depthUV, i).r;
         float occlPenalty = 1.0;
         if (sampledDepth > 0.05 && depth > sampledDepth + params.occlusionTolerance) {
+            // params.pad = hardOcclusion flag (clean room): occluded kamerani TO'LIQ rad et
+            // (mebel devorга proyeksiya bo'lmasin; devorni to'g'ridan ko'rgan kamera yoki fallback).
+            if (params.pad > 0.5) { continue; }
             occlPenalty = 0.02;
         }
 
