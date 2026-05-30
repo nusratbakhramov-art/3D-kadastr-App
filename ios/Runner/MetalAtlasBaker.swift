@@ -201,7 +201,7 @@ final class MetalAtlasBaker {
             let normBestFunc = library.makeFunction(name: "normalizeBest"),       // Multi-band
             let combineFunc = library.makeFunction(name: "multiBandCombine"),     // Multi-band
             let dilFunc = library.makeFunction(name: "dilateAtlas"),
-            let smoothFunc = library.makeFunction(name: "smoothAtlas")  // Phase 4.3
+            let wideBlurFunc = library.makeFunction(name: "blurSeparableWide")  // Phase 17 seam leveling
         else {
             throw AtlasBakeError.metalSetup("kernel functions not found")
         }
@@ -210,7 +210,7 @@ final class MetalAtlasBaker {
         let normBestState = try device.makeComputePipelineState(function: normBestFunc)
         let combineState = try device.makeComputePipelineState(function: combineFunc)
         let dilState = try device.makeComputePipelineState(function: dilFunc)
-        let smoothState = try device.makeComputePipelineState(function: smoothFunc)
+        let wideBlurState = try device.makeComputePipelineState(function: wideBlurFunc)
         guard let cmdQueue = device.makeCommandQueue() else {
             throw AtlasBakeError.metalSetup("command queue")
         }
@@ -284,6 +284,18 @@ final class MetalAtlasBaker {
         let depthW = cameras.first?.depthWidth ?? 256
         let depthH = cameras.first?.depthHeight ?? 192
 
+        // Phase 16: exposure/WB gain equalization (fotolar orasidagi yorqinlik/rang sakrashi
+        // → tekstura choklari). KADASTR_NO_GAIN o'chiradi.
+        let expGains: [SIMD3<Float>] = ProcessInfo.processInfo.environment["KADASTR_NO_GAIN"] != nil
+            ? [SIMD3<Float>](repeating: SIMD3<Float>(1, 1, 1), count: cameras.count)
+            : computeExposureGains(positions: positions, normals: normals, cameras: cameras)
+
+        // Phase 17b: soft best-view exponent. Past (4)=tiniqroq (biroz seam),
+        // yuqori (8)=silliqroq (seamless). Default 8 — eng toza, detail saqlangan
+        // (region ichida 1 kamera dominant → sharp; chegarada blend → seam yo'q).
+        let softViewPower = Float(ProcessInfo.processInfo.environment["KADASTR_VIEW_POWER"].flatMap { Float($0) } ?? 8)
+        NSLog("KADASTR soft best-view power = \(softViewPower)")
+
         let numBatches = (totalCams + cameraBatchSize - 1) / cameraBatchSize
         for batchIdx in 0..<numBatches {
             let start = batchIdx * cameraBatchSize
@@ -353,7 +365,7 @@ final class MetalAtlasBaker {
             let camPtr = camBuf.contents().bindMemory(to: MetalAtlasCamera.self, capacity: batchCount)
             for (slot, ci) in (start..<end).enumerated() {
                 let cam = cameras[ci]
-                camPtr[slot] = makeMetalCam(cam)
+                camPtr[slot] = makeMetalCam(cam, gain: ci < expGains.count ? expGains[ci] : SIMD3<Float>(1, 1, 1))
             }
 
             // Build params
@@ -371,6 +383,7 @@ final class MetalAtlasBaker {
                 // pad = hardOcclusion flag: clean room (KADASTR_CLEAN_ROOM)'da mebel devorга
                 // proyeksiya bo'lmasligi uchun occluded kamerani TO'LIQ rad etadi.
                 pad: ProcessInfo.processInfo.environment["KADASTR_CLEAN_ROOM"] != nil ? 1 : 0,
+                viewPower: softViewPower,
             )
             let paramBuf = device.makeBuffer(bytes: &params, length: MemoryLayout<AtlasParams>.stride, options: .storageModeShared)!
 
@@ -503,21 +516,37 @@ final class MetalAtlasBaker {
             cb.commit()
             cb.waitUntilCompleted()
         }
-        // Gaussian blur `passes` marta; input preserved; natija tutgan texture'ni qaytaradi.
-        func gaussBlur(_ input: MTLTexture, _ a: MTLTexture, _ b: MTLTexture, _ passes: Int) -> MTLTexture {
-            guard passes > 0 else { return input }
-            runPass(smoothState, input, a)   // pass 1: input → a (input faqat o'qiladi)
-            var s = a, d = b
-            for _ in 1..<passes { runPass(smoothState, s, d); swap(&s, &d) }
-            return s
+        // Phase 17: Poisson-style seam leveling — KENG separable Gaussian bilan
+        // past-chastotani (exposure/rang seam) ajratamiz. Eski 3x3 gaussBlur radiusi
+        // juda kichik edi (~6 px) → seam (chart ichida o'nlab-yuzlab piksel kenglik)
+        // ajralmay, multi-band blur bo'lib qolardi. Keng radius (sigma~R/2) past-
+        // chastotani to'liq ajratadi: best'ning detali (qirra/matn/plitka) saqlanadi,
+        // faqat seam'ning past-chastota ofseti avg (seamless) tomon suriladi.
+        struct WideBlurParamsLayout { var radius: UInt32; var direction: UInt32; var pad0: UInt32; var pad1: UInt32 }
+        let seamRadius = UInt32(ProcessInfo.processInfo.environment["KADASTR_SEAM_RADIUS"].flatMap { Int($0) } ?? 48)
+        // Separable: H (input→a), keyin V (a→b). b past-chastota natija.
+        let wideBlur: (MTLTexture, MTLTexture, MTLTexture) -> MTLTexture = { input, a, b in
+            for dir in 0..<2 {
+                var bp = WideBlurParamsLayout(radius: seamRadius, direction: UInt32(dir), pad0: 0, pad1: 0)
+                let bpBuf = device.makeBuffer(bytes: &bp, length: MemoryLayout<WideBlurParamsLayout>.stride, options: .storageModeShared)!
+                let inT = dir == 0 ? input : a
+                let outT = dir == 0 ? a : b
+                guard let cb = cmdQueue.makeCommandBuffer(), let e = cb.makeComputeCommandEncoder() else { continue }
+                e.setComputePipelineState(wideBlurState)
+                e.setTexture(inT, index: 0)
+                e.setTexture(outT, index: 1)
+                e.setBuffer(bpBuf, offset: 0, index: 0)
+                e.dispatchThreadgroups(tgCount, threadsPerThreadgroup: tgSize)
+                e.endEncoding(); cb.commit(); cb.waitUntilCompleted()
+            }
+            return b
         }
 
         // Multi-band combine: final = blur(avg) + (best − blur(best)).
         // blur(avg) = seamless past-chastota base; (best − blur(best)) = sharp detail.
-        progress?(0.90, "Multi-band blend…")
-        let blurPasses = 6   // 16 → 6: low-freq band torroq, high-freq (sharp detail) ko'proq saqlanadi
-        let avgLow = gaussBlur(atlasTex, avgScratchA, avgScratchB, blurPasses)
-        let bestLow = gaussBlur(bestTex, bestScratchA, bestScratchB, blurPasses)
+        progress?(0.90, "Seam leveling (wide blur)…")
+        let avgLow = wideBlur(atlasTex, avgScratchA, avgScratchB)
+        let bestLow = wideBlur(bestTex, bestScratchA, bestScratchB)
         do {
             guard let cmdBuf = cmdQueue.makeCommandBuffer(),
                   let enc = cmdBuf.makeComputeCommandEncoder() else {
@@ -538,12 +567,14 @@ final class MetalAtlasBaker {
         // occlusion teshiklarini sharp qo'shni rang bilan to'ldirish (4→12 pass).
         // MUHIM: dilate rangli (alpha>0.5) piksellarni TEGMAYDI — faqat bo'sh
         // joyni to'ldiradi → tiniqlikka zarari yo'q, blur bermaydi.
-        // Multi-band combine BLUR manbai edi (best raw qutilar matnini ko'rsatdi,
-        // multi-band o'qib bo'lmas qildi). DEFAULT: best-view raw (sharp, image
-        // to'g'ridan). Oq devor uniform → exposure seam minimal. KADASTR_MULTIBAND=1
-        // bilan eski multi-band'ga qaytish mumkin.
-        let useMultiBand = ProcessInfo.processInfo.environment["KADASTR_MULTIBAND"] == "1"
-        var src = useMultiBand ? combineTex : bestTex
+        // Phase 17/17b: final atlas manbasi.
+        //  • DEFAULT "soft": atlasTex = score⁶ weighted avg (soft best-view). Region
+        //    ichida 1 kamera dominant (sharp), chegarada blend (konsentrik naqsh/seam
+        //    yo'qoladi). Eng toza — keskin best-view region chegaralari yo'q.
+        //  • "combine": multi-band (wideBlur seam leveling) — best high-freq + avg low.
+        //  • "raw": eski best-view argmax (keskin patchwork — faqat taqqoslash).
+        let viewMode = ProcessInfo.processInfo.environment["KADASTR_VIEW_MODE"] ?? "soft"
+        var src = viewMode == "raw" ? bestTex : (viewMode == "combine" ? combineTex : atlasTex)
         var dst = dilatedTex
         for _ in 0..<24 { runPass(dilState, src, dst); swap(&src, &dst) }
         let finalTex = src
@@ -632,7 +663,9 @@ private struct MetalAtlasCamera {
     // Phase 3.3: variance-of-Laplacian sharpness [0..1] + 12 bytes pad to keep
     // 16-byte alignment. Metal AtlasCamera struct must match.
     var sharpness: Float              // 4
-    var pad0: Float = 0; var pad1: Float = 0; var pad2: Float = 0  // 12 pad
+    // Phase 16: per-camera exposure/WB gain (pad o'rniga — hajm o'zgarmaydi). Shader
+    // sample'ga ko'paytiriladi → fotolar rang jihatdan moslanadi (tekstura choklari yo'qoladi).
+    var gainR: Float = 1; var gainG: Float = 1; var gainB: Float = 1  // 12
 }
 
 private struct AtlasParams {
@@ -644,9 +677,10 @@ private struct AtlasParams {
     var maxDistance: Float
     var occlusionTolerance: Float
     var pad: Float
+    var viewPower: Float = 8  // Phase 17b: soft best-view exponent (KADASTR_VIEW_POWER)
 }
 
-private func makeMetalCam(_ cam: AtlasBakeInputCamera) -> MetalAtlasCamera {
+private func makeMetalCam(_ cam: AtlasBakeInputCamera, gain: SIMD3<Float> = SIMD3<Float>(1, 1, 1)) -> MetalAtlasCamera {
     let inv = cam.transform.inverse
     let pos = SIMD3<Float>(cam.transform.columns.3.x, cam.transform.columns.3.y, cam.transform.columns.3.z)
     let fwd = -simd_normalize(SIMD3<Float>(
@@ -660,7 +694,154 @@ private func makeMetalCam(_ cam: AtlasBakeInputCamera) -> MetalAtlasCamera {
         position: pos,
         forward: fwd,
         sharpness: cam.sharpness,
+        gainR: gain.x, gainG: gain.y, gainB: gain.z,
     )
+}
+
+/// Phase 16: per-camera exposure/WB gain (Brown-Lowe overlap matching). Bir nechta kamera
+/// ko'rgan yuza nuqtalarida ranglar mos kelishi uchun per-camera RGB gain yechiladi → fotolar
+/// orasidagi yorqinlik/rang sakrashi (tekstura choklari) yo'qoladi, tiniqlik saqlanadi.
+/// Proyeksiya shader bilan AYNAN bir xil (camSpace.x, -camSpace.y, depth; K matritsa).
+private func computeExposureGains(
+    positions: [SIMD3<Float>], normals: [SIMD3<Float>], cameras: [AtlasBakeInputCamera],
+) -> [SIMD3<Float>] {
+    let n = cameras.count
+    var gains = [SIMD3<Float>](repeating: SIMD3<Float>(1, 1, 1), count: n)
+    if n < 2 || positions.isEmpty { return gains }
+    let DS = 6
+    struct GC {
+        let inv: simd_float4x4; let K: simd_float3x3; let W, H: Float; let pos, fwd: SIMD3<Float>
+        let px: [Float]; let pw, ph: Int; let depth: [Float]; let dw, dh: Int
+    }
+    var gc: [GC] = []
+    for cam in cameras {
+        var rgb: [Float] = []; var pw = 0, ph = 0
+        if let img = UIImage(contentsOfFile: cam.imageURL.path), let cgi = img.cgImage {
+            let w = max(1, cgi.width / DS), h = max(1, cgi.height / DS)
+            var buf = [UInt8](repeating: 0, count: w * h * 4)
+            if let ctx = CGContext(data: &buf, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                   space: CGColorSpaceCreateDeviceRGB(),
+                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+                ctx.draw(cgi, in: CGRect(x: 0, y: 0, width: w, height: h))
+                rgb = [Float](repeating: 0, count: w * h * 3)
+                for p in 0..<w * h { rgb[p * 3] = Float(buf[p * 4]) / 255; rgb[p * 3 + 1] = Float(buf[p * 4 + 1]) / 255; rgb[p * 3 + 2] = Float(buf[p * 4 + 2]) / 255 }
+                pw = w; ph = h
+            }
+        }
+        var depth: [Float] = []; var dw = 0, dh = 0
+        if let du = cam.depthURL, let dd = try? Data(contentsOf: du), dd.count >= 8 + cam.depthWidth * cam.depthHeight * 4 {
+            dw = cam.depthWidth; dh = cam.depthHeight
+            depth = dd.withUnsafeBytes { raw in
+                let f = raw.baseAddress!.advanced(by: 8).assumingMemoryBound(to: Float.self)
+                return Array(UnsafeBufferPointer(start: f, count: dw * dh))
+            }
+        }
+        let pos = SIMD3<Float>(cam.transform.columns.3.x, cam.transform.columns.3.y, cam.transform.columns.3.z)
+        let fwd = -simd_normalize(SIMD3<Float>(cam.transform.columns.2.x, cam.transform.columns.2.y, cam.transform.columns.2.z))
+        gc.append(GC(inv: cam.transform.inverse, K: cam.intrinsics, W: cam.imageWidth, H: cam.imageHeight,
+                     pos: pos, fwd: fwd, px: rgb, pw: pw, ph: ph, depth: depth, dw: dw, dh: dh))
+    }
+    // pairwise overlap means: pairSum[(i*n+j)] = sum of cam i color over co-obs (i,j)
+    var pairSum = [SIMD3<Double>](repeating: SIMD3<Double>(0, 0, 0), count: n * n)
+    var pairCnt = [Int](repeating: 0, count: n * n)
+    let step = max(1, positions.count / 60000)
+    var vi = 0
+    while vi < positions.count {
+        let P = positions[vi]; let Nv = normals[vi]; vi += step
+        var vis: [(Int, SIMD3<Float>)] = []
+        for (ci, c) in gc.enumerated() where c.pw > 0 {
+            let toV = P - c.pos; let dist = simd_length(toV); if dist < 0.05 { continue }
+            let toVn = toV / dist
+            if simd_dot(c.fwd, toVn) <= 0.1 { continue }
+            if simd_dot(Nv, -toVn) <= 0.1 { continue }
+            let cs = c.inv * SIMD4<Float>(P, 1); let d = -cs.z
+            if d <= 0.05 { continue }
+            let proj = c.K * SIMD3<Float>(cs.x, -cs.y, d)
+            if proj.z <= 0 { continue }
+            let pu = proj.x / proj.z, pv = proj.y / proj.z
+            if pu < 0 || pu >= c.W || pv < 0 || pv >= c.H { continue }
+            if c.dw > 0 {
+                let dmx = min(c.dw - 1, max(0, Int(pu / c.W * Float(c.dw))))
+                let dmy = min(c.dh - 1, max(0, Int(pv / c.H * Float(c.dh))))
+                let dm = c.depth[dmy * c.dw + dmx]
+                if dm <= 0.05 || abs(d - dm) > 0.12 { continue }
+            }
+            let ix = min(c.pw - 1, max(0, Int(pu / c.W * Float(c.pw))))
+            let iy = min(c.ph - 1, max(0, c.ph - 1 - Int(pv / c.H * Float(c.ph))))  // CGContext bottom-up
+            let si = (iy * c.pw + ix) * 3
+            vis.append((ci, SIMD3<Float>(c.px[si], c.px[si + 1], c.px[si + 2])))
+        }
+        if vis.count < 2 { continue }
+        for a in 0..<vis.count {
+            for b in (a + 1)..<vis.count {
+                let (i, ci) = vis[a]; let (j, cj) = vis[b]
+                pairSum[i * n + j] += SIMD3<Double>(Double(ci.x), Double(ci.y), Double(ci.z))
+                pairSum[j * n + i] += SIMD3<Double>(Double(cj.x), Double(cj.y), Double(cj.z))
+                pairCnt[i * n + j] += 1; pairCnt[j * n + i] += 1
+            }
+        }
+    }
+    for ch in 0..<3 {
+        var M = [Double](repeating: 0, count: n * n)
+        var b = [Double](repeating: 0, count: n)
+        for i in 0..<n {
+            for j in (i + 1)..<n {
+                let cnt = pairCnt[i * n + j]; if cnt < 20 { continue }
+                let mi = pairSum[i * n + j][ch] / Double(cnt)
+                let mj = pairSum[j * n + i][ch] / Double(cnt)
+                let N_ = Double(cnt)
+                M[i * n + i] += N_ * mi * mi; M[j * n + j] += N_ * mj * mj
+                M[i * n + j] -= N_ * mi * mj; M[j * n + i] -= N_ * mi * mj
+            }
+        }
+        // ADAPTIV regularizatsiya: tizim near-singular (gauge erkinligi + siyrak kamera grafi)
+        // → naive Gaussian solve diverge qilardi (gain'lar clamp'ga urilardi). lambda ~ avg
+        // diagonal'ning 10%i → yaxshi shartlangan, gain'lar 1 atrofida, faqat overlap dalili kuchli
+        // bo'lsa siljiydi.
+        var diagSum = 0.0; for i in 0..<n { diagSum += M[i * n + i] }
+        let lambda = max(5.0, 0.1 * diagSum / Double(n))
+        for i in 0..<n { M[i * n + i] += lambda; b[i] += lambda }
+        let g = solveLinearSystem(M, b, n)
+        for i in 0..<n { gains[i][ch] = Float(min(1.7, max(0.6, g[i]))) }
+    }
+    // SINGLE-SCALAR normalize (umumiy median, per-channel EMAS) → cross-channel balans
+    // saqlanadi (global rang/WB o'zgarmaydi), faqat per-camera farqlar tuzatiladi.
+    var allG: [Float] = []
+    for i in 0..<n { allG.append(gains[i].x); allG.append(gains[i].y); allG.append(gains[i].z) }
+    allG.sort()
+    let med = allG[allG.count / 2]
+    if med > 1e-3 {
+        for i in 0..<n {
+            gains[i] = simd_clamp(gains[i] / med, SIMD3<Float>(0.6, 0.6, 0.6), SIMD3<Float>(1.7, 1.7, 1.7))
+        }
+    }
+    let gmin = gains.map { min($0.x, min($0.y, $0.z)) }.min() ?? 1
+    let gmax = gains.map { max($0.x, max($0.y, $0.z)) }.max() ?? 1
+    NSLog("KADASTR exposure gains: \(n) kamera, gain \(String(format: "%.2f", gmin))..\(String(format: "%.2f", gmax))")
+    return gains
+}
+
+/// Kichik simmetrik tizim yechuvchi (Gauss-Jordan, n≈kamera soni).
+private func solveLinearSystem(_ Ain: [Double], _ bin: [Double], _ n: Int) -> [Double] {
+    var A = Ain; var b = bin
+    for col in 0..<n {
+        var piv = col
+        for r in (col + 1)..<n where abs(A[r * n + col]) > abs(A[piv * n + col]) { piv = r }
+        if abs(A[piv * n + col]) < 1e-12 { continue }
+        if piv != col {
+            for c in 0..<n { A.swapAt(col * n + c, piv * n + c) }
+            b.swapAt(col, piv)
+        }
+        for r in 0..<n where r != col {
+            let f = A[r * n + col] / A[col * n + col]
+            if f == 0 { continue }
+            for c in col..<n { A[r * n + c] -= f * A[col * n + c] }
+            b[r] -= f * b[col]
+        }
+    }
+    var x = [Double](repeating: 1, count: n)
+    for i in 0..<n { x[i] = abs(A[i * n + i]) > 1e-12 ? b[i] / A[i * n + i] : 1.0 }
+    return x
 }
 
 // MARK: - Triangle rasterization

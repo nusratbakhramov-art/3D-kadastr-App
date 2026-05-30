@@ -18,7 +18,8 @@ struct AtlasCamera {
     // Phase 3.3 view-dependent blending: per-photo sharpness [0..1]
     // + 12 bytes pad to keep 16-byte alignment.
     float sharpness;         // 4
-    float pad0, pad1, pad2;  // 12 pad → total camera struct 176 bytes
+    // Phase 16: per-camera exposure/WB gain (pad o'rniga). Sample rangga ko'paytiriladi.
+    float gainR, gainG, gainB;  // 12 → total camera struct 176 bytes
 };
 
 struct AtlasParams {
@@ -30,6 +31,7 @@ struct AtlasParams {
     float maxDistance;
     float occlusionTolerance;
     float pad;
+    float viewPower;  // Phase 17b: soft best-view exponent (score^viewPower weight)
 };
 
 // Batch kernel — har atlas piksel uchun batch'dagi cameralarni iteratsiya
@@ -106,6 +108,8 @@ kernel void bakeAtlasBatch(
         // Sample image (bilinear)
         float2 imgUV = float2(pu / cam.imageSize.x, pv / cam.imageSize.y);
         float3 color = imageArray.sample(linearSampler, imgUV, i).rgb;
+        // Phase 16: per-camera exposure/WB gain — fotolar rang jihatdan moslanadi (choklar yo'qoladi).
+        color = clamp(color * float3(cam.gainR, cam.gainG, cam.gainB), 0.0, 1.0);
 
         // Phase 3.3: glare/specular detection. Agar pixel deyarli oq (RGB
         // ham yuqori, ham balanced) — bu mat yuza emas, ko'zgu/spekulyar.
@@ -122,8 +126,13 @@ kernel void bakeAtlasBatch(
         score *= glareReduction;
         score *= occlPenalty;  // occluded → 50x kichik, lekin >0 (teshik to'ldiriladi)
 
-        // (1) O'rtacha base uchun — power 2 weight (seamless, exposure averaged).
-        float wBase = score * score;
+        // (1) Phase 17b: SOFT best-view base — tunable power weight (score^viewPower).
+        // power 2 (eski) juda silliq edi → blur. Yuqori power (4..8): region ICHIDA
+        // eng yaxshi kamera dominant (2x score → 2^P x weight → sharp, best-view kabi
+        // tiniq), region CHEGARASIDA 2 kamera score yaqin → silliq blend (best-view'ning
+        // keskin argmax seam/konsentrik naqshi YO'QOLADI). Detail + chok yo'q balansi
+        // viewPower bilan: past=tiniqroq(biroz seam), yuqori=silliqroq(seamless).
+        float wBase = pow(max(score, 1e-8), params.viewPower);
         avgSum += color * wBase;
         avgW += wBase;
 
@@ -310,6 +319,54 @@ kernel void multiBandCombine(
     float highLum = dot(high, float3(0.299, 0.587, 0.114));
     float3 final = a + highLum + (high - highLum) * 0.3;
     outTex.write(float4(saturate(final), 1.0), gid);
+}
+
+// Phase 17: Poisson-style seam leveling uchun KENG separable Gaussian.
+// 3x3 smoothAtlas (radius~1) past-chastota seam'ni (chart ichida o'nlab-yuzlab
+// piksel kenglikdagi exposure/rang sakrashi) ajrata olmaydi. Bu kernel katta
+// radius (sigma~R/2) bilan bitta o'qda blur qiladi — H + V ketma-ket =
+// separable 2D Gaussian. Chart-aware: alpha<0.5 (chart tashqarisi) qo'shni
+// HISSA QO'SHMAYDI (cross-chart bleed yo'q) va markaz tegilmaydi.
+struct WideBlurParams {
+    uint radius;
+    uint direction;  // 0 = horizontal, 1 = vertical
+    uint pad0;
+    uint pad1;
+};
+
+kernel void blurSeparableWide(
+    texture2d<float, access::read>  inTex  [[texture(0)]],
+    texture2d<float, access::write> outTex [[texture(1)]],
+    constant WideBlurParams &bp [[buffer(0)]],
+    uint2 gid [[thread_position_in_grid]]
+) {
+    uint w = inTex.get_width();
+    uint h = inTex.get_height();
+    if (gid.x >= w || gid.y >= h) return;
+
+    float4 c = inTex.read(gid);
+    if (c.a < 0.5) {
+        // Chart tashqarisi — o'zgartirmaymiz (dilate keyin to'ldiradi).
+        outTex.write(c, gid);
+        return;
+    }
+
+    int R = int(bp.radius);
+    float sigma = max(1.0, float(R) * 0.5);
+    float inv2s2 = 1.0 / (2.0 * sigma * sigma);
+    float3 sum = float3(0.0);
+    float wSum = 0.0;
+    for (int t = -R; t <= R; ++t) {
+        int nx = int(gid.x) + (bp.direction == 0 ? t : 0);
+        int ny = int(gid.y) + (bp.direction == 0 ? 0 : t);
+        if (nx < 0 || nx >= int(w) || ny < 0 || ny >= int(h)) continue;
+        float4 n = inTex.read(uint2(uint(nx), uint(ny)));
+        if (n.a < 0.5) continue;  // chart boundary — cross qilmaymiz
+        float k = exp(-float(t * t) * inv2s2);
+        sum += n.rgb * k;
+        wSum += k;
+    }
+    outTex.write(float4(wSum > 0.0 ? sum / wSum : c.rgb, 1.0), gid);
 }
 
 // Phase 4.3: Bilateral Gaussian smoothing — atlas pixel'larini qo'shnilar
