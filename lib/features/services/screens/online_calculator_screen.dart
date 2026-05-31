@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 import '../models/calculator_draft.dart';
 import '../widgets/service_app_bar.dart';
+import 'calculator/abc4_estimate_screen.dart';
 import 'calculator/arxitektura_form_screen.dart';
 import 'calculator/baholash_form_screen.dart';
 import 'calculator/dizayn_form_screen.dart';
 import 'calculator/kadastr_form_screen.dart';
-import 'calculator/tamirlash_form_screen.dart';
 import 'calculator/yuridik_screen.dart';
 
 class OnlineCalculatorScreen extends StatefulWidget {
@@ -133,7 +133,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
           const KadastrFormScreen(is3d: true),
       CalculatorCategory.baholash => (_) => const BaholashFormScreen(),
       CalculatorCategory.dizayn => (_) => const DizaynFormScreen(),
-      CalculatorCategory.tamirlash => (_) => const TamirlashFormScreen(),
+      CalculatorCategory.tamirlash => (_) => const Abc4EstimateScreen(),
       CalculatorCategory.yuridik => (_) => const YuridikScreen(),
     };
     Navigator.of(context).push(MaterialPageRoute<void>(builder: builder));
