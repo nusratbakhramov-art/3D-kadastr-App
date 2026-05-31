@@ -298,10 +298,10 @@ import RoomPlan
             return
           }
           DebugLog.log("APPDELEGATE", "saved_scans/process id=\(id) params=\(params)")
-          // Concave clean-room (watertight L-xona footprint + flip + hard occlusion) DEFAULT
-          // YOQILADI — aks holda env-var yo'q → eski messy/cube chiqardi. params["clean_room"]=="0"
-          // bo'lsagina o'chiriladi. Bu mening buildCleanRoomConcave + flip fix'larini faollashtiradi.
-          if params["clean_room"] != "0" {
+          // Clean-room DEFAULT OFF (foydalanuvchi qarori: v24 = clean_room OFF = raw mesh + tekstura,
+          // foto MOS keladi, real geometriya). UI "Qayta ishlash" → v24 kabi natija beradi.
+          // params["clean_room"]=="1" bo'lsagina watertight clean-room yoqiladi (ixtiyoriy).
+          if params["clean_room"] == "1" {
             setenv("KADASTR_CLEAN_ROOM", "1", 1)
           } else {
             unsetenv("KADASTR_CLEAN_ROOM")

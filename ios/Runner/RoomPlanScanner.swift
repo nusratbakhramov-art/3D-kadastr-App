@@ -3378,12 +3378,17 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             self.processingStatusLabel.text = "Extracting mesh…"
             self.progressView.setProgress(0.30, animated: true)
         }
+        // Bosqich 2 "yumshoq clean": maxHoleBoundary 16→40 — o'rta teshiklarni
+        // ear-clipping bilan yopadi (raw 45-foto teshiklari) → watertight-ga yaqin.
+        // Katta devor-ochiq joylar QOLADI (noto'g'ri planar fill'дан saqlanish).
+        // KADASTR_HOLE_MAX bilan tunable (yumshoqlik darajasi).
+        let holeMax = Int(ProcessInfo.processInfo.environment["KADASTR_HOLE_MAX"] ?? "") ?? 40
         let cleaned = MeshCleaner.clean(
             vertices: hybridVerts, normals: hybridNormals, triangles: hybridTris,
             weldEpsilon: 0.025,          // 2.5 sm — yengilroq anchor merge
             minComponentTris: 12,        // 12 tri'dan kam fragment → tashlash (yumshoq)
             slimAspectThreshold: 0.005,  // juda thin triangle'larnigina (yumshoq)
-            maxHoleBoundary: 16,         // ≤16 edge hole'lar (kengroq)
+            maxHoleBoundary: holeMax,    // Bosqich 2: 16→40 (yumshoq teshik yopish, tunable)
         )
 
         // 1c. Camera coverage filter — Polycam-style focus crop.
@@ -3527,15 +3532,28 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // DIQQAT: plane-snap shu yerda EMAS — u xatlas'ni 6min'ga sekinlashtiradi (snap
         // sliver/degenerate yaratadi → piecewise param qotади). Snap atlas bake'dan KEYIN
         // (filteredResult.vertices) — xatlas tez (normal mesh), tekstura UV orqali birga ko'chadi.
+        // Merge "yumshoq clean" — TEZLIK: 130k→65k tri. xatlas UV tri soniga ~lineer →
+        // ~2x tez (8min→~4min). 45-foto scan'da detail saqlanadi (devor toza, foto MOS).
+        // KADASTR_DECIMATE_TRI bilan tunable (sifat/tezlik balansi uchun).
+        let decimTarget = Int(ProcessInfo.processInfo.environment["KADASTR_DECIMATE_TRI"] ?? "") ?? 65_000
         let decimated = MeshCleaner.decimate(
             vertices: despeckled.vertices,
             normals: despeckled.normals,
             triangles: despeckled.triangles,
-            targetTriangles: 130_000,
+            targetTriangles: decimTarget,
         )
-        let globalVerts = decimated.vertices
-        let globalNormals = decimated.normals
-        let globalTris = decimated.triangles
+        // Bosqich 2b: POST-decimate teshik yopish. Decimate (QEM edge-collapse) mesh'ni
+        // re-triangulate qiladi → non-manifold T-junction'lar manifold bo'ladi → fillSmallHoles
+        // (decimate'дан OLDIN o'tkazib yuborgan divan/obyekt teshiklarini) endi topa oladi.
+        // KADASTR_POST_FILL=0 o'chiradi.
+        let postFilled: CleanedMesh = ProcessInfo.processInfo.environment["KADASTR_POST_FILL"] == "0"
+            ? decimated
+            : MeshCleaner.clean(
+                vertices: decimated.vertices, normals: decimated.normals, triangles: decimated.triangles,
+                weldEpsilon: 0.008, minComponentTris: 1, slimAspectThreshold: 0.001, maxHoleBoundary: holeMax)
+        let globalVerts = postFilled.vertices
+        let globalNormals = postFilled.normals
+        let globalTris = postFilled.triangles
         await MainActor.run {
             self.processingStatusLabel.text = "Extracting mesh… \(globalTris.count) tri"
             self.progressView.setProgress(0.34, animated: true)
