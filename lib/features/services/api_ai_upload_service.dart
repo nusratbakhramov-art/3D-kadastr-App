@@ -8,8 +8,43 @@ library;
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../core/api_config.dart';
+
+/// Extension → MIME, so the multipart part is tagged correctly (Flutter's
+/// MultipartFile.fromPath otherwise sends application/octet-stream, which the
+/// backend would treat as an unknown type).
+MediaType? _mediaTypeFor(String path) {
+  final ext = path.contains('.') ? path.split('.').last.toLowerCase() : '';
+  switch (ext) {
+    case 'jpg':
+    case 'jpeg':
+      return MediaType('image', 'jpeg');
+    case 'png':
+      return MediaType('image', 'png');
+    case 'webp':
+      return MediaType('image', 'webp');
+    case 'heic':
+      return MediaType('image', 'heic');
+    case 'heif':
+      return MediaType('image', 'heif');
+    case 'pdf':
+      return MediaType('application', 'pdf');
+    case 'doc':
+      return MediaType('application', 'msword');
+    case 'docx':
+      return MediaType('application',
+          'vnd.openxmlformats-officedocument.wordprocessingml.document');
+    case 'xls':
+      return MediaType('application', 'vnd.ms-excel');
+    case 'xlsx':
+      return MediaType('application',
+          'vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    default:
+      return null;
+  }
+}
 
 /// Upload categories — must match the backend `_UPLOAD_CATEGORIES` keys.
 enum UploadCategory {
@@ -51,7 +86,11 @@ class AiUploadService {
       ..headers['Authorization'] = 'Bearer $token'
       ..fields['category'] = category.wire;
     for (final path in filePaths) {
-      req.files.add(await http.MultipartFile.fromPath('files', path));
+      req.files.add(await http.MultipartFile.fromPath(
+        'files',
+        path,
+        contentType: _mediaTypeFor(path),
+      ));
     }
 
     final streamed = await _client.send(req).timeout(const Duration(seconds: 120));

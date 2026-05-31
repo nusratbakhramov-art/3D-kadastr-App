@@ -110,7 +110,10 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: true,
       type: FileType.custom,
-      allowedExtensions: const ['pdf', 'jpg', 'jpeg', 'png', 'webp'],
+      allowedExtensions: const [
+        'pdf', 'doc', 'docx', 'xls', 'xlsx',
+        'jpg', 'jpeg', 'png', 'webp', 'heic',
+      ],
     );
     if (result == null || result.files.isEmpty) return;
     final paths = result.files
