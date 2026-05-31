@@ -16,9 +16,9 @@ import '../ratings/my_ratings_screen.dart';
 import '../scans/my_scans_screen.dart';
 import '../services/screens/ai_cadastre_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
+import '../services/screens/online_calculator_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
-import '../../widgets/app_toast.dart';
 import 'app_bottom_nav.dart';
 
 class MainShell extends StatefulWidget {
@@ -169,7 +169,9 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _openCalculator() {
-    AppToast.success(context, AppLocale.comingSoonLabel(widget.locale));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
+    );
   }
 
   void _openMarketTab() => _onTabChanged(2);
