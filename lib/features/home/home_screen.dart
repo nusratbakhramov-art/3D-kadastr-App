@@ -7,6 +7,7 @@ import '../market/market_controller.dart';
 import '../market/models/market_listing.dart';
 import '../market/listing_detail_screen.dart';
 import '../market/widgets/featured_carousel.dart';
+import '../chat/screens/chat_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
 import 'user_profile.dart';
 import 'widgets/home_card.dart';
@@ -112,6 +113,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'homeChatFab',
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ChatScreen(locale: widget.locale),
+          ),
+        ),
+        backgroundColor: AppColors.splashGreen,
+        foregroundColor: AppColors.greenBlack,
+        tooltip: 'Yordamchi',
+        child: const Icon(Icons.chat_bubble_rounded),
+      ),
       body: Stack(
         fit: StackFit.expand,
         children: [
