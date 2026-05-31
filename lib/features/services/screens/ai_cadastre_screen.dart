@@ -104,6 +104,22 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
         token: token,
       );
       if (!mounted || reqId != _lookupRequestId) return;
+      // davreest.uz returns an all-null result for a non-existent number
+      // instead of an error — treat that as "not found" so the user can't
+      // continue with empty property data.
+      final hasData = (result.address?.trim().isNotEmpty ?? false) ||
+          result.totalArea != null ||
+          result.livingArea != null ||
+          result.cadastreValue != null ||
+          (result.objectTypeHint?.trim().isNotEmpty ?? false);
+      if (!hasData) {
+        setState(() {
+          _status = _LoadStatus.error;
+          _info = null;
+          _errorMsg = "Bu kadastr raqami bo'yicha ma'lumot topilmadi";
+        });
+        return;
+      }
       setState(() {
         _info = result;
         _status = _LoadStatus.loaded;
@@ -417,13 +433,18 @@ class _CadastreMaskFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final digits = newValue.text.replaceAll(RegExp(r'\D'), '').substring(
-          0,
-          newValue.text
-              .replaceAll(RegExp(r'\D'), '')
-              .length
-              .clamp(0, _maxDigits),
-        );
+    final allDigits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final digits = allDigits.substring(0, allDigits.length.clamp(0, _maxDigits));
+
+    // Count how many digits sit to the LEFT of the incoming caret, so we can
+    // put the caret back after the same digit once the colons are re-inserted
+    // (instead of always jumping to the end — which broke mid-string edits).
+    final selEnd = newValue.selection.end.clamp(0, newValue.text.length);
+    final digitsBeforeCaret = newValue.text
+        .substring(0, selEnd)
+        .replaceAll(RegExp(r'\D'), '')
+        .length
+        .clamp(0, digits.length);
 
     final buffer = StringBuffer();
     var consumed = 0;
@@ -435,11 +456,23 @@ class _CadastreMaskFormatter extends TextInputFormatter {
       buffer.write(digits.substring(consumed, end));
       consumed = end;
     }
-
     final formatted = buffer.toString();
+
+    // Map "N digits before caret" → an offset in the formatted string, walking
+    // past the inserted colons.
+    var offset = 0;
+    var seen = 0;
+    while (offset < formatted.length && seen < digitsBeforeCaret) {
+      if (formatted[offset] != ':') seen++;
+      offset++;
+    }
+    // If we land right before a separator after completing a group, step past
+    // it so forward typing flows into the next segment naturally.
+    if (offset < formatted.length && formatted[offset] == ':') offset++;
+
     return TextEditingValue(
       text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
+      selection: TextSelection.collapsed(offset: offset.clamp(0, formatted.length)),
     );
   }
 }

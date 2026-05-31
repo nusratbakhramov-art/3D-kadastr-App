@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_flow_screen.dart';
 import '../auth/auth_storage.dart';
+import '../auth/widgets/login_required_sheet.dart';
 import '../applications/applications_screen.dart';
 import '../help/help_screen.dart';
 import '../home/home_screen.dart';
@@ -160,9 +161,16 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _openAiValuation() async {
-    // AI Baholash wizard entry (kadastr → client → location → result) — the
-    // same screen the Services tab opens. (Was wrongly opening the LiDAR scan
-    // screen, AiScanScreen.)
+    // AI Baholash needs an account — gate with a login drawer before the
+    // wizard opens (kadastr → client → location → purpose → intake → result).
+    if (!await ensureLoggedIn(
+      context,
+      storage: widget.authStorage,
+      message: "AI Baholash uchun avval tizimga kiring.",
+    )) {
+      return;
+    }
+    if (!mounted) return;
     await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const AiCadastreScreen()));

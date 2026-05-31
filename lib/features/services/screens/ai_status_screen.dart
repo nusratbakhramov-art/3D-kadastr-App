@@ -11,6 +11,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
@@ -270,19 +271,7 @@ class _ProgressView extends StatelessWidget {
           active: snapshot.status == AiJobStatus.aiPricing,
           isDark: isDark,
         ),
-        const SizedBox(height: 32),
-        Center(
-          child: Container(
-            width: 64,
-            height: 64,
-            padding: const EdgeInsets.all(8),
-            child: const CircularProgressIndicator(
-              strokeWidth: 3,
-              color: AppColors.splashGreen,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 36),
         Center(
           child: Text(
             'Bu jarayon 30 sekund - 2 daqiqa olishi mumkin.\n'
@@ -510,6 +499,19 @@ class _ResultView extends StatelessWidget {
                 const SizedBox(height: 8),
                 _ApproachesCard(
                   approaches: (result['approaches'] as Map).cast<String, dynamic>(),
+                  isDark: isDark,
+                ),
+              ],
+              // Comparables actually used (the market approach evidence).
+              if ((result['comparables_preview'] as List?)?.isNotEmpty ?? false) ...[
+                const SizedBox(height: 18),
+                _SectionTitle('Solishtirilgan e\'lonlar', isDark: isDark),
+                const SizedBox(height: 8),
+                _ComparablesCard(
+                  comparables: (result['comparables_preview'] as List)
+                      .whereType<Map>()
+                      .map((e) => e.cast<String, dynamic>())
+                      .toList(),
                   isDark: isDark,
                 ),
               ],
@@ -861,6 +863,121 @@ class _ApproachesCard extends StatelessWidget {
   }
 }
 
+class _ComparablesCard extends StatelessWidget {
+  const _ComparablesCard({required this.comparables, required this.isDark});
+  final List<Map<String, dynamic>> comparables;
+  final bool isDark;
+
+  double? _d(dynamic v) =>
+      v is num ? v.toDouble() : (v is String ? double.tryParse(v) : null);
+
+  String _money(double? v) {
+    if (v == null || v <= 0) return '—';
+    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)} mlrd';
+    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(0)} mln';
+    if (v >= 1e3) return '${(v / 1e3).toStringAsFixed(0)} ming';
+    return v.toStringAsFixed(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final text = isDark ? Colors.white : AppColors.textBlack;
+    final sub = isDark
+        ? Colors.white.withValues(alpha: 0.6)
+        : const Color(0xFF8A9097);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < comparables.length; i++)
+            _row(comparables[i], i != comparables.length - 1, text, sub, border),
+        ],
+      ),
+    );
+  }
+
+  Widget _row(Map<String, dynamic> c, bool divider, Color text, Color sub,
+      Color border) {
+    final price = _d(c['price_uzs']);
+    final area = _d(c['area_sqm']);
+    final psm = _d(c['price_per_sqm']);
+    final dist = _d(c['distance_km']);
+    final addr = (c['address'] as String?)?.trim();
+    final url = (c['url'] as String?)?.trim();
+
+    final meta = <String>[
+      if (area != null) '${area.toStringAsFixed(area % 1 == 0 ? 0 : 1)} m²',
+      if (psm != null) '${_money(psm)}/m²',
+      if (dist != null) '${dist.toStringAsFixed(dist < 1 ? 2 : 1)} km',
+    ].join('  ·  ');
+
+    return InkWell(
+      onTap: (url != null && url.isNotEmpty)
+          ? () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          border: divider
+              ? Border(bottom: BorderSide(color: border))
+              : null,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _money(price),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: text,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    meta,
+                    style: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontSize: 12,
+                      color: sub,
+                    ),
+                  ),
+                  if (addr != null && addr.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      addr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'MTSText',
+                        fontSize: 11.5,
+                        color: sub,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (url != null && url.isNotEmpty)
+              Icon(Icons.open_in_new, size: 16, color: sub),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _PoiSummary extends StatelessWidget {
   const _PoiSummary({required this.pois, required this.isDark});
   final Map<String, dynamic> pois;
@@ -904,7 +1021,7 @@ class _PoiSummary extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '${(r.value as List).length} ta',
+                    _countLabel(r.key, (r.value as List).length),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -918,6 +1035,14 @@ class _PoiSummary extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // Common, high-density amenities (bus stops) are capped at "10+" — the exact
+  // count (e.g. 1230) is noise. Price-affecting / rarer ones show the real n.
+  String _countLabel(String kind, int n) {
+    const capped = {'bus_stop'};
+    if (capped.contains(kind) && n > 10) return '10+ ta';
+    return '$n ta';
   }
 
   String _labelFor(String kind) {

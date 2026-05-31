@@ -18,6 +18,11 @@ import 'theme/app_theme.dart';
 void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
+  // Faqat portret rejim — ilova hech qachon yon (landscape) aylanmaydi.
+  SystemChrome.setPreferredOrientations(const [
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   // Foydalanuvchi profili AuthStorage'dan KadastrApp.initState ichida
   // yuklanadi (saqlangan sessiya bo'lsa). Mehmon (login qilmagan) holatda
   // userProfileNotifier null bo'lib qoladi va Profil ekranida "Kirish" tugmasi

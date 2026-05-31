@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../auth/widgets/login_required_sheet.dart';
 import 'models/service_item.dart';
 import 'screens/ai_cadastre_screen.dart';
 import 'screens/kadastr_3d_screen.dart';
@@ -199,16 +200,23 @@ class _ServicesScreenState extends State<ServicesScreen>
     );
   }
 
-  void _open(BuildContext context, ServiceItem item) {
+  Future<void> _open(BuildContext context, ServiceItem item) async {
     switch (item.id) {
       case ServiceId.kadastr3d:
         Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()),
         );
       case ServiceId.aiValuation:
-        // AI Baholash — to'liq flow:
-        // 1) Kadastr raqami (davreest.uz lookup), 2) RoomPlan LiDAR skan,
-        // 3) ArxitekturaTzWizard metadata, 4) AiResultScreen.
+        // AI Baholash needs an account (davreest.uz lookup + job submit).
+        // Gate the entry with a login drawer before the wizard opens.
+        if (!await ensureLoggedIn(
+          context,
+          message:
+              "AI Baholash uchun avval tizimga kiring.",
+        )) {
+          return;
+        }
+        if (!context.mounted) return;
         Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const AiCadastreScreen()),
         );
