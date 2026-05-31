@@ -498,10 +498,21 @@ class _ResultView extends StatelessWidget {
           confidence: confidence,
           isDark: isDark,
         ),
-              // Method/counts block removed per product: no engine name and
-              // no raw comparable counts — just value, confidence, amenities.
-              // Nearby-listings list also stays hidden (low-quality data); the
-              // comparables still feed the estimate server-side.
+              // AI narrative summary (plain Uzbek), if the LLM produced one.
+              if ((result['summary'] as String?)?.trim().isNotEmpty ?? false) ...[
+                const SizedBox(height: 14),
+                _SummaryCard(text: (result['summary'] as String).trim(), isDark: isDark),
+              ],
+              // 3-approach breakdown (cost / income / comparison + weights).
+              if (result['approaches'] is Map) ...[
+                const SizedBox(height: 18),
+                _SectionTitle('Baholash yondashuvlari', isDark: isDark),
+                const SizedBox(height: 8),
+                _ApproachesCard(
+                  approaches: (result['approaches'] as Map).cast<String, dynamic>(),
+                  isDark: isDark,
+                ),
+              ],
               if (pois.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 _SectionTitle('Yaqin atrofdagi obyektlar', isDark: isDark),
@@ -692,6 +703,159 @@ class _SectionTitle extends StatelessWidget {
         fontWeight: FontWeight.w700,
         fontSize: 16,
         color: isDark ? Colors.white : AppColors.textBlack,
+      ),
+    );
+  }
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.text, required this.isDark});
+  final String text;
+  final bool isDark;
+  @override
+  Widget build(BuildContext context) {
+    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final color = isDark ? Colors.white : AppColors.textBlack;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.auto_awesome, size: 18, color: AppColors.splashGreen),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontSize: 13.5,
+                height: 1.4,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ApproachesCard extends StatelessWidget {
+  const _ApproachesCard({required this.approaches, required this.isDark});
+  final Map<String, dynamic> approaches;
+  final bool isDark;
+
+  static const _labels = {
+    'cost': 'Xarajat (qayta tiklash)',
+    'income': 'Daromad (ijara)',
+    'comparison': 'Qiyoslash (bozor)',
+  };
+
+  double? _d(dynamic v) =>
+      v is num ? v.toDouble() : (v is String ? double.tryParse(v) : null);
+
+  String _fmt(double? v) {
+    if (v == null) return '—';
+    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)} mlrd';
+    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(1)} mln';
+    return v.toStringAsFixed(0);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final text = isDark ? Colors.white : AppColors.textBlack;
+    final sub = isDark
+        ? Colors.white.withValues(alpha: 0.6)
+        : const Color(0xFF8A9097);
+
+    final weights = (approaches['weights'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final cost = (approaches['cost_approach'] as Map?)?.cast<String, dynamic>();
+    final income = (approaches['income_approach'] as Map?)?.cast<String, dynamic>();
+    final comparison = _d(approaches['comparison_value']);
+
+    final values = <String, double?>{
+      'cost': cost == null ? null : _d(cost['value']),
+      'income': income == null ? null : _d(income['value']),
+      'comparison': comparison,
+    };
+
+    Widget row(String key) {
+      final w = _d(weights[key]);
+      if (w == null || w <= 0) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 5,
+              child: Text(_labels[key] ?? key,
+                  style: TextStyle(
+                      fontFamily: 'MTSCompact', fontSize: 13, color: text)),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(_fmt(values[key]),
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: text)),
+            ),
+            const SizedBox(width: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.splashGreen.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text('${(w * 100).round()}%',
+                  style: const TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.splashGreen)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text('Yondashuv',
+                    style: TextStyle(
+                        fontFamily: 'MTSCompact', fontSize: 11, color: sub)),
+              ),
+              Text('Qiymat · Og\'irlik',
+                  style: TextStyle(
+                      fontFamily: 'MTSCompact', fontSize: 11, color: sub)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          row('comparison'),
+          row('income'),
+          row('cost'),
+        ],
       ),
     );
   }

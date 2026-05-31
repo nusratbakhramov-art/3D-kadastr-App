@@ -22,7 +22,7 @@ import '../data/geocoder_client.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
-import 'ai_status_screen.dart';
+import 'ai_purpose_screen.dart';
 
 class AiLocationScreen extends StatefulWidget {
   const AiLocationScreen({super.key, required this.bundle});
@@ -206,7 +206,7 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => AiStatusScreen(bundle: widget.bundle),
+        builder: (_) => AiPurposeScreen(bundle: widget.bundle),
       ),
     );
   }

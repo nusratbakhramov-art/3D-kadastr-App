@@ -12,11 +12,30 @@ class AiBaholashBundle {
     required this.kadastr,
     this.client,
     this.location,
-  });
+    this.purpose = ValuationPurpose.sale,
+    List<AiRoom>? rooms,
+    List<String>? imageKeys,
+    List<String>? kadastrKeys,
+    List<String>? passportKeys,
+  })  : rooms = rooms ?? <AiRoom>[],
+        imageKeys = imageKeys ?? <String>[],
+        kadastrKeys = kadastrKeys ?? <String>[],
+        passportKeys = passportKeys ?? <String>[];
 
   final CadastreLookupResult kadastr;
   AiClientInfo? client;
   AiLocationInfo? location;
+
+  /// Baholash maqsadi — drives the reconciliation weighting on the backend.
+  ValuationPurpose purpose;
+
+  /// Optional dynamic room breakdown.
+  final List<AiRoom> rooms;
+
+  /// S3 object keys returned by `POST /ai-valuations/upload`, per category.
+  final List<String> imageKeys; // property photos (property_photo)
+  final List<String> kadastrKeys; // kadastr docs (kadastr)
+  final List<String> passportKeys; // owner ID (passport)
 
   Map<String, dynamic> toJson() => {
         'kadastr': {
@@ -31,7 +50,73 @@ class AiBaholashBundle {
         },
         if (client != null) 'client': client!.toJson(),
         if (location != null) 'location': location!.toJson(),
+        'purpose': purpose.wire,
+        if (rooms.isNotEmpty) 'rooms': rooms.map((r) => r.toJson()).toList(),
+        if (imageKeys.isNotEmpty) 'image_keys': imageKeys,
+        if (kadastrKeys.isNotEmpty) 'kadastr_keys': kadastrKeys,
+        if (passportKeys.isNotEmpty) 'passport_keys': passportKeys,
       };
+}
+
+/// Baholash maqsadi — mirrors backend `ValuationPurpose`.
+enum ValuationPurpose {
+  sale('sale'),
+  mortgage('mortgage'),
+  insurance('insurance'),
+  court('court'),
+  tax('tax');
+
+  const ValuationPurpose(this.wire);
+  final String wire;
+
+  String get labelUz => switch (this) {
+        ValuationPurpose.sale => 'Sotish',
+        ValuationPurpose.mortgage => 'Ipoteka / kredit',
+        ValuationPurpose.insurance => "Sug'urta",
+        ValuationPurpose.court => 'Sud / nizo',
+        ValuationPurpose.tax => 'Soliq',
+      };
+
+  String get hintUz => switch (this) {
+        ValuationPurpose.sale => 'Bozor narxi asosida',
+        ValuationPurpose.mortgage => 'Bank garovi uchun',
+        ValuationPurpose.insurance => 'Qayta tiklash qiymati',
+        ValuationPurpose.court => '3 yondashuv teng',
+        ValuationPurpose.tax => 'Kadastr asosida',
+      };
+}
+
+/// One room in the optional breakdown. Mirrors backend `RoomInput`.
+class AiRoom {
+  AiRoom({required this.kind, this.name, this.count = 1, this.area});
+
+  RoomKind kind;
+  String? name;
+  int count;
+  double? area;
+
+  Map<String, dynamic> toJson() => {
+        'kind': kind.wire,
+        if (name != null && name!.trim().isNotEmpty) 'name': name!.trim(),
+        'count': count,
+        if (area != null) 'area': area,
+      };
+}
+
+/// Room types — mirrors backend `RoomKind`.
+enum RoomKind {
+  living('living', 'Mehmonxona'),
+  bedroom('bedroom', 'Yotoqxona'),
+  kitchen('kitchen', 'Oshxona'),
+  bathroom('bathroom', 'Hammom'),
+  hallway('hallway', 'Koridor'),
+  balcony('balcony', 'Balkon'),
+  storage('storage', 'Ombor'),
+  other('other', 'Boshqa');
+
+  const RoomKind(this.wire, this.labelUz);
+  final String wire;
+  final String labelUz;
 }
 
 class AiClientInfo {

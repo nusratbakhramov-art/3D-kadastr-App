@@ -1,0 +1,72 @@
+/// Upload client for `POST /api/v1/ai-valuations/upload`.
+///
+/// The AI Baholash intake screen uploads files per category (kadastr docs,
+/// property photos, passport) to S3 via the backend and gets back the object
+/// keys. Those keys are echoed into the submit bundle.
+library;
+
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../../core/api_config.dart';
+
+/// Upload categories — must match the backend `_UPLOAD_CATEGORIES` keys.
+enum UploadCategory {
+  kadastr('kadastr'),
+  propertyPhoto('property_photo'),
+  passport('passport'),
+  document('document');
+
+  const UploadCategory(this.wire);
+  final String wire;
+}
+
+class AiUploadException implements Exception {
+  AiUploadException(this.message, {this.statusCode});
+  final String message;
+  final int? statusCode;
+  @override
+  String toString() => 'AiUploadException($statusCode): $message';
+}
+
+class AiUploadService {
+  AiUploadService({http.Client? client, String? baseUrl})
+      : _client = client ?? http.Client(),
+        _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+
+  final http.Client _client;
+  final String _baseUrl;
+
+  /// Upload [filePaths] under [category]; returns the stored S3 object keys
+  /// (in the same order, best-effort). Throws [AiUploadException] on failure.
+  Future<List<String>> upload({
+    required UploadCategory category,
+    required List<String> filePaths,
+    required String token,
+  }) async {
+    if (filePaths.isEmpty) return const [];
+    final uri = Uri.parse('$_baseUrl/ai-valuations/upload');
+    final req = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['category'] = category.wire;
+    for (final path in filePaths) {
+      req.files.add(await http.MultipartFile.fromPath('files', path));
+    }
+
+    final streamed = await _client.send(req).timeout(const Duration(seconds: 120));
+    final res = await http.Response.fromStream(streamed);
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      var msg = res.body;
+      if (msg.length > 200) msg = '${msg.substring(0, 200)}…';
+      throw AiUploadException('upload failed: $msg', statusCode: res.statusCode);
+    }
+    final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    final files = (body['files'] as List?) ?? const [];
+    return files
+        .map((f) => (f as Map<String, dynamic>)['key'] as String)
+        .toList(growable: false);
+  }
+
+  void dispose() => _client.close();
+}
