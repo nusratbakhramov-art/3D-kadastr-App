@@ -181,9 +181,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final ordersFuture = ArchitectureOrderApiService()
         .list(token: token, page: 1, size: 100)
         .then(
-          (page) => page.items
-              .map(_orderToApplicationItem)
-              .toList(growable: false),
+          (page) =>
+              page.items.map(_orderToApplicationItem).toList(growable: false),
         )
         .catchError((_) => <ApplicationItem>[]);
 
@@ -201,8 +200,9 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final photogrammetryFuture = PhotogrammetryApiService()
         .listJobs()
         .then(
-          (list) =>
-              list.map(_photogrammetryToApplicationItem).toList(growable: false),
+          (list) => list
+              .map(_photogrammetryToApplicationItem)
+              .toList(growable: false),
         )
         .catchError((_) => <ApplicationItem>[]);
 
@@ -453,6 +453,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: ColorTokens.scaffoldBg(context),
@@ -472,9 +473,10 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const _Title(),
+                          _Title(locale: locale),
                           const SizedBox(height: 14),
                           _ServiceChips(
+                            locale: locale,
                             selectedId: _selectedServiceId,
                             onChanged: _onServiceChanged,
                           ),
@@ -492,12 +494,12 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                   else if (_loadError != null)
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _ErrorState(message: _loadError!),
+                      child: _ErrorState(locale: locale, message: _loadError!),
                     )
                   else if (_initialized && _items.isEmpty)
-                    const SliverFillRemaining(
+                    SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _EmptyState(),
+                      child: _EmptyState(locale: locale),
                     )
                   else if (_initialized)
                     SliverPadding(
@@ -821,13 +823,15 @@ class _SlidingGradientTransform extends GradientTransform {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.locale});
+
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Text(
-        'Arizalar topilmadi',
+        _ApplicationsStrings.empty(locale),
         style: TextStyle(
           fontFamily: 'MTSCompact',
           fontWeight: FontWeight.w500,
@@ -840,7 +844,8 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message});
+  const _ErrorState({required this.locale, required this.message});
+  final Locale locale;
   final String message;
 
   @override
@@ -858,7 +863,7 @@ class _ErrorState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Yuklab boʻlmadi',
+              _ApplicationsStrings.loadFailed(locale),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -884,12 +889,14 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _Title extends StatelessWidget {
-  const _Title();
+  const _Title({required this.locale});
+
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Arizalar',
+      _ApplicationsStrings.title(locale),
       style: TextStyle(
         fontFamily: 'MTSCompact',
         fontWeight: FontWeight.w700,
@@ -902,8 +909,13 @@ class _Title extends StatelessWidget {
 }
 
 class _ServiceChips extends StatelessWidget {
-  const _ServiceChips({required this.selectedId, required this.onChanged});
+  const _ServiceChips({
+    required this.locale,
+    required this.selectedId,
+    required this.onChanged,
+  });
 
+  final Locale locale;
   final String selectedId;
   final ValueChanged<String> onChanged;
 
@@ -911,13 +923,64 @@ class _ServiceChips extends StatelessWidget {
   Widget build(BuildContext context) {
     return CategoryChips(
       categories: applicationServiceChips
-          .map((chip) => MarketCategory(id: chip.id, label: chip.label))
+          .map(
+            (chip) => MarketCategory(
+              id: chip.id,
+              label: _ApplicationsStrings.serviceChip(locale, chip.id),
+            ),
+          )
           .toList(growable: false),
       selectedId: selectedId,
       onSelected: onChanged,
       padding: EdgeInsets.zero,
     );
   }
+}
+
+class _ApplicationsStrings {
+  const _ApplicationsStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'Заявки',
+    'en' => 'Applications',
+    _ => 'Arizalar',
+  };
+
+  static String empty(Locale l) => switch (l.languageCode) {
+    'ru' => 'Заявки не найдены',
+    'en' => 'No applications found',
+    _ => 'Arizalar topilmadi',
+  };
+
+  static String loadFailed(Locale l) => switch (l.languageCode) {
+    'ru' => 'Не удалось загрузить',
+    'en' => 'Failed to load',
+    _ => 'Yuklab boʻlmadi',
+  };
+
+  static String serviceChip(Locale l, String id) => switch (id) {
+    'all' => switch (l.languageCode) {
+      'ru' => 'Все',
+      'en' => 'All',
+      _ => 'Barchasi',
+    },
+    'kad_3d' => switch (l.languageCode) {
+      'ru' => '3D кадастр',
+      'en' => '3D cadastre',
+      _ => '3D Kadastr',
+    },
+    'ai_eval' => switch (l.languageCode) {
+      'ru' => 'AI оценка',
+      'en' => 'AI valuation',
+      _ => 'AI Baholash',
+    },
+    'calc' => switch (l.languageCode) {
+      'ru' => 'Калькулятор',
+      'en' => 'Calculator',
+      _ => 'Kalkulyator',
+    },
+    _ => id,
+  };
 }
 
 class _ApplicationCard extends StatelessWidget {
@@ -1125,9 +1188,7 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark
-        ? style.fgColor.withValues(alpha: 0.18)
-        : style.bgColor;
+    final bg = isDark ? style.fgColor.withValues(alpha: 0.18) : style.bgColor;
     return Container(
       height: 24,
       padding: const EdgeInsets.fromLTRB(3, 3, 8, 3),

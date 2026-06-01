@@ -72,11 +72,7 @@ class _MarketScreenState extends State<MarketScreen> {
     // background "loadMore" failures silent if user already sees items.
     if (_controller.items.isNotEmpty) return;
     if (!mounted) return;
-    NetworkErrorHandler.maybeShow(
-      context,
-      err,
-      onRetry: _controller.retry,
-    );
+    NetworkErrorHandler.maybeShow(context, err, onRetry: _controller.retry);
   }
 
   void _syncSearchText() {
@@ -186,6 +182,7 @@ class _MarketScreenState extends State<MarketScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -234,6 +231,7 @@ class _MarketScreenState extends State<MarketScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       sliver: _BodySliver(
                         controller: _controller,
+                        locale: locale,
                         onCardTap: _onCardTap,
                         onResetAll: _resetAll,
                       ),
@@ -274,13 +272,14 @@ class _StickyHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: ListenableBuilder(
         listenable: controller,
         builder: (context, _) {
           return MarketHeader(
-            title: 'Market',
+            title: _MarketScreenStrings.title(locale),
             onFilterTap: onFilterTap,
             filterActiveCount: controller.filters.activeCount,
           );
@@ -313,11 +312,13 @@ class _ChipsRow extends StatelessWidget {
 class _BodySliver extends StatelessWidget {
   const _BodySliver({
     required this.controller,
+    required this.locale,
     required this.onCardTap,
     required this.onResetAll,
   });
 
   final MarketController controller;
+  final Locale locale;
   final ValueChanged<MarketListing> onCardTap;
   final VoidCallback onResetAll;
 
@@ -341,9 +342,9 @@ class _BodySliver extends StatelessWidget {
             hasScrollBody: false,
             child: MarketEmptyState(
               icon: Icons.wifi_off_rounded,
-              title: 'Xatolik yuz berdi',
-              subtitle: c.error ?? 'Qayta urinib ko\'ring.',
-              actionLabel: 'Qayta urinish',
+              title: _MarketScreenStrings.errorTitle(locale),
+              subtitle: c.error ?? _MarketScreenStrings.errorSubtitle(locale),
+              actionLabel: _MarketScreenStrings.retry(locale),
               onAction: () => unawaited(c.retry()),
             ),
           );
@@ -358,9 +359,11 @@ class _BodySliver extends StatelessWidget {
             hasScrollBody: false,
             child: MarketEmptyState(
               icon: Icons.search_off_rounded,
-              title: 'Hech narsa topilmadi',
-              subtitle: 'Boshqa qidiruv yoki filtrlarni sinab ko\'ring.',
-              actionLabel: filtered ? 'Filtrlarni tozalash' : null,
+              title: _MarketScreenStrings.emptyTitle(locale),
+              subtitle: _MarketScreenStrings.emptySubtitle(locale),
+              actionLabel: filtered
+                  ? _MarketScreenStrings.clearFilters(locale)
+                  : null,
               onAction: filtered ? onResetAll : null,
             ),
           );
@@ -422,7 +425,9 @@ class _TailSliver extends StatelessWidget {
             child: Center(
               child: TextButton(
                 onPressed: () => unawaited(c.loadMore()),
-                child: const Text('Qayta urinish'),
+                child: Text(
+                  _MarketScreenStrings.retry(Localizations.localeOf(context)),
+                ),
               ),
             ),
           );
@@ -487,6 +492,52 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _StickyHeaderDelegate old) =>
       height != old.height || child != old.child || scrolled != old.scrolled;
+}
+
+class _MarketScreenStrings {
+  const _MarketScreenStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'Маркет',
+    'en' => 'Market',
+    _ => 'Market',
+  };
+
+  static String errorTitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Произошла ошибка',
+    'en' => 'Something went wrong',
+    _ => 'Xatolik yuz berdi',
+  };
+
+  static String errorSubtitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Попробуйте ещё раз.',
+    'en' => 'Please try again.',
+    _ => 'Qayta urinib ko\'ring.',
+  };
+
+  static String retry(Locale l) => switch (l.languageCode) {
+    'ru' => 'Повторить',
+    'en' => 'Retry',
+    _ => 'Qayta urinish',
+  };
+
+  static String emptyTitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Ничего не найдено',
+    'en' => 'Nothing found',
+    _ => 'Hech narsa topilmadi',
+  };
+
+  static String emptySubtitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Попробуйте другой поиск или фильтры.',
+    'en' => 'Try a different query or filters.',
+    _ => 'Boshqa qidiruv yoki filtrlarni sinab ko\'ring.',
+  };
+
+  static String clearFilters(Locale l) => switch (l.languageCode) {
+    'ru' => 'Сбросить фильтры',
+    'en' => 'Clear filters',
+    _ => 'Filtrlarni tozalash',
+  };
 }
 
 class _ScrollToTopButton extends StatelessWidget {
