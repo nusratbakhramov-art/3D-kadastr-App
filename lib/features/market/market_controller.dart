@@ -68,20 +68,29 @@ class MarketController extends ChangeNotifier {
   Future<void> _loadCategories() async {
     final svc = _categoriesService;
     if (svc == null) return;
-    try {
-      final remote = await svc.fetchCategories();
-      if (_disposed) return;
-      final apiSlugs = remote.map((c) => c.slug).toSet();
-      _categories = [
-        const MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
-        // Always show Non-residential chip; skip if API already returns it
-        if (!apiSlugs.contains('nonresidential'))
-          const MarketCategory(id: 'nonresidential', label: "No'turar"),
-        ...remote.map((c) => MarketCategory(id: c.slug, label: c.name)),
-      ];
-      _notify();
-    } catch (_) {
-      // Silent fallback — keep the default "Barchasi" entry.
+    // Cold-start'da tarmoq ba'zan birinchi so'rovni uzadi — bir marta qayta urinamiz.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final remote = await svc.fetchCategories();
+        if (_disposed) return;
+        final apiSlugs = remote.map((c) => c.slug).toSet();
+        _categories = [
+          const MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
+          // Always show Non-residential chip; skip if API already returns it
+          if (!apiSlugs.contains('nonresidential'))
+            const MarketCategory(id: 'nonresidential', label: "No'turar"),
+          ...remote.map((c) => MarketCategory(id: c.slug, label: c.name)),
+        ];
+        _notify();
+        return;
+      } catch (_) {
+        if (_disposed) return;
+        if (attempt == 0) {
+          await Future<void>.delayed(const Duration(seconds: 2));
+          continue;
+        }
+        // Ikkinchi urinishdan keyin ham — default "Barchasi" qoladi.
+      }
     }
   }
 
@@ -124,9 +133,17 @@ class MarketController extends ChangeNotifier {
     unawaited(_fetchFirstPage());
   }
 
-  Future<void> refresh() => _fetchFirstPage();
+  Future<void> refresh() async {
+    // Kategoriyalar cold-start'da tushib qolgan bo'lsa, pull-to-refresh tiklaydi.
+    if (_categories.length <= 1) unawaited(_loadCategories());
+    await _fetchFirstPage();
+  }
 
-  Future<void> retry() => _fetchFirstPage();
+  Future<void> retry() async {
+    // "Qayta urinish" listing bilan birga kategoriyalarni ham qayta yuklaydi.
+    unawaited(_loadCategories());
+    await _fetchFirstPage();
+  }
 
   Future<void> loadMore() async {
     if (_status != MarketStatus.success) return;
