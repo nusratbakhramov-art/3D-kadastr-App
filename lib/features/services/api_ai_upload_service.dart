@@ -47,11 +47,14 @@ MediaType? _mediaTypeFor(String path) {
 }
 
 /// Upload categories — must match the backend `_UPLOAD_CATEGORIES` keys.
+/// `passport`/`document` belong to AI Baholash; `scan3d` belongs to the
+/// 3D Kadastr flow (LiDAR mesh uploads).
 enum UploadCategory {
   kadastr('kadastr'),
   propertyPhoto('property_photo'),
   passport('passport'),
-  document('document');
+  document('document'),
+  scan3d('scan_3d');
 
   const UploadCategory(this.wire);
   final String wire;
@@ -75,13 +78,18 @@ class AiUploadService {
 
   /// Upload [filePaths] under [category]; returns the stored S3 object keys
   /// (in the same order, best-effort). Throws [AiUploadException] on failure.
+  ///
+  /// [endpoint] selects the backend upload route (relative to the API base):
+  /// AI Baholash uses `/ai-valuations/upload` (default), 3D Kadastr passes
+  /// `/3d-kadastr-jobs/upload`.
   Future<List<String>> upload({
     required UploadCategory category,
     required List<String> filePaths,
     required String token,
+    String endpoint = '/ai-valuations/upload',
   }) async {
     if (filePaths.isEmpty) return const [];
-    final uri = Uri.parse('$_baseUrl/ai-valuations/upload');
+    final uri = Uri.parse('$_baseUrl$endpoint');
     final req = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token'
       ..fields['category'] = category.wire;
