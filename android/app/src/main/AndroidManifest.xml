@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Backend API'ga ulanish uchun. Flutter buni faqat debug/profile
+         manifestga avtomatik qo'shadi — release APK'da internet bo'lmasligi
+         uchun shu yerda ham e'lon qilamiz. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Xaritada joriy joylashuvni aniqlash uchun (geolocator). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
