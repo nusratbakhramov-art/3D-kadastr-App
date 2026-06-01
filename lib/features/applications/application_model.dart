@@ -1,4 +1,4 @@
-enum ApplicationStatusGroup { inProgress, completed, cancelled }
+enum ApplicationStatusGroup { sent, inProgress, completed, cancelled }
 
 enum ApplicationTimelineStatus {
   accepted,

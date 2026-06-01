@@ -8,6 +8,7 @@ import '../../theme/color_tokens.dart';
 import '../auth/auth_storage.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_architecture_order_service.dart';
+import '../services/api_calculator_order_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import 'application_detail_screen.dart';
 import '../market/models/market_listing.dart' show MarketCategory;
@@ -205,15 +206,25 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         )
         .catchError((_) => <ApplicationItem>[]);
 
+    // Kalkulyator arizalari (`GET /services/calculator/orders`).
+    final calcFuture = CalculatorOrderApiService()
+        .list(token: token)
+        .then(
+          (list) => list.map(_calcToApplicationItem).toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
     final results = await Future.wait([
       ordersFuture,
       aiJobsFuture,
       photogrammetryFuture,
+      calcFuture,
     ]);
     final combined = <ApplicationItem>[
       ...results[0],
       ...results[1],
       ...results[2],
+      ...results[3],
     ];
     // Yangidan eskigacha tartiblash — sanalar string sifatida saqlangan,
     // lekin DD.MM.YYYY format saqlanadi → teskari sort.
@@ -254,6 +265,32 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       typeValue: hasValue ? j.cadastreNumber : null,
       timeline: const <ApplicationTimelineStep>[],
     );
+  }
+
+  static ApplicationItem _calcToApplicationItem(CalculatorOrderSummary o) {
+    return ApplicationItem(
+      id: 'calc_${o.id}',
+      serviceId: 'calc',
+      serviceLabel: 'Kalkulyator',
+      statusGroup: _calcStatusToGroup(o.status),
+      addressLabel: 'Turi',
+      addressValue: o.categoryTitle,
+      dateLabel: 'Ariza sanasi',
+      dateValue: _formatDate(o.createdAt),
+      typeLabel: 'Narx',
+      typeValue: _formatUzs(o.totalUzs),
+      timeline: const <ApplicationTimelineStep>[],
+    );
+  }
+
+  static ApplicationStatusGroup _calcStatusToGroup(String status) {
+    return switch (status) {
+      'done' => ApplicationStatusGroup.completed,
+      'cancelled' => ApplicationStatusGroup.cancelled,
+      'processing' => ApplicationStatusGroup.inProgress,
+      // 'submitted' (and anything else) → freshly sent.
+      _ => ApplicationStatusGroup.sent,
+    };
   }
 
   static ApplicationStatusGroup _statusToGroup(String status) {
@@ -1053,6 +1090,12 @@ class _StatusStyle {
 
   static _StatusStyle fromGroup(ApplicationStatusGroup group) =>
       switch (group) {
+        ApplicationStatusGroup.sent => const _StatusStyle(
+          label: 'Yuborilgan',
+          bgColor: Color(0xFFE2ECFD),
+          fgColor: Color(0xFF2B7FFF),
+          iconAsset: 'assets/icons/application-pending.svg',
+        ),
         ApplicationStatusGroup.inProgress => const _StatusStyle(
           label: 'Jarayonda',
           bgColor: Color(0xFFFCEDE3),
