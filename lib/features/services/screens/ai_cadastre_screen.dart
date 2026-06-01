@@ -24,6 +24,10 @@ class AiCadastreScreen extends StatefulWidget {
 
 class _AiCadastreScreenState extends State<AiCadastreScreen> {
   static const _fullMaskLength = 19;
+  // Base NN:NN:NN:NN:NN:NNNN, optionally followed by sub-parcel / building /
+  // unit blocks, e.g. 10:09:01:01:02:5942:0001:039.
+  static final _cadastreRe =
+      RegExp(r'^\d{2}:\d{2}:\d{2}:\d{2}:\d{2}:\d{4}(:\d{1,4})*$');
   final TextEditingController _cadastreController = TextEditingController();
   Timer? _loadTimer;
   _LoadStatus _status = _LoadStatus.idle;
@@ -66,7 +70,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   }
 
   void _onCadastreChanged() {
-    final filled = _cadastreController.text.length == _fullMaskLength;
+    final filled = _cadastreRe.hasMatch(_cadastreController.text);
     if (filled) {
       if (_status == _LoadStatus.idle || _status == _LoadStatus.error) {
         _loadTimer?.cancel();
@@ -426,7 +430,9 @@ class _CadastreInput extends StatelessWidget {
 
 class _CadastreMaskFormatter extends TextInputFormatter {
   static const _segments = [2, 2, 2, 2, 2, 4];
-  static const _maxDigits = 14;
+  // Base = 14 digits; allow extra for sub-parcel / building / unit tail
+  // (e.g. 10:09:01:01:02:5942:0001:039).
+  static const _maxDigits = 25;
 
   @override
   TextEditingValue formatEditUpdate(
@@ -453,6 +459,14 @@ class _CadastreMaskFormatter extends TextInputFormatter {
       final take = _segments[i];
       final end = (consumed + take).clamp(0, digits.length);
       if (i > 0) buffer.write(':');
+      buffer.write(digits.substring(consumed, end));
+      consumed = end;
+    }
+    // Extended tail (beyond the 6-block base): group remaining digits into
+    // blocks of up to 4 so a pasted/typed sub-parcel number keeps its colons.
+    while (consumed < digits.length) {
+      final end = (consumed + 4).clamp(0, digits.length);
+      buffer.write(':');
       buffer.write(digits.substring(consumed, end));
       consumed = end;
     }

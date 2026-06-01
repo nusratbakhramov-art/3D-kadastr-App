@@ -57,6 +57,10 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>3D kadastr skanini olish uchun kamera va LiDAR sensori kerak.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Obyekt rasmlari va kadastr hujjatlarini baholash uchun yuklash maqsadida foto galereyaga ruxsat kerak.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Hisobot va skan natijalarini foto galereyaga saqlash uchun ruxsat kerak.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Ilova lokal tarmoqdagi server bilan bog'lanadi (test rejimi).</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
