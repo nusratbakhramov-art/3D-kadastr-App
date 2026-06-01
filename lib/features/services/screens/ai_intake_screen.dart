@@ -11,6 +11,8 @@
 /// to "Hisoblash" and the backend handles missing inputs with sane defaults.
 library;
 
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -43,10 +45,73 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   bool _passportBusy = false;
   bool _submitting = false;
 
+  // Local file paths for the picked files, index-aligned with the bundle's
+  // key lists. The keys are server-side and can't be rendered directly, so we
+  // keep the on-device path to draw a thumbnail / file chip. Removing index i
+  // drops both the path here and the key on the bundle.
+  final List<String> _photoPaths = [];
+  final List<String> _kadastrPaths = [];
+  final List<String> _passportPaths = [];
+
+  // Floor inputs — required. Mirror straight into the bundle on change.
+  final TextEditingController _floorCtrl = TextEditingController();
+  final TextEditingController _totalFloorsCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.bundle.floor != null) {
+      _floorCtrl.text = '${widget.bundle.floor}';
+    }
+    if (widget.bundle.totalFloors != null) {
+      _totalFloorsCtrl.text = '${widget.bundle.totalFloors}';
+    }
+  }
+
   @override
   void dispose() {
     _uploads.dispose();
+    _floorCtrl.dispose();
+    _totalFloorsCtrl.dispose();
     super.dispose();
+  }
+
+  // ── Required-fields gate ──────────────────────────────────────────────
+  // Photos, kadastr docs, rooms, and both floor numbers are mandatory.
+  // Passport stays optional.
+  bool get _ready =>
+      widget.bundle.imageKeys.isNotEmpty &&
+      widget.bundle.kadastrKeys.isNotEmpty &&
+      widget.bundle.rooms.isNotEmpty &&
+      widget.bundle.floor != null &&
+      widget.bundle.totalFloors != null &&
+      widget.bundle.floor! >= 1 &&
+      widget.bundle.totalFloors! >= 1 &&
+      widget.bundle.floor! <= widget.bundle.totalFloors!;
+
+  // Short hint listing what's still missing, or null when ready.
+  String? get _missingHint {
+    if (_ready) return null;
+    final missing = <String>[];
+    if (widget.bundle.imageKeys.isEmpty) missing.add('rasm');
+    if (widget.bundle.kadastrKeys.isEmpty) missing.add('kadastr hujjati');
+    if (widget.bundle.rooms.isEmpty) missing.add('xonalar');
+    final f = widget.bundle.floor;
+    final tf = widget.bundle.totalFloors;
+    if (f == null || tf == null || f < 1 || tf < 1) {
+      missing.add('qavat');
+    } else if (f > tf) {
+      return 'Qavat binodagi jami qavatlardan katta bo\'lmasligi kerak';
+    }
+    return '${missing.join(', ')} majburiy';
+  }
+
+  void _setFloor(String raw) {
+    setState(() => widget.bundle.floor = int.tryParse(raw.trim()));
+  }
+
+  void _setTotalFloors(String raw) {
+    setState(() => widget.bundle.totalFloors = int.tryParse(raw.trim()));
   }
 
   Future<String?> _token() async {
@@ -72,6 +137,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
       category: UploadCategory.propertyPhoto,
       paths: picked.map((x) => x.path).toList(),
       target: widget.bundle.imageKeys,
+      targetPaths: _photoPaths,
       setBusy: (v) => setState(() => _photosBusy = v),
     );
   }
@@ -81,6 +147,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     await _pickFilesUpload(
       category: UploadCategory.kadastr,
       target: widget.bundle.kadastrKeys,
+      targetPaths: _kadastrPaths,
       maxTotal: 20,
       setBusy: (v) => setState(() => _kadastrBusy = v),
     );
@@ -91,14 +158,26 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     await _pickFilesUpload(
       category: UploadCategory.passport,
       target: widget.bundle.passportKeys,
+      targetPaths: _passportPaths,
       maxTotal: 5,
       setBusy: (v) => setState(() => _passportBusy = v),
     );
   }
 
+  // Drop the file at index `i` from a section — both its on-device path and
+  // its server-side key stay aligned.
+  void _removeAt(List<String> target, List<String> targetPaths, int i) {
+    HapticFeedback.lightImpact();
+    setState(() {
+      if (i >= 0 && i < target.length) target.removeAt(i);
+      if (i >= 0 && i < targetPaths.length) targetPaths.removeAt(i);
+    });
+  }
+
   Future<void> _pickFilesUpload({
     required UploadCategory category,
     required List<String> target,
+    required List<String> targetPaths,
     required int maxTotal,
     required void Function(bool) setBusy,
   }) async {
@@ -122,13 +201,19 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
         .take(remaining)
         .toList();
     await _doUpload(
-      category: category, paths: paths, target: target, setBusy: setBusy);
+      category: category,
+      paths: paths,
+      target: target,
+      targetPaths: targetPaths,
+      setBusy: setBusy,
+    );
   }
 
   Future<void> _doUpload({
     required UploadCategory category,
     required List<String> paths,
     required List<String> target,
+    required List<String> targetPaths,
     required void Function(bool) setBusy,
   }) async {
     if (paths.isEmpty) return;
@@ -142,7 +227,12 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
       final keys = await _uploads.upload(
         category: category, filePaths: paths, token: token);
       if (!mounted) return;
-      setState(() => target.addAll(keys));
+      // keys come back 1:1 and in order with `paths`; keep the previews aligned
+      // to whatever actually uploaded.
+      setState(() {
+        target.addAll(keys);
+        targetPaths.addAll(paths.take(keys.length));
+      });
     } catch (e) {
       _snack('Yuklashda xatolik: $e');
     } finally {
@@ -181,7 +271,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                   padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
                     title: 'Hujjat va rasmlar',
-                    subtitle: 'Aniqroq baho uchun (ixtiyoriy)',
+                    subtitle: 'Baholash uchun zarur ma\'lumotlar',
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -196,6 +286,9 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                         count: b.imageKeys.length,
                         busy: _photosBusy,
                         onAdd: _addPhotos,
+                        paths: _photoPaths,
+                        onRemove: (i) =>
+                            _removeAt(b.imageKeys, _photoPaths, i),
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
@@ -205,6 +298,9 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                         count: b.kadastrKeys.length,
                         busy: _kadastrBusy,
                         onAdd: _addKadastr,
+                        paths: _kadastrPaths,
+                        onRemove: (i) =>
+                            _removeAt(b.kadastrKeys, _kadastrPaths, i),
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
@@ -214,18 +310,58 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                         count: b.passportKeys.length,
                         busy: _passportBusy,
                         onAdd: _addPassport,
+                        paths: _passportPaths,
+                        onRemove: (i) =>
+                            _removeAt(b.passportKeys, _passportPaths, i),
                       ),
                       const SizedBox(height: 20),
-                      _RoomsSelector(rooms: b.rooms),
+                      _FloorSection(
+                        floorCtrl: _floorCtrl,
+                        totalFloorsCtrl: _totalFloorsCtrl,
+                        onFloorChanged: _setFloor,
+                        onTotalChanged: _setTotalFloors,
+                      ),
+                      const SizedBox(height: 20),
+                      _RoomsSelector(
+                        rooms: b.rooms,
+                        onChanged: () => setState(() {}),
+                      ),
                     ],
                   ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: ListingCtaButton(
-                    label: _submitting ? 'Yuborilmoqda…' : 'Hisoblash',
-                    enabled: !_submitting,
-                    onTap: _calculate,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_missingHint != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline,
+                                  size: 15, color: Color(0xFFE5A23D)),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  _missingHint!,
+                                  style: const TextStyle(
+                                    fontFamily: 'MTSText',
+                                    fontSize: 12,
+                                    color: Color(0xFFE5A23D),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                      ListingCtaButton(
+                        label: _submitting ? 'Yuborilmoqda…' : 'Hisoblash',
+                        enabled: _ready && !_submitting,
+                        onTap: _calculate,
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -246,6 +382,8 @@ class _UploadCard extends StatelessWidget {
     required this.count,
     required this.busy,
     required this.onAdd,
+    required this.paths,
+    required this.onRemove,
   });
 
   final String title;
@@ -254,6 +392,10 @@ class _UploadCard extends StatelessWidget {
   final int count;
   final bool busy;
   final VoidCallback onAdd;
+  // On-device paths of the picked files, for thumbnail previews.
+  final List<String> paths;
+  // Remove the file at this index (drops both preview + server key).
+  final ValueChanged<int> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -270,71 +412,323 @@ class _UploadCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: border),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 26, color: AppColors.splashGreen),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Icon(icon, size: 26, color: AppColors.splashGreen),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        title,
-                        style: TextStyle(
-                          fontFamily: 'MTSCompact',
-                          fontWeight: FontWeight.w700,
-                          fontSize: 15,
-                          color: textColor,
-                        ),
-                      ),
-                    ),
-                    if (count > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.splashGreen.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '$count',
-                          style: const TextStyle(
-                            fontFamily: 'MTSCompact',
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            color: AppColors.splashGreen,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            title,
+                            style: TextStyle(
+                              fontFamily: 'MTSCompact',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: textColor,
+                            ),
                           ),
                         ),
+                        if (count > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.splashGreen
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '$count',
+                              style: const TextStyle(
+                                fontFamily: 'MTSCompact',
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: AppColors.splashGreen,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      hint,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontSize: 12,
+                        height: 1.3,
+                        color: muted,
                       ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  hint,
-                  style: TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontSize: 12,
-                    height: 1.3,
-                    color: muted,
+              ),
+              const SizedBox(width: 8),
+              busy
+                  ? const SizedBox(
+                      width: 28, height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2.5))
+                  : IconButton(
+                      onPressed: onAdd,
+                      icon: const Icon(Icons.add_circle, size: 32),
+                      color: AppColors.splashGreen,
+                      visualDensity: VisualDensity.compact,
+                    ),
+            ],
+          ),
+          if (paths.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (var i = 0; i < paths.length; i++)
+                  _PreviewTile(
+                    path: paths[i],
+                    onRemove: () => onRemove(i),
                   ),
-                ),
               ],
             ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// ── Preview tile ──────────────────────────────────────────────────────
+// A small box per picked file: image thumbnail for photos, a file-type chip
+// (extension label + icon) for PDFs / Office docs. A × badge removes it.
+class _PreviewTile extends StatelessWidget {
+  const _PreviewTile({required this.path, required this.onRemove});
+
+  final String path;
+  final VoidCallback onRemove;
+
+  static const double _size = 60;
+  static const Set<String> _imageExts = {
+    'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp',
+  };
+
+  String get _ext {
+    final name = path.toLowerCase();
+    final dot = name.lastIndexOf('.');
+    return dot >= 0 ? name.substring(dot + 1) : '';
+  }
+
+  bool get _isImage => _imageExts.contains(_ext);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final chipBg = isDark ? const Color(0xFF14181A) : const Color(0xFFF1F2F4);
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+
+    Widget body;
+    if (_isImage) {
+      body = ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.file(
+          File(path),
+          width: _size,
+          height: _size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) => Container(
+            width: _size,
+            height: _size,
+            color: chipBg,
+            child: Icon(Icons.broken_image_outlined, size: 22, color: muted),
           ),
-          const SizedBox(width: 8),
-          busy
-              ? const SizedBox(
-                  width: 28, height: 28,
-                  child: CircularProgressIndicator(strokeWidth: 2.5))
-              : IconButton(
-                  onPressed: onAdd,
-                  icon: const Icon(Icons.add_circle, size: 32),
-                  color: AppColors.splashGreen,
-                  visualDensity: VisualDensity.compact,
+        ),
+      );
+    } else {
+      body = Container(
+        width: _size,
+        height: _size,
+        decoration: BoxDecoration(
+          color: chipBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: border),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.insert_drive_file_outlined, size: 22, color: muted),
+            const SizedBox(height: 4),
+            Text(
+              _ext.isEmpty ? 'fayl' : _ext.toUpperCase(),
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 9.5,
+                color: muted,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: _size + 6,
+      height: _size + 6,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(left: 0, top: 6, child: body),
+          Positioned(
+            right: 0,
+            top: 0,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE5484D),
+                  shape: BoxShape.circle,
                 ),
+                child: const Icon(Icons.close_rounded,
+                    size: 14, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Floor section ─────────────────────────────────────────────────────
+// Two required number fields: which floor the object sits on, and how many
+// floors the building has. Both feed the backend's floor-position price
+// adjustment.
+class _FloorSection extends StatelessWidget {
+  const _FloorSection({
+    required this.floorCtrl,
+    required this.totalFloorsCtrl,
+    required this.onFloorChanged,
+    required this.onTotalChanged,
+  });
+
+  final TextEditingController floorCtrl;
+  final TextEditingController totalFloorsCtrl;
+  final ValueChanged<String> onFloorChanged;
+  final ValueChanged<String> onTotalChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Qavat',
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            color: muted,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          'Obyekt qavati va binodagi jami qavatlar',
+          style: TextStyle(fontFamily: 'MTSCompact', fontSize: 12, color: muted),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _FloorField(
+                label: 'Obyekt qavati',
+                controller: floorCtrl,
+                onChanged: onFloorChanged,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _FloorField(
+                label: 'Jami qavatlar',
+                controller: totalFloorsCtrl,
+                onChanged: onTotalChanged,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _FloorField extends StatelessWidget {
+  const _FloorField({
+    required this.label,
+    required this.controller,
+    required this.onChanged,
+  });
+
+  final String label;
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fieldBg = isDark ? const Color(0xFF1F2426) : const Color(0xFFF7F8F9);
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: fieldBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontSize: 11,
+              color: muted,
+            ),
+          ),
+          TextField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            onChanged: onChanged,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(3),
+            ],
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+              color: textColor,
+            ),
+            decoration: const InputDecoration(
+              isDense: true,
+              hintText: '—',
+              border: InputBorder.none,
+              contentPadding: EdgeInsets.symmetric(vertical: 4),
+            ),
+          ),
         ],
       ),
     );
@@ -345,10 +739,13 @@ class _UploadCard extends StatelessWidget {
 // Chips shown inline under the title. Tap a chip to (de)select a room type;
 // each selected type gets its own row below with a typeable count + stepper.
 class _RoomsSelector extends StatefulWidget {
-  const _RoomsSelector({required this.rooms});
+  const _RoomsSelector({required this.rooms, this.onChanged});
 
   /// The bundle's room list — mutated in place as the user selects/edits.
   final List<AiRoom> rooms;
+
+  /// Fired after any add/remove so the parent can re-evaluate the submit gate.
+  final VoidCallback? onChanged;
 
   @override
   State<_RoomsSelector> createState() => _RoomsSelectorState();
@@ -403,6 +800,7 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
         _counts[room] = TextEditingController(text: '1');
       }
     });
+    widget.onChanged?.call();
   }
 
   void _addCustom() {
@@ -415,6 +813,7 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
       _counts[room] = TextEditingController(text: '1');
       _customName.clear();
     });
+    widget.onChanged?.call();
   }
 
   void _remove(AiRoom room) {
@@ -422,6 +821,7 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
       widget.rooms.remove(room);
       _counts.remove(room)?.dispose();
     });
+    widget.onChanged?.call();
   }
 
   void _setCount(AiRoom room, int value) {

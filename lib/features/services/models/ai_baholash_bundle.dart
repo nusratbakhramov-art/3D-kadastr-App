@@ -13,6 +13,8 @@ class AiBaholashBundle {
     this.client,
     this.location,
     this.purpose = ValuationPurpose.sale,
+    this.floor,
+    this.totalFloors,
     List<AiRoom>? rooms,
     List<String>? imageKeys,
     List<String>? kadastrKeys,
@@ -28,6 +30,12 @@ class AiBaholashBundle {
 
   /// Baholash maqsadi — drives the reconciliation weighting on the backend.
   ValuationPurpose purpose;
+
+  /// Which floor the object is on, and total floors in the building. Both are
+  /// required by the intake step and adjust the market value (ground/top floor
+  /// discount).
+  int? floor;
+  int? totalFloors;
 
   /// Optional dynamic room breakdown.
   final List<AiRoom> rooms;
@@ -51,6 +59,8 @@ class AiBaholashBundle {
         if (client != null) 'client': client!.toJson(),
         if (location != null) 'location': location!.toJson(),
         'purpose': purpose.wire,
+        if (floor != null) 'floor': floor,
+        if (totalFloors != null) 'total_floors': totalFloors,
         if (rooms.isNotEmpty) 'rooms': rooms.map((r) => r.toJson()).toList(),
         if (imageKeys.isNotEmpty) 'image_keys': imageKeys,
         if (kadastrKeys.isNotEmpty) 'kadastr_keys': kadastrKeys,

@@ -518,6 +518,17 @@ class _ResultView extends StatelessWidget {
               if (pois.isNotEmpty) ...[
                 const SizedBox(height: 18),
                 _SectionTitle('Yaqin atrofdagi obyektlar', isDark: isDark),
+                const SizedBox(height: 3),
+                Text(
+                  '1–2 km radiusda topilgan infratuzilma',
+                  style: TextStyle(
+                    fontFamily: 'MTSText',
+                    fontSize: 12,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.55)
+                        : const Color(0xFF8A9097),
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _PoiSummary(pois: pois, isDark: isDark),
               ],
@@ -879,6 +890,9 @@ class _ComparablesCard extends StatelessWidget {
     return v.toStringAsFixed(0);
   }
 
+  // Show only the top few comparables; the rest collapse into a footer count.
+  static const int _maxVisible = 5;
+
   @override
   Widget build(BuildContext context) {
     final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
@@ -888,6 +902,10 @@ class _ComparablesCard extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
 
+    final visibleCount =
+        comparables.length > _maxVisible ? _maxVisible : comparables.length;
+    final extra = comparables.length - visibleCount;
+
     return Container(
       decoration: BoxDecoration(
         color: fill,
@@ -896,8 +914,23 @@ class _ComparablesCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          for (var i = 0; i < comparables.length; i++)
-            _row(comparables[i], i != comparables.length - 1, text, sub, border),
+          for (var i = 0; i < visibleCount; i++)
+            _row(comparables[i], i != visibleCount - 1 || extra > 0, text, sub,
+                border),
+          if (extra > 0)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+              child: Text(
+                'Yana $extra ta e\'lon',
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12.5,
+                  color: sub,
+                ),
+              ),
+            ),
         ],
       ),
     );
