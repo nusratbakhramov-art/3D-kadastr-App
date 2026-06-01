@@ -1011,63 +1011,173 @@ class _ComparablesCard extends StatelessWidget {
   }
 }
 
-class _PoiSummary extends StatelessWidget {
+class _PoiSummary extends StatefulWidget {
   const _PoiSummary({required this.pois, required this.isDark});
   final Map<String, dynamic> pois;
   final bool isDark;
   @override
+  State<_PoiSummary> createState() => _PoiSummaryState();
+}
+
+class _PoiSummaryState extends State<_PoiSummary> {
+  // Categories the user has expanded to reveal the named places.
+  final Set<String> _open = {};
+  // Named places listed per category before a "+N ta" tail.
+  static const int _maxPlaces = 8;
+
+  @override
   Widget build(BuildContext context) {
+    final isDark = widget.isDark;
     final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
     final text = isDark ? Colors.white : AppColors.textBlack;
     final sub = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
+    final dividerColor =
+        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
 
-    final rows = pois.entries
+    final rows = widget.pois.entries
         .where((e) => e.value is List && (e.value as List).isNotEmpty)
         .toList();
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       decoration: BoxDecoration(
         color: fill,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         children: [
-          for (final r in rows)
+          for (var i = 0; i < rows.length; i++)
+            _category(rows[i], i != rows.length - 1, text, sub, dividerColor),
+        ],
+      ),
+    );
+  }
+
+  Widget _category(MapEntry<String, dynamic> r, bool divider, Color text,
+      Color sub, Color dividerColor) {
+    final kind = r.key;
+    final list = r.value as List;
+    final isOpen = _open.contains(kind);
+    return Column(
+      children: [
+        InkWell(
+          onTap: () => setState(() {
+            isOpen ? _open.remove(kind) : _open.add(kind);
+          }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            child: Row(
+              children: [
+                Icon(_iconFor(kind), color: AppColors.splashGreen, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _labelFor(kind),
+                    style: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontSize: 13,
+                      color: text,
+                    ),
+                  ),
+                ),
+                Text(
+                  _countLabel(kind, list.length),
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: sub,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Icon(isOpen ? Icons.expand_less : Icons.expand_more,
+                    size: 18, color: sub),
+              ],
+            ),
+          ),
+        ),
+        if (isOpen) _places(list, sub, text),
+        if (divider) Divider(height: 1, thickness: 1, color: dividerColor),
+      ],
+    );
+  }
+
+  Widget _places(List raw, Color sub, Color text) {
+    final places = raw
+        .whereType<Map>()
+        .map((e) => e.cast<String, dynamic>())
+        .toList()
+      ..sort((a, b) => _distOf(a).compareTo(_distOf(b)));
+    final shown = places.take(_maxPlaces).toList();
+    final extra = places.length - shown.length;
+    return Padding(
+      padding: const EdgeInsets.only(left: 28, bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final p in shown)
             Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
+              padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  Icon(_iconFor(r.key),
-                      color: AppColors.splashGreen, size: 18),
-                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      _labelFor(r.key),
+                      _nameOf(p),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontFamily: 'MTSText',
-                        fontSize: 13,
+                        fontSize: 12.5,
                         color: text,
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Text(
-                    _countLabel(r.key, (r.value as List).length),
+                    _distLabel(p),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
+                      fontSize: 12,
                       color: sub,
                     ),
                   ),
                 ],
               ),
             ),
+          if (extra > 0)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                'Yana $extra ta',
+                style: TextStyle(
+                  fontFamily: 'MTSText',
+                  fontSize: 11.5,
+                  color: sub,
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  num _distOf(Map<String, dynamic> p) {
+    final d = p['distance_m'];
+    return d is num ? d : (1 << 30);
+  }
+
+  String _nameOf(Map<String, dynamic> p) {
+    final n = (p['name'] as String?)?.trim();
+    return (n != null && n.isNotEmpty) ? n : 'Nomsiz';
+  }
+
+  String _distLabel(Map<String, dynamic> p) {
+    final d = p['distance_m'];
+    if (d is! num) return '';
+    if (d < 1000) return '${d.round()} m';
+    return '${(d / 1000).toStringAsFixed(d < 10000 ? 1 : 0)} km';
   }
 
   // Common, high-density amenities (bus stops) are capped at "10+" — the exact
