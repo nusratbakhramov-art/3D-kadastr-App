@@ -9,6 +9,7 @@ import '../auth/auth_storage.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_architecture_order_service.dart';
 import '../services/api_calculator_order_service.dart';
+import '../services/api_kadastr_3d_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import 'application_detail_screen.dart';
 import '../market/models/market_listing.dart' show MarketCategory;
@@ -214,17 +215,28 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         )
         .catchError((_) => <ApplicationItem>[]);
 
+    // 3D Kadastr arizalari (`GET /3d-kadastr-jobs`).
+    final kadastr3dFuture = Kadastr3dJobService()
+        .list(token: token)
+        .then(
+          (list) =>
+              list.map(_kadastr3dToApplicationItem).toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
     final results = await Future.wait([
       ordersFuture,
       aiJobsFuture,
       photogrammetryFuture,
       calcFuture,
+      kadastr3dFuture,
     ]);
     final combined = <ApplicationItem>[
       ...results[0],
       ...results[1],
       ...results[2],
       ...results[3],
+      ...results[4],
     ];
     // Yangidan eskigacha tartiblash — sanalar string sifatida saqlangan,
     // lekin DD.MM.YYYY format saqlanadi → teskari sort.
@@ -233,54 +245,164 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   }
 
   static ApplicationItem _orderToApplicationItem(OrderSummary o) {
+    final group = _statusToGroup(o.status);
+    final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'arch_${o.id}',
-      // Backend hozir faqat arxitektura buyurtmasini qaytaradi —
-      // 3D kadastr/AI baholash uchun alohida endpoint'lar keyinroq.
       serviceId: 'arch',
       serviceLabel: 'Arxitektura TZ',
-      statusGroup: _statusToGroup(o.status),
+      statusGroup: group,
       addressLabel: 'Manzil',
       addressValue: (o.address ?? o.cadastreNumber ?? '—'),
       dateLabel: 'Ariza sanasi',
-      dateValue: _formatDate(o.createdAt),
-      timeline: const <ApplicationTimelineStep>[],
+      dateValue: date,
+      detailRows: [
+        ('Manzil', o.address ?? '—'),
+        if (o.cadastreNumber != null) ('Kadastr raqami', o.cadastreNumber!),
+        ('Holat', _groupLabel(group)),
+        ('Ariza sanasi', date),
+      ],
+      timeline: _basicTimeline(group, o.createdAt),
     );
   }
 
   static ApplicationItem _aiJobToApplicationItem(AiJobSummary j) {
     final hasValue = j.estimatedValue != null;
+    final group = _aiJobStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
     return ApplicationItem(
       id: 'aival_${j.id}',
       serviceId: 'ai_eval',
       serviceLabel: 'AI Baholash',
-      statusGroup: _aiJobStatusToGroup(j.status),
+      statusGroup: group,
       addressLabel: hasValue ? 'Taxminiy qiymat' : 'Kadastr raqami',
       addressValue: hasValue
           ? _formatUzs(j.estimatedValue!)
           : (j.cadastreNumber ?? '—'),
       dateLabel: 'Ariza sanasi',
-      dateValue: _formatDate(j.createdAt),
+      dateValue: date,
       typeLabel: hasValue && j.cadastreNumber != null ? 'Kadastr' : null,
       typeValue: hasValue ? j.cadastreNumber : null,
-      timeline: const <ApplicationTimelineStep>[],
+      detailRows: [
+        if (j.cadastreNumber != null) ('Kadastr raqami', j.cadastreNumber!),
+        if (hasValue) ('Taxminiy qiymat', _formatUzs(j.estimatedValue!)),
+        ('Holat', _groupLabel(group)),
+        ('Ariza sanasi', date),
+      ],
+      timeline: _basicTimeline(group, j.createdAt),
     );
   }
 
   static ApplicationItem _calcToApplicationItem(CalculatorOrderSummary o) {
+    final group = _calcStatusToGroup(o.status);
+    final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'calc_${o.id}',
       serviceId: 'calc',
       serviceLabel: 'Kalkulyator',
-      statusGroup: _calcStatusToGroup(o.status),
+      statusGroup: group,
       addressLabel: 'Turi',
       addressValue: o.categoryTitle,
       dateLabel: 'Ariza sanasi',
-      dateValue: _formatDate(o.createdAt),
+      dateValue: date,
       typeLabel: 'Narx',
       typeValue: _formatUzs(o.totalUzs),
-      timeline: const <ApplicationTimelineStep>[],
+      detailRows: [
+        ('Turi', o.categoryTitle),
+        ('Narx', _formatUzs(o.totalUzs)),
+        ('Holat', _groupLabel(group)),
+        ('Ariza sanasi', date),
+      ],
+      timeline: _basicTimeline(group, o.createdAt),
     );
+  }
+
+  static ApplicationItem _kadastr3dToApplicationItem(Kadastr3dJobSummary j) {
+    final group = _kadastr3dStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
+    final objectType = _objectTypeLabel(j.objectType);
+    return ApplicationItem(
+      id: 'kad3d_${j.id}',
+      serviceId: 'kad_3d',
+      serviceLabel: '3D Kadastr',
+      statusGroup: group,
+      addressLabel: 'Kadastr raqami',
+      addressValue: j.cadastreNumber ?? '—',
+      dateLabel: 'Ariza sanasi',
+      dateValue: date,
+      typeLabel: objectType != null ? 'Obyekt turi' : null,
+      typeValue: objectType,
+      detailRows: [
+        if (j.cadastreNumber != null) ('Kadastr raqami', j.cadastreNumber!),
+        if (objectType != null) ('Obyekt turi', objectType),
+        ('Holat', _groupLabel(group)),
+        ('Ariza sanasi', date),
+      ],
+      timeline: _basicTimeline(group, j.createdAt),
+    );
+  }
+
+  static ApplicationStatusGroup _kadastr3dStatusToGroup(Kadastr3dJobStatus s) {
+    return switch (s) {
+      Kadastr3dJobStatus.completed => ApplicationStatusGroup.completed,
+      Kadastr3dJobStatus.failed => ApplicationStatusGroup.cancelled,
+      Kadastr3dJobStatus.processing => ApplicationStatusGroup.inProgress,
+      Kadastr3dJobStatus.submitted => ApplicationStatusGroup.sent,
+    };
+  }
+
+  static String? _objectTypeLabel(String? wire) {
+    return switch (wire) {
+      'residential' => 'Turar joy',
+      'non_residential' => 'Noturar joy',
+      'warehouse' => 'Ombor',
+      'industrial' => 'Sanoat',
+      _ => null,
+    };
+  }
+
+  static String _groupLabel(ApplicationStatusGroup g) {
+    return switch (g) {
+      ApplicationStatusGroup.sent => 'Yuborilgan',
+      ApplicationStatusGroup.inProgress => 'Jarayonda',
+      ApplicationStatusGroup.completed => 'Tayyor',
+      ApplicationStatusGroup.cancelled => 'Bekor qilingan',
+    };
+  }
+
+  /// Minimal honest timeline from what we know (creation + current status).
+  /// We don't have a per-step history from the backend, so we surface the
+  /// accepted step always, and the report-ready step when completed.
+  static List<ApplicationTimelineStep> _basicTimeline(
+    ApplicationStatusGroup group,
+    DateTime createdAt,
+  ) {
+    if (group == ApplicationStatusGroup.cancelled) {
+      return [
+        ApplicationTimelineStep(
+          status: ApplicationTimelineStatus.accepted,
+          at: createdAt,
+          completed: true,
+        ),
+      ];
+    }
+    return [
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.accepted,
+        at: createdAt,
+        completed: true,
+      ),
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.sentToSystem,
+        at: createdAt,
+        completed: true,
+      ),
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.reportReady,
+        at: createdAt,
+        completed: group == ApplicationStatusGroup.completed,
+      ),
+    ];
   }
 
   static ApplicationStatusGroup _calcStatusToGroup(String status) {
@@ -312,22 +434,32 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static ApplicationItem _photogrammetryToApplicationItem(
     PhotogrammetryJobSummary j,
   ) {
+    final group = _photogrammetryStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
     return ApplicationItem(
       id: 'photo_${j.id}',
       serviceId: 'kad_3d',
       serviceLabel: '3D Skan',
-      statusGroup: _photogrammetryStatusToGroup(j.status),
+      statusGroup: group,
       addressLabel: 'Foto soni',
       addressValue: '${j.photoCount} ta',
       dateLabel: 'Yuborilgan',
-      dateValue: _formatDate(j.createdAt),
+      dateValue: date,
       typeLabel: j.isCompleted
           ? '3D model'
           : (j.status == 'failed' ? 'Xato' : 'Holat'),
       typeValue: j.isCompleted
           ? 'Tayyor'
           : (j.errorMessage ?? _photogrammetryStatusLabel(j.status)),
-      timeline: const <ApplicationTimelineStep>[],
+      detailRows: [
+        ('Foto soni', '${j.photoCount} ta'),
+        ('Holat', _photogrammetryStatusLabel(j.status)),
+        if (j.errorMessage != null) ('Xato', j.errorMessage!),
+        ('Yuborilgan', date),
+      ],
+      // Completed photogrammetry jobs have a downloadable 3D model.
+      hasDeliverable: j.isCompleted,
+      timeline: _basicTimeline(group, j.createdAt),
     );
   }
 
