@@ -93,6 +93,7 @@ class _OtpStepState extends State<OtpStep> {
   }
 
   Future<void> _resend() async {
+    final locale = Localizations.localeOf(context);
     try {
       await widget.service.sendOtp(widget.phone);
       if (!mounted) return;
@@ -100,7 +101,7 @@ class _OtpStepState extends State<OtpStep> {
       setState(() => _boxState = OtpBoxState.neutral);
       AuthToasts.show(
         context,
-        message: 'Kod qayta yuborildi',
+        message: _OtpStepStrings.resent(locale),
         variant: AuthToastVariant.success,
       );
     } on AuthException catch (e) {
@@ -130,13 +131,14 @@ class _OtpStepState extends State<OtpStep> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final labelColor = isDark
         ? Colors.white70
         : AppColors.textBlack.withValues(alpha: 0.65);
     final complete = _otp.value.length == widget.otpLength;
     return AuthScaffold(
-      title: 'Tasdiqlash kodi',
+      title: _OtpStepStrings.title(locale),
       iconAsset: 'assets/images/auth/msg.png',
       onBack: widget.onEdit,
       onSkip: widget.onSkip,
@@ -145,7 +147,7 @@ class _OtpStepState extends State<OtpStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Raqamingizga yuborilgan kodni kiriting',
+              _OtpStepStrings.subtitle(locale),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -169,13 +171,41 @@ class _OtpStepState extends State<OtpStep> {
         ),
       ),
       bottom: PrimaryCta(
-        label: 'Davom etish',
+        label: _OtpStepStrings.continueLabel(locale),
         enabled: complete,
         loading: _loading,
         onPressed: _verify,
       ),
     );
   }
+}
+
+class _OtpStepStrings {
+  const _OtpStepStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'Код подтверждения',
+    'en' => 'Verification code',
+    _ => 'Tasdiqlash kodi',
+  };
+
+  static String subtitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Введите код, отправленный на ваш номер',
+    'en' => 'Enter the code sent to your phone number',
+    _ => 'Raqamingizga yuborilgan kodni kiriting',
+  };
+
+  static String continueLabel(Locale l) => switch (l.languageCode) {
+    'ru' => 'Продолжить',
+    'en' => 'Continue',
+    _ => 'Davom etish',
+  };
+
+  static String resent(Locale l) => switch (l.languageCode) {
+    'ru' => 'Код отправлен повторно',
+    'en' => 'Code resent',
+    _ => 'Kod qayta yuborildi',
+  };
 }
 
 class _PhonePill extends StatelessWidget {

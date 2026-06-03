@@ -301,24 +301,13 @@ class _AboutTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const rows = <(String, String)>[
-      ('Obyekt', "Ko'p qavatli xonadon, 3 xona"),
-      ('Manzil', 'Toshkent sh., Chilonzor t., 7-mavze'),
-      ('Maydon', '120.5 m²'),
-      ('Qavat', '5/9'),
-      ('Kadastr qiymati', '385 mln'),
-      ('Kadastr raqami', '10:06:0310101:012:0001'),
-      ('Skan sanasi', '02.04.2026'),
-      ('Hisobot sanasi', '02.04.2026'),
-      ('Skan aniqligi', '±2 sm'),
-      ('Mutaxassis', 'Abdullayev J.'),
-    ];
+    final rows = item.detailRows;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Hisobot',
+          item.hasDeliverable ? 'Hisobot' : 'Ariza maʼlumotlari',
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -334,29 +323,47 @@ class _AboutTab extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: ColorTokens.outline(context), width: 0.6),
           ),
-          child: Column(
-            children: [
-              for (var i = 0; i < rows.length; i++) ...[
-                _InfoRow(label: rows[i].$1, value: rows[i].$2),
-                if (i != rows.length - 1)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: ColorTokens.divider(context),
+          child: rows.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Maʼlumot mavjud emas',
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: ColorTokens.secondaryText(context),
+                    ),
                   ),
-              ],
-            ],
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < rows.length; i++) ...[
+                      _InfoRow(label: rows[i].$1, value: rows[i].$2),
+                      if (i != rows.length - 1)
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: ColorTokens.divider(context),
+                        ),
+                    ],
+                  ],
+                ),
+        ),
+        // The downloadable report / 3D model / AR view only exist for a
+        // finished deliverable (completed photogrammetry scan). For jobs that
+        // are still just submitted, we don't fake a report.
+        if (item.hasDeliverable) ...[
+          const SizedBox(height: 14),
+          const _FileCard(),
+          const SizedBox(height: 14),
+          _ModelCard(item: item),
+          const SizedBox(height: 18),
+          _PrimaryGreenAction(
+            label: "AR orqali ko'rish",
+            item: item,
           ),
-        ),
-        const SizedBox(height: 14),
-        const _FileCard(),
-        const SizedBox(height: 14),
-        _ModelCard(item: item),
-        const SizedBox(height: 18),
-        _PrimaryGreenAction(
-          label: "AR orqali ko'rish",
-          item: item,
-        ),
+        ],
       ],
     );
   }

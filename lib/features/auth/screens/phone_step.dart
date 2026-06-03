@@ -53,13 +53,14 @@ class _PhoneStepState extends State<PhoneStep> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final labelColor = isDark
         ? Colors.white70
         : AppColors.textBlack.withValues(alpha: 0.65);
 
     return AuthScaffold(
-      title: 'Ilovaga kiring',
+      title: _PhoneStepStrings.title(locale),
       iconAsset: 'assets/images/auth/login.png',
       onSkip: widget.onSkip,
       body: SingleChildScrollView(
@@ -67,7 +68,7 @@ class _PhoneStepState extends State<PhoneStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Sizning raqamingiz',
+              _PhoneStepStrings.phoneLabel(locale),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -76,11 +77,33 @@ class _PhoneStepState extends State<PhoneStep> {
         ),
       ),
       bottom: PrimaryCta(
-        label: 'Davom etish',
+        label: _PhoneStepStrings.continueLabel(locale),
         enabled: _phone.isValid,
         loading: widget.loading,
         onPressed: _submit,
       ),
     );
   }
+}
+
+class _PhoneStepStrings {
+  const _PhoneStepStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'Войдите в приложение',
+    'en' => 'Sign in to app',
+    _ => 'Ilovaga kiring',
+  };
+
+  static String phoneLabel(Locale l) => switch (l.languageCode) {
+    'ru' => 'Ваш номер',
+    'en' => 'Your phone number',
+    _ => 'Sizning raqamingiz',
+  };
+
+  static String continueLabel(Locale l) => switch (l.languageCode) {
+    'ru' => 'Продолжить',
+    'en' => 'Continue',
+    _ => 'Davom etish',
+  };
 }

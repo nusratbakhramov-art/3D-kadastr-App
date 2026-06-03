@@ -8,6 +8,8 @@ import '../../theme/color_tokens.dart';
 import '../auth/auth_storage.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_architecture_order_service.dart';
+import '../services/api_calculator_order_service.dart';
+import '../services/api_kadastr_3d_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import 'application_detail_screen.dart';
 import '../market/models/market_listing.dart' show MarketCategory;
@@ -180,9 +182,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final ordersFuture = ArchitectureOrderApiService()
         .list(token: token, page: 1, size: 100)
         .then(
-          (page) => page.items
-              .map(_orderToApplicationItem)
-              .toList(growable: false),
+          (page) =>
+              page.items.map(_orderToApplicationItem).toList(growable: false),
         )
         .catchError((_) => <ApplicationItem>[]);
 
@@ -200,8 +201,26 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final photogrammetryFuture = PhotogrammetryApiService()
         .listJobs()
         .then(
+          (list) => list
+              .map(_photogrammetryToApplicationItem)
+              .toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
+    // Kalkulyator arizalari (`GET /services/calculator/orders`).
+    final calcFuture = CalculatorOrderApiService()
+        .list(token: token)
+        .then(
+          (list) => list.map(_calcToApplicationItem).toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
+    // 3D Kadastr arizalari (`GET /3d-kadastr-jobs`).
+    final kadastr3dFuture = Kadastr3dJobService()
+        .list(token: token)
+        .then(
           (list) =>
-              list.map(_photogrammetryToApplicationItem).toList(growable: false),
+              list.map(_kadastr3dToApplicationItem).toList(growable: false),
         )
         .catchError((_) => <ApplicationItem>[]);
 
@@ -209,11 +228,15 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       ordersFuture,
       aiJobsFuture,
       photogrammetryFuture,
+      calcFuture,
+      kadastr3dFuture,
     ]);
     final combined = <ApplicationItem>[
       ...results[0],
       ...results[1],
       ...results[2],
+      ...results[3],
+      ...results[4],
     ];
     // Yangidan eskigacha tartiblash — sanalar string sifatida saqlangan,
     // lekin DD.MM.YYYY format saqlanadi → teskari sort.
@@ -222,38 +245,174 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   }
 
   static ApplicationItem _orderToApplicationItem(OrderSummary o) {
+    final group = _statusToGroup(o.status);
+    final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'arch_${o.id}',
-      // Backend hozir faqat arxitektura buyurtmasini qaytaradi —
-      // 3D kadastr/AI baholash uchun alohida endpoint'lar keyinroq.
       serviceId: 'arch',
       serviceLabel: 'Arxitektura TZ',
-      statusGroup: _statusToGroup(o.status),
+      statusGroup: group,
       addressLabel: 'Manzil',
       addressValue: (o.address ?? o.cadastreNumber ?? '—'),
       dateLabel: 'Ariza sanasi',
-      dateValue: _formatDate(o.createdAt),
-      timeline: const <ApplicationTimelineStep>[],
+      dateValue: date,
+      detailRows: [
+        ('Manzil', o.address ?? '—'),
+        if (o.cadastreNumber != null) ('Kadastr raqami', o.cadastreNumber!),
+        ('Holat', _groupLabel(group)),
+        ('Ariza sanasi', date),
+      ],
+      timeline: _basicTimeline(group, o.createdAt),
     );
   }
 
   static ApplicationItem _aiJobToApplicationItem(AiJobSummary j) {
     final hasValue = j.estimatedValue != null;
+    final group = _aiJobStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
     return ApplicationItem(
       id: 'aival_${j.id}',
       serviceId: 'ai_eval',
       serviceLabel: 'AI Baholash',
-      statusGroup: _aiJobStatusToGroup(j.status),
+      statusGroup: group,
       addressLabel: hasValue ? 'Taxminiy qiymat' : 'Kadastr raqami',
       addressValue: hasValue
           ? _formatUzs(j.estimatedValue!)
           : (j.cadastreNumber ?? '—'),
       dateLabel: 'Ariza sanasi',
-      dateValue: _formatDate(j.createdAt),
+      dateValue: date,
       typeLabel: hasValue && j.cadastreNumber != null ? 'Kadastr' : null,
       typeValue: hasValue ? j.cadastreNumber : null,
-      timeline: const <ApplicationTimelineStep>[],
+      detailRows: [
+        if (j.cadastreNumber != null) ('Kadastr raqami', j.cadastreNumber!),
+        if (hasValue) ('Taxminiy qiymat', _formatUzs(j.estimatedValue!)),
+        ('Holat', _groupLabel(group)),
+        ('Ariza sanasi', date),
+      ],
+      timeline: _basicTimeline(group, j.createdAt),
     );
+  }
+
+  static ApplicationItem _calcToApplicationItem(CalculatorOrderSummary o) {
+    final group = _calcStatusToGroup(o.status);
+    final date = _formatDate(o.createdAt);
+    return ApplicationItem(
+      id: 'calc_${o.id}',
+      serviceId: 'calc',
+      serviceLabel: 'Kalkulyator',
+      statusGroup: group,
+      addressLabel: 'Turi',
+      addressValue: o.categoryTitle,
+      dateLabel: 'Ariza sanasi',
+      dateValue: date,
+      typeLabel: 'Narx',
+      typeValue: _formatUzs(o.totalUzs),
+      detailRows: [
+        ('Turi', o.categoryTitle),
+        ('Narx', _formatUzs(o.totalUzs)),
+        ('Holat', _groupLabel(group)),
+        ('Ariza sanasi', date),
+      ],
+      timeline: _basicTimeline(group, o.createdAt),
+    );
+  }
+
+  static ApplicationItem _kadastr3dToApplicationItem(Kadastr3dJobSummary j) {
+    final group = _kadastr3dStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
+    final objectType = _objectTypeLabel(j.objectType);
+    return ApplicationItem(
+      id: 'kad3d_${j.id}',
+      serviceId: 'kad_3d',
+      serviceLabel: '3D Kadastr',
+      statusGroup: group,
+      addressLabel: 'Kadastr raqami',
+      addressValue: j.cadastreNumber ?? '—',
+      dateLabel: 'Ariza sanasi',
+      dateValue: date,
+      typeLabel: objectType != null ? 'Obyekt turi' : null,
+      typeValue: objectType,
+      detailRows: [
+        if (j.cadastreNumber != null) ('Kadastr raqami', j.cadastreNumber!),
+        if (objectType != null) ('Obyekt turi', objectType),
+        ('Holat', _groupLabel(group)),
+        ('Ariza sanasi', date),
+      ],
+      timeline: _basicTimeline(group, j.createdAt),
+    );
+  }
+
+  static ApplicationStatusGroup _kadastr3dStatusToGroup(Kadastr3dJobStatus s) {
+    return switch (s) {
+      Kadastr3dJobStatus.completed => ApplicationStatusGroup.completed,
+      Kadastr3dJobStatus.failed => ApplicationStatusGroup.cancelled,
+      Kadastr3dJobStatus.processing => ApplicationStatusGroup.inProgress,
+      Kadastr3dJobStatus.submitted => ApplicationStatusGroup.sent,
+    };
+  }
+
+  static String? _objectTypeLabel(String? wire) {
+    return switch (wire) {
+      'residential' => 'Turar joy',
+      'non_residential' => 'Noturar joy',
+      'warehouse' => 'Ombor',
+      'industrial' => 'Sanoat',
+      _ => null,
+    };
+  }
+
+  static String _groupLabel(ApplicationStatusGroup g) {
+    return switch (g) {
+      ApplicationStatusGroup.sent => 'Yuborilgan',
+      ApplicationStatusGroup.inProgress => 'Jarayonda',
+      ApplicationStatusGroup.completed => 'Tayyor',
+      ApplicationStatusGroup.cancelled => 'Bekor qilingan',
+    };
+  }
+
+  /// Minimal honest timeline from what we know (creation + current status).
+  /// We don't have a per-step history from the backend, so we surface the
+  /// accepted step always, and the report-ready step when completed.
+  static List<ApplicationTimelineStep> _basicTimeline(
+    ApplicationStatusGroup group,
+    DateTime createdAt,
+  ) {
+    if (group == ApplicationStatusGroup.cancelled) {
+      return [
+        ApplicationTimelineStep(
+          status: ApplicationTimelineStatus.accepted,
+          at: createdAt,
+          completed: true,
+        ),
+      ];
+    }
+    return [
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.accepted,
+        at: createdAt,
+        completed: true,
+      ),
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.sentToSystem,
+        at: createdAt,
+        completed: true,
+      ),
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.reportReady,
+        at: createdAt,
+        completed: group == ApplicationStatusGroup.completed,
+      ),
+    ];
+  }
+
+  static ApplicationStatusGroup _calcStatusToGroup(String status) {
+    return switch (status) {
+      'done' => ApplicationStatusGroup.completed,
+      'cancelled' => ApplicationStatusGroup.cancelled,
+      'processing' => ApplicationStatusGroup.inProgress,
+      // 'submitted' (and anything else) → freshly sent.
+      _ => ApplicationStatusGroup.sent,
+    };
   }
 
   static ApplicationStatusGroup _statusToGroup(String status) {
@@ -275,22 +434,32 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static ApplicationItem _photogrammetryToApplicationItem(
     PhotogrammetryJobSummary j,
   ) {
+    final group = _photogrammetryStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
     return ApplicationItem(
       id: 'photo_${j.id}',
       serviceId: 'kad_3d',
       serviceLabel: '3D Skan',
-      statusGroup: _photogrammetryStatusToGroup(j.status),
+      statusGroup: group,
       addressLabel: 'Foto soni',
       addressValue: '${j.photoCount} ta',
       dateLabel: 'Yuborilgan',
-      dateValue: _formatDate(j.createdAt),
+      dateValue: date,
       typeLabel: j.isCompleted
           ? '3D model'
           : (j.status == 'failed' ? 'Xato' : 'Holat'),
       typeValue: j.isCompleted
           ? 'Tayyor'
           : (j.errorMessage ?? _photogrammetryStatusLabel(j.status)),
-      timeline: const <ApplicationTimelineStep>[],
+      detailRows: [
+        ('Foto soni', '${j.photoCount} ta'),
+        ('Holat', _photogrammetryStatusLabel(j.status)),
+        if (j.errorMessage != null) ('Xato', j.errorMessage!),
+        ('Yuborilgan', date),
+      ],
+      // Completed photogrammetry jobs have a downloadable 3D model.
+      hasDeliverable: j.isCompleted,
+      timeline: _basicTimeline(group, j.createdAt),
     );
   }
 
@@ -416,6 +585,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: ColorTokens.scaffoldBg(context),
@@ -435,9 +605,10 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const _Title(),
+                          _Title(locale: locale),
                           const SizedBox(height: 14),
                           _ServiceChips(
+                            locale: locale,
                             selectedId: _selectedServiceId,
                             onChanged: _onServiceChanged,
                           ),
@@ -455,12 +626,12 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                   else if (_loadError != null)
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _ErrorState(message: _loadError!),
+                      child: _ErrorState(locale: locale, message: _loadError!),
                     )
                   else if (_initialized && _items.isEmpty)
-                    const SliverFillRemaining(
+                    SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _EmptyState(),
+                      child: _EmptyState(locale: locale),
                     )
                   else if (_initialized)
                     SliverPadding(
@@ -784,13 +955,15 @@ class _SlidingGradientTransform extends GradientTransform {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.locale});
+
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Text(
-        'Arizalar topilmadi',
+        _ApplicationsStrings.empty(locale),
         style: TextStyle(
           fontFamily: 'MTSCompact',
           fontWeight: FontWeight.w500,
@@ -803,7 +976,8 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message});
+  const _ErrorState({required this.locale, required this.message});
+  final Locale locale;
   final String message;
 
   @override
@@ -821,7 +995,7 @@ class _ErrorState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Yuklab boʻlmadi',
+              _ApplicationsStrings.loadFailed(locale),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -847,12 +1021,14 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _Title extends StatelessWidget {
-  const _Title();
+  const _Title({required this.locale});
+
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Arizalar',
+      _ApplicationsStrings.title(locale),
       style: TextStyle(
         fontFamily: 'MTSCompact',
         fontWeight: FontWeight.w700,
@@ -865,8 +1041,13 @@ class _Title extends StatelessWidget {
 }
 
 class _ServiceChips extends StatelessWidget {
-  const _ServiceChips({required this.selectedId, required this.onChanged});
+  const _ServiceChips({
+    required this.locale,
+    required this.selectedId,
+    required this.onChanged,
+  });
 
+  final Locale locale;
   final String selectedId;
   final ValueChanged<String> onChanged;
 
@@ -874,13 +1055,64 @@ class _ServiceChips extends StatelessWidget {
   Widget build(BuildContext context) {
     return CategoryChips(
       categories: applicationServiceChips
-          .map((chip) => MarketCategory(id: chip.id, label: chip.label))
+          .map(
+            (chip) => MarketCategory(
+              id: chip.id,
+              label: _ApplicationsStrings.serviceChip(locale, chip.id),
+            ),
+          )
           .toList(growable: false),
       selectedId: selectedId,
       onSelected: onChanged,
       padding: EdgeInsets.zero,
     );
   }
+}
+
+class _ApplicationsStrings {
+  const _ApplicationsStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'Заявки',
+    'en' => 'Applications',
+    _ => 'Arizalar',
+  };
+
+  static String empty(Locale l) => switch (l.languageCode) {
+    'ru' => 'Заявки не найдены',
+    'en' => 'No applications found',
+    _ => 'Arizalar topilmadi',
+  };
+
+  static String loadFailed(Locale l) => switch (l.languageCode) {
+    'ru' => 'Не удалось загрузить',
+    'en' => 'Failed to load',
+    _ => 'Yuklab boʻlmadi',
+  };
+
+  static String serviceChip(Locale l, String id) => switch (id) {
+    'all' => switch (l.languageCode) {
+      'ru' => 'Все',
+      'en' => 'All',
+      _ => 'Barchasi',
+    },
+    'kad_3d' => switch (l.languageCode) {
+      'ru' => '3D кадастр',
+      'en' => '3D cadastre',
+      _ => '3D Kadastr',
+    },
+    'ai_eval' => switch (l.languageCode) {
+      'ru' => 'AI оценка',
+      'en' => 'AI valuation',
+      _ => 'AI Baholash',
+    },
+    'calc' => switch (l.languageCode) {
+      'ru' => 'Калькулятор',
+      'en' => 'Calculator',
+      _ => 'Kalkulyator',
+    },
+    _ => id,
+  };
 }
 
 class _ApplicationCard extends StatelessWidget {
@@ -1053,6 +1285,12 @@ class _StatusStyle {
 
   static _StatusStyle fromGroup(ApplicationStatusGroup group) =>
       switch (group) {
+        ApplicationStatusGroup.sent => const _StatusStyle(
+          label: 'Yuborilgan',
+          bgColor: Color(0xFFE2ECFD),
+          fgColor: Color(0xFF2B7FFF),
+          iconAsset: 'assets/icons/application-pending.svg',
+        ),
         ApplicationStatusGroup.inProgress => const _StatusStyle(
           label: 'Jarayonda',
           bgColor: Color(0xFFFCEDE3),
@@ -1082,9 +1320,7 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark
-        ? style.fgColor.withValues(alpha: 0.18)
-        : style.bgColor;
+    final bg = isDark ? style.fgColor.withValues(alpha: 0.18) : style.bgColor;
     return Container(
       height: 24,
       padding: const EdgeInsets.fromLTRB(3, 3, 8, 3),

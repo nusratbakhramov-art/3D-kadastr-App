@@ -16,19 +16,27 @@ class MarketController extends ChangeNotifier {
     MarketplaceApiService? categoriesService,
     Duration searchDebounce = const Duration(milliseconds: 400),
     int pageSize = 12,
+    String localeCode = 'uz',
   }) : _repository = repository,
+       _localeCode = localeCode,
        _categoriesService = categoriesService,
        _debounce = searchDebounce,
-       _pageSize = pageSize;
+       _pageSize = pageSize {
+    _categories = [
+      MarketCategory(
+        id: kMarketCategoryAll,
+        label: _MarketControllerStrings.all(_localeCode),
+      ),
+    ];
+  }
 
   final MarketRepository _repository;
+  final String _localeCode;
   final MarketplaceApiService? _categoriesService;
   final Duration _debounce;
   final int _pageSize;
 
-  List<MarketCategory> _categories = const [
-    MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
-  ];
+  late List<MarketCategory> _categories;
   List<MarketCategory> get categories => _categories;
 
   final List<MarketListing> _items = [];
@@ -75,10 +83,16 @@ class MarketController extends ChangeNotifier {
         if (_disposed) return;
         final apiSlugs = remote.map((c) => c.slug).toSet();
         _categories = [
-          const MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
+          MarketCategory(
+            id: kMarketCategoryAll,
+            label: _MarketControllerStrings.all(_localeCode),
+          ),
           // Always show Non-residential chip; skip if API already returns it
           if (!apiSlugs.contains('nonresidential'))
-            const MarketCategory(id: 'nonresidential', label: "No'turar"),
+            MarketCategory(
+              id: 'nonresidential',
+              label: _MarketControllerStrings.nonResidential(_localeCode),
+            ),
           ...remote.map((c) => MarketCategory(id: c.slug, label: c.name)),
         ];
         _notify();
@@ -171,7 +185,7 @@ class MarketController extends ChangeNotifier {
     } catch (e) {
       if (_disposed || token != _requestToken) return;
       _isLoadingMore = false;
-      _error = 'Yana yuklashda xatolik.';
+      _error = _MarketControllerStrings.loadMoreError(_localeCode);
       _lastErrorObject = e;
       _notify();
     }
@@ -209,7 +223,7 @@ class MarketController extends ChangeNotifier {
     } catch (e) {
       if (_disposed || token != _requestToken) return;
       _status = MarketStatus.error;
-      _error = 'Ma\'lumotlarni yuklab bo\'lmadi.';
+      _error = _MarketControllerStrings.loadError(_localeCode);
       _lastErrorObject = e;
       _notify();
     }
@@ -244,7 +258,36 @@ MarketController sharedMarketController({String? locale}) {
   _shared = MarketController(
     repository: ApiMarketRepository(service: svc),
     categoriesService: svc,
+    localeCode: locale ?? 'uz',
   );
   _sharedLocale = locale;
   return _shared!;
+}
+
+class _MarketControllerStrings {
+  const _MarketControllerStrings._();
+
+  static String all(String localeCode) => switch (localeCode) {
+    'ru' => 'Все',
+    'en' => 'All',
+    _ => 'Barchasi',
+  };
+
+  static String nonResidential(String localeCode) => switch (localeCode) {
+    'ru' => 'Нежилое',
+    'en' => 'Non-residential',
+    _ => "No'turar",
+  };
+
+  static String loadMoreError(String localeCode) => switch (localeCode) {
+    'ru' => 'Ошибка при подгрузке.',
+    'en' => 'Failed to load more.',
+    _ => 'Yana yuklashda xatolik.',
+  };
+
+  static String loadError(String localeCode) => switch (localeCode) {
+    'ru' => 'Не удалось загрузить данные.',
+    'en' => 'Could not load data.',
+    _ => 'Ma\'lumotlarni yuklab bo\'lmadi.',
+  };
 }

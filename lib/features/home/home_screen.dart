@@ -65,15 +65,16 @@ class _HomeScreenState extends State<HomeScreen> {
                   ListingDetailScreen(listing: listing),
               transitionsBuilder: (_, animation, __, child) {
                 return SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(1, 0),
-                    end: Offset.zero,
-                  ).animate(
-                    CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                    ),
-                  ),
+                  position:
+                      Tween<Offset>(
+                        begin: const Offset(1, 0),
+                        end: Offset.zero,
+                      ).animate(
+                        CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                        ),
+                      ),
                   child: child,
                 );
               },
@@ -108,8 +109,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final date = widget.today ?? DateTime.now();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor =
-        isDark ? AppColors.greenBlack : AppColors.lightBackground;
+    final backgroundColor = isDark
+        ? AppColors.greenBlack
+        : AppColors.lightBackground;
 
     return Scaffold(
       backgroundColor: backgroundColor,
@@ -182,6 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 24),
                   _SectionHeader(
                     title: _sectionTitle(widget.locale),
+                    locale: widget.locale,
                     onSeeAll: widget.onOpenMarket,
                   ),
                   const SizedBox(height: 12),
@@ -199,15 +202,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   static String _sectionTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Топ модели',
-        'en' => 'Top models',
-        _ => 'Top modellar',
-      };
+    'ru' => 'Топ модели',
+    'en' => 'Top models',
+    _ => 'Top modellar',
+  };
 }
 
 class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.onSeeAll});
+  const _SectionHeader({
+    required this.title,
+    required this.locale,
+    this.onSeeAll,
+  });
   final String title;
+  final Locale locale;
   final VoidCallback? onSeeAll;
 
   @override
@@ -232,7 +240,7 @@ class _SectionHeader extends StatelessWidget {
           GestureDetector(
             onTap: onSeeAll,
             child: Text(
-              'Barchasi →',
+              _HomeScreenStrings.seeAll(locale),
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -363,7 +371,11 @@ class _CardStrings {
   const _CardStrings._();
 
   static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+      switch (l.languageCode) {
+        'ru' => ru,
+        'en' => en,
+        _ => uz,
+      };
 
   static String kadastr3d(Locale l) =>
       _pick(l, '3D kadastr', '3D кадастр', '3D cadastre');
@@ -375,4 +387,14 @@ class _CardStrings {
       _pick(l, 'Kalkulyator', 'Калькулятор', 'Calculator');
 
   static String market(Locale l) => _pick(l, 'Market', 'Маркет', 'Market');
+}
+
+class _HomeScreenStrings {
+  const _HomeScreenStrings._();
+
+  static String seeAll(Locale l) => switch (l.languageCode) {
+    'ru' => 'Все →',
+    'en' => 'See all →',
+    _ => 'Barchasi →',
+  };
 }

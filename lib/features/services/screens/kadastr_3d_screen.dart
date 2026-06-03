@@ -2,20 +2,16 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:latlong2/latlong.dart';
 
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../api_cadastre_service.dart';
-import '../models/scan_draft.dart';
+import '../models/kadastr_3d_bundle.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
-import 'calculator/arxitektura_tz_wizard_screen.dart';
-import 'map_location_picker_screen.dart';
-import 'scan_object_type_screen.dart';
-import '../models/architecture_order_draft.dart';
+import 'kadastr_3d/k3d_client_form_screen.dart';
 
 enum _LoadStatus { idle, loading, loaded, error }
 
@@ -27,18 +23,40 @@ class Kadastr3dScreen extends StatefulWidget {
 }
 
 class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
-  static const _fullMaskLength = 19; // 14 digits + 5 colons (NN:NN:NN:NN:NN:NNNN)
+  static const _fullMaskLength = 19;
+  // Base NN:NN:NN:NN:NN:NNNN, optionally followed by sub-parcel / building /
+  // unit blocks, e.g. 10:09:01:01:02:5942:0001:039.
+  static final _cadastreRe =
+      RegExp(r'^\d{2}:\d{2}:\d{2}:\d{2}:\d{2}:\d{4}(:\d{1,4})*$');
   final TextEditingController _cadastreController = TextEditingController();
   Timer? _loadTimer;
   _LoadStatus _status = _LoadStatus.idle;
   CadastreLookupResult? _info;
   String? _errorMsg;
   int _lookupRequestId = 0;
+  List<String> _recent = const [];
 
   @override
   void initState() {
     super.initState();
     _cadastreController.addListener(_onCadastreChanged);
+    _loadRecent();
+  }
+
+  Future<void> _loadRecent() async {
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null) return;
+    final list = await CadastreApiService().recent(token: token);
+    if (!mounted) return;
+    setState(() => _recent = list);
+  }
+
+  void _useRecent(String number) {
+    _cadastreController.value = TextEditingValue(
+      text: number,
+      selection: TextSelection.collapsed(offset: number.length),
+    );
   }
 
   @override
@@ -49,58 +67,10 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
     super.dispose();
   }
 
-  Future<void> _openMapPicker() async {
-    final picked = await Navigator.of(context).push<LatLng>(
-      MaterialPageRoute<LatLng>(
-        builder: (_) => const MapLocationPickerScreen(
-          title: 'Obyekt joylashuvi',
-          subtitle: 'Xaritada uy joyini belgilang',
-        ),
-      ),
-    );
-    if (picked == null || !mounted) return;
-
-    final scanDraft = ScanDraft(
-      cadastreNumber: _cadastreController.text,
-      latitude: picked.latitude,
-      longitude: picked.longitude,
-    );
-
-    // Wizard'ga avvalgi step'larda yig'ilgan ma'lumotlarni prefill:
-    // kadastr raqami va manzil (xaritadan tanlangan koordinatadan).
-    final tzPrefill = ArchitectureOrderDraft()
-      ..cadastreNumber = scanDraft.cadastreNumber
-      ..address = 'lat: ${picked.latitude.toStringAsFixed(6)}, '
-          'lon: ${picked.longitude.toStringAsFixed(6)}';
-
-    // MAP PICKER → TZ wizard (DOCX so'rovnomadagi 7 step) → ScanObjectType
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ArxitekturaTzWizardScreen(
-          initialDraft: tzPrefill,
-          submitLabel: 'Davom etish',
-          onSubmit: (tzDraft) {
-            // Wizard tugagandan keyin TZ draft'ni ScanDraft.tzDraft'ga
-            // saqlab, navbatdagi step'ga o'tamiz.
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute<void>(
-                builder: (_) =>
-                    ScanObjectTypeScreen(draft: scanDraft.copyWith(
-                      tzDraft: tzDraft,
-                    )),
-              ),
-            );
-          },
-        ),
-      ),
-    );
-  }
-
   void _onCadastreChanged() {
-    final filled = _cadastreController.text.length == _fullMaskLength;
+    final filled = _cadastreRe.hasMatch(_cadastreController.text);
     if (filled) {
-      if (_status == _LoadStatus.idle ||
-          _status == _LoadStatus.error) {
+      if (_status == _LoadStatus.idle || _status == _LoadStatus.error) {
         _loadTimer?.cancel();
         // 250 ms debounce — paste yoki tez yozishda bir nechta API call
         // ketmasligi uchun.
@@ -138,6 +108,22 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
         token: token,
       );
       if (!mounted || reqId != _lookupRequestId) return;
+      // davreest.uz returns an all-null result for a non-existent number
+      // instead of an error — treat that as "not found" so the user can't
+      // continue with empty property data.
+      final hasData = (result.address?.trim().isNotEmpty ?? false) ||
+          result.totalArea != null ||
+          result.livingArea != null ||
+          result.cadastreValue != null ||
+          (result.objectTypeHint?.trim().isNotEmpty ?? false);
+      if (!hasData) {
+        setState(() {
+          _status = _LoadStatus.error;
+          _info = null;
+          _errorMsg = "Bu kadastr raqami bo'yicha ma'lumot topilmadi";
+        });
+        return;
+      }
       setState(() {
         _info = result;
         _status = _LoadStatus.loaded;
@@ -159,14 +145,27 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
     }
   }
 
+  void _continue() {
+    if (_status != _LoadStatus.loaded || _info == null) return;
+    HapticFeedback.lightImpact();
+    // 3D Kadastr wizard mirrors AI Baholash's intake steps (minus purpose and
+    // owner documents) plus the 3D-specific location/object-type/LiDAR steps:
+    // kadastr → buyurtmachi → joylashuv → obyekt turi → hujjatlar → 3D skan.
+    final bundle = Kadastr3dBundle(kadastr: _info!);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => K3dClientFormScreen(bundle: bundle),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final labelColor = isDark ? Colors.white : AppColors.textBlack;
-    final dividerColor = isDark
-        ? const Color(0xFF2C3133)
-        : const Color(0xFFE3E5E8);
+    final dividerColor =
+        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
 
     return Scaffold(
       backgroundColor: bg,
@@ -189,7 +188,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 4, activeIndex: 0),
+                      child: const StepProgressBar(count: 6, activeIndex: 0),
                     ),
                     Expanded(
                       child: ListView(
@@ -203,19 +202,33 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                           ),
                           const SizedBox(height: 10),
                           _HelperLine(isDark: isDark),
+                          if (_status == _LoadStatus.idle &&
+                              _recent.isNotEmpty &&
+                              _cadastreController.text.length <
+                                  _fullMaskLength) ...[
+                            const SizedBox(height: 16),
+                            _SectionLabel('Oxirgi qidiruvlar',
+                                color: labelColor),
+                            const SizedBox(height: 10),
+                            _RecentChips(
+                              numbers: _recent,
+                              isDark: isDark,
+                              onTap: _useRecent,
+                            ),
+                          ],
                           AnimatedSwitcher(
                             duration: const Duration(milliseconds: 240),
                             switchInCurve: Curves.easeOut,
                             switchOutCurve: Curves.easeIn,
                             transitionBuilder: (child, animation) =>
                                 FadeTransition(
-                                  opacity: animation,
-                                  child: SizeTransition(
-                                    sizeFactor: animation,
-                                    axisAlignment: -1,
-                                    child: child,
-                                  ),
-                                ),
+                              opacity: animation,
+                              child: SizeTransition(
+                                sizeFactor: animation,
+                                axisAlignment: -1,
+                                child: child,
+                              ),
+                            ),
                             child: _status == _LoadStatus.idle
                                 ? const SizedBox.shrink(key: ValueKey('idle'))
                                 : Column(
@@ -224,7 +237,8 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       const SizedBox(height: 18),
-                                      Container(height: 1, color: dividerColor),
+                                      Container(
+                                          height: 1, color: dividerColor),
                                       const SizedBox(height: 18),
                                       _SectionLabel(
                                         'Uy ma\'lumotlari',
@@ -260,7 +274,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                       child: ListingCtaButton(
                         label: 'Davom etish',
                         enabled: _status == _LoadStatus.loaded,
-                        onTap: _openMapPicker,
+                        onTap: _continue,
                       ),
                     ),
                   ],
@@ -295,6 +309,70 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
+/// Quick-pick chips of the user's recent kadastr numbers. Tapping one fills
+/// the field (which then resolves instantly from the backend cache).
+class _RecentChips extends StatelessWidget {
+  const _RecentChips({
+    required this.numbers,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final List<String> numbers;
+  final bool isDark;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final n in numbers)
+          GestureDetector(
+            onTap: () => onTap(n),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF1F2426)
+                    : const Color(0xFFF1F3F5),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isDark
+                      ? const Color(0xFF2C3133)
+                      : const Color(0xFFE3E5E8),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    size: 14,
+                    color: isDark
+                        ? Colors.white70
+                        : const Color(0xFF8A9097),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    n,
+                    style: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontSize: 13,
+                      color: isDark ? Colors.white : AppColors.textBlack,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _CadastreInput extends StatelessWidget {
   const _CadastreInput({required this.isDark, required this.controller});
 
@@ -308,15 +386,17 @@ class _CadastreInput extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.45)
         : const Color(0xFFB4B9BF);
     final textColor = isDark ? Colors.white : AppColors.textBlack;
-    final borderColor = isDark
-        ? const Color(0xFF2C3133)
-        : const Color(0xFFE3E5E8);
+    final borderColor =
+        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
 
     return TextField(
       controller: controller,
       onTapOutside: (_) => FocusScope.of(context).unfocus(),
-      // See note in ai_cadastre_screen.dart — `phone` lets pasted text with
-      // colons reach the mask formatter; `number` silently strips it on Android.
+      // `phone` (not `number`) — Android's number keyboard/clipboard layer
+      // silently strips non-digit characters from pasted text, so a clipboard
+      // value like "11:14:04:01:01:1630" never reaches our formatter. The
+      // phone keyboard accepts arbitrary characters on paste; the mask
+      // formatter below then strips/re-inserts the colons.
       keyboardType: TextInputType.phone,
       inputFormatters: [_CadastreMaskFormatter()],
       style: TextStyle(
@@ -327,10 +407,8 @@ class _CadastreInput extends StatelessWidget {
       ),
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 18,
-        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
         hintText: 'XX:XX:XX:XX:XX:XXXX',
         hintStyle: TextStyle(
           fontFamily: 'MTSText',
@@ -353,27 +431,29 @@ class _CadastreInput extends StatelessWidget {
   }
 }
 
-/// Formats raw digits into `NN:NN:NN:NN:NN:NNNN` (davreestr.uz formati,
-/// segments 2/2/2/2/2/4), auto-inserting colons as the user types and
-/// stripping non-digits on paste.
+/// Formats raw digits into `NN:NN:NN:NN:NN:NNNN`, auto-inserting colons and
+/// keeping the caret on the right digit during mid-string edits, with an
+/// extended tail for sub-parcel / building / unit blocks.
 class _CadastreMaskFormatter extends TextInputFormatter {
   static const _segments = [2, 2, 2, 2, 2, 4];
-  static const _maxDigits = 14;
+  // Base = 14 digits; allow extra for sub-parcel / building / unit tail
+  // (e.g. 10:09:01:01:02:5942:0001:039).
+  static const _maxDigits = 25;
 
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final digits = newValue.text
+    final allDigits = newValue.text.replaceAll(RegExp(r'\D'), '');
+    final digits = allDigits.substring(0, allDigits.length.clamp(0, _maxDigits));
+
+    final selEnd = newValue.selection.end.clamp(0, newValue.text.length);
+    final digitsBeforeCaret = newValue.text
+        .substring(0, selEnd)
         .replaceAll(RegExp(r'\D'), '')
-        .substring(
-          0,
-          newValue.text
-              .replaceAll(RegExp(r'\D'), '')
-              .length
-              .clamp(0, _maxDigits),
-        );
+        .length
+        .clamp(0, digits.length);
 
     final buffer = StringBuffer();
     var consumed = 0;
@@ -385,11 +465,26 @@ class _CadastreMaskFormatter extends TextInputFormatter {
       buffer.write(digits.substring(consumed, end));
       consumed = end;
     }
-
+    while (consumed < digits.length) {
+      final end = (consumed + 4).clamp(0, digits.length);
+      buffer.write(':');
+      buffer.write(digits.substring(consumed, end));
+      consumed = end;
+    }
     final formatted = buffer.toString();
+
+    var offset = 0;
+    var seen = 0;
+    while (offset < formatted.length && seen < digitsBeforeCaret) {
+      if (formatted[offset] != ':') seen++;
+      offset++;
+    }
+    if (offset < formatted.length && formatted[offset] == ':') offset++;
+
     return TextEditingValue(
       text: formatted,
-      selection: TextSelection.collapsed(offset: formatted.length),
+      selection:
+          TextSelection.collapsed(offset: offset.clamp(0, formatted.length)),
     );
   }
 }
@@ -454,7 +549,8 @@ class _PropertyInfoCardSkeletonState extends State<_PropertyInfoCardSkeleton>
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
     final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final divider = isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
+    final divider =
+        isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
     final baseA = isDark ? const Color(0xFF1A2024) : const Color(0xFFE7EAEE);
     final baseB = isDark ? const Color(0xFF262C31) : const Color(0xFFF2F4F7);
 
@@ -541,7 +637,8 @@ class _PropertyInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final divider = isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
+    final divider =
+        isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
     final labelColor = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
@@ -560,27 +657,31 @@ class _PropertyInfoCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      '${rows[i].$1}:',
-                      style: TextStyle(
-                        fontFamily: 'MTSText',
-                        fontSize: 14,
-                        height: 1.25,
-                        color: labelColor,
-                      ),
-                    ),
-                  ),
                   Text(
-                    rows[i].$2,
-                    textAlign: TextAlign.right,
+                    '${rows[i].$1}:',
                     style: TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w700,
+                      fontFamily: 'MTSText',
                       fontSize: 14,
                       height: 1.25,
-                      color: valueColor,
+                      color: labelColor,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // Qiymat — qolgan joyni egallaydi va uzun matn (masalan to'liq
+                  // manzil) bir necha qatorga o'raladi, satrdan toshib ketmaydi.
+                  Expanded(
+                    child: Text(
+                      rows[i].$2,
+                      textAlign: TextAlign.right,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        height: 1.25,
+                        color: valueColor,
+                      ),
                     ),
                   ),
                 ],

@@ -157,6 +157,7 @@ class _SkipButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark
         ? Colors.white.withValues(alpha: 0.08)
@@ -175,7 +176,7 @@ class _SkipButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                "O'tkazib yuborish",
+                _AuthScaffoldStrings.skip(locale),
                 style: TextStyle(
                   color: fg,
                   fontSize: 13,
@@ -190,6 +191,16 @@ class _SkipButton extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AuthScaffoldStrings {
+  const _AuthScaffoldStrings._();
+
+  static String skip(Locale l) => switch (l.languageCode) {
+    'ru' => 'Пропустить',
+    'en' => 'Skip',
+    _ => "O'tkazib yuborish",
+  };
 }
 
 class _IconBadge extends StatelessWidget {

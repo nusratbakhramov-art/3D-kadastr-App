@@ -1,4 +1,4 @@
-enum ApplicationStatusGroup { inProgress, completed, cancelled }
+enum ApplicationStatusGroup { sent, inProgress, completed, cancelled }
 
 enum ApplicationTimelineStatus {
   accepted,
@@ -33,6 +33,8 @@ class ApplicationItem {
     required this.timeline,
     this.typeLabel,
     this.typeValue,
+    this.detailRows = const <(String, String)>[],
+    this.hasDeliverable = false,
   });
 
   final String id;
@@ -45,6 +47,16 @@ class ApplicationItem {
   final String dateValue;
   final String? typeLabel;
   final String? typeValue;
+
+  /// Real (label, value) rows shown on the detail "Ariza haqida" tab. Built
+  /// from the backend summary per service type — replaces the old mock report.
+  final List<(String, String)> detailRows;
+
+  /// Whether a downloadable 3D model / report deliverable exists for this
+  /// item (only completed photogrammetry scans today). Drives whether the
+  /// file / 3D-model / AR cards are shown on the detail screen.
+  final bool hasDeliverable;
+
   final List<ApplicationTimelineStep> timeline;
 }
 

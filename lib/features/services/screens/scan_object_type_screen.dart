@@ -3,11 +3,12 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
+import '../models/kadastr_3d_bundle.dart';
 import '../models/scan_draft.dart';
 import '../widgets/choice_tile.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
-import 'scan_lidar_screen.dart';
+import 'kadastr_3d/k3d_intake_screen.dart';
 
 String _scanObjectTypeLabel(ScanObjectType t, Locale locale) =>
     switch (locale.languageCode) {
@@ -27,9 +28,9 @@ String _scanObjectTypeLabel(ScanObjectType t, Locale locale) =>
     };
 
 class ScanObjectTypeScreen extends StatefulWidget {
-  const ScanObjectTypeScreen({super.key, required this.draft});
+  const ScanObjectTypeScreen({super.key, required this.bundle});
 
-  final ScanDraft draft;
+  final Kadastr3dBundle bundle;
 
   @override
   State<ScanObjectTypeScreen> createState() => _ScanObjectTypeScreenState();
@@ -41,14 +42,16 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
   @override
   void initState() {
     super.initState();
-    _selected = widget.draft.objectType;
+    _selected = widget.bundle.objectType;
   }
 
   void _continue() {
     if (_selected == null) return;
-    final draft = widget.draft.copyWith(objectType: _selected);
+    widget.bundle.objectType = _selected;
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => ScanLidarScreen(draft: draft)),
+      MaterialPageRoute<void>(
+        builder: (_) => K3dIntakeScreen(bundle: widget.bundle),
+      ),
     );
   }
 
@@ -90,7 +93,7 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 4, activeIndex: 1),
+                      child: const StepProgressBar(count: 6, activeIndex: 3),
                     ),
                     Expanded(
                       child: ListView(

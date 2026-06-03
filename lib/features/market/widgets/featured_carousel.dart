@@ -85,6 +85,7 @@ class _FeaturedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF121617) : Colors.white;
     final titleColor = isDark ? Colors.white : AppColors.textBlack;
@@ -98,9 +99,7 @@ class _FeaturedCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: cardColor,
           borderRadius: BorderRadius.circular(20),
-          border: isDark
-              ? null
-              : Border.all(color: const Color(0xFFE3E5E8)),
+          border: isDark ? null : Border.all(color: const Color(0xFFE3E5E8)),
         ),
         clipBehavior: Clip.hardEdge,
         child: Stack(
@@ -108,10 +107,7 @@ class _FeaturedCard extends StatelessWidget {
             // Image
             Positioned.fill(
               bottom: 85,
-              child: RemoteImage(
-                url: listing.imageUrl,
-                memCacheWidth: 720,
-              ),
+              child: RemoteImage(url: listing.imageUrl, memCacheWidth: 720),
             ),
             // Bottom info
             Positioned(
@@ -120,7 +116,10 @@ class _FeaturedCard extends StatelessWidget {
               bottom: 0,
               height: 85,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -128,7 +127,7 @@ class _FeaturedCard extends StatelessWidget {
                     Text(
                       listing.priceUzs > 0
                           ? '${_fmtPrice(listing.priceUzs)} UZS'
-                          : 'Bepul',
+                          : _FeaturedCarouselStrings.free(locale),
                       style: TextStyle(
                         fontSize: 12,
                         color: metaColor,
@@ -174,6 +173,16 @@ class _FeaturedCard extends StatelessWidget {
     }
     return buf.toString();
   }
+}
+
+class _FeaturedCarouselStrings {
+  const _FeaturedCarouselStrings._();
+
+  static String free(Locale l) => switch (l.languageCode) {
+    'ru' => 'Бесплатно',
+    'en' => 'Free',
+    _ => 'Bepul',
+  };
 }
 
 class _CarouselSkeleton extends StatelessWidget {

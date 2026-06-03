@@ -59,6 +59,7 @@ class _ResendTimerState extends State<ResendTimer> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : AppColors.textBlack;
     final timerBg = isDark
@@ -72,7 +73,7 @@ class _ResendTimerState extends State<ResendTimer> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          'Qayta yuborish',
+          _ResendTimerStrings.label(locale),
           style: TextStyle(
             color: titleColor,
             fontSize: 14,
@@ -114,4 +115,14 @@ class _ResendTimerState extends State<ResendTimer> {
       ],
     );
   }
+}
+
+class _ResendTimerStrings {
+  const _ResendTimerStrings._();
+
+  static String label(Locale l) => switch (l.languageCode) {
+    'ru' => 'Отправить снова',
+    'en' => 'Resend',
+    _ => 'Qayta yuborish',
+  };
 }

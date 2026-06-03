@@ -16,6 +16,7 @@ class ListingInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF121617) : Colors.white;
     final fg = isDark ? Colors.white : AppColors.textBlack;
@@ -39,8 +40,8 @@ class ListingInfoCard extends StatelessWidget {
                 color: AppColors.splashGreen,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Text(
-                'Bepul',
+              child: Text(
+                _ListingInfoStrings.free(locale),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
@@ -102,4 +103,14 @@ class ListingInfoCard extends StatelessWidget {
     }
     return buf.toString();
   }
+}
+
+class _ListingInfoStrings {
+  const _ListingInfoStrings._();
+
+  static String free(Locale l) => switch (l.languageCode) {
+    'ru' => 'Бесплатно',
+    'en' => 'Free',
+    _ => 'Bepul',
+  };
 }
