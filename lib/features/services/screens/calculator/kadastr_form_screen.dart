@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
+import '../../data/calculator_pricing_store.dart';
 import '../../models/calculator_draft.dart';
 import '../../widgets/choice_tile.dart';
 import '../../widgets/service_app_bar.dart';
@@ -49,6 +50,7 @@ class _KadastrFormScreenState extends State<KadastrFormScreen> {
       objectType: _selected!,
       areaM2: parseAmount(_area.text)!,
       is3d: widget.is3d,
+      pricing: calculatorPricingNotifier.value,
       locale: locale,
     );
     Navigator.of(context).push(

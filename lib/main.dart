@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +10,7 @@ import 'features/home/user_profile.dart';
 import 'features/notifications/notification_model.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
+import 'features/services/data/calculator_pricing_store.dart';
 import 'features/settings/locale_storage.dart';
 import 'features/settings/settings_state.dart';
 import 'features/shell/main_shell.dart';
@@ -157,6 +160,11 @@ class _AppRootState extends State<_AppRoot> {
   }
 
   Future<void> _bootstrap() async {
+    // Kalkulyator narxlarini keshdan darhol o'qib, fonda backend'dan
+    // yangilaymiz. Fire-and-forget — splash/bootstrap vaqtiga ta'sir qilmaydi
+    // (notifier boshlang'ich qiymati = defaults, offline xavfsiz).
+    unawaited(CalculatorPricingStore.instance.loadCachedThenRefresh());
+
     // Avval saqlangan locale ni yuklab, app bo'ylab qo'llaymiz. Bu
     // localeNotifier'ni o'zgartiradi va MaterialApp rebuild bo'lib, butun
     // widget tree yangi til bilan tarjima qilinadi.

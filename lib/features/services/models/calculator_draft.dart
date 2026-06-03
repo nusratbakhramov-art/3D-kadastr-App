@@ -6,6 +6,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import 'calculator_pricing.dart';
+
 // ────────────────────────────────────────────────────────────────────────
 // Locale helper
 // ────────────────────────────────────────────────────────────────────────
@@ -151,15 +153,22 @@ enum CalculatorCategory {
 // ────────────────────────────────────────────────────────────────────────
 
 enum ArxitekturaObject {
-  yakkaSmall(36000),
-  yakkaLarge(60000),
-  kopQavatli(84000),
-  jamoat(108000),
-  sanoat(60000),
-  rekonstruksiya(72000);
+  yakkaSmall,
+  yakkaLarge,
+  kopQavatli,
+  jamoat,
+  sanoat,
+  rekonstruksiya;
 
-  const ArxitekturaObject(this.pricePerM2);
-  final int pricePerM2;
+  /// Backend narx kaliti (`calculator_prices.key`).
+  String get priceKey => switch (this) {
+    ArxitekturaObject.yakkaSmall => 'arxitektura.yakka_small',
+    ArxitekturaObject.yakkaLarge => 'arxitektura.yakka_large',
+    ArxitekturaObject.kopQavatli => 'arxitektura.kop_qavatli',
+    ArxitekturaObject.jamoat => 'arxitektura.jamoat',
+    ArxitekturaObject.sanoat => 'arxitektura.sanoat',
+    ArxitekturaObject.rekonstruksiya => 'arxitektura.rekonstruksiya',
+  };
 
   String label(Locale l) => switch (this) {
     ArxitekturaObject.yakkaSmall => _pick(
@@ -265,14 +274,26 @@ enum KadastrObjectType {
 // ────────────────────────────────────────────────────────────────────────
 
 enum BaholashObject {
-  uyJoy(6000, 490000),
-  tijorat(10000, 990000),
-  tugallanmagan(15000, null);
+  uyJoy,
+  tijorat,
+  tugallanmagan;
 
-  const BaholashObject(this.pricePerM2, this.minFor200);
+  /// 1 m² narx kaliti.
+  String get priceKey => switch (this) {
+    BaholashObject.uyJoy => 'baholash.uy_joy.per_m2',
+    BaholashObject.tijorat => 'baholash.tijorat.per_m2',
+    BaholashObject.tugallanmagan => 'baholash.tugallanmagan.per_m2',
+  };
 
-  final int pricePerM2;
-  final int? minFor200; // ≤200 m² uchun belgilangan minimum
+  /// ≤200 m² uchun belgilangan minimum bormi (tugallanmaganda yo'q).
+  bool get hasMin200 => this != BaholashObject.tugallanmagan;
+
+  /// ≤200 m² belgilangan minimum narx kaliti (faqat [hasMin200] uchun).
+  String get min200Key => switch (this) {
+    BaholashObject.uyJoy => 'baholash.uy_joy.min200',
+    BaholashObject.tijorat => 'baholash.tijorat.min200',
+    BaholashObject.tugallanmagan => 'baholash.tugallanmagan.min200',
+  };
 
   String label(Locale l) => switch (this) {
     BaholashObject.uyJoy => _pick(
@@ -370,11 +391,14 @@ enum TamirlashLocation {
 }
 
 enum TamirlashServiceType {
-  tamir(5000000),
-  qurilish(2400000);
+  tamir,
+  qurilish;
 
-  const TamirlashServiceType(this.pricePerM2);
-  final int pricePerM2;
+  /// 1 m² narx kaliti.
+  String get priceKey => switch (this) {
+    TamirlashServiceType.tamir => 'tamirlash.tamir.per_m2',
+    TamirlashServiceType.qurilish => 'tamirlash.qurilish.per_m2',
+  };
 
   String label(Locale l) => switch (this) {
     TamirlashServiceType.tamir => _pick(l, uz: "Ta'mir", ru: 'Ремонт', en: 'Repair'),
@@ -498,9 +522,10 @@ class _ComputeStrings {
 CalculatorResult computeArxitektura({
   required ArxitekturaObject objectType,
   required double areaM2,
+  required CalculatorPricing pricing,
   required Locale locale,
 }) {
-  final rate = objectType.pricePerM2;
+  final rate = pricing.rate(objectType.priceKey).round();
   final total = (areaM2 * rate).round();
   return CalculatorResult(
     categoryTitle: CalculatorCategory.arxitektura.title(locale),
@@ -518,36 +543,31 @@ CalculatorResult computeKadastr({
   required KadastrObjectType objectType,
   required double areaM2,
   required bool is3d,
+  required CalculatorPricing pricing,
   required Locale locale,
 }) {
   final categoryTitle = is3d
       ? CalculatorCategory.kadastr3d.title(locale)
       : CalculatorCategory.kadastr.title(locale);
 
+  final p = is3d ? 'kadastr3d' : 'kadastr';
+
   int total;
   String tierLabel;
 
   switch (objectType) {
     case KadastrObjectType.xonadon:
-      total = is3d ? 9800000 : 4900000;
+      total = pricing.rate('$p.xonadon').round();
       tierLabel = _ComputeStrings.fixedPrice(locale);
     case KadastrObjectType.yakka:
-      final tiers = is3d
-          ? [
-              (300, 9800000, _ComputeStrings.upTo(locale, 300)),
-              (500, 19800000, _ComputeStrings.range(300, 500)),
-              (1000, 30800000, _ComputeStrings.range(500, 1000)),
-              (3000, 40800000, _ComputeStrings.range(1000, 3000)),
-              (5000, 50800000, _ComputeStrings.range(3000, 5000)),
-            ]
-          : [
-              (300, 4900000, _ComputeStrings.upTo(locale, 300)),
-              (500, 9900000, _ComputeStrings.range(300, 500)),
-              (1000, 14900000, _ComputeStrings.range(500, 1000)),
-              (3000, 19900000, _ComputeStrings.range(1000, 3000)),
-              (5000, 24900000, _ComputeStrings.range(3000, 5000)),
-            ];
-      final lastPrice = is3d ? 50800000 : 29900000;
+      final tiers = [
+        (300, pricing.rate('$p.yakka.le300').round(), _ComputeStrings.upTo(locale, 300)),
+        (500, pricing.rate('$p.yakka.le500').round(), _ComputeStrings.range(300, 500)),
+        (1000, pricing.rate('$p.yakka.le1000').round(), _ComputeStrings.range(500, 1000)),
+        (3000, pricing.rate('$p.yakka.le3000').round(), _ComputeStrings.range(1000, 3000)),
+        (5000, pricing.rate('$p.yakka.le5000').round(), _ComputeStrings.range(3000, 5000)),
+      ];
+      final lastPrice = pricing.rate('$p.yakka.gt5000').round();
       final lastLabel = _ComputeStrings.over(locale, 5000);
       var matched = false;
       total = lastPrice;
@@ -567,11 +587,11 @@ CalculatorResult computeKadastr({
     case KadastrObjectType.kopKvartirali:
       final perM2 = is3d
           ? (areaM2 <= 10000
-                ? 20000
+                ? pricing.rate('kadastr3d.kop_kvartirali.le10000').round()
                 : areaM2 <= 25000
-                ? 15000
-                : 10000)
-          : 7500;
+                ? pricing.rate('kadastr3d.kop_kvartirali.le25000').round()
+                : pricing.rate('kadastr3d.kop_kvartirali.gt25000').round())
+          : pricing.rate('kadastr.kop_kvartirali.per_m2').round();
       total = (areaM2 * perM2).round();
       tierLabel = _ComputeStrings.tierTimesArea(locale, perM2);
   }
@@ -591,15 +611,16 @@ CalculatorResult computeKadastr({
 CalculatorResult computeBaholash({
   required BaholashObject objectType,
   required double areaM2,
+  required CalculatorPricing pricing,
   required Locale locale,
 }) {
-  final rate = objectType.pricePerM2;
+  final rate = pricing.rate(objectType.priceKey).round();
   final byArea = (areaM2 * rate).round();
   int total;
   String calcStr;
 
-  if (areaM2 <= 200 && objectType.minFor200 != null) {
-    total = objectType.minFor200!;
+  if (areaM2 <= 200 && objectType.hasMin200) {
+    total = pricing.rate(objectType.min200Key).round();
     calcStr = _ComputeStrings.fixedMinFor200(locale);
   } else {
     total = byArea;
@@ -622,9 +643,13 @@ CalculatorResult computeDizayn({
   required DizaynObjectType objectType,
   required DizaynStyle style,
   required double areaM2,
+  required CalculatorPricing pricing,
   required Locale locale,
 }) {
-  final rate = areaM2 <= 100 ? 180000 : 130000;
+  final rate = (areaM2 <= 100
+          ? pricing.rate('dizayn.le100.per_m2')
+          : pricing.rate('dizayn.gt100.per_m2'))
+      .round();
   final total = (areaM2 * rate).round();
   final tierLabel =
       areaM2 <= 100 ? _ComputeStrings.upTo(locale, 100) : _ComputeStrings.over(locale, 100);
@@ -650,9 +675,10 @@ CalculatorResult computeTamirlash({
   required TamirlashLocation location,
   required TamirlashServiceType serviceType,
   required double areaM2,
+  required CalculatorPricing pricing,
   required Locale locale,
 }) {
-  final rate = serviceType.pricePerM2;
+  final rate = pricing.rate(serviceType.priceKey).round();
   final total = (areaM2 * rate).round();
   return CalculatorResult(
     categoryTitle: CalculatorCategory.tamirlash.title(locale),

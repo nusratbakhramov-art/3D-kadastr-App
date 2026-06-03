@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../models/architecture_order_draft.dart';
+import '../../data/calculator_pricing_store.dart';
 import '../../models/calculator_draft.dart';
 import '../../widgets/choice_tile.dart';
 import '../../widgets/service_app_bar.dart';
@@ -50,6 +51,7 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
     final result = computeArxitektura(
       objectType: selected,
       areaM2: area,
+      pricing: calculatorPricingNotifier.value,
       locale: locale,
     );
     Navigator.of(context).push(

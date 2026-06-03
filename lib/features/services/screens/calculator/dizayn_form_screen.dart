@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
+import '../../data/calculator_pricing_store.dart';
 import '../../models/calculator_draft.dart';
 import '../../widgets/choice_tile.dart';
 import '../../widgets/service_app_bar.dart';
@@ -49,6 +50,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
       objectType: _objectType!,
       style: _style!,
       areaM2: parseAmount(_area.text)!,
+      pricing: calculatorPricingNotifier.value,
       locale: locale,
     );
     Navigator.of(context).push(
