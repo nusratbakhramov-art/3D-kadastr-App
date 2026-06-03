@@ -23,6 +23,7 @@ import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../api_ai_upload_service.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../widgets/rooms_selector.dart';
 import '../widgets/service_app_bar.dart';
 import 'ai_status_screen.dart';
 
@@ -90,20 +91,26 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
       widget.bundle.floor! <= widget.bundle.totalFloors!;
 
   // Short hint listing what's still missing, or null when ready.
-  String? get _missingHint {
+  String? _missingHint(Locale l) {
     if (_ready) return null;
     final missing = <String>[];
-    if (widget.bundle.imageKeys.isEmpty) missing.add('rasm');
-    if (widget.bundle.kadastrKeys.isEmpty) missing.add('kadastr hujjati');
-    if (widget.bundle.rooms.isEmpty) missing.add('xonalar');
+    if (widget.bundle.imageKeys.isEmpty) {
+      missing.add(_IntakeStrings.missingPhoto(l));
+    }
+    if (widget.bundle.kadastrKeys.isEmpty) {
+      missing.add(_IntakeStrings.missingKadastr(l));
+    }
+    if (widget.bundle.rooms.isEmpty) {
+      missing.add(_IntakeStrings.missingRooms(l));
+    }
     final f = widget.bundle.floor;
     final tf = widget.bundle.totalFloors;
     if (f == null || tf == null || f < 1 || tf < 1) {
-      missing.add('qavat');
+      missing.add(_IntakeStrings.missingFloor(l));
     } else if (f > tf) {
-      return 'Qavat binodagi jami qavatlardan katta bo\'lmasligi kerak';
+      return _IntakeStrings.floorTooHigh(l);
     }
-    return '${missing.join(', ')} majburiy';
+    return _IntakeStrings.missingRequired(l, missing.join(', '));
   }
 
   void _setFloor(String raw) {
@@ -128,7 +135,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   Future<void> _addPhotos() async {
     final remaining = 15 - widget.bundle.imageKeys.length;
     if (remaining <= 0) {
-      _snack("Ko'pi bilan 15 ta rasm");
+      _snack(_IntakeStrings.maxPhotos(Localizations.localeOf(context)));
       return;
     }
     final List<XFile> picked = await _imagePicker.pickMultiImage(limit: remaining);
@@ -183,7 +190,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   }) async {
     final remaining = maxTotal - target.length;
     if (remaining <= 0) {
-      _snack("Ko'pi bilan $maxTotal ta fayl");
+      _snack(_IntakeStrings.maxFiles(
+          Localizations.localeOf(context), maxTotal));
       return;
     }
     final result = await FilePicker.platform.pickFiles(
@@ -219,7 +227,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     if (paths.isEmpty) return;
     final token = await _token();
     if (token == null || token.isEmpty) {
-      _snack('Avtorizatsiya kerak');
+      if (!mounted) return;
+      _snack(_IntakeStrings.authRequired(Localizations.localeOf(context)));
       return;
     }
     setBusy(true);
@@ -234,7 +243,10 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
         targetPaths.addAll(paths.take(keys.length));
       });
     } catch (e) {
-      _snack('Yuklashda xatolik: $e');
+      if (mounted) {
+        _snack(_IntakeStrings.uploadError(
+            Localizations.localeOf(context), '$e'));
+      }
     } finally {
       if (mounted) setBusy(false);
     }
@@ -255,9 +267,11 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final b = widget.bundle;
+    final missingHint = _missingHint(l);
 
     return Scaffold(
       backgroundColor: bg,
@@ -267,11 +281,11 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
             constraints: const BoxConstraints(maxWidth: 640),
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                    title: 'Hujjat va rasmlar',
-                    subtitle: 'Baholash uchun zarur ma\'lumotlar',
+                    title: _IntakeStrings.title(l),
+                    subtitle: _IntakeStrings.subtitle(l),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -280,8 +294,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     children: [
                       _UploadCard(
-                        title: 'Obyekt rasmlari',
-                        hint: 'Ichki va tashqi (1-15). Holatni baholash uchun.',
+                        title: _IntakeStrings.photosTitle(l),
+                        hint: _IntakeStrings.photosHint(l),
                         icon: Icons.photo_camera_outlined,
                         count: b.imageKeys.length,
                         busy: _photosBusy,
@@ -292,8 +306,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
-                        title: 'Kadastr hujjatlari',
-                        hint: 'Texpasport, plan (1-20). Maydon/yil aniqlanadi.',
+                        title: _IntakeStrings.kadastrTitle(l),
+                        hint: _IntakeStrings.kadastrHint(l),
                         icon: Icons.description_outlined,
                         count: b.kadastrKeys.length,
                         busy: _kadastrBusy,
@@ -304,8 +318,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
-                        title: 'Pasport / ID (ixtiyoriy)',
-                        hint: 'Hisobot uchun egasining ma\'lumoti.',
+                        title: _IntakeStrings.passportTitle(l),
+                        hint: _IntakeStrings.passportHint(l),
                         icon: Icons.badge_outlined,
                         count: b.passportKeys.length,
                         busy: _passportBusy,
@@ -320,11 +334,15 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                         totalFloorsCtrl: _totalFloorsCtrl,
                         onFloorChanged: _setFloor,
                         onTotalChanged: _setTotalFloors,
+                        locale: l,
                       ),
                       const SizedBox(height: 20),
-                      _RoomsSelector(
+                      RoomsSelector(
                         rooms: b.rooms,
                         onChanged: () => setState(() {}),
+                        locale: l,
+                        title: _IntakeStrings.roomsTitle(l),
+                        subtitle: _IntakeStrings.roomsSubtitle(l),
                       ),
                     ],
                   ),
@@ -334,7 +352,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (_missingHint != null) ...[
+                      if (missingHint != null) ...[
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
@@ -344,7 +362,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  _missingHint!,
+                                  missingHint,
                                   style: const TextStyle(
                                     fontFamily: 'MTSText',
                                     fontSize: 12,
@@ -357,7 +375,9 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                         ),
                       ],
                       ListingCtaButton(
-                        label: _submitting ? 'Yuborilmoqda…' : 'Hisoblash',
+                        label: _submitting
+                            ? _IntakeStrings.submitting(l)
+                            : _IntakeStrings.calculate(l),
                         enabled: _ready && !_submitting,
                         onTap: _calculate,
                       ),
@@ -564,7 +584,9 @@ class _PreviewTile extends StatelessWidget {
             Icon(Icons.insert_drive_file_outlined, size: 22, color: muted),
             const SizedBox(height: 4),
             Text(
-              _ext.isEmpty ? 'fayl' : _ext.toUpperCase(),
+              _ext.isEmpty
+                  ? _IntakeStrings.file(Localizations.localeOf(context))
+                  : _ext.toUpperCase(),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -617,12 +639,14 @@ class _FloorSection extends StatelessWidget {
     required this.totalFloorsCtrl,
     required this.onFloorChanged,
     required this.onTotalChanged,
+    required this.locale,
   });
 
   final TextEditingController floorCtrl;
   final TextEditingController totalFloorsCtrl;
   final ValueChanged<String> onFloorChanged;
   final ValueChanged<String> onTotalChanged;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -633,7 +657,7 @@ class _FloorSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Qavat',
+          _IntakeStrings.floorSectionTitle(locale),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -643,7 +667,7 @@ class _FloorSection extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'Obyekt qavati va binodagi jami qavatlar',
+          _IntakeStrings.floorSectionSubtitle(locale),
           style: TextStyle(fontFamily: 'MTSCompact', fontSize: 12, color: muted),
         ),
         const SizedBox(height: 12),
@@ -651,7 +675,7 @@ class _FloorSection extends StatelessWidget {
           children: [
             Expanded(
               child: _FloorField(
-                label: 'Obyekt qavati',
+                label: _IntakeStrings.objectFloor(locale),
                 controller: floorCtrl,
                 onChanged: onFloorChanged,
               ),
@@ -659,7 +683,7 @@ class _FloorSection extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _FloorField(
-                label: 'Jami qavatlar',
+                label: _IntakeStrings.totalFloors(locale),
                 controller: totalFloorsCtrl,
                 onChanged: onTotalChanged,
               ),
@@ -735,386 +759,170 @@ class _FloorField extends StatelessWidget {
   }
 }
 
-// ── Rooms selector ────────────────────────────────────────────────────
-// Chips shown inline under the title. Tap a chip to (de)select a room type;
-// each selected type gets its own row below with a typeable count + stepper.
-class _RoomsSelector extends StatefulWidget {
-  const _RoomsSelector({required this.rooms, this.onChanged});
 
-  /// The bundle's room list — mutated in place as the user selects/edits.
-  final List<AiRoom> rooms;
+class _IntakeStrings {
+  const _IntakeStrings._();
 
-  /// Fired after any add/remove so the parent can re-evaluate the submit gate.
-  final VoidCallback? onChanged;
+  static String title(Locale l) => switch (l.languageCode) {
+        'ru' => 'Документы и фото',
+        'en' => 'Documents and photos',
+        _ => 'Hujjat va rasmlar',
+      };
 
-  @override
-  State<_RoomsSelector> createState() => _RoomsSelectorState();
-}
+  static String subtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Необходимые данные для оценки',
+        'en' => 'Information required for valuation',
+        _ => 'Baholash uchun zarur maʼlumotlar',
+      };
 
-class _RoomsSelectorState extends State<_RoomsSelector> {
-  // Standard room kinds shown as toggle chips (everything except `other`).
-  static final List<RoomKind> _standardKinds =
-      RoomKind.values.where((k) => k != RoomKind.other).toList();
+  static String photosTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Фото объекта',
+        'en' => 'Property photos',
+        _ => 'Obyekt rasmlari',
+      };
 
-  // One count-controller per room *instance* (so multiple custom rooms with
-  // different names each get their own field).
-  final Map<AiRoom, TextEditingController> _counts = {};
-  final TextEditingController _customName = TextEditingController();
-  bool _customOpen = false;
+  static String photosHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Внутри и снаружи (1–15). Для оценки состояния.',
+        'en' => 'Interior and exterior (1–15). For condition assessment.',
+        _ => 'Ichki va tashqi (1-15). Holatni baholash uchun.',
+      };
 
-  @override
-  void initState() {
-    super.initState();
-    for (final r in widget.rooms) {
-      _counts[r] = TextEditingController(text: '${r.count}');
-    }
-    _customOpen = widget.rooms.any((r) => r.kind == RoomKind.other);
-  }
+  static String kadastrTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Кадастровые документы',
+        'en' => 'Cadastral documents',
+        _ => 'Kadastr hujjatlari',
+      };
 
-  @override
-  void dispose() {
-    for (final c in _counts.values) {
-      c.dispose();
-    }
-    _customName.dispose();
-    super.dispose();
-  }
+  static String kadastrHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Техпаспорт, план (1–20). Определяется площадь/год.',
+        'en' => 'Tech passport, plan (1–20). Area/year are derived.',
+        _ => 'Texpasport, plan (1-20). Maydon/yil aniqlanadi.',
+      };
 
-  AiRoom? _standardRoom(RoomKind k) {
-    for (final r in widget.rooms) {
-      if (r.kind == k && k != RoomKind.other) return r;
-    }
-    return null;
-  }
+  static String passportTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Паспорт / ID (необязательно)',
+        'en' => 'Passport / ID (optional)',
+        _ => 'Pasport / ID (ixtiyoriy)',
+      };
 
-  void _toggleStandard(RoomKind k) {
-    HapticFeedback.selectionClick();
-    final existing = _standardRoom(k);
-    setState(() {
-      if (existing != null) {
-        widget.rooms.remove(existing);
-        _counts.remove(existing)?.dispose();
-      } else {
-        final room = AiRoom(kind: k, count: 1);
-        widget.rooms.add(room);
-        _counts[room] = TextEditingController(text: '1');
-      }
-    });
-    widget.onChanged?.call();
-  }
+  static String passportHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Данные владельца для отчёта.',
+        'en' => "Owner's details for the report.",
+        _ => 'Hisobot uchun egasining maʼlumoti.',
+      };
 
-  void _addCustom() {
-    final name = _customName.text.trim();
-    if (name.isEmpty) return;
-    HapticFeedback.selectionClick();
-    setState(() {
-      final room = AiRoom(kind: RoomKind.other, name: name, count: 1);
-      widget.rooms.add(room);
-      _counts[room] = TextEditingController(text: '1');
-      _customName.clear();
-    });
-    widget.onChanged?.call();
-  }
+  static String floorSectionTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этаж',
+        'en' => 'Floor',
+        _ => 'Qavat',
+      };
 
-  void _remove(AiRoom room) {
-    setState(() {
-      widget.rooms.remove(room);
-      _counts.remove(room)?.dispose();
-    });
-    widget.onChanged?.call();
-  }
+  static String floorSectionSubtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этаж объекта и всего этажей в здании',
+        'en' => 'Object floor and total floors in the building',
+        _ => 'Obyekt qavati va binodagi jami qavatlar',
+      };
 
-  void _setCount(AiRoom room, int value) {
-    final v = value.clamp(1, 50);
-    room.count = v;
-    final ctrl = _counts[room];
-    if (ctrl != null && ctrl.text != '$v') {
-      ctrl.text = '$v';
-      ctrl.selection = TextSelection.collapsed(offset: ctrl.text.length);
-    }
-    setState(() {});
-  }
+  static String objectFloor(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этаж объекта',
+        'en' => 'Object floor',
+        _ => 'Obyekt qavati',
+      };
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+  static String totalFloors(Locale l) => switch (l.languageCode) {
+        'ru' => 'Всего этажей',
+        'en' => 'Total floors',
+        _ => 'Jami qavatlar',
+      };
 
-    final selectedKinds = widget.rooms.map((r) => r.kind).toSet();
-    final hasCustom = widget.rooms.any((r) => r.kind == RoomKind.other);
+  static String roomsTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Комнаты (необязательно)',
+        'en' => 'Rooms (optional)',
+        _ => 'Xonalar (ixtiyoriy)',
+      };
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Xonalar (ixtiyoriy)',
-          style: TextStyle(
-            fontFamily: 'MTSCompact',
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            color: muted,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          'Xona turlarini tanlang, sonini kiriting',
-          style: TextStyle(fontFamily: 'MTSCompact', fontSize: 12, color: muted),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final k in _standardKinds)
-              _RoomChip(
-                label: k.labelUz,
-                selected: selectedKinds.contains(k),
-                onTap: () => _toggleStandard(k),
-              ),
-            // "Boshqa" opens a custom-name input instead of adding a fixed row.
-            _RoomChip(
-              label: RoomKind.other.labelUz,
-              selected: _customOpen || hasCustom,
-              onTap: () => setState(() => _customOpen = !_customOpen),
-            ),
-          ],
-        ),
-        if (_customOpen) ...[
-          const SizedBox(height: 12),
-          _CustomNameInput(
-            controller: _customName,
-            onAdd: _addCustom,
-          ),
-        ],
-        if (widget.rooms.isNotEmpty) ...[
-          const SizedBox(height: 14),
-          for (final room in widget.rooms)
-            _RoomCountRow(
-              label: room.kind == RoomKind.other
-                  ? (room.name?.trim().isNotEmpty ?? false
-                      ? room.name!.trim()
-                      : 'Boshqa')
-                  : room.kind.labelUz,
-              controller: _counts[room]!,
-              count: room.count,
-              // Minus at 1 removes the room (toggles it off); otherwise -1.
-              onMinus: () => room.count <= 1
-                  ? _remove(room)
-                  : _setCount(room, room.count - 1),
-              onPlus: () => _setCount(room, room.count + 1),
-              onTyped: (txt) {
-                final n = int.tryParse(txt);
-                if (n != null) _setCount(room, n);
-              },
-            ),
-        ],
-      ],
-    );
-  }
-}
+  static String roomsSubtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Выберите типы комнат, укажите количество',
+        'en' => 'Select room types, enter the count',
+        _ => 'Xona turlarini tanlang, sonini kiriting',
+      };
 
-// Inline "add custom room" field — text + a green add button.
-class _CustomNameInput extends StatelessWidget {
-  const _CustomNameInput({required this.controller, required this.onAdd});
-  final TextEditingController controller;
-  final VoidCallback onAdd;
+  static String submitting(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отправка…',
+        'en' => 'Submitting…',
+        _ => 'Yuborilmoqda…',
+      };
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fieldBg = isDark ? const Color(0xFF1F2426) : const Color(0xFFF7F8F9);
-    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
-    final textColor = isDark ? Colors.white : AppColors.textBlack;
+  static String calculate(Locale l) => switch (l.languageCode) {
+        'ru' => 'Рассчитать',
+        'en' => 'Calculate',
+        _ => 'Hisoblash',
+      };
 
-    return Container(
-      decoration: BoxDecoration(
-        color: fieldBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: border),
-      ),
-      padding: const EdgeInsets.only(left: 14, right: 6),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => onAdd(),
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontSize: 15,
-                color: textColor,
-              ),
-              decoration: const InputDecoration(
-                hintText: 'Xona nomi (masalan: Ish xonasi)',
-                isDense: true,
-                border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
-          IconButton(
-            onPressed: onAdd,
-            icon: const Icon(Icons.add_circle, size: 30),
-            color: AppColors.splashGreen,
-            visualDensity: VisualDensity.compact,
-          ),
-        ],
-      ),
-    );
-  }
-}
+  static String file(Locale l) => switch (l.languageCode) {
+        'ru' => 'файл',
+        'en' => 'file',
+        _ => 'fayl',
+      };
 
-class _RoomChip extends StatelessWidget {
-  const _RoomChip({
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  static String maxPhotos(Locale l) => switch (l.languageCode) {
+        'ru' => 'Не более 15 фото',
+        'en' => 'Up to 15 photos',
+        _ => "Koʻpi bilan 15 ta rasm",
+      };
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final idleBg = isDark ? const Color(0xFF1F2426) : const Color(0xFFF1F2F4);
-    final idleText = isDark ? Colors.white : AppColors.textBlack;
-    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+  static String maxFiles(Locale l, int n) => switch (l.languageCode) {
+        'ru' => 'Не более $n файлов',
+        'en' => 'Up to $n files',
+        _ => "Koʻpi bilan $n ta fayl",
+      };
 
-    return Material(
-      color: selected
-          ? AppColors.splashGreen.withValues(alpha: 0.16)
-          : idleBg,
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: selected ? AppColors.splashGreen : border,
-              width: selected ? 1.4 : 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (selected) ...[
-                const Icon(Icons.check, size: 15, color: AppColors.splashGreen),
-                const SizedBox(width: 5),
-              ],
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                  color: selected ? AppColors.splashGreen : idleText,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+  static String authRequired(Locale l) => switch (l.languageCode) {
+        'ru' => 'Требуется авторизация',
+        'en' => 'Authorization required',
+        _ => 'Avtorizatsiya kerak',
+      };
 
-class _RoomCountRow extends StatelessWidget {
-  const _RoomCountRow({
-    required this.label,
-    required this.controller,
-    required this.count,
-    required this.onMinus,
-    required this.onPlus,
-    required this.onTyped,
-  });
+  static String uploadError(Locale l, String err) => switch (l.languageCode) {
+        'ru' => 'Ошибка загрузки: $err',
+        'en' => 'Upload error: $err',
+        _ => 'Yuklashda xatolik: $err',
+      };
 
-  final String label;
-  final TextEditingController controller;
-  final int count;
-  // onMinus removes the room when count == 1 (toggle off), else decrements.
-  final VoidCallback onMinus;
-  final VoidCallback onPlus;
-  final ValueChanged<String> onTyped;
+  static String missingPhoto(Locale l) => switch (l.languageCode) {
+        'ru' => 'фото',
+        'en' => 'photo',
+        _ => 'rasm',
+      };
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
-    final textColor = isDark ? Colors.white : AppColors.textBlack;
+  static String missingKadastr(Locale l) => switch (l.languageCode) {
+        'ru' => 'кадастровый документ',
+        'en' => 'cadastral document',
+        _ => 'kadastr hujjati',
+      };
 
-    // At count 1 the minus turns into a "remove" affordance (red-ish) so it
-    // reads as "tap again to deselect", per the toggle behaviour.
-    final atOne = count <= 1;
-    final minusColor = atOne ? const Color(0xFFE5484D) : AppColors.splashGreen;
-    final minusIcon = atOne ? Icons.close_rounded : Icons.remove_rounded;
+  static String missingRooms(Locale l) => switch (l.languageCode) {
+        'ru' => 'комнаты',
+        'en' => 'rooms',
+        _ => 'xonalar',
+      };
 
-    Widget stepBtn(IconData icon, VoidCallback onTap, Color color) => InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onTap();
-          },
-          borderRadius: BorderRadius.circular(10),
-          child: Padding(
-            padding: const EdgeInsets.all(7),
-            child: Icon(icon, size: 20, color: color),
-          ),
-        );
+  static String missingFloor(Locale l) => switch (l.languageCode) {
+        'ru' => 'этаж',
+        'en' => 'floor',
+        _ => 'qavat',
+      };
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w600,
-                fontSize: 15,
-                color: textColor,
-              ),
-            ),
-          ),
-          stepBtn(minusIcon, onMinus, minusColor),
-          SizedBox(
-            width: 34,
-            child: TextField(
-              controller: controller,
-              textAlign: TextAlign.center,
-              keyboardType: TextInputType.number,
-              inputFormatters: [
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(2),
-              ],
-              onChanged: onTyped,
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: textColor,
-              ),
-              decoration: const InputDecoration(
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 8),
-                border: InputBorder.none,
-              ),
-            ),
-          ),
-          stepBtn(Icons.add_rounded, onPlus, AppColors.splashGreen),
-        ],
-      ),
-    );
-  }
+  static String floorTooHigh(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этаж не может превышать общее число этажей в здании',
+        'en' => 'The floor cannot exceed the total floors in the building',
+        _ => "Qavat binodagi jami qavatlardan katta boʻlmasligi kerak",
+      };
+
+  static String missingRequired(Locale l, String fields) =>
+      switch (l.languageCode) {
+        'ru' => '$fields обязательны',
+        'en' => '$fields are required',
+        _ => '$fields majburiy',
+      };
 }

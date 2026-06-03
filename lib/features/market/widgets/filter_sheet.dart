@@ -75,6 +75,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF0E1A12) : Colors.white;
     final fg = isDark ? Colors.white : AppColors.textBlack;
@@ -109,7 +110,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                   children: [
                     Expanded(
                       child: Text(
-                        'Filtrlar',
+                        _FilterStrings.title(l),
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w700,
@@ -122,7 +123,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     TextButton(
                       onPressed: _reset,
                       child: Text(
-                        'Tozalash',
+                        _FilterStrings.reset(l),
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w500,
@@ -139,7 +140,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
-                    _SectionLabel(text: 'Narx (UZS)', color: fg),
+                    _SectionLabel(text: _FilterStrings.price(l), color: fg),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
@@ -163,7 +164,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _SectionLabel(text: 'Maydon (m²)', color: fg),
+                    _SectionLabel(text: _FilterStrings.area(l), color: fg),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
@@ -187,7 +188,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    _SectionLabel(text: 'Tumanlar', color: fg),
+                    _SectionLabel(text: _FilterStrings.districts(l), color: fg),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 8,
@@ -195,7 +196,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       children: [
                         for (final d in kMarketDistricts)
                           _DistrictChip(
-                            label: d,
+                            label: _FilterStrings.district(l, d),
                             selected: _districts.contains(d),
                             onTap: () {
                               HapticFeedback.selectionClick();
@@ -225,12 +226,12 @@ class _FilterSheetState extends State<_FilterSheet> {
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
                       onTap: _apply,
-                      child: const SizedBox(
+                      child: SizedBox(
                         height: 52,
                         child: Center(
                           child: Text(
-                            'Qo\'llash',
-                            style: TextStyle(
+                            _FilterStrings.apply(l),
+                            style: const TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
                               fontSize: 16,
@@ -270,6 +271,64 @@ class _FilterSheetState extends State<_FilterSheet> {
     }
     return buf.toString();
   }
+}
+
+class _FilterStrings {
+  const _FilterStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'Фильтры',
+    'en' => 'Filters',
+    _ => 'Filtrlar',
+  };
+  static String reset(Locale l) => switch (l.languageCode) {
+    'ru' => 'Очистить',
+    'en' => 'Clear',
+    _ => 'Tozalash',
+  };
+  static String price(Locale l) => switch (l.languageCode) {
+    'ru' => 'Цена (UZS)',
+    'en' => 'Price (UZS)',
+    _ => 'Narx (UZS)',
+  };
+  static String area(Locale l) => switch (l.languageCode) {
+    'ru' => 'Площадь (м²)',
+    'en' => 'Area (m²)',
+    _ => 'Maydon (m²)',
+  };
+  static String districts(Locale l) => switch (l.languageCode) {
+    'ru' => 'Районы',
+    'en' => 'Districts',
+    _ => 'Tumanlar',
+  };
+  static String apply(Locale l) => switch (l.languageCode) {
+    'ru' => 'Применить',
+    'en' => 'Apply',
+    _ => 'Qo‘llash',
+  };
+
+  /// Localized display label for a canonical district value. The value stored
+  /// in the filter set stays the original (used as the query/match key).
+  static String district(Locale l, String canonical) =>
+      switch (l.languageCode) {
+        'ru' => switch (canonical) {
+          'Yashnabod tumani' => 'Яшнабадский район',
+          'Mirzo Ulug\'bek tumani' => 'Мирзо-Улугбекский район',
+          'Yunusobod tumani' => 'Юнусабадский район',
+          'Chilonzor tumani' => 'Чиланзарский район',
+          'Sergeli tumani' => 'Сергелийский район',
+          _ => canonical,
+        },
+        'en' => switch (canonical) {
+          'Yashnabod tumani' => 'Yashnabad district',
+          'Mirzo Ulug\'bek tumani' => 'Mirzo Ulugbek district',
+          'Yunusobod tumani' => 'Yunusabad district',
+          'Chilonzor tumani' => 'Chilanzar district',
+          'Sergeli tumani' => 'Sergeli district',
+          _ => canonical,
+        },
+        _ => canonical,
+      };
 }
 
 class _SectionLabel extends StatelessWidget {

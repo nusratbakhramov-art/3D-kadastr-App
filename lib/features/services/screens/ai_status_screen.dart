@@ -68,7 +68,9 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _submitError = 'Avval tizimga kiring';
+        _submitError = _StatusStrings.signInFirst(
+          Localizations.localeOf(context),
+        );
       });
       return;
     }
@@ -130,6 +132,7 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -146,7 +149,7 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
               return Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: maxContent),
-                  child: _body(context, isDark),
+                  child: _body(context, isDark, l),
                 ),
               );
             },
@@ -156,56 +159,58 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
     );
   }
 
-  Widget _body(BuildContext context, bool isDark) {
+  Widget _body(BuildContext context, bool isDark, Locale l) {
+    final appTitle = _StatusStrings.appTitle(l);
     if (_submitting) {
       return _scaffoldFrame(
         isDark: isDark,
-        title: 'AI Baholash',
-        subtitle: 'So\'rov yuborilmoqda...',
+        title: appTitle,
+        subtitle: _StatusStrings.submittingRequest(l),
         progressIndex: 3,
-        child: const _SpinnerBlock(label: 'Yuborilmoqda...'),
+        child: _SpinnerBlock(label: _StatusStrings.submitting(l)),
       );
     }
     if (_submitError != null) {
       return _scaffoldFrame(
         isDark: isDark,
-        title: 'AI Baholash',
-        subtitle: 'Yuborilmadi',
+        title: appTitle,
+        subtitle: _StatusStrings.notSubmitted(l),
         progressIndex: 3,
-        child: _ErrorBlock(message: _submitError!, onRetry: _submit),
+        child: _ErrorBlock(message: _submitError!, onRetry: _submit, locale: l),
       );
     }
     final snap = _snapshot;
     if (snap == null) {
       return _scaffoldFrame(
         isDark: isDark,
-        title: 'AI Baholash',
-        subtitle: 'Holat olinmoqda...',
+        title: appTitle,
+        subtitle: _StatusStrings.fetchingStatus(l),
         progressIndex: 3,
-        child: const _SpinnerBlock(label: 'Holat olinmoqda...'),
+        child: _SpinnerBlock(label: _StatusStrings.fetchingStatus(l)),
       );
     }
     if (snap.status == AiJobStatus.failed) {
       return _scaffoldFrame(
         isDark: isDark,
-        title: 'AI Baholash',
-        subtitle: 'Xatolik',
+        title: appTitle,
+        subtitle: _StatusStrings.error(l),
         progressIndex: 3,
         child: _ErrorBlock(
-          message: snap.errorMessage ?? 'Noma\'lum xatolik',
+          message: snap.errorMessage ?? _StatusStrings.unknownError(l),
           onRetry: _submit,
+          locale: l,
         ),
       );
     }
     if (snap.status == AiJobStatus.completed) {
-      return _ResultView(snapshot: snap, isDark: isDark);
+      return _ResultView(snapshot: snap, isDark: isDark, locale: l);
     }
     return _scaffoldFrame(
       isDark: isDark,
-      title: 'AI Baholash',
-      subtitle: 'Hisoblanmoqda...',
+      title: appTitle,
+      subtitle: _StatusStrings.calculating(l),
       progressIndex: 3,
-      child: _ProgressView(snapshot: snap, isDark: isDark),
+      child: _ProgressView(snapshot: snap, isDark: isDark, locale: l),
     );
   }
 
@@ -236,24 +241,30 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
 // ── In-flight progress ────────────────────────────────────────────────
 
 class _ProgressView extends StatelessWidget {
-  const _ProgressView({required this.snapshot, required this.isDark});
+  const _ProgressView({
+    required this.snapshot,
+    required this.isDark,
+    required this.locale,
+  });
 
   final AiJobSnapshot snapshot;
   final bool isDark;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
+    final l = locale;
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
       children: [
         _StepRow(
-          label: 'So\'rov qabul qilindi',
+          label: _StatusStrings.stepReceived(l),
           done: true,
           active: false,
           isDark: isDark,
         ),
         _StepRow(
-          label: 'Ma\'lumotlar yig\'ilmoqda',
+          label: _StatusStrings.stepGathering(l),
           done: snapshot.status == AiJobStatus.aiPricing ||
               snapshot.status == AiJobStatus.completed,
           active: snapshot.status == AiJobStatus.gatheringInfo,
@@ -261,12 +272,15 @@ class _ProgressView extends StatelessWidget {
           details: snapshot.status == AiJobStatus.gatheringInfo ||
                   snapshot.nearbyListingsCount > 0 ||
                   snapshot.nearbyPoisCount > 0
-              ? '${snapshot.nearbyListingsCount} ta e\'lon · '
-                  '${snapshot.nearbyPoisCount} ta yaqin obyekt'
+              ? _StatusStrings.gatheringDetails(
+                  l,
+                  snapshot.nearbyListingsCount,
+                  snapshot.nearbyPoisCount,
+                )
               : null,
         ),
         _StepRow(
-          label: 'AI narx hisoblanmoqda',
+          label: _StatusStrings.stepPricing(l),
           done: snapshot.status == AiJobStatus.completed,
           active: snapshot.status == AiJobStatus.aiPricing,
           isDark: isDark,
@@ -274,8 +288,7 @@ class _ProgressView extends StatelessWidget {
         const SizedBox(height: 36),
         Center(
           child: Text(
-            'Bu jarayon 30 sekund - 2 daqiqa olishi mumkin.\n'
-            'Tugagandan keyin xabar yuboramiz.',
+            _StatusStrings.progressNote(l),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSText',
@@ -391,9 +404,14 @@ class _SpinnerBlock extends StatelessWidget {
 }
 
 class _ErrorBlock extends StatelessWidget {
-  const _ErrorBlock({required this.message, required this.onRetry});
+  const _ErrorBlock({
+    required this.message,
+    required this.onRetry,
+    required this.locale,
+  });
   final String message;
   final VoidCallback onRetry;
+  final Locale locale;
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -417,7 +435,7 @@ class _ErrorBlock extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: ListingCtaButton(
-              label: 'Qayta urinish',
+              label: _StatusStrings.retry(locale),
               enabled: true,
               onTap: onRetry,
             ),
@@ -431,13 +449,19 @@ class _ErrorBlock extends StatelessWidget {
 // ── Completed result ──────────────────────────────────────────────────
 
 class _ResultView extends StatelessWidget {
-  const _ResultView({required this.snapshot, required this.isDark});
+  const _ResultView({
+    required this.snapshot,
+    required this.isDark,
+    required this.locale,
+  });
 
   final AiJobSnapshot snapshot;
   final bool isDark;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
+    final l = locale;
     final result = snapshot.resultPayload ?? const {};
     final estimated = _asDouble(result['estimated_value']);
     final low = _asDouble(result['range_low']);
@@ -467,7 +491,7 @@ class _ResultView extends StatelessWidget {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  'AI Baholash natijasi',
+                  _StatusStrings.resultTitle(l),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -486,6 +510,7 @@ class _ResultView extends StatelessWidget {
           high: high,
           confidence: confidence,
           isDark: isDark,
+          locale: l,
         ),
               // AI narrative summary (plain Uzbek), if the LLM produced one.
               if ((result['summary'] as String?)?.trim().isNotEmpty ?? false) ...[
@@ -495,17 +520,20 @@ class _ResultView extends StatelessWidget {
               // 3-approach breakdown (cost / income / comparison + weights).
               if (result['approaches'] is Map) ...[
                 const SizedBox(height: 18),
-                _SectionTitle('Baholash yondashuvlari', isDark: isDark),
+                _SectionTitle(_StatusStrings.approachesTitle(l),
+                    isDark: isDark),
                 const SizedBox(height: 8),
                 _ApproachesCard(
                   approaches: (result['approaches'] as Map).cast<String, dynamic>(),
                   isDark: isDark,
+                  locale: l,
                 ),
               ],
               // Comparables actually used (the market approach evidence).
               if ((result['comparables_preview'] as List?)?.isNotEmpty ?? false) ...[
                 const SizedBox(height: 18),
-                _SectionTitle('Solishtirilgan e\'lonlar', isDark: isDark),
+                _SectionTitle(_StatusStrings.comparablesTitle(l),
+                    isDark: isDark),
                 const SizedBox(height: 8),
                 _ComparablesCard(
                   comparables: (result['comparables_preview'] as List)
@@ -513,14 +541,15 @@ class _ResultView extends StatelessWidget {
                       .map((e) => e.cast<String, dynamic>())
                       .toList(),
                   isDark: isDark,
+                  locale: l,
                 ),
               ],
               if (pois.isNotEmpty) ...[
                 const SizedBox(height: 18),
-                _SectionTitle('Yaqin atrofdagi obyektlar', isDark: isDark),
+                _SectionTitle(_StatusStrings.poisTitle(l), isDark: isDark),
                 const SizedBox(height: 3),
                 Text(
-                  '1–2 km radiusda topilgan infratuzilma',
+                  _StatusStrings.poisSubtitle(l),
                   style: TextStyle(
                     fontFamily: 'MTSText',
                     fontSize: 12,
@@ -530,7 +559,7 @@ class _ResultView extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-                _PoiSummary(pois: pois, isDark: isDark),
+                _PoiSummary(pois: pois, isDark: isDark, locale: l),
               ],
             ],
           ),
@@ -539,7 +568,7 @@ class _ResultView extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: ListingCtaButton(
-            label: 'Asosiy sahifa',
+            label: _StatusStrings.home(l),
             enabled: true,
             onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
           ),
@@ -562,6 +591,7 @@ class _PriceCard extends StatelessWidget {
     required this.high,
     required this.confidence,
     required this.isDark,
+    required this.locale,
   });
 
   final double? estimated;
@@ -569,9 +599,11 @@ class _PriceCard extends StatelessWidget {
   final double? high;
   final double confidence;
   final bool isDark;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
+    final l = locale;
     final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
     final text = isDark ? Colors.white : AppColors.textBlack;
     final sub = isDark
@@ -588,7 +620,7 @@ class _PriceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Taxminiy qiymat',
+            _StatusStrings.estimatedValue(l),
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 13,
@@ -597,7 +629,7 @@ class _PriceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            estimated == null ? '—' : _formatUzs(estimated!),
+            estimated == null ? '—' : _formatUzs(estimated!, l),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w900,
@@ -607,7 +639,7 @@ class _PriceCard extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            'so\'m',
+            _StatusStrings.soum(l),
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 13,
@@ -624,7 +656,7 @@ class _PriceCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    '${_formatUzs(low!)} — ${_formatUzs(high!)}',
+                    '${_formatUzs(low!, l)} — ${_formatUzs(high!, l)}',
                     style: TextStyle(
                       fontFamily: 'MTSText',
                       fontSize: 13,
@@ -636,38 +668,52 @@ class _PriceCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 12),
-          _ConfidenceBar(value: confidence, isDark: isDark),
+          _ConfidenceBar(value: confidence, isDark: isDark, locale: l),
         ],
       ),
     );
   }
 
-  static String _formatUzs(double v) {
-    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)} mlrd';
-    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(1)} mln';
-    if (v >= 1e3) return '${(v / 1e3).toStringAsFixed(0)} ming';
+  static String _formatUzs(double v, Locale l) {
+    if (v >= 1e9) {
+      return '${(v / 1e9).toStringAsFixed(2)} ${_StatusStrings.billion(l)}';
+    }
+    if (v >= 1e6) {
+      return '${(v / 1e6).toStringAsFixed(1)} ${_StatusStrings.million(l)}';
+    }
+    if (v >= 1e3) {
+      return '${(v / 1e3).toStringAsFixed(0)} ${_StatusStrings.thousand(l)}';
+    }
     return v.toStringAsFixed(0);
   }
 }
 
 class _ConfidenceBar extends StatelessWidget {
-  const _ConfidenceBar({required this.value, required this.isDark});
+  const _ConfidenceBar({
+    required this.value,
+    required this.isDark,
+    required this.locale,
+  });
   final double value;
   final bool isDark;
+  final Locale locale;
   @override
   Widget build(BuildContext context) {
     final track =
         isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final pct = (value.clamp(0.0, 1.0) * 100).round();
-    final label =
-        pct >= 70 ? 'Yuqori' : (pct >= 45 ? 'O\'rtacha' : 'Past');
+    final label = pct >= 70
+        ? _StatusStrings.confidenceHigh(locale)
+        : (pct >= 45
+            ? _StatusStrings.confidenceMedium(locale)
+            : _StatusStrings.confidenceLow(locale));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Text(
-              'Ishonchlilik: ',
+              _StatusStrings.confidenceLabel(locale),
               style: TextStyle(
                 fontFamily: 'MTSText',
                 fontSize: 12,
@@ -760,23 +806,33 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _ApproachesCard extends StatelessWidget {
-  const _ApproachesCard({required this.approaches, required this.isDark});
+  const _ApproachesCard({
+    required this.approaches,
+    required this.isDark,
+    required this.locale,
+  });
   final Map<String, dynamic> approaches;
   final bool isDark;
+  final Locale locale;
 
-  static const _labels = {
-    'cost': 'Xarajat (qayta tiklash)',
-    'income': 'Daromad (ijara)',
-    'comparison': 'Qiyoslash (bozor)',
-  };
+  String _labelFor(String key) => switch (key) {
+        'cost' => _StatusStrings.approachCost(locale),
+        'income' => _StatusStrings.approachIncome(locale),
+        'comparison' => _StatusStrings.approachComparison(locale),
+        _ => key,
+      };
 
   double? _d(dynamic v) =>
       v is num ? v.toDouble() : (v is String ? double.tryParse(v) : null);
 
   String _fmt(double? v) {
     if (v == null) return '—';
-    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)} mlrd';
-    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(1)} mln';
+    if (v >= 1e9) {
+      return '${(v / 1e9).toStringAsFixed(2)} ${_StatusStrings.billion(locale)}';
+    }
+    if (v >= 1e6) {
+      return '${(v / 1e6).toStringAsFixed(1)} ${_StatusStrings.million(locale)}';
+    }
     return v.toStringAsFixed(0);
   }
 
@@ -809,7 +865,7 @@ class _ApproachesCard extends StatelessWidget {
           children: [
             Expanded(
               flex: 5,
-              child: Text(_labels[key] ?? key,
+              child: Text(_labelFor(key),
                   style: TextStyle(
                       fontFamily: 'MTSCompact', fontSize: 13, color: text)),
             ),
@@ -855,11 +911,11 @@ class _ApproachesCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('Yondashuv',
+                child: Text(_StatusStrings.approachHeader(locale),
                     style: TextStyle(
                         fontFamily: 'MTSCompact', fontSize: 11, color: sub)),
               ),
-              Text('Qiymat · Og\'irlik',
+              Text(_StatusStrings.valueWeightHeader(locale),
                   style: TextStyle(
                       fontFamily: 'MTSCompact', fontSize: 11, color: sub)),
             ],
@@ -875,18 +931,29 @@ class _ApproachesCard extends StatelessWidget {
 }
 
 class _ComparablesCard extends StatelessWidget {
-  const _ComparablesCard({required this.comparables, required this.isDark});
+  const _ComparablesCard({
+    required this.comparables,
+    required this.isDark,
+    required this.locale,
+  });
   final List<Map<String, dynamic>> comparables;
   final bool isDark;
+  final Locale locale;
 
   double? _d(dynamic v) =>
       v is num ? v.toDouble() : (v is String ? double.tryParse(v) : null);
 
   String _money(double? v) {
     if (v == null || v <= 0) return '—';
-    if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)} mlrd';
-    if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(0)} mln';
-    if (v >= 1e3) return '${(v / 1e3).toStringAsFixed(0)} ming';
+    if (v >= 1e9) {
+      return '${(v / 1e9).toStringAsFixed(2)} ${_StatusStrings.billion(locale)}';
+    }
+    if (v >= 1e6) {
+      return '${(v / 1e6).toStringAsFixed(0)} ${_StatusStrings.million(locale)}';
+    }
+    if (v >= 1e3) {
+      return '${(v / 1e3).toStringAsFixed(0)} ${_StatusStrings.thousand(locale)}';
+    }
     return v.toStringAsFixed(0);
   }
 
@@ -922,7 +989,7 @@ class _ComparablesCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               child: Text(
-                'Yana $extra ta e\'lon',
+                _StatusStrings.moreListings(locale, extra),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w600,
@@ -1012,9 +1079,14 @@ class _ComparablesCard extends StatelessWidget {
 }
 
 class _PoiSummary extends StatefulWidget {
-  const _PoiSummary({required this.pois, required this.isDark});
+  const _PoiSummary({
+    required this.pois,
+    required this.isDark,
+    required this.locale,
+  });
   final Map<String, dynamic> pois;
   final bool isDark;
+  final Locale locale;
   @override
   State<_PoiSummary> createState() => _PoiSummaryState();
 }
@@ -1150,7 +1222,7 @@ class _PoiSummaryState extends State<_PoiSummary> {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                'Yana $extra ta',
+                _StatusStrings.moreCount(widget.locale, extra),
                 style: TextStyle(
                   fontFamily: 'MTSText',
                   fontSize: 11.5,
@@ -1170,7 +1242,9 @@ class _PoiSummaryState extends State<_PoiSummary> {
 
   String _nameOf(Map<String, dynamic> p) {
     final n = (p['name'] as String?)?.trim();
-    return (n != null && n.isNotEmpty) ? n : 'Nomsiz';
+    return (n != null && n.isNotEmpty)
+        ? n
+        : _StatusStrings.unnamed(widget.locale);
   }
 
   String _distLabel(Map<String, dynamic> p) {
@@ -1184,28 +1258,31 @@ class _PoiSummaryState extends State<_PoiSummary> {
   // count (e.g. 1230) is noise. Price-affecting / rarer ones show the real n.
   String _countLabel(String kind, int n) {
     const capped = {'bus_stop'};
-    if (capped.contains(kind) && n > 10) return '10+ ta';
-    return '$n ta';
+    if (capped.contains(kind) && n > 10) {
+      return _StatusStrings.countCapped(widget.locale);
+    }
+    return _StatusStrings.countLabel(widget.locale, n);
   }
 
   String _labelFor(String kind) {
+    final l = widget.locale;
     switch (kind) {
       case 'school':
-        return 'Maktablar';
+        return _StatusStrings.poiSchools(l);
       case 'kindergarten':
-        return 'Bog\'chalar';
+        return _StatusStrings.poiKindergartens(l);
       case 'metro':
-        return 'Metro bekatlari';
+        return _StatusStrings.poiMetro(l);
       case 'park':
-        return 'Bog\'lar';
+        return _StatusStrings.poiParks(l);
       case 'hospital':
-        return 'Shifoxonalar';
+        return _StatusStrings.poiHospitals(l);
       case 'clinic':
-        return 'Poliklinikalar';
+        return _StatusStrings.poiClinics(l);
       case 'supermarket':
-        return 'Supermarketlar';
+        return _StatusStrings.poiSupermarkets(l);
       case 'bus_stop':
-        return 'Avtobus bekatlari';
+        return _StatusStrings.poiBusStops(l);
       default:
         return kind;
     }
@@ -1231,4 +1308,300 @@ class _PoiSummaryState extends State<_PoiSummary> {
         return Icons.place_outlined;
     }
   }
+}
+
+class _StatusStrings {
+  const _StatusStrings._();
+
+  static String appTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'AI Оценка',
+        'en' => 'AI Valuation',
+        _ => 'AI Baholash',
+      };
+
+  static String submittingRequest(Locale l) => switch (l.languageCode) {
+        'ru' => 'Запрос отправляется...',
+        'en' => 'Submitting request...',
+        _ => "Soʻrov yuborilmoqda...",
+      };
+
+  static String submitting(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отправка...',
+        'en' => 'Submitting...',
+        _ => 'Yuborilmoqda...',
+      };
+
+  static String notSubmitted(Locale l) => switch (l.languageCode) {
+        'ru' => 'Не отправлено',
+        'en' => 'Not submitted',
+        _ => 'Yuborilmadi',
+      };
+
+  static String fetchingStatus(Locale l) => switch (l.languageCode) {
+        'ru' => 'Получение статуса...',
+        'en' => 'Fetching status...',
+        _ => 'Holat olinmoqda...',
+      };
+
+  static String error(Locale l) => switch (l.languageCode) {
+        'ru' => 'Ошибка',
+        'en' => 'Error',
+        _ => 'Xatolik',
+      };
+
+  static String unknownError(Locale l) => switch (l.languageCode) {
+        'ru' => 'Неизвестная ошибка',
+        'en' => 'Unknown error',
+        _ => "Nomaʼlum xatolik",
+      };
+
+  static String calculating(Locale l) => switch (l.languageCode) {
+        'ru' => 'Идёт расчёт...',
+        'en' => 'Calculating...',
+        _ => 'Hisoblanmoqda...',
+      };
+
+  static String signInFirst(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сначала войдите в систему',
+        'en' => 'Please sign in first',
+        _ => 'Avval tizimga kiring',
+      };
+
+  static String retry(Locale l) => switch (l.languageCode) {
+        'ru' => 'Повторить',
+        'en' => 'Try again',
+        _ => 'Qayta urinish',
+      };
+
+  static String stepReceived(Locale l) => switch (l.languageCode) {
+        'ru' => 'Запрос принят',
+        'en' => 'Request received',
+        _ => "Soʻrov qabul qilindi",
+      };
+
+  static String stepGathering(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сбор данных',
+        'en' => 'Gathering data',
+        _ => "Maʼlumotlar yigʻilmoqda",
+      };
+
+  static String stepPricing(Locale l) => switch (l.languageCode) {
+        'ru' => 'AI рассчитывает цену',
+        'en' => 'AI is pricing',
+        _ => 'AI narx hisoblanmoqda',
+      };
+
+  static String gatheringDetails(Locale l, int listings, int pois) =>
+      switch (l.languageCode) {
+        'ru' => '$listings объявл. · $pois ближайших объектов',
+        'en' => '$listings listings · $pois nearby places',
+        _ => "$listings ta eʼlon · $pois ta yaqin obyekt",
+      };
+
+  static String progressNote(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этот процесс может занять от 30 секунд до 2 минут.\n'
+            'Мы уведомим вас по завершении.',
+        'en' => 'This may take 30 seconds to 2 minutes.\n'
+            'We will notify you when it is done.',
+        _ => 'Bu jarayon 30 sekund - 2 daqiqa olishi mumkin.\n'
+            'Tugagandan keyin xabar yuboramiz.',
+      };
+
+  static String resultTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Результат AI Оценки',
+        'en' => 'AI Valuation result',
+        _ => 'AI Baholash natijasi',
+      };
+
+  static String estimatedValue(Locale l) => switch (l.languageCode) {
+        'ru' => 'Примерная стоимость',
+        'en' => 'Estimated value',
+        _ => 'Taxminiy qiymat',
+      };
+
+  static String soum(Locale l) => switch (l.languageCode) {
+        'ru' => 'сум',
+        'en' => 'soʻm',
+        _ => "soʻm",
+      };
+
+  static String confidenceLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Достоверность: ',
+        'en' => 'Confidence: ',
+        _ => 'Ishonchlilik: ',
+      };
+
+  static String confidenceHigh(Locale l) => switch (l.languageCode) {
+        'ru' => 'Высокая',
+        'en' => 'High',
+        _ => 'Yuqori',
+      };
+
+  static String confidenceMedium(Locale l) => switch (l.languageCode) {
+        'ru' => 'Средняя',
+        'en' => 'Medium',
+        _ => "Oʻrtacha",
+      };
+
+  static String confidenceLow(Locale l) => switch (l.languageCode) {
+        'ru' => 'Низкая',
+        'en' => 'Low',
+        _ => 'Past',
+      };
+
+  static String approachesTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Подходы к оценке',
+        'en' => 'Valuation approaches',
+        _ => 'Baholash yondashuvlari',
+      };
+
+  static String approachHeader(Locale l) => switch (l.languageCode) {
+        'ru' => 'Подход',
+        'en' => 'Approach',
+        _ => 'Yondashuv',
+      };
+
+  static String valueWeightHeader(Locale l) => switch (l.languageCode) {
+        'ru' => 'Стоимость · Вес',
+        'en' => 'Value · Weight',
+        _ => "Qiymat · Ogʻirlik",
+      };
+
+  static String approachCost(Locale l) => switch (l.languageCode) {
+        'ru' => 'Затратный (восстановление)',
+        'en' => 'Cost (replacement)',
+        _ => 'Xarajat (qayta tiklash)',
+      };
+
+  static String approachIncome(Locale l) => switch (l.languageCode) {
+        'ru' => 'Доходный (аренда)',
+        'en' => 'Income (rental)',
+        _ => 'Daromad (ijara)',
+      };
+
+  static String approachComparison(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сравнительный (рынок)',
+        'en' => 'Comparison (market)',
+        _ => 'Qiyoslash (bozor)',
+      };
+
+  static String comparablesTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сравниваемые объявления',
+        'en' => 'Comparable listings',
+        _ => "Solishtirilgan eʼlonlar",
+      };
+
+  static String moreListings(Locale l, int n) => switch (l.languageCode) {
+        'ru' => 'Ещё $n объявл.',
+        'en' => '$n more listings',
+        _ => "Yana $n ta eʼlon",
+      };
+
+  static String poisTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Объекты поблизости',
+        'en' => 'Nearby places',
+        _ => 'Yaqin atrofdagi obyektlar',
+      };
+
+  static String poisSubtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Инфраструктура в радиусе 1–2 км',
+        'en' => 'Infrastructure found within 1–2 km',
+        _ => '1–2 km radiusda topilgan infratuzilma',
+      };
+
+  static String home(Locale l) => switch (l.languageCode) {
+        'ru' => 'Главная',
+        'en' => 'Home',
+        _ => 'Asosiy sahifa',
+      };
+
+  static String unnamed(Locale l) => switch (l.languageCode) {
+        'ru' => 'Без названия',
+        'en' => 'Unnamed',
+        _ => 'Nomsiz',
+      };
+
+  static String moreCount(Locale l, int n) => switch (l.languageCode) {
+        'ru' => 'Ещё $n',
+        'en' => '$n more',
+        _ => 'Yana $n ta',
+      };
+
+  static String countCapped(Locale l) => switch (l.languageCode) {
+        'ru' => '10+ шт.',
+        'en' => '10+',
+        _ => '10+ ta',
+      };
+
+  static String countLabel(Locale l, int n) => switch (l.languageCode) {
+        'ru' => '$n шт.',
+        'en' => '$n',
+        _ => '$n ta',
+      };
+
+  static String poiSchools(Locale l) => switch (l.languageCode) {
+        'ru' => 'Школы',
+        'en' => 'Schools',
+        _ => 'Maktablar',
+      };
+
+  static String poiKindergartens(Locale l) => switch (l.languageCode) {
+        'ru' => 'Детские сады',
+        'en' => 'Kindergartens',
+        _ => "Bogʻchalar",
+      };
+
+  static String poiMetro(Locale l) => switch (l.languageCode) {
+        'ru' => 'Станции метро',
+        'en' => 'Metro stations',
+        _ => 'Metro bekatlari',
+      };
+
+  static String poiParks(Locale l) => switch (l.languageCode) {
+        'ru' => 'Парки',
+        'en' => 'Parks',
+        _ => "Bogʻlar",
+      };
+
+  static String poiHospitals(Locale l) => switch (l.languageCode) {
+        'ru' => 'Больницы',
+        'en' => 'Hospitals',
+        _ => 'Shifoxonalar',
+      };
+
+  static String poiClinics(Locale l) => switch (l.languageCode) {
+        'ru' => 'Поликлиники',
+        'en' => 'Clinics',
+        _ => 'Poliklinikalar',
+      };
+
+  static String poiSupermarkets(Locale l) => switch (l.languageCode) {
+        'ru' => 'Супермаркеты',
+        'en' => 'Supermarkets',
+        _ => 'Supermarketlar',
+      };
+
+  static String poiBusStops(Locale l) => switch (l.languageCode) {
+        'ru' => 'Автобусные остановки',
+        'en' => 'Bus stops',
+        _ => 'Avtobus bekatlari',
+      };
+
+  static String billion(Locale l) => switch (l.languageCode) {
+        'ru' => 'млрд',
+        'en' => 'bn',
+        _ => 'mlrd',
+      };
+
+  static String million(Locale l) => switch (l.languageCode) {
+        'ru' => 'млн',
+        'en' => 'mln',
+        _ => 'mln',
+      };
+
+  static String thousand(Locale l) => switch (l.languageCode) {
+        'ru' => 'тыс',
+        'en' => 'k',
+        _ => 'ming',
+      };
 }

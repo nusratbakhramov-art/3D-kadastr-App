@@ -19,13 +19,17 @@ class MapLocationPickerScreen extends StatefulWidget {
   const MapLocationPickerScreen({
     super.key,
     this.initialPoint,
-    this.title = 'Joyni tanlang',
-    this.subtitle = 'Xaritada tap qilib belgilang',
+    this.title,
+    this.subtitle,
   });
 
   final LatLng? initialPoint;
-  final String title;
-  final String subtitle;
+
+  /// AppBar sarlavhasi; `null` bo'lsa joriy tilda 'Joyni tanlang'.
+  final String? title;
+
+  /// AppBar izohi; `null` bo'lsa joriy tilda standart matn ishlatiladi.
+  final String? subtitle;
 
   @override
   State<MapLocationPickerScreen> createState() =>
@@ -67,12 +71,13 @@ class _MapLocationPickerScreenState extends State<MapLocationPickerScreen> {
 
   Future<void> _locateMe() async {
     if (_locating) return;
+    final l = Localizations.localeOf(context);
     setState(() => _locating = true);
     try {
       // 1. Qurilmada geolokatsiya yoqilganmi?
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showError('Qurilmada geolokatsiya o\'chirilgan');
+        _showError(_MapPickerStrings.locationDisabled(l));
         return;
       }
 
@@ -81,12 +86,12 @@ class _MapLocationPickerScreenState extends State<MapLocationPickerScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          _showError('Joylashuv ruxsati berilmadi');
+          _showError(_MapPickerStrings.permissionDenied(l));
           return;
         }
       }
       if (permission == LocationPermission.deniedForever) {
-        _showError('Ruxsat butunlay rad etilgan — sozlamadan yoqing');
+        _showError(_MapPickerStrings.permissionDeniedForever(l));
         return;
       }
 
@@ -104,7 +109,7 @@ class _MapLocationPickerScreenState extends State<MapLocationPickerScreen> {
       setState(() => _selected = point);
       _controller.move(point, 16);
     } catch (e) {
-      _showError('Joylashuvni aniqlab bo\'lmadi: $e');
+      _showError(_MapPickerStrings.locateFailed(l, '$e'));
     } finally {
       if (mounted) setState(() => _locating = false);
     }
@@ -117,6 +122,7 @@ class _MapLocationPickerScreenState extends State<MapLocationPickerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -128,8 +134,8 @@ class _MapLocationPickerScreenState extends State<MapLocationPickerScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: widget.title,
-                subtitle: widget.subtitle,
+                title: widget.title ?? _MapPickerStrings.title(l),
+                subtitle: widget.subtitle ?? _MapPickerStrings.subtitle(l),
               ),
             ),
             const SizedBox(height: 8),
@@ -198,8 +204,8 @@ class _MapLocationPickerScreenState extends State<MapLocationPickerScreen> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               child: ListingCtaButton(
                 label: _selected == null
-                    ? 'Avval xaritada belgilang'
-                    : 'Tasdiqlash',
+                    ? _MapPickerStrings.markFirst(l)
+                    : _MapPickerStrings.confirm(l),
                 enabled: _selected != null,
                 onTap: _confirm,
               ),
@@ -362,4 +368,56 @@ class _CoordsBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+class _MapPickerStrings {
+  const _MapPickerStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+        'ru' => 'Выберите место',
+        'en' => 'Pick a location',
+        _ => 'Joyni tanlang',
+      };
+
+  static String subtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отметьте, нажав на карту',
+        'en' => 'Tap on the map to mark',
+        _ => 'Xaritada tap qilib belgilang',
+      };
+
+  static String markFirst(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сначала отметьте на карте',
+        'en' => 'First mark on the map',
+        _ => 'Avval xaritada belgilang',
+      };
+
+  static String confirm(Locale l) => switch (l.languageCode) {
+        'ru' => 'Подтвердить',
+        'en' => 'Confirm',
+        _ => 'Tasdiqlash',
+      };
+
+  static String locationDisabled(Locale l) => switch (l.languageCode) {
+        'ru' => 'Геолокация на устройстве отключена',
+        'en' => 'Location is disabled on the device',
+        _ => 'Qurilmada geolokatsiya o\'chirilgan',
+      };
+
+  static String permissionDenied(Locale l) => switch (l.languageCode) {
+        'ru' => 'Доступ к местоположению не предоставлен',
+        'en' => 'Location permission was denied',
+        _ => 'Joylashuv ruxsati berilmadi',
+      };
+
+  static String permissionDeniedForever(Locale l) => switch (l.languageCode) {
+        'ru' => 'Доступ полностью запрещён — включите в настройках',
+        'en' => 'Permission permanently denied — enable it in settings',
+        _ => 'Ruxsat butunlay rad etilgan — sozlamadan yoqing',
+      };
+
+  static String locateFailed(Locale l, String e) => switch (l.languageCode) {
+        'ru' => 'Не удалось определить местоположение: $e',
+        'en' => 'Could not determine location: $e',
+        _ => 'Joylashuvni aniqlab bo\'lmadi: $e',
+      };
 }

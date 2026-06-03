@@ -21,11 +21,19 @@ import 'settings_state.dart';
 const _kAppStoreId = '6744487945';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, this.onLogoutConfirmed});
+  const SettingsScreen({
+    super.key,
+    this.onLogoutConfirmed,
+    this.onAccountDeleted,
+  });
 
   /// Called after the user confirms the logout dialog. The screen itself does
   /// not clear auth — the host wires that up.
   final VoidCallback? onLogoutConfirmed;
+
+  /// Called after the account has been deleted on the backend. The host clears
+  /// the local session and returns the user to the logged-out state.
+  final VoidCallback? onAccountDeleted;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -252,6 +260,12 @@ class _SettingsScreenState extends State<SettingsScreen>
           destructive: true,
           onTap: () => _confirmLogout(context, locale),
         ),
+        AppMenuRow(
+          icon: Icons.delete_outline_rounded,
+          label: _S.deleteAccount(locale),
+          destructive: true,
+          onTap: () => _confirmDeleteAccount(context, locale),
+        ),
       ],
     );
   }
@@ -324,6 +338,23 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     if (confirmed == true && mounted) {
       widget.onLogoutConfirmed?.call();
+    }
+  }
+
+  Future<void> _confirmDeleteAccount(BuildContext context, Locale locale) async {
+    final deleted = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: ColorTokens.cardBg(context),
+      isScrollControlled: true,
+      isDismissible: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => _DeleteAccountSheet(locale: locale),
+    );
+    if (deleted == true && context.mounted) {
+      AppToast.success(context, _S.accountDeletedToast(locale));
+      widget.onAccountDeleted?.call();
     }
   }
 }
@@ -460,6 +491,166 @@ class _SheetButton extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Delete Account Bottom Sheet  (calls DELETE /profile/ then pops `true`)
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _DeleteAccountSheet extends StatefulWidget {
+  const _DeleteAccountSheet({required this.locale});
+
+  final Locale locale;
+
+  @override
+  State<_DeleteAccountSheet> createState() => _DeleteAccountSheetState();
+}
+
+class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _delete() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final client = AuthHttpClient();
+      final res = await client
+          .delete(Uri.parse('${ApiConfig.baseUrl}/profile/'))
+          .timeout(const Duration(seconds: 15));
+      if (res.statusCode == 200) {
+        if (mounted) Navigator.pop(context, true);
+        return;
+      }
+      if (mounted) {
+        setState(() {
+          _error = _S.deleteAccountError(widget.locale);
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = _S.deleteAccountError(widget.locale);
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final locale = widget.locale;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E0E0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFDE8E8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Color(0xFFE5484D),
+                  size: 26,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              _S.deleteAccountTitle(locale),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 19,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _S.deleteAccountMessage(locale),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 14,
+                height: 1.4,
+                color: ColorTokens.secondaryText(context),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Color(0xFFE5484D), fontSize: 13),
+              ),
+            ],
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetButton(
+                    label: _S.cancel(locale),
+                    onTap: _loading ? () {} : () => Navigator.pop(context, false),
+                    background: ColorTokens.iconBg(context),
+                    foreground: ColorTokens.primaryText(context),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _loading
+                      ? Container(
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5484D),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        )
+                      : _SheetButton(
+                          label: _S.deleteAccount(locale),
+                          onTap: _delete,
+                          background: const Color(0xFFE5484D),
+                          foreground: Colors.white,
+                        ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Change Phone Bottom Sheet
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -498,7 +689,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
       if (res.statusCode == 200) {
         setState(() { _otpSent = true; _loading = false; });
       } else {
-        setState(() { _error = 'Xatolik yuz berdi'; _loading = false; });
+        setState(() { _error = _S.genericError(widget.locale); _loading = false; });
       }
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
@@ -520,11 +711,11 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
       if (res.statusCode == 200) {
         if (mounted) {
           Navigator.pop(context);
-          AppToast.success(context, 'Telefon raqam yangilandi');
+          AppToast.success(context, _S.phoneUpdated(widget.locale));
         }
       } else {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
-        setState(() { _error = (body['detail'] as String?) ?? 'Xatolik yuz berdi'; _loading = false; });
+        setState(() { _error = (body['detail'] as String?) ?? _S.genericError(widget.locale); _loading = false; });
       }
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
@@ -556,7 +747,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Telefon raqamni o\'zgartirish',
+              _S.changePhoneTitle(widget.locale),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -586,7 +777,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 decoration: InputDecoration(
-                  hintText: 'OTP kodi',
+                  hintText: _S.otpHint(widget.locale),
                   counterText: '',
                   filled: true,
                   fillColor: ColorTokens.iconBg(context),
@@ -613,7 +804,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
               child: _loading
                   ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(
-                      _otpSent ? 'Tasdiqlash' : 'OTP yuborish',
+                      _otpSent ? _S.confirm(widget.locale) : _S.sendOtp(widget.locale),
                       style: const TextStyle(fontFamily: 'MTSCompact', fontWeight: FontWeight.w700, fontSize: 15),
                     ),
             ),
@@ -859,7 +1050,7 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
                   children: [
                     Icon(Icons.wifi_off_rounded, size: 32, color: ColorTokens.secondaryText(context)),
                     const SizedBox(height: 12),
-                    TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); unawaited(_load()); }, child: const Text('Qayta urinish')),
+                    TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); unawaited(_load()); }, child: Text(_S.retry(widget.locale))),
                   ],
                 ),
               ),
@@ -1137,6 +1328,74 @@ class _S {
     'ru' => 'Отмена',
     'en' => 'Cancel',
     _ => 'Bekor qilish',
+  };
+
+  static String deleteAccount(Locale l) => switch (l.languageCode) {
+    'ru' => 'Удалить аккаунт',
+    'en' => 'Delete account',
+    _ => 'Hisobni o‘chirish',
+  };
+  static String deleteAccountTitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Удалить аккаунт?',
+    'en' => 'Delete account?',
+    _ => 'Hisobni o‘chirasizmi?',
+  };
+  static String deleteAccountMessage(Locale l) => switch (l.languageCode) {
+    'ru' =>
+      'Ваш аккаунт и связанные с ним персональные данные будут удалены. '
+          'Это действие нельзя отменить.',
+    'en' =>
+      'Your account and associated personal data will be deleted. '
+          'This action cannot be undone.',
+    _ =>
+      'Hisobingiz va unga bog‘liq shaxsiy ma’lumotlar o‘chiriladi. '
+          'Bu amalni ortga qaytarib bo‘lmaydi.',
+  };
+  static String deleteAccountError(Locale l) => switch (l.languageCode) {
+    'ru' => 'Не удалось удалить аккаунт. Попробуйте ещё раз.',
+    'en' => 'Could not delete account. Please try again.',
+    _ => 'Hisobni o‘chirib bo‘lmadi. Qayta urinib ko‘ring.',
+  };
+  static String accountDeletedToast(Locale l) => switch (l.languageCode) {
+    'ru' => 'Аккаунт удалён',
+    'en' => 'Account deleted',
+    _ => 'Hisob o‘chirildi',
+  };
+
+  static String changePhoneTitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Сменить номер телефона',
+    'en' => 'Change phone number',
+    _ => 'Telefon raqamni o‘zgartirish',
+  };
+  static String sendOtp(Locale l) => switch (l.languageCode) {
+    'ru' => 'Отправить код',
+    'en' => 'Send code',
+    _ => 'OTP yuborish',
+  };
+  static String confirm(Locale l) => switch (l.languageCode) {
+    'ru' => 'Подтвердить',
+    'en' => 'Confirm',
+    _ => 'Tasdiqlash',
+  };
+  static String otpHint(Locale l) => switch (l.languageCode) {
+    'ru' => 'Код из SMS',
+    'en' => 'OTP code',
+    _ => 'OTP kodi',
+  };
+  static String phoneUpdated(Locale l) => switch (l.languageCode) {
+    'ru' => 'Номер телефона обновлён',
+    'en' => 'Phone number updated',
+    _ => 'Telefon raqam yangilandi',
+  };
+  static String genericError(Locale l) => switch (l.languageCode) {
+    'ru' => 'Произошла ошибка',
+    'en' => 'Something went wrong',
+    _ => 'Xatolik yuz berdi',
+  };
+  static String retry(Locale l) => switch (l.languageCode) {
+    'ru' => 'Повторить',
+    'en' => 'Retry',
+    _ => 'Qayta urinish',
   };
 
   static String languageName(Locale l) => switch (l.languageCode) {

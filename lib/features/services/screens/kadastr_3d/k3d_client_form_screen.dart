@@ -87,10 +87,11 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
   }
 
   bool _revalidate() {
-    _nameErr = _validateName(_nameCtrl.text);
-    _stirErr = _validateStir(_stirCtrl.text);
-    _phoneErr = _validatePhone(_phoneCtrl.text);
-    _emailErr = _validateEmail(_emailCtrl.text);
+    final l = Localizations.localeOf(context);
+    _nameErr = _validateName(_nameCtrl.text, l);
+    _stirErr = _validateStir(_stirCtrl.text, l);
+    _phoneErr = _validatePhone(_phoneCtrl.text, l);
+    _emailErr = _validateEmail(_emailCtrl.text, l);
     return _nameErr == null &&
         _stirErr == null &&
         _phoneErr == null &&
@@ -127,6 +128,7 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -141,11 +143,11 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                 constraints: BoxConstraints(maxWidth: maxContent),
                 child: Column(
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: 'Buyurtmachi',
-                        subtitle: 'Ma\'lumotlaringizni kiriting',
+                        title: _K3dClientFormStrings.appBarTitle(l),
+                        subtitle: _K3dClientFormStrings.appBarSubtitle(l),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -157,22 +159,24 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
-                          _FieldLabel('Ism / Kompaniya', isDark: isDark),
+                          _FieldLabel(_K3dClientFormStrings.nameLabel(l),
+                              isDark: isDark),
                           const SizedBox(height: 8),
                           _AppTextField(
                             controller: _nameCtrl,
                             isDark: isDark,
                             placeholder:
-                                'Toshpo\'lat Toshpo\'latov yoki "ABC" MChJ',
+                                _K3dClientFormStrings.namePlaceholder(l),
                             keyboardType: TextInputType.name,
                             textCapitalization: TextCapitalization.words,
                             errorText: _nameErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel('STIR yoki JSHSHIR', isDark: isDark),
+                          _FieldLabel(_K3dClientFormStrings.stirLabel(l),
+                              isDark: isDark),
                           const SizedBox(height: 4),
                           Text(
-                            'Yuridik shaxs: 9 raqam. Jismoniy shaxs: 14 raqam.',
+                            _K3dClientFormStrings.stirHint(l),
                             style: TextStyle(
                               fontFamily: 'MTSText',
                               fontSize: 12,
@@ -194,7 +198,8 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                             errorText: _stirErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel('Telefon', isDark: isDark),
+                          _FieldLabel(_K3dClientFormStrings.phoneLabel(l),
+                              isDark: isDark),
                           const SizedBox(height: 8),
                           _AppTextField(
                             controller: _phoneCtrl,
@@ -205,7 +210,8 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                             errorText: _phoneErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel('Email (ixtiyoriy)', isDark: isDark),
+                          _FieldLabel(_K3dClientFormStrings.emailLabel(l),
+                              isDark: isDark),
                           const SizedBox(height: 8),
                           _AppTextField(
                             controller: _emailCtrl,
@@ -221,7 +227,7 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: 'Davom etish',
+                        label: _K3dClientFormStrings.ctaContinue(l),
                         enabled: true,
                         onTap: _continue,
                       ),
@@ -240,36 +246,40 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
 
 // ── Validators ──────────────────────────────────────────────────────────
 
-String? _validateName(String raw) {
+String? _validateName(String raw, Locale l) {
   final v = raw.trim();
-  if (v.isEmpty) return 'Ism kerak';
-  if (v.length < 2) return 'Juda qisqa';
+  if (v.isEmpty) return _K3dClientFormStrings.errNameRequired(l);
+  if (v.length < 2) return _K3dClientFormStrings.errTooShort(l);
   return null;
 }
 
-String? _validateStir(String raw) {
+String? _validateStir(String raw, Locale l) {
   final v = raw.trim();
-  if (v.isEmpty) return 'STIR yoki JSHSHIR kerak';
-  if (!RegExp(r'^\d+$').hasMatch(v)) return 'Faqat raqamlar';
-  if (v.length != 9 && v.length != 14) return 'Aniq 9 yoki 14 raqam bo\'lishi kerak';
-  return null;
-}
-
-String? _validatePhone(String raw) {
-  final digits = raw.replaceAll(RegExp(r'\D'), '');
-  if (digits.isEmpty) return 'Telefon kerak';
-  final normalized = digits.length == 9 ? '998$digits' : digits;
-  if (normalized.length != 12 || !normalized.startsWith('998')) {
-    return 'UZ formati: +998 XX XXX-XX-XX';
+  if (v.isEmpty) return _K3dClientFormStrings.errStirRequired(l);
+  if (!RegExp(r'^\d+$').hasMatch(v)) {
+    return _K3dClientFormStrings.errDigitsOnly(l);
+  }
+  if (v.length != 9 && v.length != 14) {
+    return _K3dClientFormStrings.errStirLength(l);
   }
   return null;
 }
 
-String? _validateEmail(String raw) {
+String? _validatePhone(String raw, Locale l) {
+  final digits = raw.replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return _K3dClientFormStrings.errPhoneRequired(l);
+  final normalized = digits.length == 9 ? '998$digits' : digits;
+  if (normalized.length != 12 || !normalized.startsWith('998')) {
+    return _K3dClientFormStrings.errPhoneFormat(l);
+  }
+  return null;
+}
+
+String? _validateEmail(String raw, Locale l) {
   final v = raw.trim();
   if (v.isEmpty) return null;
   if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
-    return 'Email noto\'g\'ri';
+    return _K3dClientFormStrings.errEmailInvalid(l);
   }
   return null;
 }
@@ -441,4 +451,110 @@ class _PhoneMaskFormatter extends TextInputFormatter {
       composing: TextRange.empty,
     );
   }
+}
+
+class _K3dClientFormStrings {
+  const _K3dClientFormStrings._();
+
+  static String appBarTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Заказчик',
+        'en' => 'Client',
+        _ => 'Buyurtmachi',
+      };
+
+  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Введите ваши данные',
+        'en' => 'Enter your details',
+        _ => 'Ma\'lumotlaringizni kiriting',
+      };
+
+  static String nameLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Имя / Компания',
+        'en' => 'Name / Company',
+        _ => 'Ism / Kompaniya',
+      };
+
+  static String namePlaceholder(Locale l) => switch (l.languageCode) {
+        'ru' => 'Иванов Иван или ООО «ABC»',
+        'en' => 'John Smith or "ABC" LLC',
+        _ => 'Toshpo\'lat Toshpo\'latov yoki "ABC" MChJ',
+      };
+
+  static String stirLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'ИНН или ПИНФЛ',
+        'en' => 'TIN or PINFL',
+        _ => 'STIR yoki JSHSHIR',
+      };
+
+  static String stirHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Юр. лицо: 9 цифр. Физ. лицо: 14 цифр.',
+        'en' => 'Legal entity: 9 digits. Individual: 14 digits.',
+        _ => 'Yuridik shaxs: 9 raqam. Jismoniy shaxs: 14 raqam.',
+      };
+
+  static String phoneLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Телефон',
+        'en' => 'Phone',
+        _ => 'Telefon',
+      };
+
+  static String emailLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Email (необязательно)',
+        'en' => 'Email (optional)',
+        _ => 'Email (ixtiyoriy)',
+      };
+
+  static String ctaContinue(Locale l) => switch (l.languageCode) {
+        'ru' => 'Продолжить',
+        'en' => 'Continue',
+        _ => 'Davom etish',
+      };
+
+  static String errNameRequired(Locale l) => switch (l.languageCode) {
+        'ru' => 'Введите имя',
+        'en' => 'Name is required',
+        _ => 'Ism kerak',
+      };
+
+  static String errTooShort(Locale l) => switch (l.languageCode) {
+        'ru' => 'Слишком коротко',
+        'en' => 'Too short',
+        _ => 'Juda qisqa',
+      };
+
+  static String errStirRequired(Locale l) => switch (l.languageCode) {
+        'ru' => 'Введите ИНН или ПИНФЛ',
+        'en' => 'TIN or PINFL is required',
+        _ => 'STIR yoki JSHSHIR kerak',
+      };
+
+  static String errDigitsOnly(Locale l) => switch (l.languageCode) {
+        'ru' => 'Только цифры',
+        'en' => 'Digits only',
+        _ => 'Faqat raqamlar',
+      };
+
+  static String errStirLength(Locale l) => switch (l.languageCode) {
+        'ru' => 'Должно быть ровно 9 или 14 цифр',
+        'en' => 'Must be exactly 9 or 14 digits',
+        _ => 'Aniq 9 yoki 14 raqam bo\'lishi kerak',
+      };
+
+  static String errPhoneRequired(Locale l) => switch (l.languageCode) {
+        'ru' => 'Введите телефон',
+        'en' => 'Phone is required',
+        _ => 'Telefon kerak',
+      };
+
+  static String errPhoneFormat(Locale l) => switch (l.languageCode) {
+        'ru' => 'Формат UZ: +998 XX XXX-XX-XX',
+        'en' => 'UZ format: +998 XX XXX-XX-XX',
+        _ => 'UZ formati: +998 XX XXX-XX-XX',
+      };
+
+  static String errEmailInvalid(Locale l) => switch (l.languageCode) {
+        'ru' => 'Неверный email',
+        'en' => 'Invalid email',
+        _ => 'Email noto\'g\'ri',
+      };
 }

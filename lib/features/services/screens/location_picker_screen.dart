@@ -1,13 +1,9 @@
-/// Step 2 of 3D Kadastr — pick the property's location on a map.
+/// Xaritadan manzil tanlash uchun qayta ishlatiladigan ekran.
 ///
-/// Identical UX to AI Baholash's location step (`ai_location_screen.dart`):
-///   - Pin always at the map center; panning updates lat/lng.
-///   - Search input with autocomplete → tap → map flies there.
-///   - On settle, reverse-geocode and show the address; Confirm proceeds.
-///
-/// Unlike the old tap-to-drop modal picker, this is a normal forward wizard
-/// step — it pushes the next screen instead of popping a result, so the
-/// transition animates left-to-right like every other step.
+/// AI baholashdagi `ai_location_screen.dart` UX'ini takrorlaydi, lekin
+/// AiBaholashBundle'ga bog'liq emas — tanlangan `AiLocationInfo` ni
+/// `Navigator.pop` orqali qaytaradi. TZ wizardlarida manzil maydoni shu
+/// ekranni ochadi.
 library;
 
 import 'dart:async';
@@ -17,27 +13,25 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
-import '../../../../theme/app_colors.dart';
-import '../../../../widgets/app_toast.dart';
-import '../../../market/widgets/listing_cta_button.dart';
-import '../../data/geocoder_client.dart';
-import '../../models/ai_baholash_bundle.dart' show AiLocationInfo;
-import '../../models/kadastr_3d_bundle.dart';
-import '../../widgets/service_app_bar.dart';
-import '../../widgets/step_progress_bar.dart';
-import '../scan_object_type_screen.dart';
+import '../../../theme/app_colors.dart';
+import '../../../widgets/app_toast.dart';
+import '../../market/widgets/listing_cta_button.dart';
+import '../data/geocoder_client.dart';
+import '../models/ai_baholash_bundle.dart';
+import '../widgets/service_app_bar.dart';
 
-class K3dLocationScreen extends StatefulWidget {
-  const K3dLocationScreen({super.key, required this.bundle});
+class LocationPickerScreen extends StatefulWidget {
+  const LocationPickerScreen({super.key, this.initial});
 
-  final Kadastr3dBundle bundle;
+  /// Oldindan tanlangan manzil (mavjud bo'lsa, shu nuqtadan boshlaymiz).
+  final AiLocationInfo? initial;
 
   @override
-  State<K3dLocationScreen> createState() => _K3dLocationScreenState();
+  State<LocationPickerScreen> createState() => _LocationPickerScreenState();
 }
 
-class _K3dLocationScreenState extends State<K3dLocationScreen> {
-  static const _defaultCenter = LatLng(41.2995, 69.2401);
+class _LocationPickerScreenState extends State<LocationPickerScreen> {
+  static const _defaultCenter = LatLng(41.2995, 69.2401); // Toshkent
   static const _defaultZoom = 13.5;
 
   late final MapController _mapController;
@@ -46,14 +40,12 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
 
   late LatLng _center;
 
-  // Search state.
   List<GeoSuggestion> _suggestions = const [];
   Timer? _searchDebounce;
   int _searchRequestId = 0;
   bool _searching = false;
   bool _suppressSearch = false;
 
-  // Reverse-geocode state.
   String? _addressText;
   bool _resolving = false;
   Timer? _reverseDebounce;
@@ -64,13 +56,9 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
     super.initState();
     _mapController = MapController();
     _geocoder = GeocoderClient();
-    // Restore a previously confirmed location when stepping back into this
-    // screen; otherwise start at the Tashkent default.
-    final existing = widget.bundle.location;
-    _center = existing != null
-        ? LatLng(existing.lat, existing.lng)
-        : _defaultCenter;
-    _addressText = existing?.addressText;
+    final init = widget.initial;
+    _center = init != null ? LatLng(init.lat, init.lng) : _defaultCenter;
+    _addressText = init?.addressText;
     _searchCtrl.addListener(_onSearchChanged);
     _scheduleReverse();
   }
@@ -87,8 +75,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
     super.dispose();
   }
 
-  // ── Search (autocomplete) ────────────────────────────────────────────
-
+  // ── Search ─────────────────────────────────────────────────────────────
   void _onSearchChanged() {
     if (_suppressSearch) return;
     _searchDebounce?.cancel();
@@ -100,9 +87,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
       });
       return;
     }
-    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      _runSearch(q);
-    });
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () => _runSearch(q));
   }
 
   Future<void> _runSearch(String q) async {
@@ -142,15 +127,13 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
     setState(() {
       _suggestions = const [];
       _center = LatLng(s.lat, s.lng);
-      _addressText =
-          s.description.isEmpty ? s.name : '${s.name}, ${s.description}';
+      _addressText = s.description.isEmpty ? s.name : '${s.name}, ${s.description}';
     });
     _mapController.move(_center, 17);
     _scheduleReverse();
   }
 
   // ── Reverse geocoding ────────────────────────────────────────────────
-
   void _onMapEvent(MapEvent event) {
     if (event is MapEventMoveEnd ||
         event is MapEventFlingAnimationEnd ||
@@ -181,32 +164,22 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
         _addressText = text;
         _resolving = false;
       });
-    } on GeocoderException catch (_) {
-      if (!mounted || id != _reverseRequestId) return;
-      setState(() => _resolving = false);
     } catch (_) {
       if (!mounted || id != _reverseRequestId) return;
       setState(() => _resolving = false);
     }
   }
 
-  // ── Confirm / next ───────────────────────────────────────────────────
-
   void _confirm() {
     HapticFeedback.lightImpact();
-    widget.bundle.location = AiLocationInfo(
-      lat: _center.latitude,
-      lng: _center.longitude,
-      addressText: _addressText ?? widget.bundle.kadastr.address,
-    );
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ScanObjectTypeScreen(bundle: widget.bundle),
+    Navigator.of(context).pop(
+      AiLocationInfo(
+        lat: _center.latitude,
+        lng: _center.longitude,
+        addressText: _addressText,
       ),
     );
   }
-
-  // ── Build ────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -222,14 +195,9 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: _K3dLocationStrings.appBarTitle(l),
-                subtitle: _K3dLocationStrings.appBarSubtitle(l),
+                title: _PickerStrings.title(l),
+                subtitle: _PickerStrings.subtitle(l),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: StepProgressBar(count: 6, activeIndex: 2),
             ),
             const SizedBox(height: 12),
             Padding(
@@ -257,9 +225,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
                           maxZoom: 18,
                           onMapEvent: _onMapEvent,
                         ),
-                        children: const [
-                          _OsmTileLayer(),
-                        ],
+                        children: const [_OsmTileLayer()],
                       ),
                     ),
                   ),
@@ -290,7 +256,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: ListingCtaButton(
-                label: _K3dLocationStrings.ctaContinue(l),
+                label: _PickerStrings.confirmAddress(l),
                 enabled: !_resolving,
                 onTap: _confirm,
               ),
@@ -302,8 +268,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
   }
 }
 
-// ── Sub-widgets ───────────────────────────────────────────────────────
-
+// ── Sub-widgets (ai_location_screen UX bilan bir xil) ──────────────────
 class _OsmTileLayer extends StatelessWidget {
   const _OsmTileLayer();
   @override
@@ -365,14 +330,9 @@ class _SearchInput extends StatelessWidget {
       style: TextStyle(fontFamily: 'MTSText', fontSize: 15, color: text),
       decoration: InputDecoration(
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        hintText: _K3dLocationStrings.searchHint(locale),
-        hintStyle: TextStyle(
-          fontFamily: 'MTSText',
-          fontSize: 15,
-          color: hint,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        hintText: _PickerStrings.searchHint(locale),
+        hintStyle: TextStyle(fontFamily: 'MTSText', fontSize: 15, color: hint),
         filled: true,
         fillColor: fill,
         prefixIcon: Icon(Icons.search, color: hint),
@@ -439,15 +399,11 @@ class _SuggestionList extends StatelessWidget {
             InkWell(
               onTap: () => onTap(items[i]),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 child: Row(
                   children: [
-                    Icon(
-                      _iconFor(items[i].kind),
-                      color: AppColors.splashGreen,
-                      size: 22,
-                    ),
+                    Icon(_iconFor(items[i].kind),
+                        color: AppColors.splashGreen, size: 22),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -545,11 +501,7 @@ class _AddressBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.place_outlined,
-            color: AppColors.splashGreen,
-            size: 22,
-          ),
+          const Icon(Icons.place_outlined, color: AppColors.splashGreen, size: 22),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -557,9 +509,8 @@ class _AddressBanner extends StatelessWidget {
               children: [
                 Text(
                   resolving
-                      ? _K3dLocationStrings.resolving(locale)
-                      : (addressText ??
-                          _K3dLocationStrings.addressNotFound(locale)),
+                      ? _PickerStrings.resolving(locale)
+                      : (addressText ?? _PickerStrings.addressNotFound(locale)),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -596,31 +547,31 @@ class _AddressBanner extends StatelessWidget {
   }
 }
 
-class _K3dLocationStrings {
-  const _K3dLocationStrings._();
+class _PickerStrings {
+  const _PickerStrings._();
 
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Расположение',
-        'en' => 'Location',
-        _ => 'Joylashuv',
+  static String title(Locale l) => switch (l.languageCode) {
+        'ru' => 'Выберите адрес',
+        'en' => 'Pick an address',
+        _ => 'Manzilni tanlang',
       };
 
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отметьте расположение объекта на карте',
-        'en' => 'Mark the object location on the map',
-        _ => 'Obyekt joylashuvini xaritada belgilang',
+  static String subtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Перетащите пин в нужное место',
+        'en' => 'Drag the pin to the desired spot',
+        _ => 'Pinni kerakli joyga suring',
       };
 
   static String searchHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Поиск адреса...',
-        'en' => 'Search address...',
-        _ => 'Manzilni qidiring...',
+        'ru' => 'Поиск адреса, улицы или объекта',
+        'en' => 'Search address, street or place',
+        _ => 'Manzil, ko\'cha yoki obyekt qidirish',
       };
 
   static String resolving(Locale l) => switch (l.languageCode) {
-        'ru' => 'Определение адреса...',
-        'en' => 'Resolving address...',
-        _ => 'Manzil aniqlanmoqda...',
+        'ru' => 'Определяется…',
+        'en' => 'Resolving…',
+        _ => 'Aniqlanmoqda…',
       };
 
   static String addressNotFound(Locale l) => switch (l.languageCode) {
@@ -629,9 +580,9 @@ class _K3dLocationStrings {
         _ => 'Manzil topilmadi',
       };
 
-  static String ctaContinue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
+  static String confirmAddress(Locale l) => switch (l.languageCode) {
+        'ru' => 'Подтвердить адрес',
+        'en' => 'Confirm address',
+        _ => 'Manzilni tasdiqlash',
       };
 }
