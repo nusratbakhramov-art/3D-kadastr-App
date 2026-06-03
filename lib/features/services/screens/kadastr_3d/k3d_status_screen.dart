@@ -57,7 +57,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = 'Avval tizimga kiring';
+        _error = _K3dStatusStrings.errLogin(Localizations.localeOf(context));
       });
       return;
     }
@@ -93,6 +93,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -106,11 +107,11 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
               constraints: const BoxConstraints(maxWidth: 640),
               child: Column(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                     child: ServiceAppBar(
-                      title: '3D kadastr',
-                      subtitle: 'Ariza yuborilmoqda',
+                      title: _K3dStatusStrings.appBarTitle(l),
+                      subtitle: _K3dStatusStrings.appBarSubtitle(l),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -118,7 +119,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
                     padding: EdgeInsets.symmetric(horizontal: 16),
                     child: StepProgressBar(count: 6, activeIndex: 5),
                   ),
-                  Expanded(child: _body(isDark)),
+                  Expanded(child: _body(isDark, l)),
                 ],
               ),
             ),
@@ -128,17 +129,17 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
     );
   }
 
-  Widget _body(bool isDark) {
+  Widget _body(bool isDark, Locale l) {
     if (_submitting) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            CircularProgressIndicator(color: AppColors.splashGreen),
-            SizedBox(height: 16),
+            const CircularProgressIndicator(color: AppColors.splashGreen),
+            const SizedBox(height: 16),
             Text(
-              'Yuborilmoqda...',
-              style: TextStyle(fontFamily: 'MTSText', fontSize: 14),
+              _K3dStatusStrings.submitting(l),
+              style: const TextStyle(fontFamily: 'MTSText', fontSize: 14),
             ),
           ],
         ),
@@ -165,7 +166,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
             SizedBox(
               width: double.infinity,
               child: ListingCtaButton(
-                label: 'Qayta urinish',
+                label: _K3dStatusStrings.retry(l),
                 enabled: true,
                 onTap: _submit,
               ),
@@ -189,7 +190,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
               size: 72, color: AppColors.splashGreen),
           const SizedBox(height: 18),
           Text(
-            'Arizangiz qabul qilindi',
+            _K3dStatusStrings.successTitle(l),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSCompact',
@@ -201,11 +202,9 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
           const SizedBox(height: 10),
           Text(
             _jobId == null
-                ? 'Mutaxassis 3D model va baholashni tayyorlaydi. '
-                    'Tayyor bo\'lganda sizga xabar beramiz.'
-                : 'Ariza raqami: #$_jobId\n\n'
-                    'Mutaxassis 3D model va baholashni tayyorlaydi. '
-                    'Tayyor bo\'lganda sizga xabar beramiz.',
+                ? _K3dStatusStrings.successBody(l)
+                : '${_K3dStatusStrings.requestNumber(l, _jobId!)}\n\n'
+                    '${_K3dStatusStrings.successBody(l)}',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSText',
@@ -218,7 +217,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
           SizedBox(
             width: double.infinity,
             child: ListingCtaButton(
-              label: 'Asosiy sahifa',
+              label: _K3dStatusStrings.home(l),
               enabled: true,
               onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
             ),
@@ -227,4 +226,65 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
       ),
     );
   }
+}
+
+class _K3dStatusStrings {
+  const _K3dStatusStrings._();
+
+  static String appBarTitle(Locale l) => switch (l.languageCode) {
+        'ru' => '3D кадастр',
+        'en' => '3D cadastre',
+        _ => '3D kadastr',
+      };
+
+  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Заявка отправляется',
+        'en' => 'Submitting the request',
+        _ => 'Ariza yuborilmoqda',
+      };
+
+  static String submitting(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отправка…',
+        'en' => 'Submitting…',
+        _ => 'Yuborilmoqda...',
+      };
+
+  static String retry(Locale l) => switch (l.languageCode) {
+        'ru' => 'Повторить',
+        'en' => 'Retry',
+        _ => 'Qayta urinish',
+      };
+
+  static String successTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Ваша заявка принята',
+        'en' => 'Your request has been received',
+        _ => 'Arizangiz qabul qilindi',
+      };
+
+  static String successBody(Locale l) => switch (l.languageCode) {
+        'ru' => 'Специалист подготовит 3D-модель и оценку. '
+            'Мы уведомим вас, когда всё будет готово.',
+        'en' => 'A specialist will prepare the 3D model and valuation. '
+            'We will notify you once it is ready.',
+        _ => 'Mutaxassis 3D model va baholashni tayyorlaydi. '
+            'Tayyor bo\'lganda sizga xabar beramiz.',
+      };
+
+  static String requestNumber(Locale l, int id) => switch (l.languageCode) {
+        'ru' => 'Номер заявки: #$id',
+        'en' => 'Request number: #$id',
+        _ => 'Ariza raqami: #$id',
+      };
+
+  static String home(Locale l) => switch (l.languageCode) {
+        'ru' => 'Главная',
+        'en' => 'Home',
+        _ => 'Asosiy sahifa',
+      };
+
+  static String errLogin(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сначала войдите в систему',
+        'en' => 'Please sign in first',
+        _ => 'Avval tizimga kiring',
+      };
 }

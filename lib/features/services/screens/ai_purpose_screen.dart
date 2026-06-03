@@ -39,6 +39,7 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -50,11 +51,11 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
             constraints: const BoxConstraints(maxWidth: 640),
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                    title: 'Baholash maqsadi',
-                    subtitle: 'Qiymat nima uchun aniqlanmoqda?',
+                    title: _PurposeStrings.title(l),
+                    subtitle: _PurposeStrings.subtitle(l),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -64,7 +65,7 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
                     children: [
                       for (final p in ValuationPurpose.values) ...[
                         ChoiceTile(
-                          label: '${p.labelUz}  ·  ${p.hintUz}',
+                          label: '${p.label(l)}  ·  ${p.hint(l)}',
                           selected: _purpose == p,
                           onTap: () => setState(() => _purpose = p),
                         ),
@@ -76,7 +77,7 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
-                    label: 'Davom etish',
+                    label: _PurposeStrings.continueLabel(l),
                     enabled: true,
                     onTap: _next,
                   ),
@@ -88,4 +89,26 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
       ),
     );
   }
+}
+
+class _PurposeStrings {
+  const _PurposeStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+        'ru' => 'Цель оценки',
+        'en' => 'Valuation purpose',
+        _ => 'Baholash maqsadi',
+      };
+
+  static String subtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Для чего определяется стоимость?',
+        'en' => 'Why is the value being determined?',
+        _ => 'Qiymat nima uchun aniqlanmoqda?',
+      };
+
+  static String continueLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Продолжить',
+        'en' => 'Continue',
+        _ => 'Davom etish',
+      };
 }

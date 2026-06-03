@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
-/// Globally selected app locale. Initial value matches the legacy default of
-/// Uzbek so existing screens that don't read this notifier continue to work.
+/// Globally selected app locale. Defaults to Russian for now (App Store
+/// review requires the app to present Russian when the device is set to it;
+/// shipping Russian as the out-of-the-box default until UZ strings are fully
+/// audited). A saved user preference (LocaleStorage) still overrides this.
 final ValueNotifier<Locale> localeNotifier = ValueNotifier<Locale>(
-  const Locale('uz'),
+  const Locale('ru'),
 );
 
 /// Globally selected theme mode (system / light / dark).

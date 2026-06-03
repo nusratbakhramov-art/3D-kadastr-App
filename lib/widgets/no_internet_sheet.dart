@@ -51,6 +51,7 @@ class _NoInternetSheetState extends State<NoInternetSheet>
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.darkSurface : Colors.white;
     final headingColor = isDark ? Colors.white : AppColors.textBlack;
@@ -119,7 +120,7 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Internet aloqasi yo\'q',
+                  _NetStrings.title(l),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -129,7 +130,7 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Ulanishingizni tekshirib, qayta urinib ko\'ring',
+                  _NetStrings.subtitle(l),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'MTSText',
@@ -160,7 +161,7 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                         fontSize: 16,
                       ),
                     ),
-                    child: const Text('Qayta urinish'),
+                    child: Text(_NetStrings.retry(l)),
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -170,7 +171,7 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                     minimumSize: const Size.fromHeight(44),
                   ),
                   child: Text(
-                    'Yopish',
+                    _NetStrings.close(l),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w600,
@@ -186,6 +187,31 @@ class _NoInternetSheetState extends State<NoInternetSheet>
       ),
     );
   }
+}
+
+class _NetStrings {
+  const _NetStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'Нет подключения к интернету',
+    'en' => 'No internet connection',
+    _ => 'Internet aloqasi yo‘q',
+  };
+  static String subtitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Проверьте подключение и попробуйте снова',
+    'en' => 'Check your connection and try again',
+    _ => 'Ulanishingizni tekshirib, qayta urinib ko‘ring',
+  };
+  static String retry(Locale l) => switch (l.languageCode) {
+    'ru' => 'Повторить',
+    'en' => 'Retry',
+    _ => 'Qayta urinish',
+  };
+  static String close(Locale l) => switch (l.languageCode) {
+    'ru' => 'Закрыть',
+    'en' => 'Close',
+    _ => 'Yopish',
+  };
 }
 
 class _Ring extends StatelessWidget {

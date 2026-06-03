@@ -103,7 +103,10 @@ class _MainShellState extends State<MainShell> {
   Future<void> _openSettings() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(onLogoutConfirmed: _handleLogout),
+        builder: (_) => SettingsScreen(
+          onLogoutConfirmed: _handleLogout,
+          onAccountDeleted: _handleLogout,
+        ),
       ),
     );
   }

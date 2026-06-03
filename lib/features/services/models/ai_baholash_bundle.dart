@@ -5,6 +5,8 @@
 /// submit screen serializes the full thing for `POST /api/v1/ai-valuations`.
 library;
 
+import 'dart:ui' show Locale;
+
 import '../api_cadastre_service.dart';
 
 class AiBaholashBundle {
@@ -94,6 +96,42 @@ enum ValuationPurpose {
         ValuationPurpose.court => '3 yondashuv teng',
         ValuationPurpose.tax => 'Kadastr asosida',
       };
+
+  String label(Locale l) => switch (l.languageCode) {
+        'ru' => switch (this) {
+            ValuationPurpose.sale => 'Продажа',
+            ValuationPurpose.mortgage => 'Ипотека / кредит',
+            ValuationPurpose.insurance => 'Страхование',
+            ValuationPurpose.court => 'Суд / спор',
+            ValuationPurpose.tax => 'Налог',
+          },
+        'en' => switch (this) {
+            ValuationPurpose.sale => 'Sale',
+            ValuationPurpose.mortgage => 'Mortgage / loan',
+            ValuationPurpose.insurance => 'Insurance',
+            ValuationPurpose.court => 'Court / dispute',
+            ValuationPurpose.tax => 'Tax',
+          },
+        _ => labelUz,
+      };
+
+  String hint(Locale l) => switch (l.languageCode) {
+        'ru' => switch (this) {
+            ValuationPurpose.sale => 'По рыночной цене',
+            ValuationPurpose.mortgage => 'Для банковского залога',
+            ValuationPurpose.insurance => 'Восстановительная стоимость',
+            ValuationPurpose.court => '3 подхода равны',
+            ValuationPurpose.tax => 'На основе кадастра',
+          },
+        'en' => switch (this) {
+            ValuationPurpose.sale => 'Based on market price',
+            ValuationPurpose.mortgage => 'For bank collateral',
+            ValuationPurpose.insurance => 'Replacement value',
+            ValuationPurpose.court => '3 approaches equal',
+            ValuationPurpose.tax => 'Cadastre-based',
+          },
+        _ => hintUz,
+      };
 }
 
 /// One room in the optional breakdown. Mirrors backend `RoomInput`.
@@ -127,6 +165,30 @@ enum RoomKind {
   const RoomKind(this.wire, this.labelUz);
   final String wire;
   final String labelUz;
+
+  String label(Locale l) => switch (l.languageCode) {
+        'ru' => switch (this) {
+            RoomKind.living => 'Гостиная',
+            RoomKind.bedroom => 'Спальня',
+            RoomKind.kitchen => 'Кухня',
+            RoomKind.bathroom => 'Ванная',
+            RoomKind.hallway => 'Коридор',
+            RoomKind.balcony => 'Балкон',
+            RoomKind.storage => 'Кладовая',
+            RoomKind.other => 'Другое',
+          },
+        'en' => switch (this) {
+            RoomKind.living => 'Living room',
+            RoomKind.bedroom => 'Bedroom',
+            RoomKind.kitchen => 'Kitchen',
+            RoomKind.bathroom => 'Bathroom',
+            RoomKind.hallway => 'Hallway',
+            RoomKind.balcony => 'Balcony',
+            RoomKind.storage => 'Storage',
+            RoomKind.other => 'Other',
+          },
+        _ => labelUz,
+      };
 }
 
 class AiClientInfo {

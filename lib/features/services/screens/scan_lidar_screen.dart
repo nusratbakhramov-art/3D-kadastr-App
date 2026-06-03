@@ -89,7 +89,12 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
     final session = await const AuthStorage().loadSession();
     final token = session.token;
     if (token == null || token.isEmpty) {
-      if (mounted) AppToast.error(context, 'Avtorizatsiya kerak');
+      if (mounted) {
+        AppToast.error(
+          context,
+          _ScanLidarStrings.authRequired(localeNotifier.value),
+        );
+      }
       return;
     }
     setState(() => _uploading = true);
@@ -107,7 +112,12 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
           ..addAll(keys);
       });
     } catch (e) {
-      if (mounted) AppToast.error(context, 'Skan yuklanmadi: $e');
+      if (mounted) {
+        AppToast.error(
+          context,
+          '${_ScanLidarStrings.uploadFailed(localeNotifier.value)}: $e',
+        );
+      }
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -224,7 +234,7 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
                         label: _uploading
-                            ? 'Skan yuklanmoqda…'
+                            ? _ScanLidarStrings.uploadingScan(locale)
                             : (_state == ScanCardState.done
                                 ? _ScanLidarStrings.ctaContinue(locale)
                                 : _ScanLidarStrings.ctaStart(locale)),
@@ -417,6 +427,24 @@ class _ScanLidarStrings {
         'ru' => 'Ошибка сканирования',
         'en' => 'Scan error',
         _ => 'Skan xatosi',
+      };
+
+  static String authRequired(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Требуется авторизация',
+        'en' => 'Authorization required',
+        _ => 'Avtorizatsiya kerak',
+      };
+
+  static String uploadFailed(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Не удалось загрузить скан',
+        'en' => 'Scan upload failed',
+        _ => 'Skan yuklanmadi',
+      };
+
+  static String uploadingScan(Locale locale) => switch (locale.languageCode) {
+        'ru' => 'Загрузка скана…',
+        'en' => 'Uploading scan…',
+        _ => 'Skan yuklanmoqda…',
       };
 
   static String rowWalls(Locale locale) => switch (locale.languageCode) {

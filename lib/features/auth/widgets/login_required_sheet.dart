@@ -22,8 +22,8 @@ import '../auth_storage.dart';
 Future<bool> ensureLoggedIn(
   BuildContext context, {
   AuthStorage storage = const AuthStorage(),
-  String title = 'Tizimga kirish kerak',
-  String message = 'Bu xizmatdan foydalanish uchun avval tizimga kiring.',
+  String? title,
+  String? message,
 }) async {
   final session = await storage.loadSession();
   if (session.token != null && session.token!.isNotEmpty) return true;
@@ -63,11 +63,12 @@ Future<bool> ensureLoggedIn(
 
 class _LoginRequiredSheet extends StatelessWidget {
   const _LoginRequiredSheet({required this.title, required this.message});
-  final String title;
-  final String message;
+  final String? title;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF15191B) : Colors.white;
     final textColor = isDark ? Colors.white : AppColors.textBlack;
@@ -105,7 +106,7 @@ class _LoginRequiredSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              title,
+              title ?? _LoginRequiredStrings.title(l),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -116,7 +117,7 @@ class _LoginRequiredSheet extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              message,
+              message ?? _LoginRequiredStrings.message(l),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -140,9 +141,9 @@ class _LoginRequiredSheet extends StatelessWidget {
                   HapticFeedback.lightImpact();
                   Navigator.of(context).pop(true);
                 },
-                child: const Text(
-                  'Kirish',
-                  style: TextStyle(
+                child: Text(
+                  _LoginRequiredStrings.signIn(l),
+                  style: const TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
                     fontSize: 16,
@@ -154,7 +155,7 @@ class _LoginRequiredSheet extends StatelessWidget {
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
               child: Text(
-                'Bekor qilish',
+                _LoginRequiredStrings.cancel(l),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontSize: 15,
@@ -167,4 +168,32 @@ class _LoginRequiredSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+class _LoginRequiredStrings {
+  const _LoginRequiredStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+        'ru' => 'Требуется вход',
+        'en' => 'Sign in required',
+        _ => 'Tizimga kirish kerak',
+      };
+
+  static String message(Locale l) => switch (l.languageCode) {
+        'ru' => 'Чтобы воспользоваться этой услугой, сначала войдите в систему.',
+        'en' => 'Please sign in first to use this service.',
+        _ => 'Bu xizmatdan foydalanish uchun avval tizimga kiring.',
+      };
+
+  static String signIn(Locale l) => switch (l.languageCode) {
+        'ru' => 'Войти',
+        'en' => 'Sign in',
+        _ => 'Kirish',
+      };
+
+  static String cancel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отмена',
+        'en' => 'Cancel',
+        _ => 'Bekor qilish',
+      };
 }

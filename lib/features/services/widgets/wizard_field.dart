@@ -18,6 +18,8 @@ class WizardField extends StatelessWidget {
     this.numericOnly = false,
     this.allowDecimal = false,
     this.required = false,
+    this.maxLength,
+    this.errorText,
   });
 
   final String label;
@@ -29,6 +31,8 @@ class WizardField extends StatelessWidget {
   final bool numericOnly;
   final bool allowDecimal;
   final bool required;
+  final int? maxLength;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +55,9 @@ class WizardField extends StatelessWidget {
           allowDecimal ? RegExp(r'[0-9.,]') : RegExp(r'[0-9]'),
         ),
       );
+    }
+    if (maxLength != null) {
+      formatters.add(LengthLimitingTextInputFormatter(maxLength));
     }
 
     return Column(
@@ -127,6 +134,17 @@ class WizardField extends StatelessWidget {
             ),
           ),
         ),
+        if (errorText != null) ...[
+          const SizedBox(height: 5),
+          Text(
+            errorText!,
+            style: const TextStyle(
+              fontFamily: 'MTSText',
+              fontSize: 12,
+              color: Color(0xFFE0492A),
+            ),
+          ),
+        ],
       ],
     );
   }
