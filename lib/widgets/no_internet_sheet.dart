@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/i18n.dart';
 import '../theme/app_colors.dart';
 
 /// Animated bottom sheet shown when an API call fails because there's no
@@ -160,7 +161,7 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                         fontSize: 16,
                       ),
                     ),
-                    child: const Text('Qayta urinish'),
+                    child: Text(L.retry(Localizations.localeOf(context))),
                   ),
                 ),
                 const SizedBox(height: 4),

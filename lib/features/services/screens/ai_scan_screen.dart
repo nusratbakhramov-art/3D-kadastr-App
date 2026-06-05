@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/api_config.dart';
+import '../../../core/i18n.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
@@ -604,7 +605,7 @@ class _ProviderPickerSheet extends StatelessWidget {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Bekor qilish'),
+              child: Text(L.cancel(Localizations.localeOf(context))),
             ),
           ],
         ),
@@ -798,7 +799,7 @@ class _QualityPickerSheet extends StatelessWidget {
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Bekor qilish'),
+              child: Text(L.cancel(Localizations.localeOf(context))),
             ),
           ],
         ),

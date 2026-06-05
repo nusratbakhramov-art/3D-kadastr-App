@@ -169,8 +169,24 @@ class _AppRootState extends State<_AppRoot> {
     // localeNotifier'ni o'zgartiradi va MaterialApp rebuild bo'lib, butun
     // widget tree yangi til bilan tarjima qilinadi.
     final savedLocale = await const LocaleStorage().load();
-    if (savedLocale != null && savedLocale != localeNotifier.value) {
-      localeNotifier.value = savedLocale;
+    if (savedLocale != null) {
+      // Foydalanuvchi tilni qo'lda tanlagan — o'shanga rioya qilamiz.
+      if (savedLocale != localeNotifier.value) {
+        localeNotifier.value = savedLocale;
+      }
+    } else {
+      // Foydalanuvchi tanlamagan — QURILMA tilini kuzatamiz (App Store 2.1(a):
+      // qurilma ruscha bo'lsa, ilova ham ruscha ochilsin). Qo'llab-quvvatlanadigan
+      // til (uz/ru/en) bo'lsa o'sha, aks holda default uz.
+      final deviceLang =
+          WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+      const supported = {'uz', 'ru', 'en'};
+      final resolved = supported.contains(deviceLang)
+          ? Locale(deviceLang)
+          : const Locale('uz');
+      if (resolved != localeNotifier.value) {
+        localeNotifier.value = resolved;
+      }
     }
 
     final done = await widget.onboardingStorage.hasCompleted();

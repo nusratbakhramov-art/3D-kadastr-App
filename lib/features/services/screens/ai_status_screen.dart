@@ -782,6 +782,7 @@ class _ApproachesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
     final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final text = isDark ? Colors.white : AppColors.textBlack;
@@ -855,11 +856,21 @@ class _ApproachesCard extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text('Yondashuv',
+                child: Text(
+                    switch (locale.languageCode) {
+                      'ru' => 'Подход',
+                      'en' => 'Approach',
+                      _ => 'Yondashuv',
+                    },
                     style: TextStyle(
                         fontFamily: 'MTSCompact', fontSize: 11, color: sub)),
               ),
-              Text('Qiymat · Og\'irlik',
+              Text(
+                  switch (locale.languageCode) {
+                    'ru' => 'Значение · Вес',
+                    'en' => 'Value · Weight',
+                    _ => 'Qiymat · Og\'irlik',
+                  },
                   style: TextStyle(
                       fontFamily: 'MTSCompact', fontSize: 11, color: sub)),
             ],

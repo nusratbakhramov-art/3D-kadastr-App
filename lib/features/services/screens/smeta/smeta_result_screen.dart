@@ -224,6 +224,7 @@ class _ResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final records = snap.records ?? const [];
     final primary = _primaryExport;
 
@@ -254,7 +255,11 @@ class _ResultView extends StatelessWidget {
               );
             },
             icon: const Icon(Icons.description_outlined),
-            label: Text('$primary ko\'rish'),
+            label: Text(switch (locale.languageCode) {
+              'ru' => 'Открыть $primary',
+              'en' => 'View $primary',
+              _ => '$primary ko\'rish',
+            }),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -263,7 +268,11 @@ class _ResultView extends StatelessWidget {
               mode: LaunchMode.externalApplication,
             ),
             icon: const Icon(Icons.open_in_new),
-            label: const Text('Tashqi brauzerda ochish'),
+            label: Text(switch (locale.languageCode) {
+              'ru' => 'Открыть во внешнем браузере',
+              'en' => 'Open in external browser',
+              _ => 'Tashqi brauzerda ochish',
+            }),
           ),
         ],
         if (exports.length > 1) ...[

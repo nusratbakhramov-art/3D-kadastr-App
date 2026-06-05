@@ -921,6 +921,7 @@ class _CustomNameInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fieldBg = isDark ? const Color(0xFF1F2426) : const Color(0xFFF7F8F9);
     final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
@@ -945,11 +946,15 @@ class _CustomNameInput extends StatelessWidget {
                 fontSize: 15,
                 color: textColor,
               ),
-              decoration: const InputDecoration(
-                hintText: 'Xona nomi (masalan: Ish xonasi)',
+              decoration: InputDecoration(
+                hintText: switch (locale.languageCode) {
+                  'ru' => 'Название комнаты (например: Кабинет)',
+                  'en' => 'Room name (e.g. Office)',
+                  _ => 'Xona nomi (masalan: Ish xonasi)',
+                },
                 isDense: true,
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),

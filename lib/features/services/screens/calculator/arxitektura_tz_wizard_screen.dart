@@ -19,6 +19,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../home/user_profile.dart';
@@ -675,6 +676,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   Widget _buildRoomsEditor() {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
     final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
@@ -700,10 +702,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                     child: TextFormField(
                       initialValue: _draft.rooms[i].name,
                       onChanged: (v) => _draft.rooms[i].name = v,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
-                        hintText: 'Xona nomi',
+                        hintText: L.roomName(locale),
                       ),
                       style: TextStyle(color: textColor, fontSize: 14),
                     ),
@@ -718,10 +720,14 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                       ],
                       onChanged: (v) =>
                           _draft.rooms[i].count = int.tryParse(v),
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
-                        hintText: 'Soni',
+                        hintText: switch (locale.languageCode) {
+                          'ru' => 'Кол-во',
+                          'en' => 'Qty',
+                          _ => 'Soni',
+                        },
                       ),
                       style: TextStyle(color: textColor, fontSize: 14),
                     ),
@@ -763,7 +769,11 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
               () => _draft.rooms.add(RoomEntry(name: '')),
             ),
             icon: const Icon(Icons.add, size: 18),
-            label: const Text('Xona qo\'shish'),
+            label: Text(switch (locale.languageCode) {
+              'ru' => 'Добавить комнату',
+              'en' => 'Add room',
+              _ => 'Xona qo\'shish',
+            }),
             style: TextButton.styleFrom(foregroundColor: AppColors.splashGreen),
           ),
         ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
@@ -89,7 +90,7 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
     final session = await const AuthStorage().loadSession();
     final token = session.token;
     if (token == null || token.isEmpty) {
-      if (mounted) AppToast.error(context, 'Avtorizatsiya kerak');
+      if (mounted) AppToast.error(context, L.authRequired(localeNotifier.value));
       return;
     }
     setState(() => _uploading = true);
@@ -107,7 +108,13 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
           ..addAll(keys);
       });
     } catch (e) {
-      if (mounted) AppToast.error(context, 'Skan yuklanmadi: $e');
+      if (mounted) {
+        AppToast.error(context, switch (localeNotifier.value.languageCode) {
+          'ru' => 'Не удалось загрузить скан: $e',
+          'en' => 'Failed to upload scan: $e',
+          _ => 'Skan yuklanmadi: $e',
+        });
+      }
     } finally {
       if (mounted) setState(() => _uploading = false);
     }

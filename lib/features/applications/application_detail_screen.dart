@@ -9,6 +9,7 @@ import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_http_client.dart';
+import '../settings/settings_state.dart';
 import '../scans/splat_viewer_screen.dart';
 import '../services/api_photogrammetry_service.dart';
 import '../services/data/room_plan_scanner.dart';
@@ -530,7 +531,11 @@ class _ModelCardState extends State<_ModelCard> {
     if (_loading) return;
     final jobId = _photogrammetryJobId;
     if (jobId == null) {
-      AppToast.success(context, '3D model bu ariza turida mavjud emas');
+      AppToast.success(context, switch (localeNotifier.value.languageCode) {
+        'ru' => '3D-модель недоступна для этого типа заявки',
+        'en' => '3D model is not available for this application type',
+        _ => '3D model bu ariza turida mavjud emas',
+      });
       return;
     }
 
@@ -542,17 +547,30 @@ class _ModelCardState extends State<_ModelCard> {
 
       if (!job.isCompleted) {
         if (!mounted) return;
+        final locale = localeNotifier.value;
         AppToast.success(
           context,
           job.status == 'failed'
-              ? '3D model qurib bo\'lmadi: ${job.errorMessage ?? 'xato'}'
-              : '3D model hali tayyor emas (${job.status}). Iltimos, kuting.',
+              ? switch (locale.languageCode) {
+                  'ru' => 'Не удалось построить 3D-модель: ${job.errorMessage ?? 'ошибка'}',
+                  'en' => 'Failed to build 3D model: ${job.errorMessage ?? 'error'}',
+                  _ => '3D model qurib bo\'lmadi: ${job.errorMessage ?? 'xato'}',
+                }
+              : switch (locale.languageCode) {
+                  'ru' => '3D-модель ещё не готова (${job.status}). Пожалуйста, подождите.',
+                  'en' => '3D model is not ready yet (${job.status}). Please wait.',
+                  _ => '3D model hali tayyor emas (${job.status}). Iltimos, kuting.',
+                },
         );
         return;
       }
       if (job.downloadUrl == null) {
         if (!mounted) return;
-        AppToast.error(context, 'Download URL kelmadi');
+        AppToast.error(context, switch (localeNotifier.value.languageCode) {
+          'ru' => 'URL для загрузки не получен',
+          'en' => 'Download URL not received',
+          _ => 'Download URL kelmadi',
+        });
         return;
       }
 
@@ -596,7 +614,11 @@ class _ModelCardState extends State<_ModelCard> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, 'Xato: $e');
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -806,7 +828,11 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
     if (_loading) return;
     final id = widget.item.id;
     if (!id.startsWith('photo_')) {
-      AppToast.success(context, 'AR ko\'rish bu ariza turida mavjud emas');
+      AppToast.success(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'AR-просмотр недоступен для этого типа заявки',
+        'en' => 'AR view is not available for this application type',
+        _ => 'AR ko\'rish bu ariza turida mavjud emas',
+      });
       return;
     }
     final jobId = int.tryParse(id.substring('photo_'.length));
@@ -818,7 +844,11 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
       final job = await api.getJob(jobId);
       if (!job.isCompleted || job.downloadUrl == null) {
         if (!mounted) return;
-        AppToast.success(context, '3D model hali tayyor emas');
+        AppToast.success(context, switch (localeNotifier.value.languageCode) {
+          'ru' => '3D-модель ещё не готова',
+          'en' => '3D model is not ready yet',
+          _ => '3D model hali tayyor emas',
+        });
         return;
       }
       final format = job.resultFormat ?? 'usdz';
@@ -848,7 +878,11 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, 'Xato: $e');
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
     }

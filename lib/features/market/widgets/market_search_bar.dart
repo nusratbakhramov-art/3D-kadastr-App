@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/i18n.dart';
 import '../../../theme/app_colors.dart';
 
 class MarketSearchBar extends StatefulWidget {
@@ -41,6 +42,7 @@ class _MarketSearchBarState extends State<MarketSearchBar> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fill = isDark ? const Color(0xFF121617) : Colors.white;
     final fg = isDark ? Colors.white : AppColors.textBlack;
@@ -91,7 +93,7 @@ class _MarketSearchBarState extends State<MarketSearchBar> {
                     color: fg,
                   ),
                   decoration: InputDecoration(
-                    hintText: 'Qidirish',
+                    hintText: L.search(locale),
                     hintStyle: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w500,

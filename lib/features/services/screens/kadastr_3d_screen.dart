@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
@@ -708,6 +709,7 @@ class _LookupErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
     final textColor = isDark ? Colors.white : AppColors.textBlack;
     final hintColor = isDark
@@ -760,7 +762,7 @@ class _LookupErrorCard extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh, size: 18),
-              label: const Text('Qayta urinish'),
+              label: Text(L.retry(locale)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.splashGreen,
                 side: const BorderSide(color: AppColors.splashGreen),

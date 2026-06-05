@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/i18n.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -370,7 +371,7 @@ class _SearchInput extends StatelessWidget {
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        hintText: 'Manzilni qidiring...',
+        hintText: L.searchAddress(Localizations.localeOf(context)),
         hintStyle: TextStyle(
           fontFamily: 'MTSText',
           fontSize: 15,
