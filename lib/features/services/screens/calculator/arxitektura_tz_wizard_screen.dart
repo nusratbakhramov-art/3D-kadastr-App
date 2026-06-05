@@ -25,6 +25,7 @@ import '../../../auth/auth_storage.dart';
 import '../../../home/user_profile.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_architecture_order_service.dart';
+import '../../models/ai_baholash_bundle.dart' show AiRoom, RoomKind;
 import '../../models/architecture_order_draft.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
@@ -76,7 +77,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   late final TextEditingController _phone;
   late final TextEditingController _email;
 
-  // Step 2
+  // Step 2 — viloyat/tuman faqat UI uchun (modelda saqlanmaydi; manzil
+  // matni `_address` orqali yuboriladi).
+  String? _viloyat;
+  String? _tuman;
   late final TextEditingController _objectName;
   late final TextEditingController _address;
   late final TextEditingController _cadastreNumber;
@@ -500,9 +504,9 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   // ── Step 2: Obyekt va manzil ─────────────────────────────────────────
   Widget _buildStep2() {
-    final tumanlar = _draft.viloyat == null
+    final tumanlar = _viloyat == null
         ? const <String>[]
-        : _tumanlarByViloyat[_draft.viloyat!] ?? const <String>[];
+        : _tumanlarByViloyat[_viloyat!] ?? const <String>[];
     return _scrollableStep([
       const WizardSectionTitle(text: 'Obyekt va manzil'),
       WizardField(
@@ -521,19 +525,19 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         required: true,
         options: _viloyatKeys,
         labelOf: _viloyatLabel,
-        value: _draft.viloyat,
+        value: _viloyat,
         onChanged: (v) {
           setState(() {
-            _draft.viloyat = v;
+            _viloyat = v;
             // Yangi viloyat tanlansa, tuman avvalgi viloyatga tegishli bo'lsa
             // tozalanadi.
             if (v != null) {
               final allowed = _tumanlarByViloyat[v] ?? const <String>[];
-              if (_draft.tuman != null && !allowed.contains(_draft.tuman)) {
-                _draft.tuman = null;
+              if (_tuman != null && !allowed.contains(_tuman)) {
+                _tuman = null;
               }
             } else {
-              _draft.tuman = null;
+              _tuman = null;
             }
           });
         },
@@ -543,8 +547,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
           label: 'Tuman',
           options: tumanlar,
           labelOf: (s) => s,
-          value: _draft.tuman,
-          onChanged: (v) => setState(() => _draft.tuman = v),
+          value: _tuman,
+          onChanged: (v) => setState(() => _tuman = v),
         ),
       // Kadastr raqami avvalgi step'da kiritilgan bo'lsa, qayta so'ramaymiz.
       if (_cadastreNumber.text.trim().isEmpty)
@@ -713,13 +717,13 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                   SizedBox(
                     width: 50,
                     child: TextFormField(
-                      initialValue: _draft.rooms[i].count?.toString() ?? '',
+                      initialValue: _draft.rooms[i].count.toString(),
                       keyboardType: TextInputType.number,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
                       ],
                       onChanged: (v) =>
-                          _draft.rooms[i].count = int.tryParse(v),
+                          _draft.rooms[i].count = int.tryParse(v) ?? 1,
                       decoration: InputDecoration(
                         isDense: true,
                         border: InputBorder.none,
@@ -735,14 +739,14 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                   SizedBox(
                     width: 70,
                     child: TextFormField(
-                      initialValue: _draft.rooms[i].areaSqm?.toString() ?? '',
+                      initialValue: _draft.rooms[i].area?.toString() ?? '',
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                       ),
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                       ],
-                      onChanged: (v) => _draft.rooms[i].areaSqm =
+                      onChanged: (v) => _draft.rooms[i].area =
                           double.tryParse(v.replaceAll(',', '.')),
                       decoration: const InputDecoration(
                         isDense: true,
@@ -766,7 +770,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             onPressed: () => setState(
-              () => _draft.rooms.add(RoomEntry(name: '')),
+              () => _draft.rooms.add(AiRoom(kind: RoomKind.other, name: '')),
             ),
             icon: const Icon(Icons.add, size: 18),
             label: Text(switch (locale.languageCode) {

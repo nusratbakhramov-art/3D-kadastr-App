@@ -22,11 +22,19 @@ import 'settings_state.dart';
 const _kAppStoreId = '6744487945';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, this.onLogoutConfirmed});
+  const SettingsScreen({
+    super.key,
+    this.onLogoutConfirmed,
+    this.onAccountDeleted,
+  });
 
   /// Called after the user confirms the logout dialog. The screen itself does
   /// not clear auth — the host wires that up.
   final VoidCallback? onLogoutConfirmed;
+
+  /// Called after the account is successfully deleted on the backend. Falls
+  /// back to [onLogoutConfirmed] if not provided.
+  final VoidCallback? onAccountDeleted;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -384,7 +392,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           context,
           t('Аккаунт удалён', 'Account deleted', "Hisob o'chirildi"),
         );
-        widget.onLogoutConfirmed?.call();
+        (widget.onAccountDeleted ?? widget.onLogoutConfirmed)?.call();
       } else {
         AppToast.error(
           context,
