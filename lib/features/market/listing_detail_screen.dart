@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_storage.dart';
+import '../settings/settings_state.dart';
 import 'api_marketplace_service.dart';
 import 'models/market_listing.dart';
 import 'widgets/listing_formats_card.dart';
@@ -58,10 +59,13 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
 
   Future<void> _downloadFormat(MarketListingFile file) async {
     if (_downloadingFileId != null) return;
-    final l = Localizations.localeOf(context);
     final id = widget.listing.backendId;
     if (id == null) {
-      AppToast.error(context, _DetailStrings.modelIdNotFound(l));
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'ID модели не найден',
+        'en' => 'Model ID not found',
+        _ => 'Model ID topilmadi',
+      });
       return;
     }
     setState(() => _downloadingFileId = file.id);
@@ -69,7 +73,11 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       final session = await widget.authStorage.loadSession();
       if (session.token == null) {
         if (!mounted) return;
-        AppToast.error(context, _DetailStrings.loginToDownload(l));
+        AppToast.error(context, switch (localeNotifier.value.languageCode) {
+          'ru' => 'Войдите в систему, чтобы скачать',
+          'en' => 'Sign in to download',
+          _ => 'Yuklab olish uchun tizimga kiring',
+        });
         return;
       }
       final info = await _api.getDownloadUrl(
@@ -98,10 +106,18 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         sharePositionOrigin: origin,
       );
       if (!mounted) return;
-      AppToast.success(context, _DetailStrings.fileReady(l, filename));
+      AppToast.success(context, switch (localeNotifier.value.languageCode) {
+        'ru' => '$filename готов',
+        'en' => '$filename ready',
+        _ => '$filename tayyor',
+      });
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, _DetailStrings.downloadError(l, '$e'));
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка при загрузке: $e',
+        'en' => 'Download error: $e',
+        _ => 'Yuklab olishda xatolik: $e',
+      });
     } finally {
       if (mounted) setState(() => _downloadingFileId = null);
     }
@@ -178,32 +194,4 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       ),
     );
   }
-}
-
-class _DetailStrings {
-  const _DetailStrings._();
-
-  static String modelIdNotFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'ID модели не найден',
-        'en' => 'Model ID not found',
-        _ => 'Model ID topilmadi',
-      };
-
-  static String loginToDownload(Locale l) => switch (l.languageCode) {
-        'ru' => 'Войдите в систему, чтобы скачать',
-        'en' => 'Sign in to download',
-        _ => 'Yuklab olish uchun tizimga kiring',
-      };
-
-  static String fileReady(Locale l, String filename) => switch (l.languageCode) {
-        'ru' => '$filename готов',
-        'en' => '$filename ready',
-        _ => '$filename tayyor',
-      };
-
-  static String downloadError(Locale l, String e) => switch (l.languageCode) {
-        'ru' => 'Ошибка при скачивании: $e',
-        'en' => 'Download error: $e',
-        _ => 'Yuklab olishda xatolik: $e',
-      };
 }

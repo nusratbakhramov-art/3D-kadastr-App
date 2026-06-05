@@ -17,6 +17,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../../core/i18n.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/app_toast.dart';
 import '../../../market/widgets/listing_cta_button.dart';
@@ -210,7 +211,6 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -219,11 +219,11 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: _K3dLocationStrings.appBarTitle(l),
-                subtitle: _K3dLocationStrings.appBarSubtitle(l),
+                title: 'Joylashuv',
+                subtitle: 'Obyekt joylashuvini xaritada belgilang',
               ),
             ),
             const SizedBox(height: 8),
@@ -238,7 +238,6 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
                 controller: _searchCtrl,
                 isDark: isDark,
                 searching: _searching,
-                locale: l,
               ),
             ),
             Expanded(
@@ -284,13 +283,12 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
                 isDark: isDark,
                 lat: _center.latitude,
                 lng: _center.longitude,
-                locale: l,
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: ListingCtaButton(
-                label: _K3dLocationStrings.ctaContinue(l),
+                label: 'Davom etish',
                 enabled: !_resolving,
                 onTap: _confirm,
               ),
@@ -341,13 +339,11 @@ class _SearchInput extends StatelessWidget {
     required this.controller,
     required this.isDark,
     required this.searching,
-    required this.locale,
   });
 
   final TextEditingController controller;
   final bool isDark;
   final bool searching;
-  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -367,7 +363,7 @@ class _SearchInput extends StatelessWidget {
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        hintText: _K3dLocationStrings.searchHint(locale),
+        hintText: L.searchAddress(Localizations.localeOf(context)),
         hintStyle: TextStyle(
           fontFamily: 'MTSText',
           fontSize: 15,
@@ -517,7 +513,6 @@ class _AddressBanner extends StatelessWidget {
     required this.isDark,
     required this.lat,
     required this.lng,
-    required this.locale,
   });
 
   final String? addressText;
@@ -525,7 +520,6 @@ class _AddressBanner extends StatelessWidget {
   final bool isDark;
   final double lat;
   final double lng;
-  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -557,9 +551,8 @@ class _AddressBanner extends StatelessWidget {
               children: [
                 Text(
                   resolving
-                      ? _K3dLocationStrings.resolving(locale)
-                      : (addressText ??
-                          _K3dLocationStrings.addressNotFound(locale)),
+                      ? 'Manzil aniqlanmoqda...'
+                      : (addressText ?? 'Manzil topilmadi'),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -594,44 +587,4 @@ class _AddressBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-class _K3dLocationStrings {
-  const _K3dLocationStrings._();
-
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Расположение',
-        'en' => 'Location',
-        _ => 'Joylashuv',
-      };
-
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отметьте расположение объекта на карте',
-        'en' => 'Mark the object location on the map',
-        _ => 'Obyekt joylashuvini xaritada belgilang',
-      };
-
-  static String searchHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Поиск адреса...',
-        'en' => 'Search address...',
-        _ => 'Manzilni qidiring...',
-      };
-
-  static String resolving(Locale l) => switch (l.languageCode) {
-        'ru' => 'Определение адреса...',
-        'en' => 'Resolving address...',
-        _ => 'Manzil aniqlanmoqda...',
-      };
-
-  static String addressNotFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'Адрес не найден',
-        'en' => 'Address not found',
-        _ => 'Manzil topilmadi',
-      };
-
-  static String ctaContinue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
 }

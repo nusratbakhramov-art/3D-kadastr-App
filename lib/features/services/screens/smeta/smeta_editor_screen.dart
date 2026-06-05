@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/smeta_api_service.dart';
@@ -59,28 +60,41 @@ class _SmetaEditorScreenState extends State<SmetaEditorScreen> {
 
   Future<void> _addSection() async {
     final ctrl = TextEditingController();
+    final locale = Localizations.localeOf(context);
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Yangi bo\'lim'),
+        title: Text(switch (locale.languageCode) {
+          'ru' => 'Новый раздел',
+          'en' => 'New section',
+          _ => 'Yangi bo\'lim',
+        }),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(
-            labelText: "Bo'lim nomi",
-            hintText: 'Masalan: Yer ishlari',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: switch (locale.languageCode) {
+              'ru' => 'Название раздела',
+              'en' => 'Section name',
+              _ => "Bo'lim nomi",
+            },
+            hintText: switch (locale.languageCode) {
+              'ru' => 'Например: Земляные работы',
+              'en' => 'E.g. Earthworks',
+              _ => 'Masalan: Yer ishlari',
+            },
+            border: const OutlineInputBorder(),
           ),
           onSubmitted: (v) => Navigator.of(ctx).pop(v),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Bekor'),
+            child: Text(L.cancel(locale)),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(ctrl.text),
-            child: const Text("Qo'shish"),
+            child: Text(L.add(locale)),
           ),
         ],
       ),
@@ -122,7 +136,11 @@ class _SmetaEditorScreenState extends State<SmetaEditorScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Xatolik: $e')),
+        SnackBar(content: Text(switch (Localizations.localeOf(context).languageCode) {
+          'ru' => 'Ошибка: $e',
+          'en' => 'Error: $e',
+          _ => 'Xatolik: $e',
+        })),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -292,6 +310,7 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? const Color(0xFF1F2426) : Colors.white;
     final border =
@@ -358,7 +377,11 @@ class _SectionCard extends StatelessWidget {
             child: TextButton.icon(
               onPressed: onAddItem,
               icon: const Icon(Icons.add, size: 16),
-              label: const Text('Pozitsiya'),
+              label: Text(switch (locale.languageCode) {
+                'ru' => 'Позиция',
+                'en' => 'Item',
+                _ => 'Pozitsiya',
+              }),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 minimumSize: const Size(0, 36),

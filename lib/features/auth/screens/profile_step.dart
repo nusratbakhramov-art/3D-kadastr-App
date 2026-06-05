@@ -57,17 +57,20 @@ class _ProfileStepState extends State<ProfileStep> {
   bool get _formValid => _nameValid && _dob != null && _gender != null;
 
   void _submit() {
-    if (!_formValid) {
-      setState(() => _nameTouched = true);
-      return;
+    // Ism / tug'ilgan sana / jins — IXTIYORIY (App Store 5.1.1(v) talabi).
+    // To'liq to'ldirilsa profilni saqlaymiz; aks holda profilsiz kiramiz
+    // (backend completeProfile faqat to'liq profilni qabul qiladi).
+    if (_formValid) {
+      widget.onSubmit(
+        UserProfile(
+          fullName: _name.text.trim(),
+          dateOfBirth: _dob!,
+          gender: _gender!,
+        ),
+      );
+    } else {
+      widget.onSkip();
     }
-    widget.onSubmit(
-      UserProfile(
-        fullName: _name.text.trim(),
-        dateOfBirth: _dob!,
-        gender: _gender!,
-      ),
-    );
   }
 
   @override
@@ -98,6 +101,11 @@ class _ProfileStepState extends State<ProfileStep> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              _ProfileStepStrings.optionalHint(locale),
+              style: TextStyle(color: labelColor, fontSize: 13, height: 1.35),
+            ),
+            const SizedBox(height: 18),
             Text(
               _ProfileStepStrings.fullName(locale),
               style: TextStyle(color: labelColor, fontSize: 14),
@@ -149,7 +157,7 @@ class _ProfileStepState extends State<ProfileStep> {
       ),
       bottom: PrimaryCta(
         label: _ProfileStepStrings.login(locale),
-        enabled: _formValid,
+        enabled: !widget.loading,
         loading: widget.loading,
         onPressed: _submit,
       ),
@@ -164,6 +172,15 @@ class _ProfileStepStrings {
     'ru' => 'О себе',
     'en' => 'About you',
     _ => "O'zingiz haqingizda",
+  };
+
+  static String optionalHint(Locale l) => switch (l.languageCode) {
+    'ru' =>
+      'Эти поля необязательны — можно заполнить позже в настройках или просто нажать «Войти».',
+    'en' =>
+      'These fields are optional — you can fill them later in Settings or just tap “Log in”.',
+    _ =>
+      "Bu maydonlar ixtiyoriy — keyinroq Sozlamalarda to'ldirishingiz yoki shunchaki “Kirish”ni bosishingiz mumkin.",
   };
 
   static String fullName(Locale l) => switch (l.languageCode) {

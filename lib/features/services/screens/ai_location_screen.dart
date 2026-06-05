@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/i18n.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -215,7 +216,6 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -224,11 +224,11 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: _LocationStrings.title(l),
-                subtitle: _LocationStrings.subtitle(l),
+                title: 'Joylashuv',
+                subtitle: 'Obyekt joylashuvini xaritada belgilang',
               ),
             ),
             const SizedBox(height: 8),
@@ -243,7 +243,6 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
                 controller: _searchCtrl,
                 isDark: isDark,
                 searching: _searching,
-                locale: l,
               ),
             ),
             Expanded(
@@ -289,13 +288,12 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
                 isDark: isDark,
                 lat: _center.latitude,
                 lng: _center.longitude,
-                locale: l,
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: ListingCtaButton(
-                label: _LocationStrings.confirmAndSubmit(l),
+                label: 'Tasdiqlash va yuborish',
                 enabled: !_resolving,
                 onTap: _confirm,
               ),
@@ -348,13 +346,11 @@ class _SearchInput extends StatelessWidget {
     required this.controller,
     required this.isDark,
     required this.searching,
-    required this.locale,
   });
 
   final TextEditingController controller;
   final bool isDark;
   final bool searching;
-  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -375,7 +371,7 @@ class _SearchInput extends StatelessWidget {
         isDense: true,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        hintText: _LocationStrings.searchHint(locale),
+        hintText: L.searchAddress(Localizations.localeOf(context)),
         hintStyle: TextStyle(
           fontFamily: 'MTSText',
           fontSize: 15,
@@ -526,7 +522,6 @@ class _AddressBanner extends StatelessWidget {
     required this.isDark,
     required this.lat,
     required this.lng,
-    required this.locale,
   });
 
   final String? addressText;
@@ -534,7 +529,6 @@ class _AddressBanner extends StatelessWidget {
   final bool isDark;
   final double lat;
   final double lng;
-  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -567,8 +561,8 @@ class _AddressBanner extends StatelessWidget {
               children: [
                 Text(
                   resolving
-                      ? _LocationStrings.resolving(locale)
-                      : (addressText ?? _LocationStrings.notFound(locale)),
+                      ? 'Manzil aniqlanmoqda...'
+                      : (addressText ?? 'Manzil topilmadi'),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -603,44 +597,4 @@ class _AddressBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LocationStrings {
-  const _LocationStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'Местоположение',
-        'en' => 'Location',
-        _ => 'Joylashuv',
-      };
-
-  static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отметьте местоположение объекта на карте',
-        'en' => 'Mark the property location on the map',
-        _ => 'Obyekt joylashuvini xaritada belgilang',
-      };
-
-  static String searchHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Поиск адреса...',
-        'en' => 'Search address...',
-        _ => 'Manzilni qidiring...',
-      };
-
-  static String confirmAndSubmit(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подтвердить и отправить',
-        'en' => 'Confirm and submit',
-        _ => 'Tasdiqlash va yuborish',
-      };
-
-  static String resolving(Locale l) => switch (l.languageCode) {
-        'ru' => 'Определяется адрес...',
-        'en' => 'Resolving address...',
-        _ => 'Manzil aniqlanmoqda...',
-      };
-
-  static String notFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'Адрес не найден',
-        'en' => 'Address not found',
-        _ => 'Manzil topilmadi',
-      };
 }

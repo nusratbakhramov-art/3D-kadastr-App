@@ -19,17 +19,13 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../home/user_profile.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_architecture_order_service.dart';
 import '../../models/architecture_order_draft.dart';
-import '../../api_cadastre_service.dart';
-import '../../widgets/cadastre_lookup_field.dart';
-import '../../widgets/color_palette_field.dart';
-import '../../widgets/location_picker_field.dart';
-import '../../widgets/rooms_selector.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
 import '../../widgets/wizard_field.dart';
@@ -95,6 +91,9 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   late final TextEditingController _objectSubtype;
   late final TextEditingController _constructionYear;
 
+  // Step 4
+  late final TextEditingController _colors;
+
   // Step 5
   late final TextEditingController _roofMaterial;
 
@@ -105,9 +104,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   late final TextEditingController _notes;
 
   bool _submitting = false;
-
-  // Yer maydoni o'lchov birligi: 'm2' yoki 'sotix' (1 sotix = 100 m²).
-  String _landUnit = 'm2';
 
   @override
   void initState() {
@@ -156,6 +152,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       text: _draft.constructionYear?.toString() ?? '',
     );
 
+    _colors = TextEditingController(text: _draft.architecture.colors ?? '');
     _roofMaterial = TextEditingController(
       text: _draft.constructive.roofMaterial ?? '',
     );
@@ -175,7 +172,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     // o'zgarganda butun ekranni qayta hisoblash uchun listenerlar.
     for (final c in [
       _customerName,
-      _tin,
       _phone,
       _floors,
       _totalArea,
@@ -189,29 +185,11 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     if (mounted) setState(() {});
   }
 
-  // Kadastr lookup natijasidan manzil va maydonni avtomatik to'ldiramiz.
-  void _onCadastreResult(CadastreLookupResult r) {
-    setState(() {
-      if ((r.address ?? '').trim().isNotEmpty) {
-        _address.text = r.address!.trim();
-      }
-      final area = r.totalArea ?? r.livingArea;
-      if (area != null && area > 0) {
-        _totalArea.text = _trimNum(area);
-        _landUnit = 'm2';
-      }
-    });
-  }
-
-  static String _trimNum(double v) =>
-      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
-
   @override
   void dispose() {
     _pageController.dispose();
     for (final c in [
       _customerName,
-      _tin,
       _phone,
       _floors,
       _totalArea,
@@ -235,6 +213,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       _maxHeight,
       _objectSubtype,
       _constructionYear,
+      _colors,
       _roofMaterial,
       _parkingCount,
       _sketchDays,
@@ -246,19 +225,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     super.dispose();
   }
 
-  // STIR (9) yoki INN (14) — kiritilgan bo'lsa, uzunligi shu ikkitadan biri.
-  bool get _tinValid {
-    final t = _tin.text.trim();
-    return t.isEmpty || t.length == 9 || t.length == 14;
-  }
-
   // ── Validatsiya per-step ─────────────────────────────────────────────
   bool get _canAdvance {
     switch (_stepIndex) {
       case 0:
         return _customerName.text.trim().length >= 2 &&
-            _phone.text.trim().length >= 5 &&
-            _tinValid;
+            _phone.text.trim().length >= 5;
       case 2:
         return _draft.objectType != null;
       default:
@@ -277,10 +249,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     _draft.objectName = _objectName.text;
     _draft.address = _address.text;
     _draft.cadastreNumber = _cadastreNumber.text;
-    final landVal = _parseDouble(_landArea.text);
-    _draft.landAreaSqm = landVal == null
-        ? null
-        : (_landUnit == 'sotix' ? landVal * 100 : landVal);
+    _draft.landAreaSqm = _parseDouble(_landArea.text);
     _draft.landUsePurpose = _landUsePurpose.text;
 
     _draft.floors = _parseInt(_floors.text);
@@ -290,7 +259,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     _draft.objectSubtype = _objectSubtype.text;
     _draft.constructionYear = _parseInt(_constructionYear.text);
 
-    // Ranglar ColorPaletteField orqali to'g'ridan-to'g'ri draftga yoziladi.
+    _draft.architecture.colors =
+        _colors.text.trim().isEmpty ? null : _colors.text.trim();
     _draft.constructive.roofMaterial = _roofMaterial.text.trim().isEmpty
         ? null
         : _roofMaterial.text.trim();
@@ -511,9 +481,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         controller: _tin,
         placeholder: '300000000',
         numericOnly: true,
-        maxLength: 14,
-        errorText:
-            _tinValid ? null : '9 (STIR) yoki 14 (INN) raqamdan iborat bo\'lsin',
       ),
       WizardField(
         label: 'Telefon',
@@ -533,6 +500,9 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   // ── Step 2: Obyekt va manzil ─────────────────────────────────────────
   Widget _buildStep2() {
+    final tumanlar = _draft.viloyat == null
+        ? const <String>[]
+        : _tumanlarByViloyat[_draft.viloyat!] ?? const <String>[];
     return _scrollableStep([
       const WizardSectionTitle(text: 'Obyekt va manzil'),
       WizardField(
@@ -540,35 +510,56 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         controller: _objectName,
         placeholder: 'Mening uyim',
       ),
-      LocationPickerField(
+      WizardField(
         label: 'Manzil',
-        value: _draft.location,
-        onChanged: (loc) => setState(() {
-          _draft.location = loc;
-          if (loc.addressText != null) {
-            _address.text = loc.addressText!;
-          }
-        }),
+        controller: _address,
+        placeholder: 'Toshkent sh., Yakkasaroy t., …',
+        maxLines: 2,
       ),
-      // Kadastr raqami — raqam kiritilsa, manzil va maydon avtomatik to'ladi.
-      CadastreLookupField(
-        controller: _cadastreNumber,
-        onResult: _onCadastreResult,
+      WizardChipPicker<String>(
+        label: 'Viloyat',
+        required: true,
+        options: _viloyatKeys,
+        labelOf: _viloyatLabel,
+        value: _draft.viloyat,
+        onChanged: (v) {
+          setState(() {
+            _draft.viloyat = v;
+            // Yangi viloyat tanlansa, tuman avvalgi viloyatga tegishli bo'lsa
+            // tozalanadi.
+            if (v != null) {
+              final allowed = _tumanlarByViloyat[v] ?? const <String>[];
+              if (_draft.tuman != null && !allowed.contains(_draft.tuman)) {
+                _draft.tuman = null;
+              }
+            } else {
+              _draft.tuman = null;
+            }
+          });
+        },
       ),
+      if (tumanlar.isNotEmpty)
+        WizardChipPicker<String>(
+          label: 'Tuman',
+          options: tumanlar,
+          labelOf: (s) => s,
+          value: _draft.tuman,
+          onChanged: (v) => setState(() => _draft.tuman = v),
+        ),
+      // Kadastr raqami avvalgi step'da kiritilgan bo'lsa, qayta so'ramaymiz.
+      if (_cadastreNumber.text.trim().isEmpty)
+        WizardField(
+          label: 'Kadastr raqami',
+          controller: _cadastreNumber,
+          placeholder: '10:09:00:001',
+        ),
       WizardField(
         label: 'Yer maydoni',
         controller: _landArea,
         placeholder: '500',
-        suffix: _landUnit == 'sotix' ? 'sotix' : 'm²',
+        suffix: 'm²',
         numericOnly: true,
         allowDecimal: true,
-      ),
-      WizardChipPicker<String>(
-        label: 'O\'lchov birligi',
-        options: const ['m2', 'sotix'],
-        labelOf: (s) => s == 'sotix' ? 'sotix' : 'm²',
-        value: _landUnit,
-        onChanged: (v) => setState(() => _landUnit = v ?? 'm2'),
       ),
       WizardField(
         label: 'Yerning maqsadli foydalanishi',
@@ -680,14 +671,114 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   Widget _buildStep4() {
     return _scrollableStep([
       const WizardSectionTitle(text: 'Xonalar tarkibi'),
-      RoomsSelector(
-        rooms: _draft.rooms,
-        locale: Localizations.localeOf(context),
-        showArea: true,
-        subtitle: 'Xona turlarini tanlang, soni va maydonini (m²) kiriting',
-        onChanged: () => setState(() {}),
-      ),
+      _buildRoomsEditor(),
     ]);
+  }
+
+  Widget _buildRoomsEditor() {
+    final locale = Localizations.localeOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (int i = 0; i < _draft.rooms.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: fill,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: border),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 4,
+                    child: TextFormField(
+                      initialValue: _draft.rooms[i].name,
+                      onChanged: (v) => _draft.rooms[i].name = v,
+                      decoration: InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: L.roomName(locale),
+                      ),
+                      style: TextStyle(color: textColor, fontSize: 14),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 50,
+                    child: TextFormField(
+                      initialValue: _draft.rooms[i].count?.toString() ?? '',
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      onChanged: (v) =>
+                          _draft.rooms[i].count = int.tryParse(v),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: switch (locale.languageCode) {
+                          'ru' => 'Кол-во',
+                          'en' => 'Qty',
+                          _ => 'Soni',
+                        },
+                      ),
+                      style: TextStyle(color: textColor, fontSize: 14),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 70,
+                    child: TextFormField(
+                      initialValue: _draft.rooms[i].areaSqm?.toString() ?? '',
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                      ],
+                      onChanged: (v) => _draft.rooms[i].areaSqm =
+                          double.tryParse(v.replaceAll(',', '.')),
+                      decoration: const InputDecoration(
+                        isDense: true,
+                        border: InputBorder.none,
+                        hintText: 'm²',
+                      ),
+                      style: TextStyle(color: textColor, fontSize: 14),
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () =>
+                        setState(() => _draft.rooms.removeAt(i)),
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    color: const Color(0xFFE0492A),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () => setState(
+              () => _draft.rooms.add(RoomEntry(name: '')),
+            ),
+            icon: const Icon(Icons.add, size: 18),
+            label: Text(switch (locale.languageCode) {
+              'ru' => 'Добавить комнату',
+              'en' => 'Add room',
+              _ => 'Xona qo\'shish',
+            }),
+            style: TextButton.styleFrom(foregroundColor: AppColors.splashGreen),
+          ),
+        ),
+      ],
+    );
   }
 
   // ── Step 5: Arxitektura yechimlari ───────────────────────────────────
@@ -715,11 +806,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         onChanged: (v) =>
             setState(() => _draft.architecture.facadeMaterial = v),
       ),
-      ColorPaletteField(
+      WizardField(
         label: 'Ranglar',
-        value: _draft.architecture.colors,
-        onChanged: (v) =>
-            _draft.architecture.colors = v.trim().isEmpty ? null : v.trim(),
+        controller: _colors,
+        placeholder: 'Bej, oq, yog\'och',
       ),
       WizardSwitchTile(
         label: '3D vizualizatsiya kerak',
@@ -750,13 +840,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       ),
       WizardChipPicker<String>(
         label: 'Poydevor',
-        options: const ['ustun', 'lenta', 'plita', 'svay', 'boshqa'],
+        options: const ['ustun', 'lenta', 'plita', 'svay'],
         labelOf: (s) => switch (s) {
           'ustun' => 'Ustun',
           'lenta' => 'Lenta',
           'plita' => 'Plita',
           'svay' => 'Svay',
-          'boshqa' => 'Boshqa',
           _ => s,
         },
         value: _draft.constructive.foundation,
@@ -764,13 +853,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       ),
       WizardChipPicker<String>(
         label: 'Devor materiali',
-        options: const ['gisht', 'gazoblok', 'beton', 'sendvich_panel', 'boshqa'],
+        options: const ['gisht', 'gazoblok', 'beton', 'sendvich_panel'],
         labelOf: (s) => switch (s) {
           'gisht' => 'G\'isht',
           'gazoblok' => 'Gazoblok',
           'beton' => 'Beton',
           'sendvich_panel' => 'Sendvich panel',
-          'boshqa' => 'Boshqa',
           _ => s,
         },
         value: _draft.constructive.walls,
@@ -1003,4 +1091,70 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         _ => s,
       };
 
+  // ── Viloyat / tuman katalogi ─────────────────────────────────────────
+  // Kalitlar OLX scraper region kalitlariga (`OlxUzScraper._REGION_IDS`)
+  // mos keladi — backend AI baholash filteri uchun.
+  static const List<String> _viloyatKeys = [
+    'tashkent_city',
+    'tashkent_region',
+    'andijan',
+    'bukhara',
+    'fergana',
+    'jizzakh',
+    'namangan',
+    'navoi',
+    'kashkadarya',
+    'karakalpakstan',
+    'samarkand',
+    'syrdarya',
+    'surkhandarya',
+    'khorezm',
+  ];
+
+  static String _viloyatLabel(String key) => switch (key) {
+        'tashkent_city' => 'Toshkent shahri',
+        'tashkent_region' => 'Toshkent viloyati',
+        'andijan' => 'Andijon',
+        'bukhara' => 'Buxoro',
+        'fergana' => 'Farg\'ona',
+        'jizzakh' => 'Jizzax',
+        'namangan' => 'Namangan',
+        'navoi' => 'Navoiy',
+        'kashkadarya' => 'Qashqadaryo',
+        'karakalpakstan' => 'Qoraqalpog\'iston',
+        'samarkand' => 'Samarqand',
+        'syrdarya' => 'Sirdaryo',
+        'surkhandarya' => 'Surxondaryo',
+        'khorezm' => 'Xorazm',
+        _ => key,
+      };
+
+  static const Map<String, List<String>> _tumanlarByViloyat = {
+    'tashkent_city': [
+      'Bektemir',
+      'Chilonzor',
+      'Mirobod',
+      'Mirzo Ulug\'bek',
+      'Olmazor',
+      'Sirg\'ali',
+      'Shayxontohur',
+      'Uchtepa',
+      'Yakkasaroy',
+      'Yashnobod',
+      'Yunusobod',
+    ],
+    'tashkent_region': [
+      'Bekobod',
+      'Bo\'ka',
+      'Chinoz',
+      'Ohangaron',
+      'Olmaliq',
+      'Parkent',
+      'Piskent',
+      'Quyichirchiq',
+      'O\'rtachirchiq',
+      'Yangiyo\'l',
+      'Zangiota',
+    ],
+  };
 }

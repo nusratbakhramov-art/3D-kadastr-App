@@ -9,6 +9,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n.dart';
 import '../../../../theme/app_colors.dart';
 import '../../data/smeta_api_service.dart';
 import '../../models/smeta_draft.dart';
@@ -110,6 +111,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
 
   Future<double?> _askQuantity(CatalogCode c) async {
     final ctrl = TextEditingController();
+    final locale = Localizations.localeOf(context);
     final qty = await showDialog<double>(
       context: context,
       builder: (ctx) {
@@ -130,7 +132,11 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 ],
                 decoration: InputDecoration(
-                  labelText: 'Hajm (${c.unit})',
+                  labelText: switch (locale.languageCode) {
+                    'ru' => 'Объём (${c.unit})',
+                    'en' => 'Volume (${c.unit})',
+                    _ => 'Hajm (${c.unit})',
+                  },
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -139,7 +145,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Bekor'),
+              child: Text(L.cancel(locale)),
             ),
             FilledButton(
               onPressed: () {
@@ -147,7 +153,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
                 if (v == null || v <= 0) return;
                 Navigator.of(ctx).pop(v);
               },
-              child: const Text("Qo'shish"),
+              child: Text(L.add(locale)),
             ),
           ],
         );
@@ -159,6 +165,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? const Color(0xFF15191B) : Colors.white;
     final textColor = isDark ? Colors.white : AppColors.textBlack;
@@ -212,7 +219,11 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
               child: TextField(
                 controller: _query,
                 decoration: InputDecoration(
-                  hintText: 'Kod yoki nom bo\'yicha qidirish',
+                  hintText: switch (locale.languageCode) {
+                    'ru' => 'Поиск по коду или названию',
+                    'en' => 'Search by code or name',
+                    _ => 'Kod yoki nom bo\'yicha qidirish',
+                  },
                   prefixIcon: const Icon(Icons.search, size: 20),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -429,6 +440,7 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -438,14 +450,18 @@ class _ErrorView extends StatelessWidget {
             const Icon(Icons.error_outline, size: 32, color: Colors.redAccent),
             const SizedBox(height: 12),
             Text(
-              'Xatolik: $message',
+              switch (locale.languageCode) {
+                'ru' => 'Ошибка: $message',
+                'en' => 'Error: $message',
+                _ => 'Xatolik: $message',
+              },
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 12),
             OutlinedButton(
               onPressed: onRetry,
-              child: const Text('Qayta urinish'),
+              child: Text(L.retry(locale)),
             ),
           ],
         ),

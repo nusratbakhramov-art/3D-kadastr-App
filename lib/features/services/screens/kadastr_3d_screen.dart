@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
@@ -98,9 +99,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
       if (!mounted || reqId != _lookupRequestId) return;
       setState(() {
         _status = _LoadStatus.error;
-        _errorMsg = _Kadastr3dStrings.errLogin(
-          Localizations.localeOf(context),
-        );
+        _errorMsg = 'Avval tizimga kiring';
       });
       return;
     }
@@ -122,9 +121,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
         setState(() {
           _status = _LoadStatus.error;
           _info = null;
-          _errorMsg = _Kadastr3dStrings.errNotFound(
-            Localizations.localeOf(context),
-          );
+          _errorMsg = "Bu kadastr raqami bo'yicha ma'lumot topilmadi";
         });
         return;
       }
@@ -143,8 +140,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
       if (!mounted || reqId != _lookupRequestId) return;
       setState(() {
         _status = _LoadStatus.error;
-        _errorMsg =
-            '${_Kadastr3dStrings.errNetwork(Localizations.localeOf(context))}: $e';
+        _errorMsg = 'Tarmoq xatosi: $e';
       });
       await NetworkErrorHandler.maybeShow(context, e, onRetry: _runLookup);
     }
@@ -166,7 +162,6 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final labelColor = isDark ? Colors.white : AppColors.textBlack;
@@ -186,9 +181,9 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: ServiceAppBar(
-                        title: _Kadastr3dStrings.appBarTitle(l),
-                        subtitle: _Kadastr3dStrings.appBarSubtitle(l),
+                      child: const ServiceAppBar(
+                        title: '3D kadastr',
+                        subtitle: 'Turar-joy binolari uchun',
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -200,21 +195,20 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
-                          _SectionLabel(_Kadastr3dStrings.cadastreNumber(l),
-                              color: labelColor),
+                          _SectionLabel('Kadastr raqami', color: labelColor),
                           const SizedBox(height: 10),
                           _CadastreInput(
                             isDark: isDark,
                             controller: _cadastreController,
                           ),
                           const SizedBox(height: 10),
-                          _HelperLine(isDark: isDark, locale: l),
+                          _HelperLine(isDark: isDark),
                           if (_status == _LoadStatus.idle &&
                               _recent.isNotEmpty &&
                               _cadastreController.text.length <
                                   _fullMaskLength) ...[
                             const SizedBox(height: 16),
-                            _SectionLabel(_Kadastr3dStrings.recentSearches(l),
+                            _SectionLabel('Oxirgi qidiruvlar',
                                 color: labelColor),
                             const SizedBox(height: 10),
                             _RecentChips(
@@ -248,7 +242,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                                           height: 1, color: dividerColor),
                                       const SizedBox(height: 18),
                                       _SectionLabel(
-                                        _Kadastr3dStrings.propertyInfo(l),
+                                        'Uy ma\'lumotlari',
                                         color: labelColor,
                                       ),
                                       const SizedBox(height: 10),
@@ -258,17 +252,14 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                                         )
                                       else if (_status == _LoadStatus.error)
                                         _LookupErrorCard(
-                                          message: _errorMsg ??
-                                              _Kadastr3dStrings.errGeneric(l),
+                                          message: _errorMsg ?? 'Xato',
                                           onRetry: _runLookup,
                                           isDark: isDark,
-                                          locale: l,
                                         )
                                       else if (_info != null)
                                         _PropertyInfoCard(
                                           isDark: isDark,
                                           info: _info!,
-                                          locale: l,
                                         )
                                       else
                                         const SizedBox.shrink(),
@@ -282,7 +273,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _Kadastr3dStrings.ctaContinue(l),
+                        label: 'Davom etish',
                         enabled: _status == _LoadStatus.loaded,
                         onTap: _continue,
                       ),
@@ -500,10 +491,9 @@ class _CadastreMaskFormatter extends TextInputFormatter {
 }
 
 class _HelperLine extends StatelessWidget {
-  const _HelperLine({required this.isDark, required this.locale});
+  const _HelperLine({required this.isDark});
 
   final bool isDark;
-  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -518,15 +508,15 @@ class _HelperLine extends StatelessWidget {
           height: 1.3,
           color: restColor,
         ),
-        children: [
-          const TextSpan(
+        children: const [
+          TextSpan(
             text: 'davreest.uz',
             style: TextStyle(
               color: AppColors.splashGreen,
               fontWeight: FontWeight.w600,
             ),
           ),
-          TextSpan(text: _Kadastr3dStrings.helperLineRest(locale)),
+          TextSpan(text: ' dan avtomatlik olinadi'),
         ],
       ),
     );
@@ -615,39 +605,28 @@ class _PropertyInfoCardSkeletonState extends State<_PropertyInfoCardSkeleton>
 }
 
 class _PropertyInfoCard extends StatelessWidget {
-  const _PropertyInfoCard({
-    required this.isDark,
-    required this.info,
-    required this.locale,
-  });
+  const _PropertyInfoCard({required this.isDark, required this.info});
 
   final bool isDark;
   final CadastreLookupResult info;
-  final Locale locale;
 
   List<(String, String)> get _rows {
     String fmtNum(double? v, String unit) =>
         v == null ? '—' : '${_formatDecimal(v)} $unit';
     String fmtUzs(double? v) {
       if (v == null) return '—';
-      if (v >= 1e9) {
-        return '${(v / 1e9).toStringAsFixed(2)} ${_Kadastr3dStrings.unitBillion(locale)}';
-      }
-      if (v >= 1e6) {
-        return '${(v / 1e6).toStringAsFixed(1)} ${_Kadastr3dStrings.unitMillion(locale)}';
-      }
+      if (v >= 1e9) return '${(v / 1e9).toStringAsFixed(2)} mlrd';
+      if (v >= 1e6) return '${(v / 1e6).toStringAsFixed(1)} mln';
       return _formatDecimal(v);
     }
 
     return [
-      (_Kadastr3dStrings.rowAddress(locale), info.address ?? '—'),
-      if (info.objectTypeHint != null)
-        (_Kadastr3dStrings.rowType(locale), info.objectTypeHint!),
-      (_Kadastr3dStrings.rowArea(locale), fmtNum(info.totalArea, 'm²')),
+      ('Manzil', info.address ?? '—'),
+      if (info.objectTypeHint != null) ('Turi', info.objectTypeHint!),
+      ('Maydon', fmtNum(info.totalArea, 'm²')),
       if (info.livingArea != null)
-        (_Kadastr3dStrings.rowLivingArea(locale),
-            fmtNum(info.livingArea, 'm²')),
-      (_Kadastr3dStrings.rowCadastreValue(locale), fmtUzs(info.cadastreValue)),
+        ('Yashash maydoni', fmtNum(info.livingArea, 'm²')),
+      ('Kadastr qiymati', fmtUzs(info.cadastreValue)),
     ];
   }
 
@@ -722,16 +701,15 @@ class _LookupErrorCard extends StatelessWidget {
     required this.message,
     required this.onRetry,
     required this.isDark,
-    required this.locale,
   });
 
   final String message;
   final VoidCallback onRetry;
   final bool isDark;
-  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
     final textColor = isDark ? Colors.white : AppColors.textBlack;
     final hintColor = isDark
@@ -757,7 +735,7 @@ class _LookupErrorCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _Kadastr3dStrings.errCardTitle(locale),
+                  'Ma\'lumot olib bo\'lmadi',
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -784,7 +762,7 @@ class _LookupErrorCard extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh, size: 18),
-              label: Text(_Kadastr3dStrings.retry(locale)),
+              label: Text(L.retry(locale)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.splashGreen,
                 side: const BorderSide(color: AppColors.splashGreen),
@@ -798,128 +776,4 @@ class _LookupErrorCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Kadastr3dStrings {
-  const _Kadastr3dStrings._();
-
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => '3D кадастр',
-        'en' => '3D cadastre',
-        _ => '3D kadastr',
-      };
-
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Для жилых зданий',
-        'en' => 'For residential buildings',
-        _ => 'Turar-joy binolari uchun',
-      };
-
-  static String cadastreNumber(Locale l) => switch (l.languageCode) {
-        'ru' => 'Кадастровый номер',
-        'en' => 'Cadastre number',
-        _ => 'Kadastr raqami',
-      };
-
-  static String recentSearches(Locale l) => switch (l.languageCode) {
-        'ru' => 'Недавние поиски',
-        'en' => 'Recent searches',
-        _ => 'Oxirgi qidiruvlar',
-      };
-
-  static String propertyInfo(Locale l) => switch (l.languageCode) {
-        'ru' => 'Данные о жилье',
-        'en' => 'Property details',
-        _ => 'Uy ma\'lumotlari',
-      };
-
-  static String ctaContinue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
-
-  static String helperLineRest(Locale l) => switch (l.languageCode) {
-        'ru' => ' получается автоматически',
-        'en' => ' is fetched automatically',
-        _ => ' dan avtomatlik olinadi',
-      };
-
-  static String rowAddress(Locale l) => switch (l.languageCode) {
-        'ru' => 'Адрес',
-        'en' => 'Address',
-        _ => 'Manzil',
-      };
-
-  static String rowType(Locale l) => switch (l.languageCode) {
-        'ru' => 'Тип',
-        'en' => 'Type',
-        _ => 'Turi',
-      };
-
-  static String rowArea(Locale l) => switch (l.languageCode) {
-        'ru' => 'Площадь',
-        'en' => 'Area',
-        _ => 'Maydon',
-      };
-
-  static String rowLivingArea(Locale l) => switch (l.languageCode) {
-        'ru' => 'Жилая площадь',
-        'en' => 'Living area',
-        _ => 'Yashash maydoni',
-      };
-
-  static String rowCadastreValue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Кадастровая стоимость',
-        'en' => 'Cadastre value',
-        _ => 'Kadastr qiymati',
-      };
-
-  static String unitBillion(Locale l) => switch (l.languageCode) {
-        'ru' => 'млрд',
-        'en' => 'bln',
-        _ => 'mlrd',
-      };
-
-  static String unitMillion(Locale l) => switch (l.languageCode) {
-        'ru' => 'млн',
-        'en' => 'mln',
-        _ => 'mln',
-      };
-
-  static String errLogin(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сначала войдите в систему',
-        'en' => 'Please sign in first',
-        _ => 'Avval tizimga kiring',
-      };
-
-  static String errNotFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'По этому кадастровому номеру данные не найдены',
-        'en' => 'No data found for this cadastre number',
-        _ => 'Bu kadastr raqami bo\'yicha ma\'lumot topilmadi',
-      };
-
-  static String errNetwork(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сетевая ошибка',
-        'en' => 'Network error',
-        _ => 'Tarmoq xatosi',
-      };
-
-  static String errGeneric(Locale l) => switch (l.languageCode) {
-        'ru' => 'Ошибка',
-        'en' => 'Error',
-        _ => 'Xato',
-      };
-
-  static String errCardTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось получить данные',
-        'en' => 'Could not fetch data',
-        _ => 'Ma\'lumot olib bo\'lmadi',
-      };
-
-  static String retry(Locale l) => switch (l.languageCode) {
-        'ru' => 'Повторить',
-        'en' => 'Retry',
-        _ => 'Qayta urinish',
-      };
 }
