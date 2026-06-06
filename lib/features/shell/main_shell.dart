@@ -105,7 +105,6 @@ class _MainShellState extends State<MainShell> {
       MaterialPageRoute<void>(
         builder: (_) => SettingsScreen(
           onLogoutConfirmed: _handleLogout,
-          onAccountDeleted: _handleLogout,
         ),
       ),
     );
