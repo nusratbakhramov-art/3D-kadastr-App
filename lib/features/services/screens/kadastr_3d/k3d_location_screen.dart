@@ -211,6 +211,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -219,11 +220,11 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: 'Joylashuv',
-                subtitle: 'Obyekt joylashuvini xaritada belgilang',
+                title: _Strings.appBarTitle(l),
+                subtitle: _Strings.appBarSubtitle(l),
               ),
             ),
             const SizedBox(height: 8),
@@ -288,7 +289,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: ListingCtaButton(
-                label: 'Davom etish',
+                label: _Strings.ctaContinue(l),
                 enabled: !_resolving,
                 onTap: _confirm,
               ),
@@ -523,6 +524,7 @@ class _AddressBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
     final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final text = isDark ? Colors.white : AppColors.textBlack;
@@ -551,8 +553,8 @@ class _AddressBanner extends StatelessWidget {
               children: [
                 Text(
                   resolving
-                      ? 'Manzil aniqlanmoqda...'
-                      : (addressText ?? 'Manzil topilmadi'),
+                      ? _Strings.detectingAddress(l)
+                      : (addressText ?? _Strings.addressNotFound(l)),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -587,4 +589,38 @@ class _AddressBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Strings {
+  const _Strings._();
+
+  static String appBarTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Расположение',
+        'en' => 'Location',
+        _ => 'Joylashuv',
+      };
+
+  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отметьте расположение объекта на карте',
+        'en' => 'Mark the object location on the map',
+        _ => 'Obyekt joylashuvini xaritada belgilang',
+      };
+
+  static String ctaContinue(Locale l) => switch (l.languageCode) {
+        'ru' => 'Продолжить',
+        'en' => 'Continue',
+        _ => 'Davom etish',
+      };
+
+  static String detectingAddress(Locale l) => switch (l.languageCode) {
+        'ru' => 'Определение адреса...',
+        'en' => 'Detecting address...',
+        _ => 'Manzil aniqlanmoqda...',
+      };
+
+  static String addressNotFound(Locale l) => switch (l.languageCode) {
+        'ru' => 'Адрес не найден',
+        'en' => 'Address not found',
+        _ => 'Manzil topilmadi',
+      };
 }
