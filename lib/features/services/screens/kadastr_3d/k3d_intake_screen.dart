@@ -75,6 +75,10 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
   }
 
   // Photos, kadastr docs, rooms, and both floor numbers are mandatory.
+  // Backend caps total_floors at 200 — validate client-side for a friendly
+  // hint instead of a raw 422.
+  static const int _maxFloors = 200;
+
   bool get _ready =>
       widget.bundle.imageKeys.isNotEmpty &&
       widget.bundle.kadastrKeys.isNotEmpty &&
@@ -83,6 +87,7 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
       widget.bundle.totalFloors != null &&
       widget.bundle.floor! >= 1 &&
       widget.bundle.totalFloors! >= 1 &&
+      widget.bundle.totalFloors! <= _maxFloors &&
       widget.bundle.floor! <= widget.bundle.totalFloors!;
 
   String? get _missingHint {
@@ -98,6 +103,8 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
     final tf = widget.bundle.totalFloors;
     if (f == null || tf == null || f < 1 || tf < 1) {
       missing.add(_Strings.missingFloor(l));
+    } else if (tf > _maxFloors) {
+      return _Strings.floorMax(l, _maxFloors);
     } else if (f > tf) {
       return _Strings.floorExceeds(l);
     }
@@ -1220,6 +1227,12 @@ class _Strings {
         'ru' => 'Этаж не может быть больше общего числа этажей',
         'en' => 'The floor cannot exceed the total number of floors',
         _ => 'Qavat binodagi jami qavatlardan katta bo\'lmasligi kerak',
+      };
+
+  static String floorMax(Locale l, int max) => switch (l.languageCode) {
+        'ru' => 'Всего этажей не может превышать $max',
+        'en' => 'Total floors cannot exceed $max',
+        _ => 'Jami qavatlar $max dan oshmasligi kerak',
       };
 
   static String requiredSuffix(Locale l, String items) =>

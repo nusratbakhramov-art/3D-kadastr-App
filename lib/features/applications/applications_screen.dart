@@ -1419,10 +1419,10 @@ class _ApplicationCard extends StatelessWidget {
                               ),
                             ),
                             SizedBox(width: 6),
-                            SvgPicture.asset(
-                              'assets/icons/arrow.svg',
-                              width: 20,
-                              height: 20,
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 20,
+                              color: Colors.black,
                             ),
                           ],
                         ),

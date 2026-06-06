@@ -198,7 +198,22 @@ class AiValuationJobService {
   String? _extractDetail(http.Response res) {
     try {
       final body = jsonDecode(res.body);
-      if (body is Map && body['detail'] != null) return body['detail'].toString();
+      if (body is Map && body['detail'] != null) {
+        final detail = body['detail'];
+        if (detail is String) return detail;
+        // FastAPI/Pydantic 422 → `detail` is a list of error objects. Don't
+        // dump the raw JSON; surface just the human-readable `msg` fields.
+        if (detail is List) {
+          final msgs = detail
+              .whereType<Map>()
+              .map((e) => e['msg']?.toString())
+              .where((m) => m != null && m!.isNotEmpty)
+              .cast<String>()
+              .toList();
+          if (msgs.isNotEmpty) return msgs.join('; ');
+        }
+        return detail.toString();
+      }
     } catch (_) {}
     return null;
   }

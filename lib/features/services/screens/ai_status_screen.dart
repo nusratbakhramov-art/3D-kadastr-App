@@ -90,7 +90,11 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _submitError = e.message;
+        // 422 = server-side input validation. Don't surface the raw backend
+        // detail — show a clean localized message.
+        _submitError = e.statusCode == 422
+            ? _AiStatusStrings.invalidData(Localizations.localeOf(context))
+            : e.message;
       });
     } catch (e) {
       if (!mounted) return;
@@ -1354,6 +1358,12 @@ class _AiStatusStrings {
         'ru' => 'Сначала войдите в систему',
         'en' => 'Please sign in first',
         _ => 'Avval tizimga kiring',
+      };
+
+  static String invalidData(Locale l) => switch (l.languageCode) {
+        'ru' => 'Проверьте введённые данные и попробуйте снова',
+        'en' => 'Please check the entered data and try again',
+        _ => 'Kiritilgan ma\'lumotlarni tekshirib, qayta urinib ko\'ring',
       };
 
   static String stepReceived(Locale l) => switch (l.languageCode) {
