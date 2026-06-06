@@ -99,7 +99,11 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
       if (!mounted || reqId != _lookupRequestId) return;
       setState(() {
         _status = _LoadStatus.error;
-        _errorMsg = 'Avval tizimga kiring';
+        _errorMsg = switch (Localizations.localeOf(context).languageCode) {
+          'ru' => 'Сначала войдите в систему',
+          'en' => 'Please sign in first',
+          _ => 'Avval tizimga kiring',
+        };
       });
       return;
     }

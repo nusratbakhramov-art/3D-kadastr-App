@@ -211,8 +211,6 @@ class _ServicesScreenState extends State<ServicesScreen>
         // Gate the entry with a login drawer before the wizard opens.
         if (!await ensureLoggedIn(
           context,
-          message:
-              "AI Baholash uchun avval tizimga kiring.",
         )) {
           return;
         }

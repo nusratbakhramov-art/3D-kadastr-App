@@ -151,7 +151,12 @@ class _AiResultScreenState extends State<AiResultScreen> {
         if (mounted) {
           setState(() {
             _loading = false;
-            _error = 'AI baholash uchun avval tizimga kiring.';
+            _error = switch (Localizations.localeOf(context).languageCode) {
+              'ru' =>
+                'Чтобы воспользоваться AI оценкой, сначала войдите в систему.',
+              'en' => 'Please sign in first to use AI valuation.',
+              _ => 'AI baholash uchun avval tizimga kiring.',
+            };
           });
         }
         return;

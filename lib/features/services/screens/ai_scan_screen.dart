@@ -62,7 +62,11 @@ class _AiScanScreenState extends State<AiScanScreen> {
       if (!mounted) return;
       AppToast.error(
         context,
-        'Skan uchun avval tizimga kiring',
+        switch (Localizations.localeOf(context).languageCode) {
+          'ru' => 'Чтобы выполнить скан, сначала войдите в систему',
+          'en' => 'Please sign in first to scan',
+          _ => 'Skan uchun avval tizimga kiring',
+        },
       );
       return;
     }

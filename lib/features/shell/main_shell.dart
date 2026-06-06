@@ -169,7 +169,6 @@ class _MainShellState extends State<MainShell> {
     if (!await ensureLoggedIn(
       context,
       storage: widget.authStorage,
-      message: "AI Baholash uchun avval tizimga kiring.",
     )) {
       return;
     }

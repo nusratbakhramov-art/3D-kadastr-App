@@ -68,7 +68,11 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _submitError = 'Avval tizimga kiring';
+        _submitError = switch (Localizations.localeOf(context).languageCode) {
+          'ru' => 'Сначала войдите в систему',
+          'en' => 'Please sign in first',
+          _ => 'Avval tizimga kiring',
+        };
       });
       return;
     }

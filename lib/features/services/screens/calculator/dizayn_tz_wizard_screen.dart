@@ -261,7 +261,13 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     final session = await const AuthStorage().loadSession();
     final token = session.token;
     if (token == null) {
-      _showError('Buyurtma yuborish uchun avval tizimga kiring');
+      if (mounted) {
+        _showError(switch (Localizations.localeOf(context).languageCode) {
+          'ru' => 'Чтобы отправить заявку, сначала войдите в систему',
+          'en' => 'Please sign in first to submit the order',
+          _ => 'Buyurtma yuborish uchun avval tizimga kiring',
+        });
+      }
       return;
     }
 
