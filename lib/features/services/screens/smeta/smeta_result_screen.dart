@@ -61,7 +61,7 @@ class _SmetaResultScreenState extends State<SmetaResultScreen> {
       _timer?.cancel();
       if (mounted) {
         setState(() {
-          _error = 'Vaqt tugadi (5 daqiqa). Driver ishlamayotgan bo\'lishi mumkin.';
+          _error = _Strings.timedOut(Localizations.localeOf(context));
         });
       }
       return;
@@ -97,6 +97,7 @@ class _SmetaResultScreenState extends State<SmetaResultScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: bg,
@@ -106,7 +107,7 @@ class _SmetaResultScreenState extends State<SmetaResultScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: 'Smeta natijasi',
+                title: _Strings.appBar(locale),
                 subtitle: 'Job ${widget.jobId.substring(0, 8)}…',
               ),
             ),
@@ -134,21 +135,84 @@ class _SmetaResultScreenState extends State<SmetaResultScreen> {
   }
 }
 
+class _Strings {
+  const _Strings._();
+
+  static String _pick(Locale l, String uz, String ru, String en) =>
+      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  static String appBar(Locale l) =>
+      _pick(l, 'Smeta natijasi', 'Результат сметы', 'Estimate result');
+
+  static String timedOut(Locale l) => _pick(
+        l,
+        "Vaqt tugadi (5 daqiqa). Driver ishlamayotgan bo'lishi mumkin.",
+        'Время истекло (5 минут). Возможно, драйвер не работает.',
+        'Timed out (5 minutes). The driver may be down.',
+      );
+
+  static String inFlightLabel(Locale l, String state) => switch (state) {
+        'queued' => _pick(l, 'Navbatda kutilmoqda…', 'В очереди…', 'Queued…'),
+        'running' =>
+          _pick(l, 'ABC hisoblamoqda…', 'ABC рассчитывает…', 'ABC is calculating…'),
+        _ => _pick(l, 'Holat: $state', 'Статус: $state', 'Status: $state'),
+      };
+
+  static String inFlightHint(Locale l) => _pick(
+        l,
+        'Bu odatda 1–3 daqiqa davom etadi.',
+        'Обычно это занимает 1–3 минуты.',
+        'This usually takes 1–3 minutes.',
+      );
+
+  static String positions(Locale l) =>
+      _pick(l, 'Pozitsiyalar', 'Позиции', 'Positions');
+
+  static String vedomost(Locale l) => _pick(
+        l,
+        "Vedomost (Form N5/N6)",
+        'Ведомость (Форма N5/N6)',
+        'Statement (Form N5/N6)',
+      );
+
+  static String otherFiles(Locale l) =>
+      _pick(l, 'Boshqa fayllar', 'Другие файлы', 'Other files');
+
+  static String smetaReady(Locale l) =>
+      _pick(l, 'Smeta tayyor', 'Смета готова', 'Estimate ready');
+
+  static String smetaNoResult(Locale l) => _pick(
+        l,
+        'Hisob tugadi, lekin natija topilmadi',
+        'Расчёт завершён, но результат не найден',
+        'Calculation finished, but no result found',
+      );
+
+  static String openExternal(Locale l) => _pick(
+        l,
+        'Tashqi brauzerda ochish',
+        'Открыть во внешнем браузере',
+        'Open in external browser',
+      );
+
+  static String openFile(Locale l, String name) => _pick(
+        l,
+        "$name ko'rish",
+        'Открыть $name',
+        'View $name',
+      );
+}
+
 // ─── in-flight ────────────────────────────────────────────────────────
 
 class _InFlightView extends StatelessWidget {
   const _InFlightView({required this.state});
   final String state;
 
-  String _label(String s) => switch (s) {
-        'queued' => 'Navbatda kutilmoqda…',
-        'running' => 'ABC hisoblamoqda…',
-        _ => 'Holat: $s',
-      };
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final locale = Localizations.localeOf(context);
     final muted =
         isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
     return Center(
@@ -158,7 +222,7 @@ class _InFlightView extends StatelessWidget {
           const SizedBox(width: 48, height: 48, child: CircularProgressIndicator()),
           const SizedBox(height: 20),
           Text(
-            _label(state),
+            _Strings.inFlightLabel(locale, state),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontSize: 15,
@@ -168,7 +232,7 @@ class _InFlightView extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Bu odatda 1–3 daqiqa davom etadi.',
+            _Strings.inFlightHint(locale),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontSize: 13,
@@ -234,13 +298,13 @@ class _ResultView extends StatelessWidget {
         _StatusBanner(snap: snap, hasExports: exports.isNotEmpty),
         const SizedBox(height: 16),
         if (records.isNotEmpty) ...[
-          const _SectionLabel('Pozitsiyalar'),
+          _SectionLabel(_Strings.positions(locale)),
           for (final r in records.whereType<Map<String, dynamic>>())
             _RecordCard(record: r),
         ],
         if (primary != null) ...[
           const SizedBox(height: 20),
-          const _SectionLabel('Ведомость (Form N5/N6)'),
+          _SectionLabel(_Strings.vedomost(locale)),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () {
@@ -255,11 +319,7 @@ class _ResultView extends StatelessWidget {
               );
             },
             icon: const Icon(Icons.description_outlined),
-            label: Text(switch (locale.languageCode) {
-              'ru' => 'Открыть $primary',
-              'en' => 'View $primary',
-              _ => '$primary ko\'rish',
-            }),
+            label: Text(_Strings.openFile(locale, primary)),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -268,16 +328,12 @@ class _ResultView extends StatelessWidget {
               mode: LaunchMode.externalApplication,
             ),
             icon: const Icon(Icons.open_in_new),
-            label: Text(switch (locale.languageCode) {
-              'ru' => 'Открыть во внешнем браузере',
-              'en' => 'Open in external browser',
-              _ => 'Tashqi brauzerda ochish',
-            }),
+            label: Text(_Strings.openExternal(locale)),
           ),
         ],
         if (exports.length > 1) ...[
           const SizedBox(height: 12),
-          const _SectionLabel("Boshqa fayllar"),
+          _SectionLabel(_Strings.otherFiles(locale)),
           for (final f in exports.where((x) => x != primary))
             _SmallExportButton(
               filename: f,
@@ -296,11 +352,12 @@ class _StatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final ok = hasExports || (snap.result?.values.any((v) => v != null) ?? false);
     final color = ok ? AppColors.splashGreen : Colors.orange;
     final label = ok
-        ? 'Smeta tayyor'
-        : 'Hisob tugadi, lekin natija topilmadi';
+        ? _Strings.smetaReady(locale)
+        : _Strings.smetaNoResult(locale);
 
     return Container(
       padding: const EdgeInsets.all(16),

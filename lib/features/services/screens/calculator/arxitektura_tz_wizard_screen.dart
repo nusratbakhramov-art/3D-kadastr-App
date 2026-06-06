@@ -308,8 +308,9 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   Future<void> _submit() async {
+    final l = Localizations.localeOf(context);
     if (!_draft.canSubmit) {
-      _showError('Majburiy maydonlarni to\'ldiring');
+      _showError(_Strings.fillRequired(l));
       return;
     }
 
@@ -325,7 +326,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     // Shu sababli onSubmit majburiy hisoblanadi va backend submission'siz
     // qaytaramiz.
     if (widget.mode == WizardMode.aiValuation) {
-      _showError('AI baholash uchun callback bog\'lanmagan');
+      _showError(_Strings.aiCallbackMissing(l));
       return;
     }
 
@@ -356,7 +357,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     } on ArchitectureOrderApiException catch (e) {
       _showError(e.message);
     } catch (e) {
-      _showError('Tarmoq xatosi: $e');
+      _showError('${_Strings.networkError(l)}: $e');
     } finally {
       if (mounted) setState(() => _submitting = false);
     }
@@ -372,6 +373,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   // ── UI ───────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
@@ -389,8 +391,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: _appBarTitle,
-                        subtitle: _stepTitle(_stepIndex),
+                        title: _appBarTitle(l),
+                        subtitle: _stepTitle(_stepIndex, l),
                         onBack: _back,
                       ),
                     ),
@@ -408,15 +410,15 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                         controller: _pageController,
                         physics: const NeverScrollableScrollPhysics(),
                         children: [
-                          _buildStep1(),
-                          _buildStep2(),
-                          _buildStep3(),
-                          _buildStep4(),
-                          _buildStep5(),
-                          _buildStep6(),
-                          _buildStep7(),
-                          _buildStep8(),
-                          _buildStep9(),
+                          _buildStep1(l),
+                          _buildStep2(l),
+                          _buildStep3(l),
+                          _buildStep4(l),
+                          _buildStep5(l),
+                          _buildStep6(l),
+                          _buildStep7(l),
+                          _buildStep8(l),
+                          _buildStep9(l),
                         ],
                       ),
                     ),
@@ -424,10 +426,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       child: ListingCtaButton(
                         label: _submitting
-                            ? 'Yuborilmoqda…'
+                            ? _Strings.submitting(l)
                             : (_isLastStep
-                                ? (widget.submitLabel ?? _defaultSubmitLabel)
-                                : 'Davom etish'),
+                                ? (widget.submitLabel ?? _defaultSubmitLabel(l))
+                                : _Strings.continueLabel(l)),
                         enabled: _canAdvance && !_submitting,
                         onTap: _next,
                       ),
@@ -442,29 +444,29 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     );
   }
 
-  String _stepTitle(int i) {
+  String _stepTitle(int i, Locale l) {
     return switch (i) {
-      0 => '1/9 — Buyurtmachi',
-      1 => '2/9 — Obyekt va manzil',
-      2 => '3/9 — Loyiha haqida',
-      3 => '4/9 — Xonalar tarkibi',
-      4 => '5/9 — Arxitektura yechimlari',
-      5 => '6/9 — Konstruktiv yechimlar',
-      6 => '7/9 — Muhandislik tizimlari',
-      7 => '8/9 — Hudud rejalashtirish',
-      8 => '9/9 — Muddatlar va izoh',
+      0 => '1/9 — ${_Strings.crumbCustomer(l)}',
+      1 => '2/9 — ${_Strings.crumbObject(l)}',
+      2 => '3/9 — ${_Strings.crumbProject(l)}',
+      3 => '4/9 — ${_Strings.crumbRooms(l)}',
+      4 => '5/9 — ${_Strings.crumbArchitecture(l)}',
+      5 => '6/9 — ${_Strings.crumbConstructive(l)}',
+      6 => '7/9 — ${_Strings.crumbEngineering(l)}',
+      7 => '8/9 — ${_Strings.crumbTerritory(l)}',
+      8 => '9/9 — ${_Strings.crumbTimeline(l)}',
       _ => '',
     };
   }
 
-  String get _defaultSubmitLabel => switch (widget.mode) {
-        WizardMode.aiValuation => 'AI baholash',
-        WizardMode.architectureOrder => 'Yuborish',
+  String _defaultSubmitLabel(Locale l) => switch (widget.mode) {
+        WizardMode.aiValuation => _Strings.aiValuation(l),
+        WizardMode.architectureOrder => _Strings.submit(l),
       };
 
-  String get _appBarTitle => switch (widget.mode) {
-        WizardMode.aiValuation => 'AI Baholash',
-        WizardMode.architectureOrder => 'Arxitektura TZ',
+  String _appBarTitle(Locale l) => switch (widget.mode) {
+        WizardMode.aiValuation => _Strings.aiValuation(l),
+        WizardMode.architectureOrder => _Strings.archTz(l),
       };
 
   Widget _scrollableStep(List<Widget> children) {
@@ -477,23 +479,23 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // ── Step 1: Buyurtmachi ──────────────────────────────────────────────
-  Widget _buildStep1() {
+  Widget _buildStep1(Locale l) {
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Buyurtmachi rekvizitlari'),
+      WizardSectionTitle(text: _Strings.customerDetails(l)),
       WizardField(
-        label: 'F.I.SH yoki kompaniya nomi',
+        label: _Strings.customerNameLabel(l),
         controller: _customerName,
         placeholder: 'Asliddin Hamrayev',
         required: true,
       ),
       WizardField(
-        label: 'STIR / INN',
+        label: _Strings.tinLabel(l),
         controller: _tin,
         placeholder: '300000000',
         numericOnly: true,
       ),
       WizardField(
-        label: 'Telefon',
+        label: _Strings.phoneLabel(l),
         controller: _phone,
         placeholder: '+998 90 123 45 67',
         keyboardType: TextInputType.phone,
@@ -509,28 +511,28 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // ── Step 2: Obyekt va manzil ─────────────────────────────────────────
-  Widget _buildStep2() {
+  Widget _buildStep2(Locale l) {
     final tumanlar = _viloyat == null
         ? const <String>[]
         : _tumanlarByViloyat[_viloyat!] ?? const <String>[];
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Obyekt va manzil'),
+      WizardSectionTitle(text: _Strings.objectAndAddress(l)),
       WizardField(
-        label: 'Obyekt nomi',
+        label: _Strings.objectNameLabel(l),
         controller: _objectName,
-        placeholder: 'Mening uyim',
+        placeholder: _Strings.objectNamePlaceholder(l),
       ),
       WizardField(
-        label: 'Manzil',
+        label: _Strings.addressLabel(l),
         controller: _address,
         placeholder: 'Toshkent sh., Yakkasaroy t., …',
         maxLines: 2,
       ),
       WizardChipPicker<String>(
-        label: 'Viloyat',
+        label: _Strings.regionLabel(l),
         required: true,
         options: _viloyatKeys,
-        labelOf: _viloyatLabel,
+        labelOf: (k) => _viloyatLabel(k, l),
         value: _viloyat,
         onChanged: (v) {
           setState(() {
@@ -550,7 +552,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       ),
       if (tumanlar.isNotEmpty)
         WizardChipPicker<String>(
-          label: 'Tuman',
+          label: _Strings.districtLabel(l),
           options: tumanlar,
           labelOf: (s) => s,
           value: _tuman,
@@ -559,48 +561,50 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       // Kadastr raqami avvalgi step'da kiritilgan bo'lsa, qayta so'ramaymiz.
       if (_cadastreNumber.text.trim().isEmpty)
         WizardField(
-          label: 'Kadastr raqami',
+          label: _Strings.cadastreNumberLabel(l),
           controller: _cadastreNumber,
           placeholder: '10:09:00:001',
         ),
       WizardField(
-        label: 'Yer maydoni',
+        label: _Strings.landAreaLabel(l),
         controller: _landArea,
         placeholder: '500',
-        suffix: 'm²',
+        suffix: _Strings.unitSqm(l),
         numericOnly: true,
         allowDecimal: true,
       ),
       WizardField(
-        label: 'Yerning maqsadli foydalanishi',
+        label: _Strings.landUsePurposeLabel(l),
         controller: _landUsePurpose,
-        placeholder: 'turar joy / ishlab chiqarish',
+        placeholder: _Strings.landUsePurposePlaceholder(l),
       ),
     ]);
   }
 
   // ── Step 3: Loyiha haqida ────────────────────────────────────────────
-  Widget _buildStep3() {
+  Widget _buildStep3(Locale l) {
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Loyiha umumiy ma\'lumotlari'),
+      WizardSectionTitle(text: _Strings.projectGeneralInfo(l)),
       WizardChipPicker<ArchObjectType>(
-        label: 'Obyekt turi',
+        label: _Strings.objectTypeLabel(l),
         required: true,
         options: ArchObjectType.values,
-        labelOf: _objectTypeLabel,
+        labelOf: (t) => _objectTypeLabel(t, l),
         value: _draft.objectType,
         onChanged: (v) => setState(() => _draft.objectType = v),
       ),
       if (_draft.objectType == ArchObjectType.boshqa)
         WizardField(
-          label: 'Boshqa (qaysi turdagi)',
+          label: _Strings.objectSubtypeLabel(l),
           controller: _objectSubtype,
-          placeholder: 'Masalan: ko\'p funksiyali markaz',
+          placeholder: _Strings.objectSubtypePlaceholder(l),
         ),
       WizardChipPicker<ConstructionType>(
-        label: 'Qurilish turi',
+        label: _Strings.constructionTypeLabel(l),
         options: ConstructionType.values,
-        labelOf: (t) => t == ConstructionType.yangi ? 'Yangi' : 'Rekonstruksiya',
+        labelOf: (t) => t == ConstructionType.yangi
+            ? _Strings.constructionNew(l)
+            : _Strings.constructionReconstruction(l),
         value: _draft.constructionType,
         onChanged: (v) =>
             setState(() => _draft.constructionType = v ?? ConstructionType.yangi),
@@ -609,7 +613,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         children: [
           Expanded(
             child: WizardField(
-              label: 'Qavatlar soni',
+              label: _Strings.floorsCountLabel(l),
               controller: _floors,
               placeholder: '2',
               numericOnly: true,
@@ -618,10 +622,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: WizardField(
-              label: 'Maks. balandlik',
+              label: _Strings.maxHeightLabel(l),
               controller: _maxHeight,
               placeholder: '12',
-              suffix: 'm',
+              suffix: _Strings.unitM(l),
               numericOnly: true,
               allowDecimal: true,
             ),
@@ -629,7 +633,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         ],
       ),
       WizardField(
-        label: 'Qurilish yili',
+        label: _Strings.constructionYearLabel(l),
         controller: _constructionYear,
         placeholder: '2018',
         numericOnly: true,
@@ -638,10 +642,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         children: [
           Expanded(
             child: WizardField(
-              label: 'Umumiy maydon',
+              label: _Strings.totalAreaLabel(l),
               controller: _totalArea,
               placeholder: '350',
-              suffix: 'm²',
+              suffix: _Strings.unitSqm(l),
               numericOnly: true,
               allowDecimal: true,
             ),
@@ -649,10 +653,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: WizardField(
-              label: 'Qurilish maydoni',
+              label: _Strings.buildingAreaLabel(l),
               controller: _buildingArea,
               placeholder: '180',
-              suffix: 'm²',
+              suffix: _Strings.unitSqm(l),
               numericOnly: true,
               allowDecimal: true,
             ),
@@ -660,17 +664,17 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         ],
       ),
       WizardSwitchTile(
-        label: 'Podval bo\'lsin',
+        label: _Strings.hasBasement(l),
         value: _draft.hasBasement,
         onChanged: (v) => setState(() => _draft.hasBasement = v),
       ),
       WizardSwitchTile(
-        label: 'Mansarda bo\'lsin',
+        label: _Strings.hasMansard(l),
         value: _draft.hasMansard,
         onChanged: (v) => setState(() => _draft.hasMansard = v),
       ),
       WizardSwitchTile(
-        label: 'Yer osti avtoturargohi',
+        label: _Strings.hasUndergroundParking(l),
         value: _draft.hasUndergroundParking,
         onChanged: (v) => setState(() => _draft.hasUndergroundParking = v),
       ),
@@ -678,9 +682,9 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // ── Step 4: Xonalar tarkibi ──────────────────────────────────────────
-  Widget _buildStep4() {
+  Widget _buildStep4(Locale l) {
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Xonalar tarkibi'),
+      WizardSectionTitle(text: _Strings.roomsComposition(l)),
       _buildRoomsEditor(),
     ]);
   }
@@ -792,11 +796,11 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // ── Step 5: Arxitektura yechimlari ───────────────────────────────────
-  Widget _buildStep5() {
+  Widget _buildStep5(Locale l) {
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Arxitektura va dizayn'),
+      WizardSectionTitle(text: _Strings.architectureAndDesign(l)),
       WizardChipPicker<String>(
-        label: 'Uslub',
+        label: _Strings.styleLabel(l),
         options: const [
           'high_tech',
           'klassik',
@@ -804,25 +808,25 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
           'minimalizm',
           'loft',
         ],
-        labelOf: _designStyleLabel,
+        labelOf: (s) => _designStyleLabel(s, l),
         value: _draft.architecture.style,
         onChanged: (v) => setState(() => _draft.architecture.style = v),
       ),
       WizardChipPicker<String>(
-        label: 'Fasad materiali',
+        label: _Strings.facadeMaterialLabel(l),
         options: const ['gisht', 'tosh', 'kompozit', 'shisha', 'boyoq'],
-        labelOf: _facadeMaterialLabel,
+        labelOf: (s) => _facadeMaterialLabel(s, l),
         value: _draft.architecture.facadeMaterial,
         onChanged: (v) =>
             setState(() => _draft.architecture.facadeMaterial = v),
       ),
       WizardField(
-        label: 'Ranglar',
+        label: _Strings.colorsLabel(l),
         controller: _colors,
-        placeholder: 'Bej, oq, yog\'och',
+        placeholder: _Strings.colorsPlaceholder(l),
       ),
       WizardSwitchTile(
-        label: '3D vizualizatsiya kerak',
+        label: _Strings.need3dVisualization(l),
         value: _draft.architecture.has3dVisualization,
         onChanged: (v) =>
             setState(() => _draft.architecture.has3dVisualization = v),
@@ -831,120 +835,125 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // ── Step 6: Konstruktiv yechimlar ────────────────────────────────────
-  Widget _buildStep6() {
+  Widget _buildStep6(Locale l) {
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Konstruktiv yechimlar'),
+      WizardSectionTitle(text: _Strings.constructiveSolutions(l)),
       WizardChipPicker<String>(
-        label: 'Konstruktiv sxema',
+        label: _Strings.constructiveSchemeLabel(l),
         options: const ['karkas', 'monolit', 'gisht', 'aralash', 'metall'],
         labelOf: (s) => switch (s) {
-          'karkas' => 'Karkas',
-          'monolit' => 'Monolit',
-          'gisht' => 'G\'isht',
-          'aralash' => 'Aralash',
-          'metall' => 'Metall',
+          'karkas' => _Strings.schemeFrame(l),
+          'monolit' => _Strings.schemeMonolith(l),
+          'gisht' => _Strings.materialBrick(l),
+          'aralash' => _Strings.schemeMixed(l),
+          'metall' => _Strings.materialMetal(l),
           _ => s,
         },
         value: _draft.constructive.scheme,
         onChanged: (v) => setState(() => _draft.constructive.scheme = v),
       ),
       WizardChipPicker<String>(
-        label: 'Poydevor',
+        label: _Strings.foundationLabel(l),
         options: const ['ustun', 'lenta', 'plita', 'svay'],
         labelOf: (s) => switch (s) {
-          'ustun' => 'Ustun',
-          'lenta' => 'Lenta',
-          'plita' => 'Plita',
-          'svay' => 'Svay',
+          'ustun' => _Strings.foundationColumn(l),
+          'lenta' => _Strings.foundationStrip(l),
+          'plita' => _Strings.foundationSlab(l),
+          'svay' => _Strings.foundationPile(l),
           _ => s,
         },
         value: _draft.constructive.foundation,
         onChanged: (v) => setState(() => _draft.constructive.foundation = v),
       ),
       WizardChipPicker<String>(
-        label: 'Devor materiali',
+        label: _Strings.wallMaterialLabel(l),
         options: const ['gisht', 'gazoblok', 'beton', 'sendvich_panel'],
         labelOf: (s) => switch (s) {
-          'gisht' => 'G\'isht',
-          'gazoblok' => 'Gazoblok',
-          'beton' => 'Beton',
-          'sendvich_panel' => 'Sendvich panel',
+          'gisht' => _Strings.materialBrick(l),
+          'gazoblok' => _Strings.materialAerocrete(l),
+          'beton' => _Strings.materialConcrete(l),
+          'sendvich_panel' => _Strings.materialSandwichPanel(l),
           _ => s,
         },
         value: _draft.constructive.walls,
         onChanged: (v) => setState(() => _draft.constructive.walls = v),
       ),
       WizardChipPicker<String>(
-        label: 'Qavat yopma',
+        label: _Strings.ceilingLabel(l),
         options: const ['temir_beton', 'yogoch', 'metall'],
         labelOf: (s) => switch (s) {
-          'temir_beton' => 'Temir-beton',
-          'yogoch' => 'Yog\'och',
-          'metall' => 'Metall',
+          'temir_beton' => _Strings.ceilingReinforcedConcrete(l),
+          'yogoch' => _Strings.materialWood(l),
+          'metall' => _Strings.materialMetal(l),
           _ => s,
         },
         value: _draft.constructive.ceiling,
         onChanged: (v) => setState(() => _draft.constructive.ceiling = v),
       ),
       WizardChipPicker<String>(
-        label: 'Tom turi',
+        label: _Strings.roofTypeLabel(l),
         options: const ['yassi', 'qiya'],
-        labelOf: (s) => s == 'yassi' ? 'Yassi' : 'Qiya',
+        labelOf: (s) =>
+            s == 'yassi' ? _Strings.roofFlat(l) : _Strings.roofPitched(l),
         value: _draft.constructive.roofType,
         onChanged: (v) => setState(() => _draft.constructive.roofType = v),
       ),
       WizardField(
-        label: 'Tom qoplama materiali',
+        label: _Strings.roofMaterialLabel(l),
         controller: _roofMaterial,
-        placeholder: 'Metall cherepitsa, profnastil…',
+        placeholder: _Strings.roofMaterialPlaceholder(l),
       ),
     ]);
   }
 
   // ── Step 7: Muhandislik tizimlari ────────────────────────────────────
-  Widget _buildStep7() {
+  Widget _buildStep7(Locale l) {
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Muhandislik tizimlari'),
+      WizardSectionTitle(text: _Strings.engineeringSystems(l)),
       WizardSwitchTile(
-        label: 'Zaxira generator',
+        label: _Strings.backupGenerator(l),
         value: _draft.engineering.hasGenerator,
         onChanged: (v) => setState(() => _draft.engineering.hasGenerator = v),
       ),
       WizardChipPicker<String>(
-        label: 'Suv manbai',
+        label: _Strings.waterSourceLabel(l),
         options: const ['markaziy', 'quduq'],
-        labelOf: (s) => s == 'markaziy' ? 'Markaziy' : 'Quduq',
+        labelOf: (s) =>
+            s == 'markaziy' ? _Strings.central(l) : _Strings.well(l),
         value: _draft.engineering.waterSource,
         onChanged: (v) => setState(() => _draft.engineering.waterSource = v),
       ),
       WizardChipPicker<String>(
-        label: 'Kanalizatsiya',
+        label: _Strings.sewageLabel(l),
         options: const ['markaziy', 'septik'],
-        labelOf: (s) => s == 'markaziy' ? 'Markaziy' : 'Avtonom (septik)',
+        labelOf: (s) =>
+            s == 'markaziy' ? _Strings.central(l) : _Strings.septic(l),
         value: _draft.engineering.sewage,
         onChanged: (v) => setState(() => _draft.engineering.sewage = v),
       ),
       WizardChipPicker<String>(
-        label: 'Isitish',
+        label: _Strings.heatingLabel(l),
         options: const ['gaz', 'elektr', 'qozonxona'],
         labelOf: (s) => switch (s) {
-          'gaz' => 'Gaz',
-          'elektr' => 'Elektr',
-          'qozonxona' => 'Qozonxona',
+          'gaz' => _Strings.heatingGas(l),
+          'elektr' => _Strings.heatingElectric(l),
+          'qozonxona' => _Strings.heatingBoiler(l),
           _ => s,
         },
         value: _draft.engineering.heating,
         onChanged: (v) => setState(() => _draft.engineering.heating = v),
       ),
       WizardChipPicker<String>(
-        label: 'Ventilyatsiya',
+        label: _Strings.ventilationLabel(l),
         options: const ['tabiiy', 'mexanik'],
-        labelOf: (s) => s == 'tabiiy' ? 'Tabiiy' : 'Mexanik',
+        labelOf: (s) => s == 'tabiiy'
+            ? _Strings.ventilationNatural(l)
+            : _Strings.ventilationMechanical(l),
         value: _draft.engineering.ventilation,
         onChanged: (v) => setState(() => _draft.engineering.ventilation = v),
       ),
       WizardChipPicker<String>(
-        label: 'Konditsioner',
+        label: _Strings.airConditioningLabel(l),
         options: const ['split', 'vrf', 'chiller'],
         labelOf: (s) => switch (s) {
           'split' => 'Split',
@@ -957,23 +966,23 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
             setState(() => _draft.engineering.airConditioning = v),
       ),
       WizardSwitchTile(
-        label: 'Yong\'in xavfsizligi tizimi',
+        label: _Strings.fireSafetySystem(l),
         value: _draft.engineering.hasFireSystem,
         onChanged: (v) => setState(() => _draft.engineering.hasFireSystem = v),
       ),
       WizardSwitchTile(
-        label: 'Signalizatsiya',
+        label: _Strings.alarmSystem(l),
         value: _draft.engineering.hasAlarm,
         onChanged: (v) => setState(() => _draft.engineering.hasAlarm = v),
       ),
       WizardSwitchTile(
-        label: 'Videokuzatuv',
+        label: _Strings.videoSurveillance(l),
         value: _draft.engineering.hasVideoSurveillance,
         onChanged: (v) =>
             setState(() => _draft.engineering.hasVideoSurveillance = v),
       ),
       WizardSwitchTile(
-        label: 'Quyosh panellari',
+        label: _Strings.solarPanels(l),
         value: _draft.engineering.hasSolarPanels,
         onChanged: (v) =>
             setState(() => _draft.engineering.hasSolarPanels = v),
@@ -982,38 +991,38 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // ── Step 8: Hudud rejalashtirish ─────────────────────────────────────
-  Widget _buildStep8() {
+  Widget _buildStep8(Locale l) {
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Hududni rejalashtirish'),
+      WizardSectionTitle(text: _Strings.territoryPlanning(l)),
       WizardSwitchTile(
-        label: 'Avtoturargoh',
+        label: _Strings.parking(l),
         value: _draft.territory.hasParking,
         onChanged: (v) => setState(() => _draft.territory.hasParking = v),
       ),
       if (_draft.territory.hasParking)
         WizardField(
-          label: 'Parking joylar soni',
+          label: _Strings.parkingSpacesLabel(l),
           controller: _parkingCount,
           placeholder: '4',
           numericOnly: true,
         ),
       WizardSwitchTile(
-        label: 'Yo\'laklar',
+        label: _Strings.walkways(l),
         value: _draft.territory.hasPaths,
         onChanged: (v) => setState(() => _draft.territory.hasPaths = v),
       ),
       WizardSwitchTile(
-        label: 'Landshaft dizayni',
+        label: _Strings.landscapeDesign(l),
         value: _draft.territory.hasLandscape,
         onChanged: (v) => setState(() => _draft.territory.hasLandscape = v),
       ),
       WizardSwitchTile(
-        label: 'Hovuz',
+        label: _Strings.pool(l),
         value: _draft.territory.hasPool,
         onChanged: (v) => setState(() => _draft.territory.hasPool = v),
       ),
       WizardSwitchTile(
-        label: 'Hudud yoritilishi',
+        label: _Strings.territoryLighting(l),
         value: _draft.territory.hasLighting,
         onChanged: (v) => setState(() => _draft.territory.hasLighting = v),
       ),
@@ -1021,38 +1030,38 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // ── Step 9: Muddatlar va qo'shimcha talablar ─────────────────────────
-  Widget _buildStep9() {
+  Widget _buildStep9(Locale l) {
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Muddatlar'),
+      WizardSectionTitle(text: _Strings.timelines(l)),
       Row(
         children: [
           Expanded(
             child: WizardField(
-              label: 'Eskiz loyiha',
+              label: _Strings.sketchProjectLabel(l),
               controller: _sketchDays,
               placeholder: '30',
-              suffix: 'kun',
+              suffix: _Strings.unitDays(l),
               numericOnly: true,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: WizardField(
-              label: 'Ishchi loyiha',
+              label: _Strings.workingProjectLabel(l),
               controller: _workingDays,
               placeholder: '60',
-              suffix: 'kun',
+              suffix: _Strings.unitDays(l),
               numericOnly: true,
             ),
           ),
         ],
       ),
       const SizedBox(height: 4),
-      const WizardSectionTitle(text: 'Qo\'shimcha talablar'),
+      WizardSectionTitle(text: _Strings.additionalRequirements(l)),
       WizardField(
-        label: 'Izoh',
+        label: _Strings.notesLabel(l),
         controller: _notes,
-        placeholder: 'Loyihaga doir qo\'shimcha izohlar…',
+        placeholder: _Strings.notesPlaceholder(l),
         maxLines: 5,
       ),
     ]);
@@ -1071,33 +1080,101 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     return int.tryParse(t);
   }
 
-  static String _objectTypeLabel(ArchObjectType t) => switch (t) {
-        ArchObjectType.yakkaSmall => 'Yakka uy <500 m²',
-        ArchObjectType.yakkaLarge => 'Yakka uy >500 m²',
-        ArchObjectType.kopQavatli => 'Ko\'p qavatli turar-joy',
-        ArchObjectType.ofis => 'Ofis',
-        ArchObjectType.savdoMarkazi => 'Savdo markazi',
-        ArchObjectType.mehmonxona => 'Mehmonxona',
-        ArchObjectType.sanoat => 'Sanoat',
-        ArchObjectType.omborxona => 'Omborxona',
-        ArchObjectType.boshqa => 'Boshqa',
-      };
+  static String _objectTypeLabel(ArchObjectType t, Locale l) {
+    final ru = l.languageCode == 'ru';
+    final en = l.languageCode == 'en';
+    return switch (t) {
+      ArchObjectType.yakkaSmall => ru
+          ? 'Частный дом <500 m²'
+          : en
+              ? 'Single house <500 m²'
+              : 'Yakka uy <500 m²',
+      ArchObjectType.yakkaLarge => ru
+          ? 'Частный дом >500 m²'
+          : en
+              ? 'Single house >500 m²'
+              : 'Yakka uy >500 m²',
+      ArchObjectType.kopQavatli => ru
+          ? 'Многоэтажное жильё'
+          : en
+              ? 'Multi-storey residential'
+              : 'Ko\'p qavatli turar-joy',
+      ArchObjectType.ofis => ru
+          ? 'Офис'
+          : en
+              ? 'Office'
+              : 'Ofis',
+      ArchObjectType.savdoMarkazi => ru
+          ? 'Торговый центр'
+          : en
+              ? 'Shopping mall'
+              : 'Savdo markazi',
+      ArchObjectType.mehmonxona => ru
+          ? 'Гостиница'
+          : en
+              ? 'Hotel'
+              : 'Mehmonxona',
+      ArchObjectType.sanoat => ru
+          ? 'Промышленный'
+          : en
+              ? 'Industrial'
+              : 'Sanoat',
+      ArchObjectType.omborxona => ru
+          ? 'Склад'
+          : en
+              ? 'Warehouse'
+              : 'Omborxona',
+      ArchObjectType.boshqa => ru
+          ? 'Другое'
+          : en
+              ? 'Other'
+              : 'Boshqa',
+    };
+  }
 
-  static String _designStyleLabel(String s) => switch (s) {
+  static String _designStyleLabel(String s, Locale l) => switch (s) {
         'high_tech' => 'High-tech',
-        'klassik' => 'Klassik',
-        'neoklassik' => 'Neoklassik',
-        'minimalizm' => 'Minimalizm',
+        'klassik' => switch (l.languageCode) {
+            'ru' => 'Классика',
+            'en' => 'Classic',
+            _ => 'Klassik',
+          },
+        'neoklassik' => switch (l.languageCode) {
+            'ru' => 'Неоклассика',
+            'en' => 'Neoclassic',
+            _ => 'Neoklassik',
+          },
+        'minimalizm' => switch (l.languageCode) {
+            'ru' => 'Минимализм',
+            'en' => 'Minimalism',
+            _ => 'Minimalizm',
+          },
         'loft' => 'Loft',
         _ => s,
       };
 
-  static String _facadeMaterialLabel(String s) => switch (s) {
-        'gisht' => 'G\'isht',
-        'tosh' => 'Tosh',
-        'kompozit' => 'Kompozit panellar',
-        'shisha' => 'Shisha',
-        'boyoq' => 'Fasad bo\'yoqlari',
+  static String _facadeMaterialLabel(String s, Locale l) => switch (s) {
+        'gisht' => _Strings.materialBrick(l),
+        'tosh' => switch (l.languageCode) {
+            'ru' => 'Камень',
+            'en' => 'Stone',
+            _ => 'Tosh',
+          },
+        'kompozit' => switch (l.languageCode) {
+            'ru' => 'Композитные панели',
+            'en' => 'Composite panels',
+            _ => 'Kompozit panellar',
+          },
+        'shisha' => switch (l.languageCode) {
+            'ru' => 'Стекло',
+            'en' => 'Glass',
+            _ => 'Shisha',
+          },
+        'boyoq' => switch (l.languageCode) {
+            'ru' => 'Фасадные краски',
+            'en' => 'Facade paints',
+            _ => 'Fasad bo\'yoqlari',
+          },
         _ => s,
       };
 
@@ -1121,23 +1198,83 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     'khorezm',
   ];
 
-  static String _viloyatLabel(String key) => switch (key) {
-        'tashkent_city' => 'Toshkent shahri',
-        'tashkent_region' => 'Toshkent viloyati',
-        'andijan' => 'Andijon',
-        'bukhara' => 'Buxoro',
-        'fergana' => 'Farg\'ona',
-        'jizzakh' => 'Jizzax',
-        'namangan' => 'Namangan',
-        'navoi' => 'Navoiy',
-        'kashkadarya' => 'Qashqadaryo',
-        'karakalpakstan' => 'Qoraqalpog\'iston',
-        'samarkand' => 'Samarqand',
-        'syrdarya' => 'Sirdaryo',
-        'surkhandarya' => 'Surxondaryo',
-        'khorezm' => 'Xorazm',
-        _ => key,
-      };
+  static String _viloyatLabel(String key, Locale l) {
+    final ru = l.languageCode == 'ru';
+    final en = l.languageCode == 'en';
+    return switch (key) {
+      'tashkent_city' => ru
+          ? 'г. Ташкент'
+          : en
+              ? 'Tashkent city'
+              : 'Toshkent shahri',
+      'tashkent_region' => ru
+          ? 'Ташкентская область'
+          : en
+              ? 'Tashkent region'
+              : 'Toshkent viloyati',
+      'andijan' => ru
+          ? 'Андижан'
+          : en
+              ? 'Andijan'
+              : 'Andijon',
+      'bukhara' => ru
+          ? 'Бухара'
+          : en
+              ? 'Bukhara'
+              : 'Buxoro',
+      'fergana' => ru
+          ? 'Фергана'
+          : en
+              ? 'Fergana'
+              : 'Farg\'ona',
+      'jizzakh' => ru
+          ? 'Джизак'
+          : en
+              ? 'Jizzakh'
+              : 'Jizzax',
+      'namangan' => ru
+          ? 'Наманган'
+          : en
+              ? 'Namangan'
+              : 'Namangan',
+      'navoi' => ru
+          ? 'Навои'
+          : en
+              ? 'Navoi'
+              : 'Navoiy',
+      'kashkadarya' => ru
+          ? 'Кашкадарья'
+          : en
+              ? 'Kashkadarya'
+              : 'Qashqadaryo',
+      'karakalpakstan' => ru
+          ? 'Каракалпакстан'
+          : en
+              ? 'Karakalpakstan'
+              : 'Qoraqalpog\'iston',
+      'samarkand' => ru
+          ? 'Самарканд'
+          : en
+              ? 'Samarkand'
+              : 'Samarqand',
+      'syrdarya' => ru
+          ? 'Сырдарья'
+          : en
+              ? 'Syrdarya'
+              : 'Sirdaryo',
+      'surkhandarya' => ru
+          ? 'Сурхандарья'
+          : en
+              ? 'Surkhandarya'
+              : 'Surxondaryo',
+      'khorezm' => ru
+          ? 'Хорезм'
+          : en
+              ? 'Khorezm'
+              : 'Xorazm',
+      _ => key,
+    };
+  }
 
   static const Map<String, List<String>> _tumanlarByViloyat = {
     'tashkent_city': [
@@ -1167,4 +1304,697 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       'Zangiota',
     ],
   };
+}
+
+// ── Localized UI strings ────────────────────────────────────────────────
+class _Strings {
+  const _Strings._();
+
+  // Buttons / common
+  static String continueLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Продолжить',
+        'en' => 'Continue',
+        _ => 'Davom etish',
+      };
+
+  static String submitting(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отправка…',
+        'en' => 'Submitting…',
+        _ => 'Yuborilmoqda…',
+      };
+
+  static String submit(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отправить',
+        'en' => 'Submit',
+        _ => 'Yuborish',
+      };
+
+  static String archTz(Locale l) => switch (l.languageCode) {
+        'ru' => 'Архитектурное ТЗ',
+        'en' => 'Architecture TZ',
+        _ => 'Arxitektura TZ',
+      };
+
+  static String aiValuation(Locale l) => switch (l.languageCode) {
+        'ru' => 'AI оценка',
+        'en' => 'AI valuation',
+        _ => 'AI Baholash',
+      };
+
+  // Units
+  static String unitSqm(Locale l) => switch (l.languageCode) {
+        'ru' => 'м²',
+        _ => 'm²',
+      };
+
+  static String unitM(Locale l) => switch (l.languageCode) {
+        'ru' => 'м',
+        _ => 'm',
+      };
+
+  static String unitDays(Locale l) => switch (l.languageCode) {
+        'ru' => 'дней',
+        'en' => 'days',
+        _ => 'kun',
+      };
+
+  // Step crumbs
+  static String crumbCustomer(Locale l) => switch (l.languageCode) {
+        'ru' => 'Заказчик',
+        'en' => 'Customer',
+        _ => 'Buyurtmachi',
+      };
+
+  static String crumbObject(Locale l) => switch (l.languageCode) {
+        'ru' => 'Объект и адрес',
+        'en' => 'Object and address',
+        _ => 'Obyekt va manzil',
+      };
+
+  static String crumbProject(Locale l) => switch (l.languageCode) {
+        'ru' => 'О проекте',
+        'en' => 'About the project',
+        _ => 'Loyiha haqida',
+      };
+
+  static String crumbRooms(Locale l) => switch (l.languageCode) {
+        'ru' => 'Состав комнат',
+        'en' => 'Room composition',
+        _ => 'Xonalar tarkibi',
+      };
+
+  static String crumbArchitecture(Locale l) => switch (l.languageCode) {
+        'ru' => 'Архитектурные решения',
+        'en' => 'Architectural solutions',
+        _ => 'Arxitektura yechimlari',
+      };
+
+  static String crumbConstructive(Locale l) => switch (l.languageCode) {
+        'ru' => 'Конструктивные решения',
+        'en' => 'Structural solutions',
+        _ => 'Konstruktiv yechimlar',
+      };
+
+  static String crumbEngineering(Locale l) => switch (l.languageCode) {
+        'ru' => 'Инженерные системы',
+        'en' => 'Engineering systems',
+        _ => 'Muhandislik tizimlari',
+      };
+
+  static String crumbTerritory(Locale l) => switch (l.languageCode) {
+        'ru' => 'Планировка территории',
+        'en' => 'Territory planning',
+        _ => 'Hudud rejalashtirish',
+      };
+
+  static String crumbTimeline(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сроки и комментарий',
+        'en' => 'Timeline and notes',
+        _ => 'Muddatlar va izoh',
+      };
+
+  // Submit / validation messages
+  static String fillRequired(Locale l) => switch (l.languageCode) {
+        'ru' => 'Заполните обязательные поля',
+        'en' => 'Fill in the required fields',
+        _ => 'Majburiy maydonlarni to\'ldiring',
+      };
+
+  static String aiCallbackMissing(Locale l) => switch (l.languageCode) {
+        'ru' => 'Callback для AI оценки не подключён',
+        'en' => 'AI valuation callback is not connected',
+        _ => 'AI baholash uchun callback bog\'lanmagan',
+      };
+
+  static String networkError(Locale l) => switch (l.languageCode) {
+        'ru' => 'Ошибка сети',
+        'en' => 'Network error',
+        _ => 'Tarmoq xatosi',
+      };
+
+  // Step 1 — Customer
+  static String customerDetails(Locale l) => switch (l.languageCode) {
+        'ru' => 'Реквизиты заказчика',
+        'en' => 'Customer details',
+        _ => 'Buyurtmachi rekvizitlari',
+      };
+
+  static String customerNameLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Ф.И.О или название компании',
+        'en' => 'Full name or company name',
+        _ => 'F.I.SH yoki kompaniya nomi',
+      };
+
+  static String tinLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'СТИР / ИНН',
+        'en' => 'TIN',
+        _ => 'STIR / INN',
+      };
+
+  static String phoneLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Телефон',
+        'en' => 'Phone',
+        _ => 'Telefon',
+      };
+
+  // Step 2 — Object and address
+  static String objectAndAddress(Locale l) => switch (l.languageCode) {
+        'ru' => 'Объект и адрес',
+        'en' => 'Object and address',
+        _ => 'Obyekt va manzil',
+      };
+
+  static String objectNameLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Название объекта',
+        'en' => 'Object name',
+        _ => 'Obyekt nomi',
+      };
+
+  static String objectNamePlaceholder(Locale l) => switch (l.languageCode) {
+        'ru' => 'Мой дом',
+        'en' => 'My house',
+        _ => 'Mening uyim',
+      };
+
+  static String addressLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Адрес',
+        'en' => 'Address',
+        _ => 'Manzil',
+      };
+
+  static String regionLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Область',
+        'en' => 'Region',
+        _ => 'Viloyat',
+      };
+
+  static String districtLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Район',
+        'en' => 'District',
+        _ => 'Tuman',
+      };
+
+  static String cadastreNumberLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Кадастровый номер',
+        'en' => 'Cadastre number',
+        _ => 'Kadastr raqami',
+      };
+
+  static String landAreaLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Площадь участка',
+        'en' => 'Land area',
+        _ => 'Yer maydoni',
+      };
+
+  static String landUsePurposeLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Целевое назначение земли',
+        'en' => 'Land use purpose',
+        _ => 'Yerning maqsadli foydalanishi',
+      };
+
+  static String landUsePurposePlaceholder(Locale l) =>
+      switch (l.languageCode) {
+        'ru' => 'жилая / производственная',
+        'en' => 'residential / production',
+        _ => 'turar joy / ishlab chiqarish',
+      };
+
+  // Step 3 — Project
+  static String projectGeneralInfo(Locale l) => switch (l.languageCode) {
+        'ru' => 'Общие сведения о проекте',
+        'en' => 'General project information',
+        _ => 'Loyiha umumiy ma\'lumotlari',
+      };
+
+  static String objectTypeLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Тип объекта',
+        'en' => 'Object type',
+        _ => 'Obyekt turi',
+      };
+
+  static String objectSubtypeLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Другое (какого типа)',
+        'en' => 'Other (which type)',
+        _ => 'Boshqa (qaysi turdagi)',
+      };
+
+  static String objectSubtypePlaceholder(Locale l) =>
+      switch (l.languageCode) {
+        'ru' => 'Например: многофункциональный центр',
+        'en' => 'For example: multi-purpose center',
+        _ => 'Masalan: ko\'p funksiyali markaz',
+      };
+
+  static String constructionTypeLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Тип строительства',
+        'en' => 'Construction type',
+        _ => 'Qurilish turi',
+      };
+
+  static String constructionNew(Locale l) => switch (l.languageCode) {
+        'ru' => 'Новое',
+        'en' => 'New',
+        _ => 'Yangi',
+      };
+
+  static String constructionReconstruction(Locale l) =>
+      switch (l.languageCode) {
+        'ru' => 'Реконструкция',
+        'en' => 'Reconstruction',
+        _ => 'Rekonstruksiya',
+      };
+
+  static String floorsCountLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этажность',
+        'en' => 'Number of floors',
+        _ => 'Qavatlar soni',
+      };
+
+  static String maxHeightLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Макс. высота',
+        'en' => 'Max. height',
+        _ => 'Maks. balandlik',
+      };
+
+  static String constructionYearLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Год постройки',
+        'en' => 'Construction year',
+        _ => 'Qurilish yili',
+      };
+
+  static String totalAreaLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Общая площадь',
+        'en' => 'Total area',
+        _ => 'Umumiy maydon',
+      };
+
+  static String buildingAreaLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Площадь застройки',
+        'en' => 'Building area',
+        _ => 'Qurilish maydoni',
+      };
+
+  static String hasBasement(Locale l) => switch (l.languageCode) {
+        'ru' => 'С подвалом',
+        'en' => 'With basement',
+        _ => 'Podval bo\'lsin',
+      };
+
+  static String hasMansard(Locale l) => switch (l.languageCode) {
+        'ru' => 'С мансардой',
+        'en' => 'With mansard',
+        _ => 'Mansarda bo\'lsin',
+      };
+
+  static String hasUndergroundParking(Locale l) => switch (l.languageCode) {
+        'ru' => 'Подземный паркинг',
+        'en' => 'Underground parking',
+        _ => 'Yer osti avtoturargohi',
+      };
+
+  // Step 4 — Rooms
+  static String roomsComposition(Locale l) => switch (l.languageCode) {
+        'ru' => 'Состав комнат',
+        'en' => 'Room composition',
+        _ => 'Xonalar tarkibi',
+      };
+
+  // Step 5 — Architecture and design
+  static String architectureAndDesign(Locale l) => switch (l.languageCode) {
+        'ru' => 'Архитектура и дизайн',
+        'en' => 'Architecture and design',
+        _ => 'Arxitektura va dizayn',
+      };
+
+  static String styleLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Стиль',
+        'en' => 'Style',
+        _ => 'Uslub',
+      };
+
+  static String facadeMaterialLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Материал фасада',
+        'en' => 'Facade material',
+        _ => 'Fasad materiali',
+      };
+
+  static String colorsLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Цвета',
+        'en' => 'Colors',
+        _ => 'Ranglar',
+      };
+
+  static String colorsPlaceholder(Locale l) => switch (l.languageCode) {
+        'ru' => 'Бежевый, белый, дерево',
+        'en' => 'Beige, white, wood',
+        _ => 'Bej, oq, yog\'och',
+      };
+
+  static String need3dVisualization(Locale l) => switch (l.languageCode) {
+        'ru' => 'Нужна 3D визуализация',
+        'en' => '3D visualization needed',
+        _ => '3D vizualizatsiya kerak',
+      };
+
+  // Step 6 — Constructive solutions
+  static String constructiveSolutions(Locale l) => switch (l.languageCode) {
+        'ru' => 'Конструктивные решения',
+        'en' => 'Structural solutions',
+        _ => 'Konstruktiv yechimlar',
+      };
+
+  static String constructiveSchemeLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Конструктивная схема',
+        'en' => 'Structural scheme',
+        _ => 'Konstruktiv sxema',
+      };
+
+  static String schemeFrame(Locale l) => switch (l.languageCode) {
+        'ru' => 'Каркас',
+        'en' => 'Frame',
+        _ => 'Karkas',
+      };
+
+  static String schemeMonolith(Locale l) => switch (l.languageCode) {
+        'ru' => 'Монолит',
+        'en' => 'Monolith',
+        _ => 'Monolit',
+      };
+
+  static String schemeMixed(Locale l) => switch (l.languageCode) {
+        'ru' => 'Смешанная',
+        'en' => 'Mixed',
+        _ => 'Aralash',
+      };
+
+  static String foundationLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Фундамент',
+        'en' => 'Foundation',
+        _ => 'Poydevor',
+      };
+
+  static String foundationColumn(Locale l) => switch (l.languageCode) {
+        'ru' => 'Столбчатый',
+        'en' => 'Column',
+        _ => 'Ustun',
+      };
+
+  static String foundationStrip(Locale l) => switch (l.languageCode) {
+        'ru' => 'Ленточный',
+        'en' => 'Strip',
+        _ => 'Lenta',
+      };
+
+  static String foundationSlab(Locale l) => switch (l.languageCode) {
+        'ru' => 'Плитный',
+        'en' => 'Slab',
+        _ => 'Plita',
+      };
+
+  static String foundationPile(Locale l) => switch (l.languageCode) {
+        'ru' => 'Свайный',
+        'en' => 'Pile',
+        _ => 'Svay',
+      };
+
+  static String wallMaterialLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Материал стен',
+        'en' => 'Wall material',
+        _ => 'Devor materiali',
+      };
+
+  static String ceilingLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Перекрытия',
+        'en' => 'Floor slabs',
+        _ => 'Qavat yopma',
+      };
+
+  static String ceilingReinforcedConcrete(Locale l) =>
+      switch (l.languageCode) {
+        'ru' => 'Железобетон',
+        'en' => 'Reinforced concrete',
+        _ => 'Temir-beton',
+      };
+
+  static String roofTypeLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Тип крыши',
+        'en' => 'Roof type',
+        _ => 'Tom turi',
+      };
+
+  static String roofFlat(Locale l) => switch (l.languageCode) {
+        'ru' => 'Плоская',
+        'en' => 'Flat',
+        _ => 'Yassi',
+      };
+
+  static String roofPitched(Locale l) => switch (l.languageCode) {
+        'ru' => 'Скатная',
+        'en' => 'Pitched',
+        _ => 'Qiya',
+      };
+
+  static String roofMaterialLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Материал кровли',
+        'en' => 'Roofing material',
+        _ => 'Tom qoplama materiali',
+      };
+
+  static String roofMaterialPlaceholder(Locale l) => switch (l.languageCode) {
+        'ru' => 'Металлочерепица, профнастил…',
+        'en' => 'Metal tiles, corrugated sheet…',
+        _ => 'Metall cherepitsa, profnastil…',
+      };
+
+  // Shared materials
+  static String materialBrick(Locale l) => switch (l.languageCode) {
+        'ru' => 'Кирпич',
+        'en' => 'Brick',
+        _ => 'G\'isht',
+      };
+
+  static String materialMetal(Locale l) => switch (l.languageCode) {
+        'ru' => 'Металл',
+        'en' => 'Metal',
+        _ => 'Metall',
+      };
+
+  static String materialAerocrete(Locale l) => switch (l.languageCode) {
+        'ru' => 'Газоблок',
+        'en' => 'Aerated concrete',
+        _ => 'Gazoblok',
+      };
+
+  static String materialConcrete(Locale l) => switch (l.languageCode) {
+        'ru' => 'Бетон',
+        'en' => 'Concrete',
+        _ => 'Beton',
+      };
+
+  static String materialSandwichPanel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сэндвич-панель',
+        'en' => 'Sandwich panel',
+        _ => 'Sendvich panel',
+      };
+
+  static String materialWood(Locale l) => switch (l.languageCode) {
+        'ru' => 'Дерево',
+        'en' => 'Wood',
+        _ => 'Yog\'och',
+      };
+
+  // Step 7 — Engineering systems
+  static String engineeringSystems(Locale l) => switch (l.languageCode) {
+        'ru' => 'Инженерные системы',
+        'en' => 'Engineering systems',
+        _ => 'Muhandislik tizimlari',
+      };
+
+  static String backupGenerator(Locale l) => switch (l.languageCode) {
+        'ru' => 'Резервный генератор',
+        'en' => 'Backup generator',
+        _ => 'Zaxira generator',
+      };
+
+  static String waterSourceLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Источник воды',
+        'en' => 'Water source',
+        _ => 'Suv manbai',
+      };
+
+  static String central(Locale l) => switch (l.languageCode) {
+        'ru' => 'Центральный',
+        'en' => 'Central',
+        _ => 'Markaziy',
+      };
+
+  static String well(Locale l) => switch (l.languageCode) {
+        'ru' => 'Скважина',
+        'en' => 'Well',
+        _ => 'Quduq',
+      };
+
+  static String sewageLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Канализация',
+        'en' => 'Sewerage',
+        _ => 'Kanalizatsiya',
+      };
+
+  static String septic(Locale l) => switch (l.languageCode) {
+        'ru' => 'Автономная (септик)',
+        'en' => 'Autonomous (septic)',
+        _ => 'Avtonom (septik)',
+      };
+
+  static String heatingLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отопление',
+        'en' => 'Heating',
+        _ => 'Isitish',
+      };
+
+  static String heatingGas(Locale l) => switch (l.languageCode) {
+        'ru' => 'Газ',
+        'en' => 'Gas',
+        _ => 'Gaz',
+      };
+
+  static String heatingElectric(Locale l) => switch (l.languageCode) {
+        'ru' => 'Электричество',
+        'en' => 'Electric',
+        _ => 'Elektr',
+      };
+
+  static String heatingBoiler(Locale l) => switch (l.languageCode) {
+        'ru' => 'Котельная',
+        'en' => 'Boiler room',
+        _ => 'Qozonxona',
+      };
+
+  static String ventilationLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Вентиляция',
+        'en' => 'Ventilation',
+        _ => 'Ventilyatsiya',
+      };
+
+  static String ventilationNatural(Locale l) => switch (l.languageCode) {
+        'ru' => 'Естественная',
+        'en' => 'Natural',
+        _ => 'Tabiiy',
+      };
+
+  static String ventilationMechanical(Locale l) => switch (l.languageCode) {
+        'ru' => 'Механическая',
+        'en' => 'Mechanical',
+        _ => 'Mexanik',
+      };
+
+  static String airConditioningLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Кондиционирование',
+        'en' => 'Air conditioning',
+        _ => 'Konditsioner',
+      };
+
+  static String fireSafetySystem(Locale l) => switch (l.languageCode) {
+        'ru' => 'Система пожарной безопасности',
+        'en' => 'Fire safety system',
+        _ => 'Yong\'in xavfsizligi tizimi',
+      };
+
+  static String alarmSystem(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сигнализация',
+        'en' => 'Alarm system',
+        _ => 'Signalizatsiya',
+      };
+
+  static String videoSurveillance(Locale l) => switch (l.languageCode) {
+        'ru' => 'Видеонаблюдение',
+        'en' => 'Video surveillance',
+        _ => 'Videokuzatuv',
+      };
+
+  static String solarPanels(Locale l) => switch (l.languageCode) {
+        'ru' => 'Солнечные панели',
+        'en' => 'Solar panels',
+        _ => 'Quyosh panellari',
+      };
+
+  // Step 8 — Territory
+  static String territoryPlanning(Locale l) => switch (l.languageCode) {
+        'ru' => 'Планировка территории',
+        'en' => 'Territory planning',
+        _ => 'Hududni rejalashtirish',
+      };
+
+  static String parking(Locale l) => switch (l.languageCode) {
+        'ru' => 'Парковка',
+        'en' => 'Parking',
+        _ => 'Avtoturargoh',
+      };
+
+  static String parkingSpacesLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Кол-во парковочных мест',
+        'en' => 'Number of parking spaces',
+        _ => 'Parking joylar soni',
+      };
+
+  static String walkways(Locale l) => switch (l.languageCode) {
+        'ru' => 'Дорожки',
+        'en' => 'Walkways',
+        _ => 'Yo\'laklar',
+      };
+
+  static String landscapeDesign(Locale l) => switch (l.languageCode) {
+        'ru' => 'Ландшафтный дизайн',
+        'en' => 'Landscape design',
+        _ => 'Landshaft dizayni',
+      };
+
+  static String pool(Locale l) => switch (l.languageCode) {
+        'ru' => 'Бассейн',
+        'en' => 'Pool',
+        _ => 'Hovuz',
+      };
+
+  static String territoryLighting(Locale l) => switch (l.languageCode) {
+        'ru' => 'Освещение территории',
+        'en' => 'Territory lighting',
+        _ => 'Hudud yoritilishi',
+      };
+
+  // Step 9 — Timeline
+  static String timelines(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сроки',
+        'en' => 'Timeline',
+        _ => 'Muddatlar',
+      };
+
+  static String sketchProjectLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Эскизный проект',
+        'en' => 'Sketch design',
+        _ => 'Eskiz loyiha',
+      };
+
+  static String workingProjectLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Рабочий проект',
+        'en' => 'Working design',
+        _ => 'Ishchi loyiha',
+      };
+
+  static String additionalRequirements(Locale l) => switch (l.languageCode) {
+        'ru' => 'Дополнительные требования',
+        'en' => 'Additional requirements',
+        _ => 'Qo\'shimcha talablar',
+      };
+
+  static String notesLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Комментарий',
+        'en' => 'Notes',
+        _ => 'Izoh',
+      };
+
+  static String notesPlaceholder(Locale l) => switch (l.languageCode) {
+        'ru' => 'Дополнительные комментарии по проекту…',
+        'en' => 'Additional notes about the project…',
+        _ => 'Loyihaga doir qo\'shimcha izohlar…',
+      };
 }

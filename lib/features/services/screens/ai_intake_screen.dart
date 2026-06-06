@@ -21,6 +21,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../../settings/settings_state.dart';
 import '../api_ai_upload_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
@@ -92,18 +93,21 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   // Short hint listing what's still missing, or null when ready.
   String? get _missingHint {
     if (_ready) return null;
+    final l = localeNotifier.value;
     final missing = <String>[];
-    if (widget.bundle.imageKeys.isEmpty) missing.add('rasm');
-    if (widget.bundle.kadastrKeys.isEmpty) missing.add('kadastr hujjati');
-    if (widget.bundle.rooms.isEmpty) missing.add('xonalar');
+    if (widget.bundle.imageKeys.isEmpty) missing.add(_Strings.missingPhoto(l));
+    if (widget.bundle.kadastrKeys.isEmpty) {
+      missing.add(_Strings.missingKadastr(l));
+    }
+    if (widget.bundle.rooms.isEmpty) missing.add(_Strings.missingRooms(l));
     final f = widget.bundle.floor;
     final tf = widget.bundle.totalFloors;
     if (f == null || tf == null || f < 1 || tf < 1) {
-      missing.add('qavat');
+      missing.add(_Strings.missingFloor(l));
     } else if (f > tf) {
-      return 'Qavat binodagi jami qavatlardan katta bo\'lmasligi kerak';
+      return _Strings.floorExceeds(l);
     }
-    return '${missing.join(', ')} majburiy';
+    return _Strings.requiredSuffix(l, missing.join(', '));
   }
 
   void _setFloor(String raw) {
@@ -128,7 +132,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   Future<void> _addPhotos() async {
     final remaining = 15 - widget.bundle.imageKeys.length;
     if (remaining <= 0) {
-      _snack("Ko'pi bilan 15 ta rasm");
+      _snack(_Strings.maxPhotos(localeNotifier.value, 15));
       return;
     }
     final List<XFile> picked = await _imagePicker.pickMultiImage(limit: remaining);
@@ -183,7 +187,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   }) async {
     final remaining = maxTotal - target.length;
     if (remaining <= 0) {
-      _snack("Ko'pi bilan $maxTotal ta fayl");
+      _snack(_Strings.maxFiles(localeNotifier.value, maxTotal));
       return;
     }
     final result = await FilePicker.platform.pickFiles(
@@ -219,7 +223,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     if (paths.isEmpty) return;
     final token = await _token();
     if (token == null || token.isEmpty) {
-      _snack('Avtorizatsiya kerak');
+      _snack(_Strings.authRequired(localeNotifier.value));
       return;
     }
     setBusy(true);
@@ -234,7 +238,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
         targetPaths.addAll(paths.take(keys.length));
       });
     } catch (e) {
-      _snack('Yuklashda xatolik: $e');
+      _snack(_Strings.uploadError(localeNotifier.value, '$e'));
     } finally {
       if (mounted) setBusy(false);
     }
@@ -255,6 +259,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final b = widget.bundle;
@@ -267,11 +272,11 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
             constraints: const BoxConstraints(maxWidth: 640),
             child: Column(
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                    title: 'Hujjat va rasmlar',
-                    subtitle: 'Baholash uchun zarur ma\'lumotlar',
+                    title: _Strings.appBarTitle(l),
+                    subtitle: _Strings.appBarSubtitle(l),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -280,8 +285,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     children: [
                       _UploadCard(
-                        title: 'Obyekt rasmlari',
-                        hint: 'Ichki va tashqi (1-15). Holatni baholash uchun.',
+                        title: _Strings.objectPhotos(l),
+                        hint: _Strings.objectPhotosHint(l),
                         icon: Icons.photo_camera_outlined,
                         count: b.imageKeys.length,
                         busy: _photosBusy,
@@ -292,8 +297,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
-                        title: 'Kadastr hujjatlari',
-                        hint: 'Texpasport, plan (1-20). Maydon/yil aniqlanadi.',
+                        title: _Strings.kadastrDocs(l),
+                        hint: _Strings.kadastrDocsHint(l),
                         icon: Icons.description_outlined,
                         count: b.kadastrKeys.length,
                         busy: _kadastrBusy,
@@ -304,8 +309,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
-                        title: 'Pasport / ID (ixtiyoriy)',
-                        hint: 'Hisobot uchun egasining ma\'lumoti.',
+                        title: _Strings.passport(l),
+                        hint: _Strings.passportHint(l),
                         icon: Icons.badge_outlined,
                         count: b.passportKeys.length,
                         busy: _passportBusy,
@@ -357,7 +362,9 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                         ),
                       ],
                       ListingCtaButton(
-                        label: _submitting ? 'Yuborilmoqda…' : 'Hisoblash',
+                        label: _submitting
+                            ? _Strings.submitting(l)
+                            : _Strings.calculate(l),
                         enabled: _ready && !_submitting,
                         onTap: _calculate,
                       ),
@@ -527,6 +534,7 @@ class _PreviewTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final chipBg = isDark ? const Color(0xFF14181A) : const Color(0xFFF1F2F4);
     final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
@@ -564,7 +572,7 @@ class _PreviewTile extends StatelessWidget {
             Icon(Icons.insert_drive_file_outlined, size: 22, color: muted),
             const SizedBox(height: 4),
             Text(
-              _ext.isEmpty ? 'fayl' : _ext.toUpperCase(),
+              _ext.isEmpty ? _Strings.file(l) : _ext.toUpperCase(),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -626,6 +634,7 @@ class _FloorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
 
@@ -633,7 +642,7 @@ class _FloorSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Qavat',
+          _Strings.floor(l),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -643,7 +652,7 @@ class _FloorSection extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          'Obyekt qavati va binodagi jami qavatlar',
+          _Strings.floorDescription(l),
           style: TextStyle(fontFamily: 'MTSCompact', fontSize: 12, color: muted),
         ),
         const SizedBox(height: 12),
@@ -651,7 +660,7 @@ class _FloorSection extends StatelessWidget {
           children: [
             Expanded(
               child: _FloorField(
-                label: 'Obyekt qavati',
+                label: _Strings.objectFloor(l),
                 controller: floorCtrl,
                 onChanged: onFloorChanged,
               ),
@@ -659,7 +668,7 @@ class _FloorSection extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _FloorField(
-                label: 'Jami qavatlar',
+                label: _Strings.totalFloors(l),
                 controller: totalFloorsCtrl,
                 onChanged: onTotalChanged,
               ),
@@ -837,6 +846,7 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
 
   @override
   Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
 
@@ -847,7 +857,7 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Xonalar (ixtiyoriy)',
+          _Strings.roomsOptional(l),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -857,7 +867,7 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
         ),
         const SizedBox(height: 2),
         Text(
-          'Xona turlarini tanlang, sonini kiriting',
+          _Strings.roomsHint(l),
           style: TextStyle(fontFamily: 'MTSCompact', fontSize: 12, color: muted),
         ),
         const SizedBox(height: 12),
@@ -867,13 +877,13 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
           children: [
             for (final k in _standardKinds)
               _RoomChip(
-                label: k.labelUz,
+                label: k.label(l),
                 selected: selectedKinds.contains(k),
                 onTap: () => _toggleStandard(k),
               ),
             // "Boshqa" opens a custom-name input instead of adding a fixed row.
             _RoomChip(
-              label: RoomKind.other.labelUz,
+              label: RoomKind.other.label(l),
               selected: _customOpen || hasCustom,
               onTap: () => setState(() => _customOpen = !_customOpen),
             ),
@@ -893,8 +903,8 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
               label: room.kind == RoomKind.other
                   ? (room.name?.trim().isNotEmpty ?? false
                       ? room.name!.trim()
-                      : 'Boshqa')
-                  : room.kind.labelUz,
+                      : RoomKind.other.label(l))
+                  : room.kind.label(l),
               controller: _counts[room]!,
               count: room.count,
               // Minus at 1 removes the room (toggles it off); otherwise -1.
@@ -1122,4 +1132,172 @@ class _RoomCountRow extends StatelessWidget {
       ),
     );
   }
+}
+
+// ── Localized strings ─────────────────────────────────────────────────
+class _Strings {
+  const _Strings._();
+
+  static String appBarTitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Документы и фото',
+        'en' => 'Documents and photos',
+        _ => 'Hujjat va rasmlar',
+      };
+
+  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
+        'ru' => 'Необходимые данные для оценки',
+        'en' => 'Data required for valuation',
+        _ => 'Baholash uchun zarur ma\'lumotlar',
+      };
+
+  static String calculate(Locale l) => switch (l.languageCode) {
+        'ru' => 'Рассчитать',
+        'en' => 'Calculate',
+        _ => 'Hisoblash',
+      };
+
+  static String submitting(Locale l) => switch (l.languageCode) {
+        'ru' => 'Отправка…',
+        'en' => 'Submitting…',
+        _ => 'Yuborilmoqda…',
+      };
+
+  static String objectPhotos(Locale l) => switch (l.languageCode) {
+        'ru' => 'Фото объекта',
+        'en' => 'Object photos',
+        _ => 'Obyekt rasmlari',
+      };
+
+  static String objectPhotosHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Внутри и снаружи (1-15). Для оценки состояния.',
+        'en' => 'Inside and outside (1-15). To assess the condition.',
+        _ => 'Ichki va tashqi (1-15). Holatni baholash uchun.',
+      };
+
+  static String kadastrDocs(Locale l) => switch (l.languageCode) {
+        'ru' => 'Кадастровые документы',
+        'en' => 'Cadastre documents',
+        _ => 'Kadastr hujjatlari',
+      };
+
+  static String kadastrDocsHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Техпаспорт, план (1-20). Определяются площадь/год.',
+        'en' => 'Tech passport, plan (1-20). Area/year are determined.',
+        _ => 'Texpasport, plan (1-20). Maydon/yil aniqlanadi.',
+      };
+
+  static String passport(Locale l) => switch (l.languageCode) {
+        'ru' => 'Паспорт / ID (необязательно)',
+        'en' => 'Passport / ID (optional)',
+        _ => 'Pasport / ID (ixtiyoriy)',
+      };
+
+  static String passportHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Данные владельца для отчёта.',
+        'en' => 'Owner\'s data for the report.',
+        _ => 'Hisobot uchun egasining ma\'lumoti.',
+      };
+
+  static String floor(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этаж',
+        'en' => 'Floor',
+        _ => 'Qavat',
+      };
+
+  static String floorDescription(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этаж объекта и всего этажей в здании',
+        'en' => 'Object floor and total floors in the building',
+        _ => 'Obyekt qavati va binodagi jami qavatlar',
+      };
+
+  static String objectFloor(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этаж объекта',
+        'en' => 'Object floor',
+        _ => 'Obyekt qavati',
+      };
+
+  static String totalFloors(Locale l) => switch (l.languageCode) {
+        'ru' => 'Всего этажей',
+        'en' => 'Total floors',
+        _ => 'Jami qavatlar',
+      };
+
+  static String roomsOptional(Locale l) => switch (l.languageCode) {
+        'ru' => 'Комнаты (необязательно)',
+        'en' => 'Rooms (optional)',
+        _ => 'Xonalar (ixtiyoriy)',
+      };
+
+  static String roomsHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Выберите типы комнат, укажите количество',
+        'en' => 'Select room types, enter the count',
+        _ => 'Xona turlarini tanlang, sonini kiriting',
+      };
+
+  static String file(Locale l) => switch (l.languageCode) {
+        'ru' => 'файл',
+        'en' => 'file',
+        _ => 'fayl',
+      };
+
+  static String maxPhotos(Locale l, int n) => switch (l.languageCode) {
+        'ru' => 'Не более $n фото',
+        'en' => 'Up to $n photos',
+        _ => 'Ko\'pi bilan $n ta rasm',
+      };
+
+  static String maxFiles(Locale l, int n) => switch (l.languageCode) {
+        'ru' => 'Не более $n файлов',
+        'en' => 'Up to $n files',
+        _ => 'Ko\'pi bilan $n ta fayl',
+      };
+
+  static String authRequired(Locale l) => switch (l.languageCode) {
+        'ru' => 'Требуется авторизация',
+        'en' => 'Authorization required',
+        _ => 'Avtorizatsiya kerak',
+      };
+
+  static String uploadError(Locale l, String e) => switch (l.languageCode) {
+        'ru' => 'Ошибка загрузки: $e',
+        'en' => 'Upload error: $e',
+        _ => 'Yuklashda xatolik: $e',
+      };
+
+  static String missingPhoto(Locale l) => switch (l.languageCode) {
+        'ru' => 'фото',
+        'en' => 'photo',
+        _ => 'rasm',
+      };
+
+  static String missingKadastr(Locale l) => switch (l.languageCode) {
+        'ru' => 'кадастровый документ',
+        'en' => 'cadastre document',
+        _ => 'kadastr hujjati',
+      };
+
+  static String missingRooms(Locale l) => switch (l.languageCode) {
+        'ru' => 'комнаты',
+        'en' => 'rooms',
+        _ => 'xonalar',
+      };
+
+  static String missingFloor(Locale l) => switch (l.languageCode) {
+        'ru' => 'этаж',
+        'en' => 'floor',
+        _ => 'qavat',
+      };
+
+  static String floorExceeds(Locale l) => switch (l.languageCode) {
+        'ru' => 'Этаж не может быть больше общего числа этажей',
+        'en' => 'The floor cannot exceed the total number of floors',
+        _ => 'Qavat binodagi jami qavatlardan katta bo\'lmasligi kerak',
+      };
+
+  static String requiredSuffix(Locale l, String items) =>
+      switch (l.languageCode) {
+        'ru' => '$items — обязательно',
+        'en' => '$items required',
+        _ => '$items majburiy',
+      };
 }

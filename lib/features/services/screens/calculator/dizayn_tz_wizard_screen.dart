@@ -20,6 +20,7 @@ import 'package:flutter/services.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../home/user_profile.dart';
+import '../../../settings/settings_state.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_design_order_service.dart';
 import '../../models/design_order_draft.dart';
@@ -252,9 +253,13 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     );
   }
 
+  Locale get _locale =>
+      Localizations.maybeLocaleOf(context) ?? localeNotifier.value;
+
   Future<void> _submit() async {
+    final s = _Strings(_locale);
     if (!_draft.canSubmit) {
-      _showError('Majburiy maydonlarni to\'ldiring');
+      _showError(s.fillRequiredFields);
       return;
     }
 
@@ -262,11 +267,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     final token = session.token;
     if (token == null) {
       if (mounted) {
-        _showError(switch (Localizations.localeOf(context).languageCode) {
-          'ru' => 'Чтобы отправить заявку, сначала войдите в систему',
-          'en' => 'Please sign in first to submit the order',
-          _ => 'Buyurtma yuborish uchun avval tizimga kiring',
-        });
+        _showError(s.signInFirst);
       }
       return;
     }
@@ -284,7 +285,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     } on DesignOrderApiException catch (e) {
       _showError(e.message);
     } catch (e) {
-      _showError('Tarmoq xatosi: $e');
+      _showError('${_Strings(_locale).networkError}: $e');
     } finally {
       api.dispose();
       if (mounted) setState(() => _submitting = false);
@@ -303,6 +304,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
+    final s = _Strings(Localizations.localeOf(context));
 
     return Scaffold(
       backgroundColor: bg,
@@ -318,8 +320,8 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: 'Dizayn TZ',
-                        subtitle: _stepTitle(_stepIndex),
+                        title: s.appBarTitle,
+                        subtitle: _stepTitle(_stepIndex, s),
                         onBack: _back,
                       ),
                     ),
@@ -349,8 +351,8 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       child: ListingCtaButton(
                         label: _submitting
-                            ? 'Yuborilmoqda…'
-                            : (_isLastStep ? 'Yuborish' : 'Davom etish'),
+                            ? s.submitting
+                            : (_isLastStep ? s.submit : s.continueLabel),
                         enabled: _canAdvance && !_submitting,
                         onTap: _next,
                       ),
@@ -365,15 +367,15 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     );
   }
 
-  String _stepTitle(int i) {
+  String _stepTitle(int i, _Strings s) {
     return switch (i) {
-      0 => '1/7 — Buyurtmachi',
-      1 => '2/7 — Obyekt va o\'lchamlar',
-      2 => '3/7 — Qo\'shimcha xonalar',
-      3 => '4/7 — Interyer dizayni',
-      4 => '5/7 — Muhandislik tizimlari',
-      5 => '6/7 — Eksteryer dizayni',
-      6 => '7/7 — Muddatlar va izoh',
+      0 => '1/7 — ${s.crumbCustomer}',
+      1 => '2/7 — ${s.crumbObject}',
+      2 => '3/7 — ${s.crumbExtraRooms}',
+      3 => '4/7 — ${s.crumbInterior}',
+      4 => '5/7 — ${s.crumbEngineering}',
+      5 => '6/7 — ${s.crumbExterior}',
+      6 => '7/7 — ${s.crumbTimeline}',
       _ => '',
     };
   }
@@ -389,12 +391,13 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   // ── Step 1: Buyurtmachi ──────────────────────────────────────────────
   Widget _buildStep1() {
+    final s = _Strings(_locale);
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Buyurtmachi rekvizitlari'),
+      WizardSectionTitle(text: s.customerDetails),
       WizardField(
-        label: 'F.I.SH yoki kompaniya nomi',
+        label: s.fullNameOrCompany,
         controller: _customerName,
-        placeholder: 'Ism Familiya',
+        placeholder: s.namePlaceholder,
         required: true,
       ),
       WizardField(
@@ -403,11 +406,10 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         placeholder: '300000000',
         numericOnly: true,
         maxLength: 14,
-        errorText:
-            _tinValid ? null : '9 (STIR) yoki 14 (INN) raqamdan iborat bo\'lsin',
+        errorText: _tinValid ? null : s.tinError,
       ),
       WizardField(
-        label: 'Telefon',
+        label: s.phone,
         controller: _phone,
         placeholder: '+998 90 123 45 67',
         keyboardType: TextInputType.phone,
@@ -424,15 +426,16 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   // ── Step 2: Obyekt va o'lchamlar ─────────────────────────────────────
   Widget _buildStep2() {
+    final s = _Strings(_locale);
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Obyekt va o\'lchamlar'),
+      WizardSectionTitle(text: s.objectAndDimensions),
       WizardField(
-        label: 'Obyekt nomi',
+        label: s.objectName,
         controller: _objectName,
-        placeholder: 'Mening kvartiram',
+        placeholder: s.objectNamePlaceholder,
       ),
       LocationPickerField(
-        label: 'Manzil',
+        label: s.address,
         value: _draft.location,
         onChanged: (loc) => setState(() {
           _draft.location = loc;
@@ -442,23 +445,24 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         }),
       ),
       WizardChipPicker<DizObjectType>(
-        label: 'Obyekt turi',
+        label: s.objectType,
         required: true,
         options: DizObjectType.values,
-        labelOf: _objectTypeLabel,
+        labelOf: (t) => _objectTypeLabel(t, s),
         value: _draft.objectType,
         onChanged: (v) => setState(() => _draft.objectType = v),
       ),
       if (_draft.objectType == DizObjectType.boshqa)
         WizardField(
-          label: 'Boshqa (qaysi turdagi)',
+          label: s.otherWhichType,
           controller: _objectSubtype,
-          placeholder: 'Masalan: ko\'p funksiyali markaz',
+          placeholder: s.otherTypePlaceholder,
         ),
       WizardChipPicker<DizDesignType>(
-        label: 'Dizayn turi',
+        label: s.designType,
         options: DizDesignType.values,
-        labelOf: (t) => t == DizDesignType.yangi ? 'Yangi' : 'Rekonstruksiya',
+        labelOf: (t) =>
+            t == DizDesignType.yangi ? s.designNew : s.designReconstruction,
         value: _draft.designType,
         onChanged: (v) =>
             setState(() => _draft.designType = v ?? DizDesignType.yangi),
@@ -467,7 +471,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         children: [
           Expanded(
             child: WizardField(
-              label: 'Qavatlar soni',
+              label: s.floorsCount,
               controller: _floors,
               placeholder: '1',
               numericOnly: true,
@@ -476,7 +480,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: WizardField(
-              label: 'Xonalar soni',
+              label: s.roomsCount,
               controller: _roomsCount,
               placeholder: '4',
               numericOnly: true,
@@ -488,7 +492,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         children: [
           Expanded(
             child: WizardField(
-              label: 'Umumiy maydon',
+              label: s.totalArea,
               controller: _totalArea,
               placeholder: '120',
               suffix: 'm²',
@@ -499,7 +503,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: WizardField(
-              label: 'Honalar balandligi',
+              label: s.ceilingHeight,
               controller: _ceilingHeight,
               placeholder: '3',
               suffix: 'm',
@@ -513,7 +517,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         children: [
           Expanded(
             child: WizardField(
-              label: 'Interyer maydoni',
+              label: s.interiorArea,
               controller: _interiorArea,
               placeholder: '100',
               suffix: 'm²',
@@ -524,7 +528,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
           const SizedBox(width: 12),
           Expanded(
             child: WizardField(
-              label: 'Dizayn maydoni',
+              label: s.designArea,
               controller: _designArea,
               placeholder: '100',
               suffix: 'm²',
@@ -535,12 +539,12 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         ],
       ),
       WizardSwitchTile(
-        label: 'Podval bo\'lsin',
+        label: s.hasBasement,
         value: _draft.hasBasement,
         onChanged: (v) => setState(() => _draft.hasBasement = v),
       ),
       WizardSwitchTile(
-        label: 'Mansarda bo\'lsin',
+        label: s.hasMansard,
         value: _draft.hasMansard,
         onChanged: (v) => setState(() => _draft.hasMansard = v),
       ),
@@ -549,12 +553,13 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   // ── Step 3: Qo'shimcha xonalar ───────────────────────────────────────
   Widget _buildStep3() {
+    final s = _Strings(_locale);
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Qo\'shimcha xonalar'),
+      WizardSectionTitle(text: s.extraRoomsTitle),
       WizardField(
-        label: 'Qo\'shimcha (boshqa) xonalar',
+        label: s.extraRoomsLabel,
         controller: _extraRooms,
-        placeholder: 'Masalan: ish kabineti, kiyim xonasi, kutubxona…',
+        placeholder: s.extraRoomsPlaceholder,
         maxLines: 5,
       ),
     ]);
@@ -562,48 +567,49 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   // ── Step 4: Interyer dizayni ─────────────────────────────────────────
   Widget _buildStep4() {
+    final s = _Strings(_locale);
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Interyer dizayni'),
+      WizardSectionTitle(text: s.interiorDesign),
       WizardChipPicker<String>(
-        label: 'Uslub',
+        label: s.style,
         options: _interiorStyles,
-        labelOf: (s) => _styleLabels[s] ?? s,
+        labelOf: (k) => s.styleLabel(k),
         value: _draft.interior.style,
         onChanged: (v) => setState(() => _draft.interior.style = v),
       ),
       WizardChipPicker<String>(
-        label: 'Interyer materiali',
+        label: s.interiorMaterial,
         options: _interiorMaterials,
-        labelOf: (s) => _materialLabels[s] ?? s,
+        labelOf: (k) => s.materialLabel(k),
         value: _draft.interior.interiorMaterial,
         onChanged: (v) => setState(() => _draft.interior.interiorMaterial = v),
       ),
       WizardChipPicker<String>(
-        label: 'Pol materiali',
+        label: s.floorMaterial,
         options: _floorMaterials,
-        labelOf: (s) => _materialLabels[s] ?? s,
+        labelOf: (k) => s.materialLabel(k),
         value: _draft.interior.floorMaterial,
         onChanged: (v) => setState(() => _draft.interior.floorMaterial = v),
       ),
       ColorPaletteField(
-        label: 'Ranglar',
+        label: s.colors,
         value: _draft.interior.colors,
         onChanged: (v) =>
             _draft.interior.colors = v.trim().isEmpty ? null : v.trim(),
       ),
       WizardSwitchTile(
-        label: '3D vizualizatsiya kerak',
+        label: s.need3dVisualization,
         value: _draft.interior.has3dVisualization,
         onChanged: (v) =>
             setState(() => _draft.interior.has3dVisualization = v),
       ),
       WizardSwitchTile(
-        label: 'Loyihaning ishchi chizmalari',
+        label: s.projectWorkingDrawings,
         value: _draft.interior.hasWorkingDrawings,
         onChanged: (v) => setState(() => _draft.interior.hasWorkingDrawings = v),
       ),
       WizardSwitchTile(
-        label: 'Mualliflik nazorati',
+        label: s.authorSupervision,
         value: _draft.interior.hasAuthorSupervision,
         onChanged: (v) =>
             setState(() => _draft.interior.hasAuthorSupervision = v),
@@ -613,65 +619,66 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   // ── Step 5: Muhandislik tizimlari ────────────────────────────────────
   Widget _buildStep5() {
+    final s = _Strings(_locale);
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Muhandislik tizimlari'),
+      WizardSectionTitle(text: s.engineeringSystems),
       WizardSwitchTile(
-        label: 'Elektrika chizmalari',
+        label: s.electricalDrawings,
         value: _draft.engineering.hasElectricalDrawings,
         onChanged: (v) =>
             setState(() => _draft.engineering.hasElectricalDrawings = v),
       ),
       WizardSwitchTile(
-        label: 'Santexnika joylashuv chizmalari',
+        label: s.plumbingDrawings,
         value: _draft.engineering.hasPlumbingDrawings,
         onChanged: (v) =>
             setState(() => _draft.engineering.hasPlumbingDrawings = v),
       ),
       WizardSwitchTile(
-        label: 'Demontaj devorlar bo\'linmasi',
+        label: s.demolitionPlan,
         value: _draft.engineering.hasDemolitionPlan,
         onChanged: (v) =>
             setState(() => _draft.engineering.hasDemolitionPlan = v),
       ),
       WizardSwitchTile(
-        label: 'Montaj devorlar bo\'linmasi',
+        label: s.montagePlan,
         value: _draft.engineering.hasMontagePlan,
         onChanged: (v) => setState(() => _draft.engineering.hasMontagePlan = v),
       ),
       WizardSwitchTile(
-        label: 'Gipsokarton bo\'linmalari va chizmalari',
+        label: s.gypsumPlan,
         value: _draft.engineering.hasGypsumPlan,
         onChanged: (v) => setState(() => _draft.engineering.hasGypsumPlan = v),
       ),
       WizardChipPicker<String>(
-        label: 'Honalar bo\'linmalari',
+        label: s.partitionLabel,
         options: _partitionMaterials,
-        labelOf: (s) => _materialLabels[s] ?? s,
+        labelOf: (k) => s.materialLabel(k),
         value: _draft.engineering.partitionMaterial,
         onChanged: (v) =>
             setState(() => _draft.engineering.partitionMaterial = v),
       ),
       WizardChipPicker<String>(
-        label: 'Konditsioner',
+        label: s.airConditioning,
         options: _acTypes,
-        labelOf: (s) => _acLabels[s] ?? s,
+        labelOf: (k) => s.acLabel(k),
         value: _draft.engineering.airConditioning,
         onChanged: (v) =>
             setState(() => _draft.engineering.airConditioning = v),
       ),
       WizardSwitchTile(
-        label: 'Yong\'in xavfsizligi tizimi',
+        label: s.fireSystem,
         value: _draft.engineering.hasFireSystem,
         onChanged: (v) => setState(() => _draft.engineering.hasFireSystem = v),
       ),
       WizardSwitchTile(
-        label: 'Videokuzatuv',
+        label: s.videoSurveillance,
         value: _draft.engineering.hasVideoSurveillance,
         onChanged: (v) =>
             setState(() => _draft.engineering.hasVideoSurveillance = v),
       ),
       WizardSwitchTile(
-        label: 'Mebellar joylashuvi',
+        label: s.furnitureLayout,
         value: _draft.engineering.hasFurnitureLayout,
         onChanged: (v) =>
             setState(() => _draft.engineering.hasFurnitureLayout = v),
@@ -681,57 +688,58 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   // ── Step 6: Eksteryer dizayni ────────────────────────────────────────
   Widget _buildStep6() {
+    final s = _Strings(_locale);
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Eksteryer dizayni'),
+      WizardSectionTitle(text: s.exteriorDesign),
       WizardChipPicker<String>(
-        label: 'Uslub',
+        label: s.style,
         options: _exteriorStyles,
-        labelOf: (s) => _styleLabels[s] ?? s,
+        labelOf: (k) => s.styleLabel(k),
         value: _draft.exterior.style,
         onChanged: (v) => setState(() => _draft.exterior.style = v),
       ),
       WizardChipPicker<String>(
-        label: 'Eksteryer materiali',
+        label: s.exteriorMaterial,
         options: _exteriorMaterials,
-        labelOf: (s) => _materialLabels[s] ?? s,
+        labelOf: (k) => s.materialLabel(k),
         value: _draft.exterior.exteriorMaterial,
         onChanged: (v) => setState(() => _draft.exterior.exteriorMaterial = v),
       ),
       ColorPaletteField(
-        label: 'Ranglar',
+        label: s.colors,
         value: _draft.exterior.colors,
         onChanged: (v) =>
             _draft.exterior.colors = v.trim().isEmpty ? null : v.trim(),
       ),
       WizardSwitchTile(
-        label: 'Avtoturargoh',
+        label: s.parking,
         value: _draft.exterior.hasParking,
         onChanged: (v) => setState(() => _draft.exterior.hasParking = v),
       ),
       if (_draft.exterior.hasParking)
         WizardField(
-          label: 'Parking joylar soni',
+          label: s.parkingSpacesCount,
           controller: _parkingCount,
           placeholder: '4',
           numericOnly: true,
         ),
       WizardSwitchTile(
-        label: 'Yo\'laklar',
+        label: s.paths,
         value: _draft.exterior.hasPaths,
         onChanged: (v) => setState(() => _draft.exterior.hasPaths = v),
       ),
       WizardSwitchTile(
-        label: 'Landshaft dizayni',
+        label: s.landscapeDesign,
         value: _draft.exterior.hasLandscape,
         onChanged: (v) => setState(() => _draft.exterior.hasLandscape = v),
       ),
       WizardSwitchTile(
-        label: 'Hovuz',
+        label: s.pool,
         value: _draft.exterior.hasPool,
         onChanged: (v) => setState(() => _draft.exterior.hasPool = v),
       ),
       WizardSwitchTile(
-        label: 'Hudud yoritilishi',
+        label: s.areaLighting,
         value: _draft.exterior.hasLighting,
         onChanged: (v) => setState(() => _draft.exterior.hasLighting = v),
       ),
@@ -740,51 +748,52 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   // ── Step 7: Muddatlar va izoh ────────────────────────────────────────
   Widget _buildStep7() {
+    final s = _Strings(_locale);
     return _scrollableStep([
-      const WizardSectionTitle(text: 'Muddatlar'),
+      WizardSectionTitle(text: s.timeline),
       Row(
         children: [
           Expanded(
             child: WizardField(
-              label: 'Dizayn loyiha',
+              label: s.designProject,
               controller: _designDays,
               placeholder: '30',
-              suffix: 'kun',
+              suffix: s.daysUnit,
               numericOnly: true,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: WizardField(
-              label: 'Ishchi chizmalar',
+              label: s.workingDrawings,
               controller: _workingDrawingsDays,
               placeholder: '20',
-              suffix: 'kun',
+              suffix: s.daysUnit,
               numericOnly: true,
             ),
           ),
         ],
       ),
-      const WizardSectionTitle(text: 'Qo\'shimcha talablar'),
+      WizardSectionTitle(text: s.additionalRequirements),
       WizardField(
-        label: 'Izoh',
+        label: s.notes,
         controller: _notes,
-        placeholder: 'Qo\'shimcha talab va izohlar…',
+        placeholder: s.notesPlaceholder,
         maxLines: 5,
       ),
     ]);
   }
 
   // ── Label helpers ────────────────────────────────────────────────────
-  static String _objectTypeLabel(DizObjectType t) => switch (t) {
-        DizObjectType.yakka => 'Yakka tartibdagi uy',
-        DizObjectType.kopQavatliKvartira => 'Ko\'p qavatli — kvartira',
-        DizObjectType.savdoMarkazi => 'Savdo markazi',
-        DizObjectType.ofis => 'Ofis',
-        DizObjectType.mehmonxona => 'Mehmonxona',
-        DizObjectType.sanoat => 'Sanoat',
-        DizObjectType.omborxona => 'Omborxona',
-        DizObjectType.boshqa => 'Boshqa',
+  static String _objectTypeLabel(DizObjectType t, _Strings s) => switch (t) {
+        DizObjectType.yakka => s.objTypeYakka,
+        DizObjectType.kopQavatliKvartira => s.objTypeKopQavatli,
+        DizObjectType.savdoMarkazi => s.objTypeSavdoMarkazi,
+        DizObjectType.ofis => s.objTypeOfis,
+        DizObjectType.mehmonxona => s.objTypeMehmonxona,
+        DizObjectType.sanoat => s.objTypeSanoat,
+        DizObjectType.omborxona => s.objTypeOmborxona,
+        DizObjectType.boshqa => s.objTypeBoshqa,
       };
 
   static const _interiorStyles = [
@@ -803,36 +812,13 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     'loft',
     'modern',
   ];
-  static const _styleLabels = {
-    'high_tech': 'High-tech',
-    'klassik': 'Klassik',
-    'neoklassik': 'Neoklassik',
-    'minimalizm': 'Minimalizm',
-    'loft': 'Loft',
-    'modern': 'Modern',
-    'boshqa': 'Boshqa',
-  };
 
   static const _interiorMaterials = ['boyoq', 'tosh', 'kompozit', 'shisha', 'bambuk'];
   static const _floorMaterials = ['laminat', 'tosh', 'kafel', 'boshqa'];
   static const _exteriorMaterials = ['boyoq', 'tosh', 'kompozit', 'shisha'];
   static const _partitionMaterials = ['gisht', 'gipsokarton', 'gazoblok'];
-  static const _materialLabels = {
-    'boyoq': 'Bo\'yoq',
-    'tosh': 'Tosh',
-    'kompozit': 'Kompozit panellar',
-    'shisha': 'Shisha',
-    'bambuk': 'Bambuk panellar',
-    'laminat': 'Laminat',
-    'kafel': 'Kafel',
-    'boshqa': 'Boshqa',
-    'gisht': 'G\'isht',
-    'gipsokarton': 'Gipsokarton',
-    'gazoblok': 'Gazoblok',
-  };
 
   static const _acTypes = ['split', 'vrf', 'chiller'];
-  static const _acLabels = {'split': 'Split', 'vrf': 'VRF', 'chiller': 'Chiller'};
 }
 
 // ── Parse yordamchilari ────────────────────────────────────────────────
@@ -846,4 +832,219 @@ double? _parseDouble(String s) {
   final t = s.trim();
   if (t.isEmpty) return null;
   return double.tryParse(t.replaceAll(',', '.'));
+}
+
+// ── Lokalizatsiya matnlari (uz/ru/en) ──────────────────────────────────
+class _Strings {
+  const _Strings(this.locale);
+  final Locale locale;
+
+  String _s(String ru, String en, String uz) =>
+      switch (locale.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  // App bar / navigatsiya / tugmalar
+  String get appBarTitle => _s('Дизайн ТЗ', 'Design TZ', 'Dizayn TZ');
+  String get continueLabel => _s('Продолжить', 'Continue', 'Davom etish');
+  String get submit => _s('Отправить', 'Submit', 'Yuborish');
+  String get submitting => _s('Отправка…', 'Submitting…', 'Yuborilmoqda…');
+
+  // Step crumbs
+  String get crumbCustomer => _s('Заказчик', 'Customer', 'Buyurtmachi');
+  String get crumbObject =>
+      _s('Объект и размеры', 'Object and dimensions', 'Obyekt va o\'lchamlar');
+  String get crumbExtraRooms =>
+      _s('Доп. комнаты', 'Extra rooms', 'Qo\'shimcha xonalar');
+  String get crumbInterior =>
+      _s('Дизайн интерьера', 'Interior design', 'Interyer dizayni');
+  String get crumbEngineering => _s(
+      'Инженерные системы', 'Engineering systems', 'Muhandislik tizimlari');
+  String get crumbExterior =>
+      _s('Дизайн экстерьера', 'Exterior design', 'Eksteryer dizayni');
+  String get crumbTimeline =>
+      _s('Сроки и комментарий', 'Timeline and comment', 'Muddatlar va izoh');
+
+  // Snackbar / validatsiya
+  String get fillRequiredFields => _s('Заполните обязательные поля',
+      'Fill in the required fields', 'Majburiy maydonlarni to\'ldiring');
+  String get signInFirst => _s(
+      'Чтобы отправить заявку, сначала войдите в систему',
+      'Please sign in first to submit the order',
+      'Buyurtma yuborish uchun avval tizimga kiring');
+  String get networkError =>
+      _s('Сетевая ошибка', 'Network error', 'Tarmoq xatosi');
+
+  // Step 1: Buyurtmachi
+  String get customerDetails =>
+      _s('Реквизиты заказчика', 'Customer details', 'Buyurtmachi rekvizitlari');
+  String get fullNameOrCompany => _s('Ф.И.О или название компании',
+      'Full name or company name', 'F.I.SH yoki kompaniya nomi');
+  String get namePlaceholder =>
+      _s('Имя Фамилия', 'First name Last name', 'Ism Familiya');
+  String get tinError => _s(
+      '9 (СТИР) или 14 (ИНН) цифр',
+      'Must be 9 (STIR) or 14 (INN) digits',
+      '9 (STIR) yoki 14 (INN) raqamdan iborat bo\'lsin');
+  String get phone => _s('Телефон', 'Phone', 'Telefon');
+
+  // Step 2: Obyekt va o'lchamlar
+  String get objectAndDimensions =>
+      _s('Объект и размеры', 'Object and dimensions', 'Obyekt va o\'lchamlar');
+  String get objectName => _s('Название объекта', 'Object name', 'Obyekt nomi');
+  String get objectNamePlaceholder =>
+      _s('Моя квартира', 'My apartment', 'Mening kvartiram');
+  String get address => _s('Адрес', 'Address', 'Manzil');
+  String get objectType => _s('Тип объекта', 'Object type', 'Obyekt turi');
+  String get otherWhichType => _s(
+      'Другое (какого типа)', 'Other (which type)', 'Boshqa (qaysi turdagi)');
+  String get otherTypePlaceholder => _s('Например: многофункциональный центр',
+      'E.g.: multi-functional center', 'Masalan: ko\'p funksiyali markaz');
+  String get designType => _s('Тип дизайна', 'Design type', 'Dizayn turi');
+  String get designNew => _s('Новый', 'New', 'Yangi');
+  String get designReconstruction =>
+      _s('Реконструкция', 'Reconstruction', 'Rekonstruksiya');
+  String get floorsCount =>
+      _s('Количество этажей', 'Number of floors', 'Qavatlar soni');
+  String get roomsCount =>
+      _s('Количество комнат', 'Number of rooms', 'Xonalar soni');
+  String get totalArea => _s('Общая площадь', 'Total area', 'Umumiy maydon');
+  String get ceilingHeight =>
+      _s('Высота потолков', 'Ceiling height', 'Honalar balandligi');
+  String get interiorArea =>
+      _s('Площадь интерьера', 'Interior area', 'Interyer maydoni');
+  String get designArea =>
+      _s('Площадь дизайна', 'Design area', 'Dizayn maydoni');
+  String get hasBasement => _s('С подвалом', 'With basement', 'Podval bo\'lsin');
+  String get hasMansard => _s('С мансардой', 'With mansard', 'Mansarda bo\'lsin');
+
+  // Object type labels
+  String get objTypeYakka => _s(
+      'Индивидуальный дом', 'Detached house', 'Yakka tartibdagi uy');
+  String get objTypeKopQavatli => _s('Многоэтажка — квартира',
+      'Multi-storey — apartment', 'Ko\'p qavatli — kvartira');
+  String get objTypeSavdoMarkazi =>
+      _s('Торговый центр', 'Shopping center', 'Savdo markazi');
+  String get objTypeOfis => _s('Офис', 'Office', 'Ofis');
+  String get objTypeMehmonxona => _s('Гостиница', 'Hotel', 'Mehmonxona');
+  String get objTypeSanoat => _s('Промышленный', 'Industrial', 'Sanoat');
+  String get objTypeOmborxona => _s('Склад', 'Warehouse', 'Omborxona');
+  String get objTypeBoshqa => _s('Другое', 'Other', 'Boshqa');
+
+  // Step 3: Qo'shimcha xonalar
+  String get extraRoomsTitle =>
+      _s('Дополнительные комнаты', 'Additional rooms', 'Qo\'shimcha xonalar');
+  String get extraRoomsLabel => _s('Дополнительные (другие) комнаты',
+      'Additional (other) rooms', 'Qo\'shimcha (boshqa) xonalar');
+  String get extraRoomsPlaceholder => _s(
+      'Например: кабинет, гардеробная, библиотека…',
+      'E.g.: office, dressing room, library…',
+      'Masalan: ish kabineti, kiyim xonasi, kutubxona…');
+
+  // Step 4: Interyer dizayni
+  String get interiorDesign =>
+      _s('Дизайн интерьера', 'Interior design', 'Interyer dizayni');
+  String get style => _s('Стиль', 'Style', 'Uslub');
+  String get interiorMaterial => _s(
+      'Материал интерьера', 'Interior material', 'Interyer materiali');
+  String get floorMaterial =>
+      _s('Материал пола', 'Floor material', 'Pol materiali');
+  String get colors => _s('Цвета', 'Colors', 'Ranglar');
+  String get need3dVisualization => _s('Нужна 3D-визуализация',
+      '3D visualization needed', '3D vizualizatsiya kerak');
+  String get projectWorkingDrawings => _s('Рабочие чертежи проекта',
+      'Project working drawings', 'Loyihaning ishchi chizmalari');
+  String get authorSupervision =>
+      _s('Авторский надзор', 'Author supervision', 'Mualliflik nazorati');
+
+  // Step 5: Muhandislik tizimlari
+  String get engineeringSystems => _s(
+      'Инженерные системы', 'Engineering systems', 'Muhandislik tizimlari');
+  String get electricalDrawings => _s(
+      'Чертежи электрики', 'Electrical drawings', 'Elektrika chizmalari');
+  String get plumbingDrawings => _s('Чертежи разводки сантехники',
+      'Plumbing layout drawings', 'Santexnika joylashuv chizmalari');
+  String get demolitionPlan => _s('Раздел демонтажа стен',
+      'Wall demolition section', 'Demontaj devorlar bo\'linmasi');
+  String get montagePlan => _s('Раздел монтажа стен',
+      'Wall montage section', 'Montaj devorlar bo\'linmasi');
+  String get gypsumPlan => _s('Разделы и чертежи гипсокартона',
+      'Gypsum board sections and drawings',
+      'Gipsokarton bo\'linmalari va chizmalari');
+  String get partitionLabel => _s('Перегородки комнат',
+      'Room partitions', 'Honalar bo\'linmalari');
+  String get airConditioning =>
+      _s('Кондиционер', 'Air conditioning', 'Konditsioner');
+  String get fireSystem => _s('Система пожарной безопасности',
+      'Fire safety system', 'Yong\'in xavfsizligi tizimi');
+  String get videoSurveillance =>
+      _s('Видеонаблюдение', 'Video surveillance', 'Videokuzatuv');
+  String get furnitureLayout => _s('Расстановка мебели',
+      'Furniture layout', 'Mebellar joylashuvi');
+
+  // Step 6: Eksteryer dizayni
+  String get exteriorDesign =>
+      _s('Дизайн экстерьера', 'Exterior design', 'Eksteryer dizayni');
+  String get exteriorMaterial => _s(
+      'Материал экстерьера', 'Exterior material', 'Eksteryer materiali');
+  String get parking => _s('Автостоянка', 'Parking', 'Avtoturargoh');
+  String get parkingSpacesCount => _s('Количество парковочных мест',
+      'Number of parking spaces', 'Parking joylar soni');
+  String get paths => _s('Дорожки', 'Paths', 'Yo\'laklar');
+  String get landscapeDesign =>
+      _s('Ландшафтный дизайн', 'Landscape design', 'Landshaft dizayni');
+  String get pool => _s('Бассейн', 'Pool', 'Hovuz');
+  String get areaLighting =>
+      _s('Освещение территории', 'Area lighting', 'Hudud yoritilishi');
+
+  // Step 7: Muddatlar va izoh
+  String get timeline => _s('Сроки', 'Timeline', 'Muddatlar');
+  String get designProject =>
+      _s('Дизайн-проект', 'Design project', 'Dizayn loyiha');
+  String get workingDrawings =>
+      _s('Рабочие чертежи', 'Working drawings', 'Ishchi chizmalar');
+  String get daysUnit => _s('дн.', 'days', 'kun');
+  String get additionalRequirements => _s('Дополнительные требования',
+      'Additional requirements', 'Qo\'shimcha talablar');
+  String get notes => _s('Комментарий', 'Comment', 'Izoh');
+  String get notesPlaceholder => _s(
+      'Дополнительные требования и комментарии…',
+      'Additional requirements and comments…',
+      'Qo\'shimcha talab va izohlar…');
+
+  // Style options
+  String styleLabel(String key) => switch (key) {
+        'high_tech' => 'High-tech',
+        'klassik' => _s('Классика', 'Classic', 'Klassik'),
+        'neoklassik' => _s('Неоклассика', 'Neoclassic', 'Neoklassik'),
+        'minimalizm' => _s('Минимализм', 'Minimalism', 'Minimalizm'),
+        'loft' => _s('Лофт', 'Loft', 'Loft'),
+        'modern' => _s('Модерн', 'Modern', 'Modern'),
+        'boshqa' => _s('Другое', 'Other', 'Boshqa'),
+        _ => key,
+      };
+
+  // Material options
+  String materialLabel(String key) => switch (key) {
+        'boyoq' => _s('Краска', 'Paint', 'Bo\'yoq'),
+        'tosh' => _s('Камень', 'Stone', 'Tosh'),
+        'kompozit' =>
+          _s('Композитные панели', 'Composite panels', 'Kompozit panellar'),
+        'shisha' => _s('Стекло', 'Glass', 'Shisha'),
+        'bambuk' =>
+          _s('Бамбуковые панели', 'Bamboo panels', 'Bambuk panellar'),
+        'laminat' => _s('Ламинат', 'Laminate', 'Laminat'),
+        'kafel' => _s('Кафель', 'Tile', 'Kafel'),
+        'boshqa' => _s('Другое', 'Other', 'Boshqa'),
+        'gisht' => _s('Кирпич', 'Brick', 'G\'isht'),
+        'gipsokarton' => _s('Гипсокартон', 'Gypsum board', 'Gipsokarton'),
+        'gazoblok' => _s('Газоблок', 'Aerated block', 'Gazoblok'),
+        _ => key,
+      };
+
+  // Air conditioning options
+  String acLabel(String key) => switch (key) {
+        'split' => 'Split',
+        'vrf' => 'VRF',
+        'chiller' => _s('Чиллер', 'Chiller', 'Chiller'),
+        _ => key,
+      };
 }

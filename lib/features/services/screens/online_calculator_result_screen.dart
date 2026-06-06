@@ -77,11 +77,11 @@ class _OnlineCalculatorResultScreenState
         _orderSubmitting = false;
         _orderSubmitted = true;
       });
-      _snack('Ariza yuborildi');
+      _snack(_Strings.orderSent(Localizations.localeOf(context)));
     } catch (e) {
       if (!mounted) return;
       setState(() => _orderSubmitting = false);
-      _snack('Yuborishda xatolik: $e');
+      _snack(_Strings.sendError(Localizations.localeOf(context), '$e'));
     }
   }
 
@@ -280,6 +280,20 @@ class _Strings {
         'Ariza yuborildi ✓',
         'Заявка отправлена ✓',
         'Application sent ✓',
+      );
+
+  static String orderSent(Locale l) => _pick(
+        l,
+        'Ariza yuborildi',
+        'Заявка отправлена',
+        'Application sent',
+      );
+
+  static String sendError(Locale l, String e) => _pick(
+        l,
+        'Yuborishda xatolik: $e',
+        'Ошибка отправки: $e',
+        'Failed to send: $e',
       );
 }
 
