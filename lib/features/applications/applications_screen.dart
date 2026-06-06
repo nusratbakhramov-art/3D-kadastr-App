@@ -6,6 +6,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../auth/auth_storage.dart';
+import '../settings/settings_state.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_architecture_order_service.dart';
 import '../services/api_calculator_order_service.dart';
@@ -245,98 +246,113 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   }
 
   static ApplicationItem _orderToApplicationItem(OrderSummary o) {
+    final lang = localeNotifier.value.languageCode;
     final group = _statusToGroup(o.status);
     final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'arch_${o.id}',
       serviceId: 'arch',
-      serviceLabel: 'Arxitektura TZ',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'arch'),
       statusGroup: group,
-      addressLabel: 'Manzil',
+      addressLabel: _ApplicationsStrings.address(lang),
       addressValue: (o.address ?? o.cadastreNumber ?? '—'),
-      dateLabel: 'Ariza sanasi',
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
       dateValue: date,
       detailRows: [
-        ('Manzil', o.address ?? '—'),
-        if (o.cadastreNumber != null) ('Kadastr raqami', o.cadastreNumber!),
-        ('Holat', _groupLabel(group)),
-        ('Ariza sanasi', date),
+        (_ApplicationsStrings.address(lang), o.address ?? '—'),
+        if (o.cadastreNumber != null)
+          (_ApplicationsStrings.cadastreNumber(lang), o.cadastreNumber!),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
       ],
       timeline: _basicTimeline(group, o.createdAt),
     );
   }
 
   static ApplicationItem _aiJobToApplicationItem(AiJobSummary j) {
+    final lang = localeNotifier.value.languageCode;
     final hasValue = j.estimatedValue != null;
     final group = _aiJobStatusToGroup(j.status);
     final date = _formatDate(j.createdAt);
     return ApplicationItem(
       id: 'aival_${j.id}',
       serviceId: 'ai_eval',
-      serviceLabel: 'AI Baholash',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'ai_eval'),
       statusGroup: group,
-      addressLabel: hasValue ? 'Taxminiy qiymat' : 'Kadastr raqami',
+      addressLabel: hasValue
+          ? _ApplicationsStrings.estimatedValue(lang)
+          : _ApplicationsStrings.cadastreNumber(lang),
       addressValue: hasValue
           ? _formatUzs(j.estimatedValue!)
           : (j.cadastreNumber ?? '—'),
-      dateLabel: 'Ariza sanasi',
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
       dateValue: date,
-      typeLabel: hasValue && j.cadastreNumber != null ? 'Kadastr' : null,
+      typeLabel: hasValue && j.cadastreNumber != null
+          ? _ApplicationsStrings.cadastre(lang)
+          : null,
       typeValue: hasValue ? j.cadastreNumber : null,
       detailRows: [
-        if (j.cadastreNumber != null) ('Kadastr raqami', j.cadastreNumber!),
-        if (hasValue) ('Taxminiy qiymat', _formatUzs(j.estimatedValue!)),
-        ('Holat', _groupLabel(group)),
-        ('Ariza sanasi', date),
+        if (j.cadastreNumber != null)
+          (_ApplicationsStrings.cadastreNumber(lang), j.cadastreNumber!),
+        if (hasValue)
+          (_ApplicationsStrings.estimatedValue(lang), _formatUzs(j.estimatedValue!)),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
       ],
       timeline: _basicTimeline(group, j.createdAt),
     );
   }
 
   static ApplicationItem _calcToApplicationItem(CalculatorOrderSummary o) {
+    final lang = localeNotifier.value.languageCode;
     final group = _calcStatusToGroup(o.status);
     final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'calc_${o.id}',
       serviceId: 'calc',
-      serviceLabel: 'Kalkulyator',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'calc'),
       statusGroup: group,
-      addressLabel: 'Turi',
+      addressLabel: _ApplicationsStrings.type(lang),
       addressValue: o.categoryTitle,
-      dateLabel: 'Ariza sanasi',
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
       dateValue: date,
-      typeLabel: 'Narx',
+      typeLabel: _ApplicationsStrings.price(lang),
       typeValue: _formatUzs(o.totalUzs),
       detailRows: [
-        ('Turi', o.categoryTitle),
-        ('Narx', _formatUzs(o.totalUzs)),
-        ('Holat', _groupLabel(group)),
-        ('Ariza sanasi', date),
+        (_ApplicationsStrings.type(lang), o.categoryTitle),
+        (_ApplicationsStrings.price(lang), _formatUzs(o.totalUzs)),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
       ],
       timeline: _basicTimeline(group, o.createdAt),
     );
   }
 
   static ApplicationItem _kadastr3dToApplicationItem(Kadastr3dJobSummary j) {
+    final lang = localeNotifier.value.languageCode;
     final group = _kadastr3dStatusToGroup(j.status);
     final date = _formatDate(j.createdAt);
     final objectType = _objectTypeLabel(j.objectType);
     return ApplicationItem(
       id: 'kad3d_${j.id}',
       serviceId: 'kad_3d',
-      serviceLabel: '3D Kadastr',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'kad_3d'),
       statusGroup: group,
-      addressLabel: 'Kadastr raqami',
+      addressLabel: _ApplicationsStrings.cadastreNumber(lang),
       addressValue: j.cadastreNumber ?? '—',
-      dateLabel: 'Ariza sanasi',
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
       dateValue: date,
-      typeLabel: objectType != null ? 'Obyekt turi' : null,
+      typeLabel: objectType != null
+          ? _ApplicationsStrings.objectType(lang)
+          : null,
       typeValue: objectType,
       detailRows: [
-        if (j.cadastreNumber != null) ('Kadastr raqami', j.cadastreNumber!),
-        if (objectType != null) ('Obyekt turi', objectType),
-        ('Holat', _groupLabel(group)),
-        ('Ariza sanasi', date),
+        if (j.cadastreNumber != null)
+          (_ApplicationsStrings.cadastreNumber(lang), j.cadastreNumber!),
+        if (objectType != null)
+          (_ApplicationsStrings.objectType(lang), objectType),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
       ],
       timeline: _basicTimeline(group, j.createdAt),
     );
@@ -352,21 +368,23 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   }
 
   static String? _objectTypeLabel(String? wire) {
+    final lang = localeNotifier.value.languageCode;
     return switch (wire) {
-      'residential' => 'Turar joy',
-      'non_residential' => 'Noturar joy',
-      'warehouse' => 'Ombor',
-      'industrial' => 'Sanoat',
+      'residential' => _ApplicationsStrings.residential(lang),
+      'non_residential' => _ApplicationsStrings.nonResidential(lang),
+      'warehouse' => _ApplicationsStrings.warehouse(lang),
+      'industrial' => _ApplicationsStrings.industrial(lang),
       _ => null,
     };
   }
 
   static String _groupLabel(ApplicationStatusGroup g) {
+    final lang = localeNotifier.value.languageCode;
     return switch (g) {
-      ApplicationStatusGroup.sent => 'Yuborilgan',
-      ApplicationStatusGroup.inProgress => 'Jarayonda',
-      ApplicationStatusGroup.completed => 'Tayyor',
-      ApplicationStatusGroup.cancelled => 'Bekor qilingan',
+      ApplicationStatusGroup.sent => _ApplicationsStrings.submitted(lang),
+      ApplicationStatusGroup.inProgress => _ApplicationsStrings.inProgress(lang),
+      ApplicationStatusGroup.completed => _ApplicationsStrings.ready(lang),
+      ApplicationStatusGroup.cancelled => _ApplicationsStrings.cancelled(lang),
     };
   }
 
@@ -434,28 +452,34 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static ApplicationItem _photogrammetryToApplicationItem(
     PhotogrammetryJobSummary j,
   ) {
+    final lang = localeNotifier.value.languageCode;
     final group = _photogrammetryStatusToGroup(j.status);
     final date = _formatDate(j.createdAt);
+    final photoCountValue =
+        '${j.photoCount} ${_ApplicationsStrings.pcsUnit(lang)}';
     return ApplicationItem(
       id: 'photo_${j.id}',
       serviceId: 'kad_3d',
-      serviceLabel: '3D Skan',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, '3d_scan'),
       statusGroup: group,
-      addressLabel: 'Foto soni',
-      addressValue: '${j.photoCount} ta',
-      dateLabel: 'Yuborilgan',
+      addressLabel: _ApplicationsStrings.photoCount(lang),
+      addressValue: photoCountValue,
+      dateLabel: _ApplicationsStrings.submitted(lang),
       dateValue: date,
       typeLabel: j.isCompleted
-          ? '3D model'
-          : (j.status == 'failed' ? 'Xato' : 'Holat'),
+          ? _ApplicationsStrings.model3d(lang)
+          : (j.status == 'failed'
+              ? _ApplicationsStrings.error(lang)
+              : _ApplicationsStrings.status(lang)),
       typeValue: j.isCompleted
-          ? 'Tayyor'
+          ? _ApplicationsStrings.ready(lang)
           : (j.errorMessage ?? _photogrammetryStatusLabel(j.status)),
       detailRows: [
-        ('Foto soni', '${j.photoCount} ta'),
-        ('Holat', _photogrammetryStatusLabel(j.status)),
-        if (j.errorMessage != null) ('Xato', j.errorMessage!),
-        ('Yuborilgan', date),
+        (_ApplicationsStrings.photoCount(lang), photoCountValue),
+        (_ApplicationsStrings.status(lang), _photogrammetryStatusLabel(j.status)),
+        if (j.errorMessage != null)
+          (_ApplicationsStrings.error(lang), j.errorMessage!),
+        (_ApplicationsStrings.submitted(lang), date),
       ],
       // Completed photogrammetry jobs have a downloadable 3D model.
       hasDeliverable: j.isCompleted,
@@ -472,24 +496,26 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   }
 
   static String _photogrammetryStatusLabel(String status) {
+    final lang = localeNotifier.value.languageCode;
     return switch (status) {
-      'pending' => 'Navbatda',
-      'processing' => 'Ishlamoqda',
-      'completed' => 'Tayyor',
-      'failed' => 'Xato',
-      'cancelled' => 'Bekor qilingan',
+      'pending' => _ApplicationsStrings.queued(lang),
+      'processing' => _ApplicationsStrings.processing(lang),
+      'completed' => _ApplicationsStrings.ready(lang),
+      'failed' => _ApplicationsStrings.error(lang),
+      'cancelled' => _ApplicationsStrings.cancelled(lang),
       _ => status,
     };
   }
 
   static String _formatUzs(double value) {
+    final lang = localeNotifier.value.languageCode;
     final s = value.round().toString();
     final buf = StringBuffer();
     for (var i = 0; i < s.length; i++) {
       if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
       buf.write(s[i]);
     }
-    return '${buf.toString()} so\'m';
+    return '${buf.toString()} ${_ApplicationsStrings.soumUnit(lang)}';
   }
 
   static String _formatDate(DateTime dt) {
@@ -1113,6 +1139,194 @@ class _ApplicationsStrings {
     },
     _ => id,
   };
+
+  // ---------------------------------------------------------------------------
+  // Static mapper helpers (no BuildContext available → take a language code).
+  // These mirror the switch (l.languageCode) style above. Uzbek = default.
+  // ---------------------------------------------------------------------------
+
+  static String serviceLabel(String lang, String serviceId) =>
+      switch (serviceId) {
+        'arch' => switch (lang) {
+          'ru' => 'Архитектура ТЗ',
+          'en' => 'Architecture TZ',
+          _ => 'Arxitektura TZ',
+        },
+        'ai_eval' => switch (lang) {
+          'ru' => 'AI оценка',
+          'en' => 'AI valuation',
+          _ => 'AI Baholash',
+        },
+        'calc' => switch (lang) {
+          'ru' => 'Калькулятор',
+          'en' => 'Calculator',
+          _ => 'Kalkulyator',
+        },
+        'kad_3d' => switch (lang) {
+          'ru' => '3D кадастр',
+          'en' => '3D cadastre',
+          _ => '3D Kadastr',
+        },
+        // photogrammetry reuses 'kad_3d' serviceId but has its own label
+        '3d_scan' => switch (lang) {
+          'ru' => '3D скан',
+          'en' => '3D scan',
+          _ => '3D Skan',
+        },
+        _ => serviceId,
+      };
+
+  static String address(String lang) => switch (lang) {
+    'ru' => 'Адрес',
+    'en' => 'Address',
+    _ => 'Manzil',
+  };
+
+  static String estimatedValue(String lang) => switch (lang) {
+    'ru' => 'Примерная стоимость',
+    'en' => 'Estimated value',
+    _ => 'Taxminiy qiymat',
+  };
+
+  static String cadastreNumber(String lang) => switch (lang) {
+    'ru' => 'Кадастровый номер',
+    'en' => 'Cadastre number',
+    _ => 'Kadastr raqami',
+  };
+
+  static String cadastre(String lang) => switch (lang) {
+    'ru' => 'Кадастр',
+    'en' => 'Cadastre',
+    _ => 'Kadastr',
+  };
+
+  static String type(String lang) => switch (lang) {
+    'ru' => 'Тип',
+    'en' => 'Type',
+    _ => 'Turi',
+  };
+
+  static String photoCount(String lang) => switch (lang) {
+    'ru' => 'Кол-во фото',
+    'en' => 'Photo count',
+    _ => 'Foto soni',
+  };
+
+  static String applicationDate(String lang) => switch (lang) {
+    'ru' => 'Дата заявки',
+    'en' => 'Application date',
+    _ => 'Ariza sanasi',
+  };
+
+  static String submitted(String lang) => switch (lang) {
+    'ru' => 'Отправлено',
+    'en' => 'Submitted',
+    _ => 'Yuborilgan',
+  };
+
+  static String status(String lang) => switch (lang) {
+    'ru' => 'Статус',
+    'en' => 'Status',
+    _ => 'Holat',
+  };
+
+  static String price(String lang) => switch (lang) {
+    'ru' => 'Цена',
+    'en' => 'Price',
+    _ => 'Narx',
+  };
+
+  static String objectType(String lang) => switch (lang) {
+    'ru' => 'Тип объекта',
+    'en' => 'Object type',
+    _ => 'Obyekt turi',
+  };
+
+  static String model3d(String lang) => switch (lang) {
+    'ru' => '3D модель',
+    'en' => '3D model',
+    _ => '3D model',
+  };
+
+  static String error(String lang) => switch (lang) {
+    'ru' => 'Ошибка',
+    'en' => 'Error',
+    _ => 'Xato',
+  };
+
+  static String inProgress(String lang) => switch (lang) {
+    'ru' => 'В процессе',
+    'en' => 'In progress',
+    _ => 'Jarayonda',
+  };
+
+  static String ready(String lang) => switch (lang) {
+    'ru' => 'Готово',
+    'en' => 'Ready',
+    _ => 'Tayyor',
+  };
+
+  static String cancelled(String lang) => switch (lang) {
+    'ru' => 'Отменено',
+    'en' => 'Cancelled',
+    _ => 'Bekor qilingan',
+  };
+
+  static String residential(String lang) => switch (lang) {
+    'ru' => 'Жилое',
+    'en' => 'Residential',
+    _ => 'Turar joy',
+  };
+
+  static String nonResidential(String lang) => switch (lang) {
+    'ru' => 'Нежилое',
+    'en' => 'Non-residential',
+    _ => 'Noturar joy',
+  };
+
+  static String warehouse(String lang) => switch (lang) {
+    'ru' => 'Склад',
+    'en' => 'Warehouse',
+    _ => 'Ombor',
+  };
+
+  static String industrial(String lang) => switch (lang) {
+    'ru' => 'Промышленное',
+    'en' => 'Industrial',
+    _ => 'Sanoat',
+  };
+
+  static String queued(String lang) => switch (lang) {
+    'ru' => 'В очереди',
+    'en' => 'Queued',
+    _ => 'Navbatda',
+  };
+
+  static String processing(String lang) => switch (lang) {
+    'ru' => 'Обрабатывается',
+    'en' => 'Processing',
+    _ => 'Ishlamoqda',
+  };
+
+  static String viewResult(String lang) => switch (lang) {
+    'ru' => 'Посмотреть результат',
+    'en' => 'View result',
+    _ => 'Natijani ko‘rish',
+  };
+
+  /// Currency-unit suffix word only ("so'm" / "сум" / "soum").
+  static String soumUnit(String lang) => switch (lang) {
+    'ru' => 'сум',
+    'en' => 'soum',
+    _ => 'so\'m',
+  };
+
+  /// Quantity-unit suffix word only ("ta" / "шт" / "pcs").
+  static String pcsUnit(String lang) => switch (lang) {
+    'ru' => 'шт',
+    'en' => 'pcs',
+    _ => 'ta',
+  };
 }
 
 class _ApplicationCard extends StatelessWidget {
@@ -1123,7 +1337,8 @@ class _ApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = _StatusStyle.fromGroup(item.statusGroup);
+    final lang = Localizations.localeOf(context).languageCode;
+    final status = _StatusStyle.fromGroup(item.statusGroup, lang);
     final showResultButton =
         item.statusGroup == ApplicationStatusGroup.completed;
 
@@ -1193,7 +1408,9 @@ class _ApplicationCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Natijani ko‘rish',
+                              _ApplicationsStrings.viewResult(
+                                Localizations.localeOf(context).languageCode,
+                              ),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
@@ -1283,30 +1500,30 @@ class _StatusStyle {
   final Color fgColor;
   final String iconAsset;
 
-  static _StatusStyle fromGroup(ApplicationStatusGroup group) =>
+  static _StatusStyle fromGroup(ApplicationStatusGroup group, String lang) =>
       switch (group) {
-        ApplicationStatusGroup.sent => const _StatusStyle(
-          label: 'Yuborilgan',
-          bgColor: Color(0xFFE2ECFD),
-          fgColor: Color(0xFF2B7FFF),
+        ApplicationStatusGroup.sent => _StatusStyle(
+          label: _ApplicationsStrings.submitted(lang),
+          bgColor: const Color(0xFFE2ECFD),
+          fgColor: const Color(0xFF2B7FFF),
           iconAsset: 'assets/icons/application-pending.svg',
         ),
-        ApplicationStatusGroup.inProgress => const _StatusStyle(
-          label: 'Jarayonda',
-          bgColor: Color(0xFFFCEDE3),
-          fgColor: Color(0xFFF27523),
+        ApplicationStatusGroup.inProgress => _StatusStyle(
+          label: _ApplicationsStrings.inProgress(lang),
+          bgColor: const Color(0xFFFCEDE3),
+          fgColor: const Color(0xFFF27523),
           iconAsset: 'assets/icons/application-pending.svg',
         ),
-        ApplicationStatusGroup.completed => const _StatusStyle(
-          label: 'Tayyor',
-          bgColor: Color(0xFFD5F3E0),
-          fgColor: Color(0xFF00B447),
+        ApplicationStatusGroup.completed => _StatusStyle(
+          label: _ApplicationsStrings.ready(lang),
+          bgColor: const Color(0xFFD5F3E0),
+          fgColor: const Color(0xFF00B447),
           iconAsset: 'assets/icons/application-ready.svg',
         ),
-        ApplicationStatusGroup.cancelled => const _StatusStyle(
-          label: 'Bekor qilingan',
-          bgColor: Color(0xFFF8E1E1),
-          fgColor: Color(0xFFEF4444),
+        ApplicationStatusGroup.cancelled => _StatusStyle(
+          label: _ApplicationsStrings.cancelled(lang),
+          bgColor: const Color(0xFFF8E1E1),
+          fgColor: const Color(0xFFEF4444),
           iconAsset: 'assets/icons/application-cancelled.svg',
         ),
       };

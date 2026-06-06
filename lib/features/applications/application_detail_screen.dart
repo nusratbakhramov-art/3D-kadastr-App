@@ -41,7 +41,12 @@ Future<String> _ensureResultCached({
   final req = http.Request('GET', Uri.parse(downloadUrl));
   final res = await client.send(req);
   if (res.statusCode != 200) {
-    throw HttpException('Yuklab olish xatosi (${res.statusCode})');
+    throw HttpException(
+      _DetailStrings.downloadError(
+        localeNotifier.value.languageCode,
+        res.statusCode,
+      ),
+    );
   }
   final total = res.contentLength ?? -1;
   // Write to a tmp file first; rename on success so partials don't poison cache.
@@ -62,6 +67,132 @@ Future<String> _ensureResultCached({
   return filePath;
 }
 
+/// Localized strings for the application detail screen. Uzbek = default.
+class _DetailStrings {
+  const _DetailStrings._();
+
+  static String applications(String lang) => switch (lang) {
+    'ru' => 'Заявки',
+    'en' => 'Applications',
+    _ => 'Arizalar',
+  };
+
+  static String applicationStatus(String lang) => switch (lang) {
+    'ru' => 'Статус заявки',
+    'en' => 'Application status',
+    _ => 'Ariza holati',
+  };
+
+  static String aboutApplication(String lang) => switch (lang) {
+    'ru' => 'О заявке',
+    'en' => 'About application',
+    _ => 'Ariza haqida',
+  };
+
+  static String applicationDetails(String lang) => switch (lang) {
+    'ru' => 'Данные заявки',
+    'en' => 'Application details',
+    _ => 'Ariza maʼlumotlari',
+  };
+
+  static String report(String lang) => switch (lang) {
+    'ru' => 'Отчёт',
+    'en' => 'Report',
+    _ => 'Hisobot',
+  };
+
+  static String noData(String lang) => switch (lang) {
+    'ru' => 'Данные отсутствуют',
+    'en' => 'No data available',
+    _ => 'Maʼlumot mavjud emas',
+  };
+
+  static String noTimelineYet(String lang) => switch (lang) {
+    'ru' => 'Данные о процессе ещё отсутствуют',
+    'en' => 'No process information yet',
+    _ => 'Jarayon maʼlumotlari hali yoʻq',
+  };
+
+  static String contactSpecialist(String lang) => switch (lang) {
+    'ru' => 'Связаться со специалистом',
+    'en' => 'Contact a specialist',
+    _ => 'Mutaxasis bilan bog\'lanish',
+  };
+
+  static String viewViaAr(String lang) => switch (lang) {
+    'ru' => 'Посмотреть через AR',
+    'en' => 'View via AR',
+    _ => 'AR orqali ko\'rish',
+  };
+
+  static String download(String lang) => switch (lang) {
+    'ru' => 'Скачать',
+    'en' => 'Download',
+    _ => 'Yuklash',
+  };
+
+  static String view(String lang) => switch (lang) {
+    'ru' => 'Открыть',
+    'en' => 'Open',
+    _ => 'Ko\'rish',
+  };
+
+  static String model3d(String lang) => switch (lang) {
+    'ru' => '3D модель',
+    'en' => '3D model',
+    _ => '3D Model',
+  };
+
+  static String roomPlanViewerOpens(String lang) => switch (lang) {
+    'ru' => 'Откроется просмотрщик RoomPlan',
+    'en' => 'RoomPlan viewer will open',
+    _ => 'RoomPlan viewer ochiladi',
+  };
+
+  static String downloading(String lang) => switch (lang) {
+    'ru' => 'Загрузка…',
+    'en' => 'Downloading…',
+    _ => 'Yuklab olinmoqda…',
+  };
+
+  static String downloadError(String lang, int statusCode) => switch (lang) {
+    'ru' => 'Ошибка загрузки ($statusCode)',
+    'en' => 'Download error ($statusCode)',
+    _ => 'Yuklab olish xatosi ($statusCode)',
+  };
+
+  // Timeline step labels.
+  static String accepted(String lang) => switch (lang) {
+    'ru' => 'Заявка принята',
+    'en' => 'Application accepted',
+    _ => 'Ariza qabul qilindi',
+  };
+
+  static String sentToSystem(String lang) => switch (lang) {
+    'ru' => 'Отправлено в систему',
+    'en' => 'Sent to system',
+    _ => 'Tizimga yuborildi',
+  };
+
+  static String assignedSpecialist(String lang) => switch (lang) {
+    'ru' => 'Назначен специалист',
+    'en' => 'Specialist assigned',
+    _ => 'Mutaxassisga tayinlandi',
+  };
+
+  static String scanned(String lang) => switch (lang) {
+    'ru' => 'Сканировано',
+    'en' => 'Scanned',
+    _ => 'Skan qilindi',
+  };
+
+  static String reportReady(String lang) => switch (lang) {
+    'ru' => 'Отчёт готов',
+    'en' => 'Report ready',
+    _ => 'Hisobot tayyorlandi',
+  };
+}
+
 class ApplicationDetailScreen extends StatefulWidget {
   const ApplicationDetailScreen({super.key, required this.item});
 
@@ -77,6 +208,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
     final steps = widget.item.timeline
         .where((s) => s.completed)
         .toList(growable: false);
@@ -89,7 +221,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AppHeaderBack(
-                title: 'Arizalar',
+                title: _DetailStrings.applications(lang),
                 onBack: () => Navigator.of(context).maybePop(),
               ),
               const SizedBox(height: 2),
@@ -108,8 +240,8 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
               SegmentedTabs<_DetailTab>(
                 values: _DetailTab.values,
                 labelOf: (t) => switch (t) {
-                  _DetailTab.status => 'Ariza holati',
-                  _DetailTab.about => 'Ariza haqida',
+                  _DetailTab.status => _DetailStrings.applicationStatus(lang),
+                  _DetailTab.about => _DetailStrings.aboutApplication(lang),
                 },
                 selected: _tab,
                 onChanged: (next) => setState(() => _tab = next),
@@ -136,12 +268,13 @@ class _StatusTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _TimelineCard(steps: steps),
         const SizedBox(height: 14),
-        const _PrimaryBlackAction(label: "Mutaxasis bilan bog'lanish"),
+        _PrimaryBlackAction(label: _DetailStrings.contactSpecialist(lang)),
       ],
     );
   }
@@ -168,7 +301,9 @@ class _TimelineCard extends StatelessWidget {
             _TimelineRow(step: visible[i], showTail: i != visible.length - 1),
           if (visible.isEmpty)
             Text(
-              'Jarayon maʼlumotlari hali yoʻq',
+              _DetailStrings.noTimelineYet(
+                Localizations.localeOf(context).languageCode,
+              ),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w500,
@@ -190,7 +325,8 @@ class _TimelineRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _TimelineStyle.fromStatus(step.status);
+    final lang = Localizations.localeOf(context).languageCode;
+    final style = _TimelineStyle.fromStatus(step.status, lang);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -265,34 +401,36 @@ class _TimelineStyle {
   final IconData icon;
   final Color bg;
 
-  static _TimelineStyle fromStatus(ApplicationTimelineStatus status) =>
-      switch (status) {
-        ApplicationTimelineStatus.accepted => const _TimelineStyle(
-          label: 'Ariza qabul qilindi',
-          icon: Icons.description_outlined,
-          bg: Color(0xFF18B4E8),
-        ),
-        ApplicationTimelineStatus.sentToSystem => const _TimelineStyle(
-          label: 'Tizimga yuborildi',
-          icon: Icons.send_rounded,
-          bg: Color(0xFF6A16F6),
-        ),
-        ApplicationTimelineStatus.assignedSpecialist => const _TimelineStyle(
-          label: 'Mutaxassisga tayinlandi',
-          icon: Icons.badge_outlined,
-          bg: Color(0xFFFF9800),
-        ),
-        ApplicationTimelineStatus.scanned => const _TimelineStyle(
-          label: 'Skan qilindi',
-          icon: Icons.crop_free_rounded,
-          bg: Color(0xFF03C050),
-        ),
-        ApplicationTimelineStatus.reportReady => const _TimelineStyle(
-          label: 'Hisobot tayyorlandi',
-          icon: Icons.description_outlined,
-          bg: Color(0xFF1A9BF4),
-        ),
-      };
+  static _TimelineStyle fromStatus(
+    ApplicationTimelineStatus status,
+    String lang,
+  ) => switch (status) {
+    ApplicationTimelineStatus.accepted => _TimelineStyle(
+      label: _DetailStrings.accepted(lang),
+      icon: Icons.description_outlined,
+      bg: const Color(0xFF18B4E8),
+    ),
+    ApplicationTimelineStatus.sentToSystem => _TimelineStyle(
+      label: _DetailStrings.sentToSystem(lang),
+      icon: Icons.send_rounded,
+      bg: const Color(0xFF6A16F6),
+    ),
+    ApplicationTimelineStatus.assignedSpecialist => _TimelineStyle(
+      label: _DetailStrings.assignedSpecialist(lang),
+      icon: Icons.badge_outlined,
+      bg: const Color(0xFFFF9800),
+    ),
+    ApplicationTimelineStatus.scanned => _TimelineStyle(
+      label: _DetailStrings.scanned(lang),
+      icon: Icons.crop_free_rounded,
+      bg: const Color(0xFF03C050),
+    ),
+    ApplicationTimelineStatus.reportReady => _TimelineStyle(
+      label: _DetailStrings.reportReady(lang),
+      icon: Icons.description_outlined,
+      bg: const Color(0xFF1A9BF4),
+    ),
+  };
 }
 
 class _AboutTab extends StatelessWidget {
@@ -302,13 +440,16 @@ class _AboutTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
     final rows = item.detailRows;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          item.hasDeliverable ? 'Hisobot' : 'Ariza maʼlumotlari',
+          item.hasDeliverable
+              ? _DetailStrings.report(lang)
+              : _DetailStrings.applicationDetails(lang),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -328,7 +469,7 @@ class _AboutTab extends StatelessWidget {
               ? Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Text(
-                    'Maʼlumot mavjud emas',
+                    _DetailStrings.noData(lang),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w500,
@@ -361,7 +502,7 @@ class _AboutTab extends StatelessWidget {
           _ModelCard(item: item),
           const SizedBox(height: 18),
           _PrimaryGreenAction(
-            label: "AR orqali ko'rish",
+            label: _DetailStrings.viewViaAr(lang),
             item: item,
           ),
         ],
@@ -483,7 +624,9 @@ class _FileCard extends StatelessWidget {
             ),
           ),
           _MiniPillButton(
-            label: 'Yuklash',
+            label: _DetailStrings.download(
+              Localizations.localeOf(context).languageCode,
+            ),
             fg: const Color(0xFF03B54F),
             bg: isDark
                 ? const Color(0xFF03B54F).withValues(alpha: 0.18)
@@ -633,6 +776,7 @@ class _ModelCardState extends State<_ModelCard> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
     return InkWell(
       onTap: _onTap,
       borderRadius: BorderRadius.circular(24),
@@ -670,7 +814,7 @@ class _ModelCardState extends State<_ModelCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '3D Model',
+                  _DetailStrings.model3d(lang),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -682,11 +826,11 @@ class _ModelCardState extends State<_ModelCard> {
                 const SizedBox(height: 2),
                 Text(
                   !_loading
-                      ? 'RoomPlan viewer ochiladi'
+                      ? _DetailStrings.roomPlanViewerOpens(lang)
                       : _total > 0
-                          ? 'Yuklab olinmoqda… ${(_progress! * 100).toStringAsFixed(0)}% '
+                          ? '${_DetailStrings.downloading(lang)} ${(_progress! * 100).toStringAsFixed(0)}% '
                               '(${_fmtBytes(_received)} / ${_fmtBytes(_total)})'
-                          : 'Yuklab olinmoqda… ${_fmtBytes(_received)}',
+                          : '${_DetailStrings.downloading(lang)} ${_fmtBytes(_received)}',
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w400,
@@ -713,7 +857,7 @@ class _ModelCardState extends State<_ModelCard> {
           ),
           if (!_loading)
             _MiniPillButton(
-              label: "Ko'rish",
+              label: _DetailStrings.view(lang),
               fg: ColorTokens.primaryText(context),
               bg: ColorTokens.iconBg(context),
               iconAsset: 'assets/icons/chevron-right.svg',
