@@ -152,9 +152,6 @@ class ArchitectureOrderDraft extends ChangeNotifier {
   // Xaritadan tanlangan manzil (koordinatalar bilan). `address` matni shundan
   // to'ldiriladi; koordinatalar `details.location` ichida saqlanadi.
   AiLocationInfo? location;
-  // Viloyat / tuman tanlovi (arxitektura TZ wizardidagi joylashuv qadami).
-  String? viloyat;
-  String? tuman;
 
   // Step 3 — Loyiha umumiy
   ArchObjectType? objectType;
