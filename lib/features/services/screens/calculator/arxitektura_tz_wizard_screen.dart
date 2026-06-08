@@ -176,6 +176,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     // o'zgarganda butun ekranni qayta hisoblash uchun listenerlar.
     for (final c in [
       _customerName,
+      _tin,
       _phone,
       _floors,
       _totalArea,
@@ -194,6 +195,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     _pageController.dispose();
     for (final c in [
       _customerName,
+      _tin,
       _phone,
       _floors,
       _totalArea,
@@ -229,12 +231,19 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     super.dispose();
   }
 
+  // STIR (9) yoki INN (14) — kiritilgan bo'lsa, uzunligi shu ikkitadan biri.
+  bool get _tinValid {
+    final t = _tin.text.trim();
+    return t.isEmpty || t.length == 9 || t.length == 14;
+  }
+
   // ── Validatsiya per-step ─────────────────────────────────────────────
   bool get _canAdvance {
     switch (_stepIndex) {
       case 0:
         return _customerName.text.trim().length >= 2 &&
-            _phone.text.trim().length >= 5;
+            _phone.text.trim().length >= 5 &&
+            _tinValid;
       case 2:
         return _draft.objectType != null;
       default:
@@ -365,9 +374,19 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: const Color(0xFFE0492A)),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: const Color(0xFFE0492A),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
   }
 
   // ── UI ───────────────────────────────────────────────────────────────
@@ -493,6 +512,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         controller: _tin,
         placeholder: '300000000',
         numericOnly: true,
+        maxLength: 14,
+        errorText: _tinValid ? null : _Strings.tinError(l),
       ),
       WizardField(
         label: _Strings.phoneLabel(l),
@@ -1449,6 +1470,12 @@ class _Strings {
         'ru' => 'СТИР / ИНН',
         'en' => 'TIN',
         _ => 'STIR / INN',
+      };
+
+  static String tinError(Locale l) => switch (l.languageCode) {
+        'ru' => '9 (СТИР) или 14 (ИНН) цифр',
+        'en' => 'Must be 9 (TIN) or 14 (PINFL) digits',
+        _ => '9 (STIR) yoki 14 (INN) raqamdan iborat bo\'lsin',
       };
 
   static String phoneLabel(Locale l) => switch (l.languageCode) {
