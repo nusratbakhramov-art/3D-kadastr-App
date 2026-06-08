@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../theme/app_colors.dart';
 import '../support/support_service.dart';
-import '../support/support_sheet.dart';
 import '../market/market_controller.dart';
 import '../market/models/market_listing.dart';
 import '../market/listing_detail_screen.dart';
@@ -68,8 +68,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() => _supportInfo = info);
   }
 
-  void _openSupport() {
-    showSupportSheet(context, locale: widget.locale, info: _supportInfo);
+  Future<void> _callSupport() async {
+    final uri = Uri(scheme: 'tel', path: _supportInfo.phone);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // tel: ochilmasa jimgina o'tamiz.
+    }
   }
 
   void _onListingTap(MarketListing listing) {
@@ -172,7 +177,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             onLoginTap: widget.onLoginTap,
                             onAvatarTap: widget.onOpenProfile,
                             onBellTap: widget.onOpenNotifications,
-                            onSupportTap: _openSupport,
                           );
                         },
                       );
@@ -211,6 +215,19 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
+            ),
+          ),
+          // Pastki-chap: qo'ng'iroq tugmasi (chat tugmasi bilan bir xil uslub).
+          Positioned(
+            left: 16,
+            bottom: 16,
+            child: FloatingActionButton(
+              heroTag: 'homeCallFab',
+              onPressed: _callSupport,
+              backgroundColor: AppColors.splashGreen,
+              foregroundColor: AppColors.greenBlack,
+              tooltip: 'Qo\'ng\'iroq',
+              child: const Icon(Icons.call_rounded),
             ),
           ),
         ],
