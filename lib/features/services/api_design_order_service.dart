@@ -30,6 +30,37 @@ class CreatedDesignOrder {
   final DateTime createdAt;
 }
 
+/// Arizalar ro'yxati uchun xulosaviy dizayn order yozuvi.
+class DesignOrderSummary {
+  const DesignOrderSummary({
+    required this.id,
+    required this.status,
+    required this.createdAt,
+    this.objectType,
+    this.address,
+  });
+
+  final int id;
+  final String status;
+  final DateTime createdAt;
+  final String? objectType;
+  final String? address;
+}
+
+class DesignOrderListPage {
+  const DesignOrderListPage({
+    required this.items,
+    required this.total,
+    required this.page,
+    required this.size,
+  });
+
+  final List<DesignOrderSummary> items;
+  final int total;
+  final int page;
+  final int size;
+}
+
 class DesignOrderApiService {
   DesignOrderApiService({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
@@ -69,6 +100,47 @@ class DesignOrderApiService {
       status: json['status'] as String? ?? 'submitted',
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
           DateTime.now(),
+    );
+  }
+
+  /// Foydalanuvchi yuborgan dizayn TZ buyurtmalarini olish.
+  Future<DesignOrderListPage> list({
+    required String token,
+    int page = 1,
+    int size = 50,
+  }) async {
+    final uri = Uri.parse(
+      '$_baseUrl/services/design/orders',
+    ).replace(queryParameters: {'page': '$page', 'size': '$size'});
+
+    final res = await _client.get(
+      uri,
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      },
+    ).timeout(_timeout);
+
+    if (res.statusCode != 200) _throw(res);
+
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final raw = (body['items'] as List).cast<Map<String, dynamic>>();
+    return DesignOrderListPage(
+      items: raw.map(_parseSummary).toList(growable: false),
+      total: (body['total'] as num?)?.toInt() ?? raw.length,
+      page: (body['page'] as num?)?.toInt() ?? page,
+      size: (body['size'] as num?)?.toInt() ?? size,
+    );
+  }
+
+  DesignOrderSummary _parseSummary(Map<String, dynamic> json) {
+    return DesignOrderSummary(
+      id: (json['id'] as num).toInt(),
+      status: json['status'] as String? ?? 'submitted',
+      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
+          DateTime.now(),
+      objectType: json['object_type'] as String?,
+      address: json['address'] as String?,
     );
   }
 
