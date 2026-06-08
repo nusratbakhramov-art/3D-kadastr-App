@@ -217,10 +217,11 @@ final class MetalAtlasBaker {
 
         // Allocate accumulator buffers
         let pixCount = atlasW * atlasH
-        let colorBuf = device.makeBuffer(length: pixCount * 16, options: .storageModeShared)!
-        let weightBuf = device.makeBuffer(length: pixCount * 4, options: .storageModeShared)!
+        // var IUO — normalize/normalizeBest'dan keyin bo'shatiladi (4096 xotira fix).
+        var colorBuf: MTLBuffer! = device.makeBuffer(length: pixCount * 16, options: .storageModeShared)!
+        var weightBuf: MTLBuffer! = device.makeBuffer(length: pixCount * 4, options: .storageModeShared)!
         // Multi-band: best-view accumulator (rgb=bestColor, a=bestScore).
-        let bestBuf = device.makeBuffer(length: pixCount * 16, options: .storageModeShared)!
+        var bestBuf: MTLBuffer! = device.makeBuffer(length: pixCount * 16, options: .storageModeShared)!
         memset(colorBuf.contents(), 0, pixCount * 16)
         memset(weightBuf.contents(), 0, pixCount * 4)
         memset(bestBuf.contents(), 0, pixCount * 16)
@@ -231,7 +232,7 @@ final class MetalAtlasBaker {
         )
         posTexDesc.usage = MTLTextureUsage.shaderRead
         posTexDesc.storageMode = MTLStorageMode.shared
-        let posTexture = device.makeTexture(descriptor: posTexDesc)!
+        var posTexture: MTLTexture! = device.makeTexture(descriptor: posTexDesc)!
         positionTex.withUnsafeBytes { raw in
             posTexture.replace(
                 region: MTLRegionMake2D(0, 0, atlasW, atlasH),
@@ -245,7 +246,7 @@ final class MetalAtlasBaker {
         )
         nrmTexDesc.usage = MTLTextureUsage.shaderRead
         nrmTexDesc.storageMode = MTLStorageMode.shared
-        let nrmTexture = device.makeTexture(descriptor: nrmTexDesc)!
+        var nrmTexture: MTLTexture! = device.makeTexture(descriptor: nrmTexDesc)!
         // Convert Float32→Float16 packed
         let nrm16 = convertNormalsToHalf(normalTex)
         nrm16.withUnsafeBytes { raw in
@@ -263,15 +264,11 @@ final class MetalAtlasBaker {
         )
         outTexDesc.usage = MTLTextureUsage([.shaderRead, .shaderWrite])
         outTexDesc.storageMode = MTLStorageMode.shared
+        // Bake+normalize uchun kerakli 2 ta tekstura. Qolgan 6 ta scratch
+        // (dilate/combine/blur ping-pong) bake+normalize'dan KEYIN ajratiladi —
+        // bake fazasida kerak emas, 4096'da ~384 MB tejaladi (OOM oldini oladi).
         let atlasTex = device.makeTexture(descriptor: outTexDesc)!     // AVG (low-freq base)
-        let dilatedTex = device.makeTexture(descriptor: outTexDesc)!
-        // Multi-band textures.
         let bestTex = device.makeTexture(descriptor: outTexDesc)!      // BEST-VIEW (high-freq)
-        let combineTex = device.makeTexture(descriptor: outTexDesc)!   // multi-band output
-        let avgScratchA = device.makeTexture(descriptor: outTexDesc)!  // avg blur ping-pong
-        let avgScratchB = device.makeTexture(descriptor: outTexDesc)!
-        let bestScratchA = device.makeTexture(descriptor: outTexDesc)! // best blur ping-pong
-        let bestScratchB = device.makeTexture(descriptor: outTexDesc)!
 
         // ────────────────────────────────────────────────────────────────────
         // 4. Batched camera processing
@@ -412,6 +409,8 @@ final class MetalAtlasBaker {
             cmdBuf.commit()
             cmdBuf.waitUntilCompleted()
         }
+        // Xotira: nrmTexture faqat bake loop'da kerak edi → bo'shatamiz (4096: 128 MB).
+        nrmTexture = nil
 
         // ────────────────────────────────────────────────────────────────────
         // 5. Normalize + dilate
@@ -482,6 +481,9 @@ final class MetalAtlasBaker {
             cmdBuf.commit()
             cmdBuf.waitUntilCompleted()
         }
+        // Xotira: colorBuf/weightBuf → atlasTex'ga resolve qilindi → bo'shatamiz (4096: 320 MB).
+        colorBuf = nil
+        weightBuf = nil
 
         // ── Multi-band: BEST-VIEW atlas (yuqori chastota detail manbasi) → bestTex ──
         do {
@@ -502,6 +504,17 @@ final class MetalAtlasBaker {
             cmdBuf.commit()
             cmdBuf.waitUntilCompleted()
         }
+        // Xotira: posTexture/bestBuf → atlasTex+bestTex'ga resolve qilindi → bo'shatamiz
+        // (4096: 512 MB). ENDI blur/combine/dilate scratch teksturalarini ajratamiz —
+        // bake fazasida emas, shu yerda (pos/nrm/buferlar bo'shagach) → peak past.
+        posTexture = nil
+        bestBuf = nil
+        let dilatedTex = device.makeTexture(descriptor: outTexDesc)!
+        let combineTex = device.makeTexture(descriptor: outTexDesc)!   // multi-band output
+        let avgScratchA = device.makeTexture(descriptor: outTexDesc)!  // avg blur ping-pong
+        let avgScratchB = device.makeTexture(descriptor: outTexDesc)!
+        let bestScratchA = device.makeTexture(descriptor: outTexDesc)! // best blur ping-pong
+        let bestScratchB = device.makeTexture(descriptor: outTexDesc)!
 
         // Single-texture pass helper (smooth/dilate: texture0 → texture1).
         let tgSize = MTLSize(width: 16, height: 16, depth: 1)
@@ -572,11 +585,18 @@ final class MetalAtlasBaker {
         //    ichida 1 kamera dominant (sharp), chegarada blend (konsentrik naqsh/seam
         //    yo'qoladi). Eng toza — keskin best-view region chegaralari yo'q.
         //  • "combine": multi-band (wideBlur seam leveling) — best high-freq + avg low.
-        //  • "raw": eski best-view argmax (keskin patchwork — faqat taqqoslash).
-        let viewMode = ProcessInfo.processInfo.environment["KADASTR_VIEW_MODE"] ?? "soft"
+        //  • "raw": best-view argmax (bitta eng sharp kamera/piksel — eng tiniq).
+        // DEFAULT endi "raw": "soft"/"combine" ko'p ko'rinishni o'rtachalab davriy
+        // detalni (pol tili, monitor yozuvi) yo'qotardi. raw = piksel uchun BITTA
+        // eng yaxshi kamera → o'rtachalash yo'q → maksimal tiniqlik. Seam bo'lishi
+        // mumkin, lekin detal saqlanadi (matn/tile o'qiladi).
+        let viewMode = ProcessInfo.processInfo.environment["KADASTR_VIEW_MODE"] ?? "raw"
         var src = viewMode == "raw" ? bestTex : (viewMode == "combine" ? combineTex : atlasTex)
         var dst = dilatedTex
-        for _ in 0..<24 { runPass(dilState, src, dst); swap(&src, &dst) }
+        // 24→36: raw rejimi va torroq qoplashda bo'sh texel (teshik) ko'proq —
+        // dilate faqat bo'sh joyni qo'shni rang bilan to'ldiradi (rangli pikselga
+        // tegmaydi, blur bermaydi). Mesh teshigi emas, atlas texel teshiklari uchun.
+        for _ in 0..<36 { runPass(dilState, src, dst); swap(&src, &dst) }
         let finalTex = src
 
         // ────────────────────────────────────────────────────────────────────
@@ -590,6 +610,19 @@ final class MetalAtlasBaker {
                 raw.baseAddress!, bytesPerRow: rowBytes,
                 from: MTLRegionMake2D(0, 0, atlasW, atlasH),
                 mipmapLevel: 0,
+            )
+        }
+
+        // ── Planar re-projection (EKSPERIMENT). v2 = baseline (planar YO'Q): silliq,
+        // monitor matni o'qiladigan. Planar repaint per-texel shovqin/glare qo'shib
+        // monitorni BUZADI → DEFAULT O'CHIQ. Faqat KADASTR_USE_PLANAR=1 bilan yoqiladi
+        // (to'liq eksperiment feat/planar-texture-wip branch'ida saqlangan).
+        if ProcessInfo.processInfo.environment["KADASTR_USE_PLANAR"] != nil {
+            progress?(0.96, "Planar re-projection…")
+            applyPlanarProjection(
+                bytes: &bytes, atlasW: atlasW, atlasH: atlasH,
+                positionTex: positionTex, normalTex: normalTex,
+                positions: positions, triangles: triangles, cameras: cameras,
             )
         }
 
@@ -842,6 +875,232 @@ private func solveLinearSystem(_ Ain: [Double], _ bin: [Double], _ n: Int) -> [D
     var x = [Double](repeating: 1, count: n)
     for i in 0..<n { x[i] = abs(A[i * n + i]) > 1e-12 ? b[i] / A[i * n + i] : 1.0 }
     return x
+}
+
+// MARK: - Planar projection (tekis yuzalarni eng sharp BITTA foto bilan qayta bo'yash)
+//
+// Xira sababi: raw best-view HAR texel uchun boshqa kamera tanlaydi → poza drifti
+// tufayli qo'shni texellar mos kelmaydi → matn/tile smear. Tekis yuza (devor/pol/
+// monitor) uchun BITTA eng sharp frontal kamerani tanlab, butun yuzani O'SHA fotodan
+// proyeksiyalaymiz → barcha texel bitta izchil fotodan → smear yo'q, matn tiniq.
+
+private struct DetectedPlane {
+    var normal: SIMD3<Float>
+    var d: Float                 // plane: dot(normal, x) = d
+    var center: SIMD3<Float>
+    var area: Float
+    var cams: [Int] = []         // top-K frontal+sharp kameralar (glare'dan qochish uchun)
+}
+
+/// World nuqta → kamera piksel (bake kernel bilan AYNAN bir xil konventsiya).
+private func projectWorldToCam(
+    _ p: SIMD3<Float>, inv: simd_float4x4, K: simd_float3x3, w: Float, h: Float,
+) -> SIMD2<Float>? {
+    let cs = inv * SIMD4<Float>(p, 1)
+    let depth = -cs.z
+    if depth <= 0.05 { return nil }
+    let proj = K * SIMD3<Float>(cs.x, -cs.y, depth)
+    let pu = proj.x / proj.z
+    let pv = proj.y / proj.z
+    if pu < 0 || pu >= w || pv < 0 || pv >= h { return nil }
+    return SIMD2<Float>(pu, pv)
+}
+
+/// Mesh'dagi katta tekis yuzalarni aniqlash (normal+masofa histogrammasi) va har
+/// biri uchun eng yaxshi frontal+sharp kamerani tanlash.
+private func detectPlanarSurfaces(
+    positions: [SIMD3<Float>], triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+    cameras: [AtlasBakeInputCamera], maxPlanes: Int,
+) -> [DetectedPlane] {
+    // Per-face (centroid, normal, area) precompute.
+    struct Face { let c: SIMD3<Float>; let n: SIMD3<Float>; let area: Float }
+    var faces: [Face] = []
+    faces.reserveCapacity(triangles.count)
+    for t in triangles {
+        let i0 = Int(t.v0), i1 = Int(t.v1), i2 = Int(t.v2)
+        if i0 >= positions.count || i1 >= positions.count || i2 >= positions.count { continue }
+        let p0 = positions[i0], p1 = positions[i1], p2 = positions[i2]
+        let cx = simd_cross(p1 - p0, p2 - p0)
+        let twoA = simd_length(cx)
+        if twoA < 1e-7 { continue }
+        faces.append(Face(c: (p0 + p1 + p2) / 3, n: cx / twoA, area: 0.5 * twoA))
+    }
+    if faces.isEmpty { return [] }
+
+    // RANSAC-uslubli: histogram (to'lqinli yuzani parchalaydi) o'rniga normal
+    // TOLERANSI bilan o'sib boruvchi plane. distTol=6cm, normTol≈28° → to'lqinli
+    // monitor/devor faces'ini BITTA planega yig'adi. Determinstik seed sampling.
+    var used = [Bool](repeating: false, count: faces.count)
+    let distTol: Float = 0.05
+    let normTol: Float = 0.86   // ~31° — to'lqinli yuzani BITTA planega yig'adi, devorни chetlatadi
+    let seedStride = max(1, faces.count / 120)
+    var planes: [DetectedPlane] = []
+
+    for _ in 0..<maxPlanes {
+        var bestArea: Float = 0
+        var bestSeed = -1
+        var s = 0
+        while s < faces.count {
+            if !used[s] {
+                let sn = faces[s].n, sd = simd_dot(sn, faces[s].c)
+                var area: Float = 0
+                for i in 0..<faces.count where !used[i] {
+                    if abs(simd_dot(faces[i].n, sn)) < normTol { continue }
+                    if abs(simd_dot(faces[i].c, sn) - sd) > distTol { continue }
+                    area += faces[i].area
+                }
+                if area > bestArea { bestArea = area; bestSeed = s }
+            }
+            s += seedStride
+        }
+        if bestSeed < 0 || bestArea < 0.03 { break }   // 0.03 m² — kichikroq yuzalar ham (qoplash)
+
+        // Inlier'larni yig'ish + plane'ni aniqlash (area-weighted).
+        let sn = faces[bestSeed].n, sd = simd_dot(sn, faces[bestSeed].c)
+        var sumN = SIMD3<Float>(repeating: 0), sumC = SIMD3<Float>(repeating: 0)
+        var totA: Float = 0
+        for i in 0..<faces.count where !used[i] {
+            if abs(simd_dot(faces[i].n, sn)) < normTol { continue }
+            if abs(simd_dot(faces[i].c, sn) - sd) > distTol { continue }
+            used[i] = true
+            let nn = simd_dot(faces[i].n, sn) < 0 ? -faces[i].n : faces[i].n  // sign align
+            sumN += nn * faces[i].area; sumC += faces[i].c * faces[i].area; totA += faces[i].area
+        }
+        if totA < 1e-5 { continue }
+        let n = simd_normalize(sumN)
+        let center = sumC / totA
+        var plane = DetectedPlane(normal: n, d: simd_dot(n, center), center: center, area: totA)
+        plane.cams = topCamsForPlane(plane, cameras: cameras, k: 4)
+        NSLog("KADASTR plane: area=\(String(format: "%.2f", totA))m² n=(\(String(format: "%.2f,%.2f,%.2f", n.x, n.y, n.z))) cams=\(plane.cams)")
+        if !plane.cams.isEmpty { planes.append(plane) }
+    }
+
+    return planes
+}
+
+private func topCamsForPlane(_ plane: DetectedPlane, cameras: [AtlasBakeInputCamera], k: Int) -> [Int] {
+    var scored: [(Int, Float)] = []
+    for (i, cam) in cameras.enumerated() {
+        let t = cam.transform
+        let camPos = SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z)
+        let toCam = simd_normalize(camPos - plane.center)
+        let faceOn = abs(simd_dot(plane.normal, toCam))   // yuza kameraga qanchalik frontal
+        if faceOn < 0.4 { continue }                       // qiya ko'rinishlarni rad et
+        let dist = simd_length(camPos - plane.center)
+        if dist > 5 || dist < 0.15 { continue }
+        if projectWorldToCam(plane.center, inv: t.inverse, K: cam.intrinsics, w: cam.imageWidth, h: cam.imageHeight) == nil { continue }
+        scored.append((i, faceOn * cam.sharpness / dist))
+    }
+    scored.sort { $0.1 > $1.1 }
+    return Array(scored.prefix(k).map { $0.0 })   // eng yaxshi K ta frontal+sharp kamera
+}
+
+/// Atlas readback buferida tekis yuzalarning texellarini eng sharp bitta foto
+/// bilan qayta bo'yaydi. positionTex/normalTex CPU massivlaridan foydalanadi.
+private func applyPlanarProjection(
+    bytes: inout [UInt8], atlasW: Int, atlasH: Int,
+    positionTex: [SIMD4<Float>], normalTex: [SIMD4<Float>],
+    positions: [SIMD3<Float>], triangles: [(v0: UInt32, v1: UInt32, v2: UInt32)],
+    cameras: [AtlasBakeInputCamera],
+) {
+    let planes = detectPlanarSurfaces(positions: positions, triangles: triangles, cameras: cameras, maxPlanes: 20)
+    NSLog("KADASTR planar: \(planes.count) tekis yuza aniqlandi")
+    if planes.isEmpty { return }
+
+    struct CamCache { let inv: simd_float4x4; let K: simd_float3x3; let w: Int; let h: Int; let px: UnsafeMutablePointer<UInt8> }
+    var cache: [Int: CamCache] = [:]
+    for p in planes {
+        for ci in p.cams where cache[ci] == nil {
+            let cam = cameras[ci]
+            let w = Int(cam.imageWidth), h = Int(cam.imageHeight)
+            guard let pix = loadDownsampledRGBA(url: cam.imageURL, targetW: w, targetH: h) else { continue }
+            cache[ci] = CamCache(inv: cam.transform.inverse, K: cam.intrinsics, w: w, h: h, px: pix.data)
+        }
+    }
+    defer { for (_, c) in cache { c.px.deallocate() } }
+
+    var painted = 0
+    var perPlane = [Int](repeating: 0, count: planes.count)
+    // DEBUG: har planeni alohida solid rang bilan bo'yash (qoplashni ko'rish uchun).
+    let dbg = ProcessInfo.processInfo.environment["KADASTR_PLANAR_DEBUG"] != nil
+    let dbgCol: [(UInt8, UInt8, UInt8)] = [
+        (255,40,40),(40,255,40),(60,140,255),(255,240,40),(255,40,255),(40,255,255),
+        (255,150,40),(160,255,40),(255,255,255),(160,40,255),(40,255,160),(255,40,140)]
+    var samples: [(SIMD3<Float>, Float)] = []   // texel uchun top-K namunalar (qayta ishlatamiz)
+    samples.reserveCapacity(8)
+    bytes.withUnsafeMutableBufferPointer { bp in
+        for idx in 0..<(atlasW * atlasH) {
+            let pw = positionTex[idx]
+            if pw.w < 0.5 { continue }   // bo'sh texel
+            let pos = SIMD3<Float>(pw.x, pw.y, pw.z)
+            let nv = normalTex[idx]
+            let nrm = SIMD3<Float>(nv.x, nv.y, nv.z)
+            // Eng MOS plane: normal eng yaqin (max alignment) + masofa ichida (5cm).
+            // "Birinchi (eng katta) mos" EMAS — aks holда katta devor plane'i monitor
+            // ekranini o'g'irlardi. Monitor normali o'z plane'i (cam 27) bilan AYNAN
+            // mos → o'sha tanlanadi; devor (~30° off) yutqazadi.
+            var bestPi = -1
+            var bestAlign: Float = 0.76   // eng MOS plane normalini talab qiladi
+            for (pi, p) in planes.enumerated() {   // best-plane selection
+                if p.cams.isEmpty { continue }
+                let align = abs(simd_dot(nrm, p.normal))
+                if align <= bestAlign { continue }
+                if abs(simd_dot(p.normal, pos) - p.d) > 0.07 { continue }
+                bestAlign = align; bestPi = pi
+            }
+            if bestPi < 0 { continue }
+            let p = planes[bestPi]
+            // FLATTEN plane'ga: wavy LiDAR pos → real tekis yuza → cam'ning to'g'ri
+            // pikseli (matn sharp). Plane'ning o'z normal/d'si bilan.
+            let gsd = simd_dot(p.normal, pos) - p.d
+            let flat = pos - gsd * p.normal
+            if dbg {
+                let cc = dbgCol[bestPi % dbgCol.count]
+                let o = idx * 4
+                bp[o] = cc.0; bp[o + 1] = cc.1; bp[o + 2] = cc.2; bp[o + 3] = 255
+                painted += 1; perPlane[bestPi] += 1
+                continue
+            }
+            // GLARE-AVOID: top-K kamera orasidan MIN-LUMINANCE namuna tanlanadi —
+            // specular glare eng yorqin, eng kam yorqin = glare'siz → matn/tekstura tiniq.
+            samples.removeAll(keepingCapacity: true)
+            for ci in p.cams {
+                guard let c = cache[ci] else { continue }
+                let cs = c.inv * SIMD4<Float>(flat, 1)
+                let depth = -cs.z
+                if depth <= 0.05 { continue }
+                let proj = c.K * SIMD3<Float>(cs.x, -cs.y, depth)
+                let pu = proj.x / proj.z, pv = proj.y / proj.z
+                if pu < 0 || pu >= Float(c.w - 1) || pv < 0 || pv >= Float(c.h - 1) { continue }
+                let x0 = Int(pu), y0 = Int(pv)
+                let fx = pu - Float(x0), fy = pv - Float(y0)
+                let row0 = y0 * c.w, row1 = (y0 + 1) * c.w
+                @inline(__always) func s(_ off: Int, _ ch: Int) -> Float { Float(c.px[off * 4 + ch]) }
+                var r = SIMD3<Float>(repeating: 0)
+                for ch in 0..<3 {
+                    let top = s(row0 + x0, ch) * (1 - fx) + s(row0 + x0 + 1, ch) * fx
+                    let bot = s(row1 + x0, ch) * (1 - fx) + s(row1 + x0 + 1, ch) * fx
+                    r[ch] = top * (1 - fy) + bot * fy
+                }
+                let lum = 0.299 * r.x + 0.587 * r.y + 0.114 * r.z
+                samples.append((r, lum))
+            }
+            if samples.isEmpty { continue }
+            samples.sort { $0.1 < $1.1 }
+            let useR: SIMD3<Float> = samples[0].0   // MIN-luminance (glare'siz)
+            let o = idx * 4
+            bp[o] = UInt8(max(0, min(255, useR.x)))
+            bp[o + 1] = UInt8(max(0, min(255, useR.y)))
+            bp[o + 2] = UInt8(max(0, min(255, useR.z)))
+            bp[o + 3] = 255
+            painted += 1
+            perPlane[bestPi] += 1
+        }
+    }
+    for (pi, p) in planes.enumerated() {
+        NSLog("KADASTR planar plane[\(pi)] area=\(String(format: "%.2f", p.area))m² cams=\(p.cams) painted=\(perPlane[pi])")
+    }
+    NSLog("KADASTR planar: \(painted) texel qayta bo'yaldi (\(planes.count) yuza)")
 }
 
 // MARK: - Triangle rasterization

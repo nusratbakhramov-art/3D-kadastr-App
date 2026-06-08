@@ -15,7 +15,7 @@ import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
 import '../scans/saved_scans_screen.dart';
-import '../services/screens/ai_cadastre_screen.dart';
+import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
 import '../services/services_screen.dart';
@@ -176,7 +176,7 @@ class _MainShellState extends State<MainShell> {
     if (!mounted) return;
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AiCadastreScreen()));
+    ).push(MaterialPageRoute<void>(builder: (_) => const AiScanIntroScreen()));
   }
 
   void _openCalculator() {

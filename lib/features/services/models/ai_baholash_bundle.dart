@@ -8,10 +8,12 @@ library;
 import 'dart:ui' show Locale;
 
 import '../api_cadastre_service.dart';
+import 'ai_scan_result.dart';
 
 class AiBaholashBundle {
   AiBaholashBundle({
     required this.kadastr,
+    this.scan,
     this.client,
     this.location,
     this.purpose = ValuationPurpose.sale,
@@ -27,6 +29,11 @@ class AiBaholashBundle {
         passportKeys = passportKeys ?? <String>[];
 
   final CadastreLookupResult kadastr;
+
+  /// 3D LiDAR skan natijasi (AI Baholashning birinchi qadami). Mobil-only
+  /// fazada faqat lokalda saqlanadi — toJson hozircha yubormaydi.
+  final AiScanResult? scan;
+
   AiClientInfo? client;
   AiLocationInfo? location;
 

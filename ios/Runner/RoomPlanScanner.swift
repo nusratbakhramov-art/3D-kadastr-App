@@ -1756,8 +1756,10 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             NSLog("KADASTR fmt: \(f.captureDeviceType.rawValue) \(Int(f.imageResolution.width))×\(Int(f.imageResolution.height)) @\(f.framesPerSecond)")
         }
         var picked: ARConfiguration.VideoFormat? = nil
+        // ULTRA-WIDE (0.5x) — kengroq FOV → ko'proq qoplash → KAM TESHIK. 4K wide
+        // (1x) sinab ko'rildi: tiniqlik alignment chegarasига urilib o'zgarmadi,
+        // lekin torroq FOV teshik qo'shdi → net zarar. Ultra-wide qaytarildi.
         if #available(iOS 14.5, *) {
-            // Try ultra-wide first
             picked = allFormats.first { $0.captureDeviceType == .builtInUltraWideCamera }
             if let p = picked {
                 NSLog("KADASTR using ULTRA-WIDE: \(Int(p.imageResolution.width))×\(Int(p.imageResolution.height))")
@@ -1765,11 +1767,8 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         }
         if picked == nil {
             // 4:3 aspect format — bizning arView ham 4:3 portrait, kesilmaydi.
-            // 16:9 format'lar kesilib chiqib zoomed-in effekt beradi.
             let fourByThree = allFormats.filter { fmt in
-                let w = fmt.imageResolution.width
-                let h = fmt.imageResolution.height
-                let ratio = w / h
+                let ratio = fmt.imageResolution.width / fmt.imageResolution.height
                 return abs(ratio - 4.0/3.0) < 0.02
             }
             picked = fourByThree.max(by: { $0.imageResolution.width < $1.imageResolution.width })
@@ -1778,7 +1777,6 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             }
         }
         if picked == nil {
-            // Last fallback: max resolution (any aspect)
             picked = allFormats.max(by: { $0.imageResolution.width < $1.imageResolution.width })
             if let p = picked {
                 NSLog("KADASTR using FALLBACK: \(Int(p.imageResolution.width))×\(Int(p.imageResolution.height))")
@@ -3713,9 +3711,13 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                 normals: globalNormals,
                 triangles: globalTris,
                 cameras: bakeCameras,
-                atlasResolution: 4096,           // 4K: xatlas pack 6K'dan 2-3x tez (bottleneck). best-raw tiniqlikni saqlaydi.
-                cameraBatchSize: 4,              // hi-res 12MP × 4 = ~196 MB per batch
-                downsampleFactor: 1,             // full source (4032×3024 hi-res)
+                // POLYCAM-DARAJALI TINIQLIK: 4096 atlas (Polycam zichligi — matn/tile
+                // o'qiladi). Avval 4096 OOM berardi, lekin bake() memory-refaktoridan
+                // keyin (nrm/pos/buferlarni fazama-faza free + scratch'ni kech ajratish)
+                // peak ~1.5 GB → ~1.1 GB → entitlement'siz sig'adi. Fotolar TO'LIQ 12MP.
+                atlasResolution: 4096,           // 4K Polycam zichligi (refaktor bilan OOM yo'q)
+                cameraBatchSize: 2,              // 12MP × 2 ≈ 96 MB per batch
+                downsampleFactor: 1,             // to'liq 4032×3024 (tiniqlik uchun)
                 voxelColor: voxelVolume,         // Phase 2: gray patches → voxel color
                 useCubeProjectionUV: false,      // xatlas (sifatli, teshiksiz). Cube UV oblik yuzalarni parchalaydi — yaroqsiz.
                 progress: { p, msg in
@@ -5031,17 +5033,17 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         return SCNGeometry(sources: [vSrc, nSrc, uvSrc], elements: [elem])
     }
 
-    /// Atlas mild sharpening. Manba rasmlar 1920×1440 ultra-wide (yumshoq optika) —
-    /// yo'qolgan detail qaytmaydi, lekin CIUnsharpMask qirra/tugma kontrastini
-    /// aniqlashtiradi. radius 1.8 / intensity 0.5: halo va grain'siz mild (Mac'da
-    /// solishtirib tanlangan; 2.5/0.7 halo+grain, LUMIN deyarli ta'sirsiz).
+    /// Atlas sharpening. Manba endi to'liq 12MP (4032×3024, downsample 1) — haqiqiy
+    /// detail ko'p, shuning uchun kuchliroq CIUnsharpMask matn/qirra kontrastini
+    /// oshiradi. radius 1.6 (matn uchun nozikroq, keng halo yo'q) / intensity 0.9:
+    /// combine (best-view high-freq) bilan birga yozuv qirralarini aniqlashtiradi.
     fileprivate static func sharpenAtlas(_ image: UIImage) -> UIImage {
         guard let cg = image.cgImage else { return image }
         let ci = CIImage(cgImage: cg)
         guard let f = CIFilter(name: "CIUnsharpMask") else { return image }
         f.setValue(ci, forKey: kCIInputImageKey)
-        f.setValue(2.2, forKey: kCIInputRadiusKey)    // 1.8 → 2.2: kuchliroq (multi-band blur kamaydi)
-        f.setValue(0.65, forKey: kCIInputIntensityKey) // 0.5 → 0.65: detail kontrasti
+        f.setValue(1.6, forKey: kCIInputRadiusKey)    // 2.2 → 1.6: matn uchun nozik qirra (keng halo emas)
+        f.setValue(0.9, forKey: kCIInputIntensityKey)  // 0.65 → 0.9: yozuv qirra kontrasti
         guard let out = f.outputImage,
               let outCG = CIContext(options: nil).createCGImage(out, from: ci.extent)
         else { return image }

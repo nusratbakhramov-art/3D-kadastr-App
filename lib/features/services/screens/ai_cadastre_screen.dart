@@ -3,13 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../core/i18n.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../api_cadastre_service.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../models/ai_scan_result.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
 import 'ai_client_form_screen.dart';
@@ -17,7 +17,11 @@ import 'ai_client_form_screen.dart';
 enum _LoadStatus { idle, loading, loaded, error }
 
 class AiCadastreScreen extends StatefulWidget {
-  const AiCadastreScreen({super.key});
+  const AiCadastreScreen({super.key, this.scan});
+
+  /// AI Baholashning 3D skan qadami natijasi (oldingi qadamdan uzatiladi).
+  /// Skan majburiy bo'lgani uchun odatda to'ldirilgan; bundle ichida saqlanadi.
+  final AiScanResult? scan;
 
   @override
   State<AiCadastreScreen> createState() => _AiCadastreScreenState();
@@ -156,7 +160,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   void _continue() {
     if (_status != _LoadStatus.loaded || _info == null) return;
     HapticFeedback.lightImpact();
-    final bundle = AiBaholashBundle(kadastr: _info!);
+    final bundle = AiBaholashBundle(kadastr: _info!, scan: widget.scan);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AiClientFormScreen(bundle: bundle),
