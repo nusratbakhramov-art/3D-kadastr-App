@@ -13,6 +13,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/i18n.dart';
@@ -60,6 +61,9 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
   bool _resolving = false;
   Timer? _reverseDebounce;
   int _reverseRequestId = 0;
+
+  // Current-location (geolocator) state.
+  bool _locating = false;
 
   @override
   void initState() {
@@ -196,6 +200,44 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     }
   }
 
+  // ── Current location ─────────────────────────────────────────────────
+
+  Future<void> _goToCurrentLocation() async {
+    HapticFeedback.lightImpact();
+    final l = Localizations.localeOf(context);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) AppToast.error(context, _AiLocationStrings.locationOff(l));
+        return;
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted) {
+          AppToast.error(context, _AiLocationStrings.locationDenied(l));
+        }
+        return;
+      }
+      setState(() => _locating = true);
+      final pos = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      final here = LatLng(pos.latitude, pos.longitude);
+      setState(() {
+        _center = here;
+        _locating = false;
+      });
+      _mapController.move(here, 17);
+      _scheduleReverse();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _locating = false);
+      AppToast.error(context, _AiLocationStrings.locationError(l));
+    }
+  }
+
   // ── Confirm / submit ─────────────────────────────────────────────────
 
   void _confirm() {
@@ -262,13 +304,22 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
                           maxZoom: 18,
                           onMapEvent: _onMapEvent,
                         ),
-                        children: const [
-                          _OsmTileLayer(),
+                        children: [
+                          _ModernTileLayer(isDark: isDark),
                         ],
                       ),
                     ),
                   ),
                   const Center(child: _CenterPin()),
+                  Positioned(
+                    right: 28,
+                    bottom: 16,
+                    child: _MyLocationButton(
+                      isDark: isDark,
+                      busy: _locating,
+                      onTap: _goToCurrentLocation,
+                    ),
+                  ),
                   if (_suggestions.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -309,14 +360,67 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
 
 // ── Sub-widgets ───────────────────────────────────────────────────────
 
-class _OsmTileLayer extends StatelessWidget {
-  const _OsmTileLayer();
+class _ModernTileLayer extends StatelessWidget {
+  const _ModernTileLayer({required this.isDark});
+
+  final bool isDark;
+
   @override
   Widget build(BuildContext context) {
+    // Zamonaviy CartoDB basemap (bepul, API key shart emas). Qorong'i temada
+    // Dark Matter, yorug'da Voyager — eski OSM raster o'rniga ancha toza/zamonaviy.
+    final style = isDark ? 'dark_all' : 'voyager';
     return TileLayer(
-      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      urlTemplate:
+          'https://{s}.basemaps.cartocdn.com/rastertiles/$style/{z}/{x}/{y}{r}.png',
+      subdomains: const ['a', 'b', 'c', 'd'],
+      retinaMode: MediaQuery.of(context).devicePixelRatio > 1.0,
       userAgentPackageName: 'uz.kadastr.kadastr',
-      maxZoom: 19,
+      maxZoom: 20,
+    );
+  }
+}
+
+/// Map ustidagi "joriy joylashuv" tugmasi — geolocator orqali GPS oladi.
+class _MyLocationButton extends StatelessWidget {
+  const _MyLocationButton({
+    required this.isDark,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    return Material(
+      color: bg,
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: busy ? null : onTap,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: busy
+              ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: AppColors.splashGreen,
+                  ),
+                )
+              : const Icon(
+                  Icons.my_location,
+                  color: AppColors.splashGreen,
+                  size: 24,
+                ),
+        ),
+      ),
     );
   }
 }
@@ -634,5 +738,23 @@ class _AiLocationStrings {
         'ru' => 'Адрес не найден',
         'en' => 'Address not found',
         _ => 'Manzil topilmadi',
+      };
+
+  static String locationOff(Locale l) => switch (l.languageCode) {
+        'ru' => 'Включите геолокацию на устройстве',
+        'en' => 'Turn on location services',
+        _ => 'Qurilmada joylashuvni yoqing',
+      };
+
+  static String locationDenied(Locale l) => switch (l.languageCode) {
+        'ru' => 'Нет доступа к геолокации',
+        'en' => 'Location permission denied',
+        _ => 'Joylashuvga ruxsat berilmadi',
+      };
+
+  static String locationError(Locale l) => switch (l.languageCode) {
+        'ru' => 'Не удалось определить местоположение',
+        'en' => 'Could not determine location',
+        _ => 'Joylashuvni aniqlab boʻlmadi',
       };
 }

@@ -7,13 +7,15 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
 import '../data/room_plan_scanner.dart';
 import '../widgets/service_app_bar.dart';
+import 'ai_cadastre_screen.dart';
 import 'ai_scan_process_screen.dart';
 
-/// AI Baholashning 1-qadami — 3D LiDAR skan (MAJBURIY).
+/// AI Baholashning 1-qadami — 3D LiDAR skan.
 ///
 /// Oqim: bu ekran → mesh ko'rish → USDZ ga ishlash → kadastr raqami → ...
 /// LiDAR yo'q qurilmalarda (simulator / Pro bo'lmagan iPhone) skan
-/// qo'llab-quvvatlanmaydi — davom etish bloklanadi (skan majburiy).
+/// qo'llab-quvvatlanmaydi, lekin "O'tkazib yuborish" bilan skansiz davom
+/// etish mumkin (payment integratsiya / test uchun).
 class AiScanIntroScreen extends StatefulWidget {
   const AiScanIntroScreen({super.key});
 
@@ -76,6 +78,18 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
       setState(() => _scanning = false);
       AppToast.error(context, '${_S.scanError(localeNotifier.value)}: $e');
     }
+  }
+
+  /// Skanni o'tkazib yuborib, to'g'ridan kadastr qadamiga o'tadi (scan: null).
+  /// Payment integratsiya / LiDAR yo'q qurilmada test uchun.
+  void _skip() {
+    if (_scanning) return;
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const AiCadastreScreen(),
+      ),
+    );
   }
 
   @override
@@ -159,12 +173,30 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: _scanning
                       ? const _ScanningButton()
-                      : ListingCtaButton(
-                          label: _supported == null
-                              ? _S.checking(l)
-                              : _S.startScan(l),
-                          enabled: _supported == true,
-                          onTap: _startScan,
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            ListingCtaButton(
+                              label: _supported == null
+                                  ? _S.checking(l)
+                                  : _S.startScan(l),
+                              enabled: _supported == true,
+                              onTap: _startScan,
+                            ),
+                            const SizedBox(height: 4),
+                            TextButton(
+                              onPressed: _skip,
+                              child: Text(
+                                _S.skip(l),
+                                style: TextStyle(
+                                  fontFamily: 'MTSText',
+                                  fontSize: 14,
+                                  color: subColor,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                 ),
               ],
@@ -381,6 +413,12 @@ class _S {
         'ru' => 'Начать сканирование',
         'en' => 'Start scanning',
         _ => 'Skanlashni boshlash',
+      };
+
+  static String skip(Locale l) => switch (l.languageCode) {
+        'ru' => 'Пропустить',
+        'en' => 'Skip',
+        _ => 'O\'tkazib yuborish',
       };
 
   static String checking(Locale l) => switch (l.languageCode) {

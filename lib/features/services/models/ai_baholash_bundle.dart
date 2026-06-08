@@ -56,7 +56,12 @@ class AiBaholashBundle {
 
   Map<String, dynamic> toJson() => {
         'kadastr': {
-          'cadastre_number': kadastr.cadastreNumber,
+          // Skip qilinganda cadastre_number bo'sh bo'lishi mumkin; backend uni
+          // MAJBURIY (XX:XX:XX:XX:XX:XXXX format) deb tekshiradi → bo'sh bo'lsa
+          // test placeholder yuboramiz (aks holda POST /ai-valuations 422).
+          'cadastre_number': kadastr.cadastreNumber.trim().isEmpty
+              ? '00:00:00:00:00:0000'
+              : kadastr.cadastreNumber,
           if (kadastr.address != null) 'address': kadastr.address,
           if (kadastr.objectTypeHint != null)
             'object_type_hint': kadastr.objectTypeHint,

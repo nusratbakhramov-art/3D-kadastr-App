@@ -168,6 +168,24 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     );
   }
 
+  /// Lookup natijasiz (davreest.uz topmasa) ham davom etish — kiritilgan
+  /// kadastr raqamini olib ketadi, uy maʼlumotlari boʻsh qoladi. Payment
+  /// integratsiyasi / test uchun.
+  void _skip() {
+    HapticFeedback.lightImpact();
+    final bundle = AiBaholashBundle(
+      kadastr: CadastreLookupResult(
+        cadastreNumber: _cadastreController.text.trim(),
+      ),
+      scan: widget.scan,
+    );
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AiClientFormScreen(bundle: bundle),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = Localizations.localeOf(context);
@@ -285,10 +303,30 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: ListingCtaButton(
-                        label: _CadastreStrings.continueLabel(l),
-                        enabled: _status == _LoadStatus.loaded,
-                        onTap: _continue,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          ListingCtaButton(
+                            label: _CadastreStrings.continueLabel(l),
+                            enabled: _status == _LoadStatus.loaded,
+                            onTap: _continue,
+                          ),
+                          const SizedBox(height: 4),
+                          TextButton(
+                            onPressed: _skip,
+                            child: Text(
+                              _CadastreStrings.skip(l),
+                              style: TextStyle(
+                                fontFamily: 'MTSText',
+                                fontSize: 14,
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.6)
+                                    : const Color(0xFF8A9097),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -847,6 +885,12 @@ class _CadastreStrings {
         'ru' => 'Продолжить',
         'en' => 'Continue',
         _ => 'Davom etish',
+      };
+
+  static String skip(Locale l) => switch (l.languageCode) {
+        'ru' => 'Пропустить',
+        'en' => 'Skip',
+        _ => "O'tkazib yuborish",
       };
 
   static String helperSuffix(Locale l) => switch (l.languageCode) {

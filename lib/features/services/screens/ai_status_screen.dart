@@ -18,6 +18,7 @@ import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../../payments/ai_payment_sheet.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
@@ -88,6 +89,11 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       _startPolling(token);
     } on AiValuationApiException catch (e) {
       if (!mounted) return;
+      // DEV diagnostika: 422 da qaysi maydon validatsiyadan o'tmaganini logga
+      // chiqaramiz (foydalanuvchiga ko'rsatmaymiz).
+      if (e.statusCode == 422) {
+        debugPrint('AI valuation 422 detail: ${e.message}');
+      }
       setState(() {
         _submitting = false;
         // 422 = server-side input validation. Don't surface the raw backend
@@ -549,13 +555,13 @@ class _ResultView extends StatelessWidget {
             ],
           ),
         ),
-        // Fixed bottom CTA — always reachable without scrolling.
+        // Fixed bottom CTA — "Ariza yuborish" → to'lov bottom-sheet'i (Payme).
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: ListingCtaButton(
-            label: _AiStatusStrings.home(l),
+            label: _AiStatusStrings.submitApplication(l),
             enabled: true,
-            onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
+            onTap: () => showAiPaymentSheet(context, referenceId: snapshot.id),
           ),
         ),
       ],
@@ -1506,6 +1512,12 @@ class _AiStatusStrings {
         'ru' => 'Главная',
         'en' => 'Home',
         _ => 'Asosiy sahifa',
+      };
+
+  static String submitApplication(Locale l) => switch (l.languageCode) {
+        'ru' => 'Подать заявку',
+        'en' => 'Submit application',
+        _ => 'Ariza yuborish',
       };
 
   static String unitBln(Locale l) => switch (l.languageCode) {
