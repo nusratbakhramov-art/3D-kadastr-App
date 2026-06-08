@@ -23,6 +23,8 @@ import '../../../home/user_profile.dart';
 import '../../../settings/settings_state.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_design_order_service.dart';
+import '../../data/calculator_pricing_store.dart';
+import '../../models/calculator_pricing.dart';
 import '../../models/design_order_draft.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
@@ -255,6 +257,18 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   Locale get _locale =>
       Localizations.maybeLocaleOf(context) ?? localeNotifier.value;
+
+  // Katalog (backend → kesh → default) — adminkadan tahrirlanadigan variantlar.
+  static List<CalcOption> _catalog(String group) =>
+      calculatorPricingNotifier.value.optionsFor(group);
+
+  String _catalogLabel(List<CalcOption> opts, String? v) {
+    if (v == null) return '';
+    for (final o in opts) {
+      if (o.value == v) return o.localized(_locale);
+    }
+    return v;
+  }
 
   Future<void> _submit() async {
     final s = _Strings(_locale);
@@ -580,27 +594,36 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     final s = _Strings(_locale);
     return _scrollableStep([
       WizardSectionTitle(text: s.interiorDesign),
-      WizardChipPicker<String>(
-        label: s.style,
-        options: _interiorStyles,
-        labelOf: (k) => s.styleLabel(k),
-        value: _draft.interior.style,
-        onChanged: (v) => setState(() => _draft.interior.style = v),
-      ),
-      WizardChipPicker<String>(
-        label: s.interiorMaterial,
-        options: _interiorMaterials,
-        labelOf: (k) => s.materialLabel(k),
-        value: _draft.interior.interiorMaterial,
-        onChanged: (v) => setState(() => _draft.interior.interiorMaterial = v),
-      ),
-      WizardChipPicker<String>(
-        label: s.floorMaterial,
-        options: _floorMaterials,
-        labelOf: (k) => s.materialLabel(k),
-        value: _draft.interior.floorMaterial,
-        onChanged: (v) => setState(() => _draft.interior.floorMaterial = v),
-      ),
+      Builder(builder: (_) {
+        final opts = _catalog('dizayn.interior.style');
+        return WizardChipPicker<String>(
+          label: s.style,
+          options: [for (final o in opts) o.value],
+          labelOf: (k) => _catalogLabel(opts, k),
+          value: _draft.interior.style,
+          onChanged: (v) => setState(() => _draft.interior.style = v),
+        );
+      }),
+      Builder(builder: (_) {
+        final opts = _catalog('dizayn.interior.material');
+        return WizardChipPicker<String>(
+          label: s.interiorMaterial,
+          options: [for (final o in opts) o.value],
+          labelOf: (k) => _catalogLabel(opts, k),
+          value: _draft.interior.interiorMaterial,
+          onChanged: (v) => setState(() => _draft.interior.interiorMaterial = v),
+        );
+      }),
+      Builder(builder: (_) {
+        final opts = _catalog('dizayn.floor_material');
+        return WizardChipPicker<String>(
+          label: s.floorMaterial,
+          options: [for (final o in opts) o.value],
+          labelOf: (k) => _catalogLabel(opts, k),
+          value: _draft.interior.floorMaterial,
+          onChanged: (v) => setState(() => _draft.interior.floorMaterial = v),
+        );
+      }),
       ColorPaletteField(
         label: s.colors,
         value: _draft.interior.colors,
@@ -701,20 +724,26 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     final s = _Strings(_locale);
     return _scrollableStep([
       WizardSectionTitle(text: s.exteriorDesign),
-      WizardChipPicker<String>(
-        label: s.style,
-        options: _exteriorStyles,
-        labelOf: (k) => s.styleLabel(k),
-        value: _draft.exterior.style,
-        onChanged: (v) => setState(() => _draft.exterior.style = v),
-      ),
-      WizardChipPicker<String>(
-        label: s.exteriorMaterial,
-        options: _exteriorMaterials,
-        labelOf: (k) => s.materialLabel(k),
-        value: _draft.exterior.exteriorMaterial,
-        onChanged: (v) => setState(() => _draft.exterior.exteriorMaterial = v),
-      ),
+      Builder(builder: (_) {
+        final opts = _catalog('dizayn.exterior.style');
+        return WizardChipPicker<String>(
+          label: s.style,
+          options: [for (final o in opts) o.value],
+          labelOf: (k) => _catalogLabel(opts, k),
+          value: _draft.exterior.style,
+          onChanged: (v) => setState(() => _draft.exterior.style = v),
+        );
+      }),
+      Builder(builder: (_) {
+        final opts = _catalog('dizayn.exterior.material');
+        return WizardChipPicker<String>(
+          label: s.exteriorMaterial,
+          options: [for (final o in opts) o.value],
+          labelOf: (k) => _catalogLabel(opts, k),
+          value: _draft.exterior.exteriorMaterial,
+          onChanged: (v) => setState(() => _draft.exterior.exteriorMaterial = v),
+        );
+      }),
       ColorPaletteField(
         label: s.colors,
         value: _draft.exterior.colors,
@@ -806,26 +835,6 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         DizObjectType.boshqa => s.objTypeBoshqa,
       };
 
-  static const _interiorStyles = [
-    'high_tech',
-    'klassik',
-    'neoklassik',
-    'minimalizm',
-    'loft',
-    'boshqa',
-  ];
-  static const _exteriorStyles = [
-    'high_tech',
-    'klassik',
-    'neoklassik',
-    'minimalizm',
-    'loft',
-    'modern',
-  ];
-
-  static const _interiorMaterials = ['boyoq', 'tosh', 'kompozit', 'shisha', 'bambuk'];
-  static const _floorMaterials = ['laminat', 'tosh', 'kafel', 'boshqa'];
-  static const _exteriorMaterials = ['boyoq', 'tosh', 'kompozit', 'shisha'];
   static const _partitionMaterials = ['gisht', 'gipsokarton', 'gazoblok'];
 
   static const _acTypes = ['split', 'vrf', 'chiller'];

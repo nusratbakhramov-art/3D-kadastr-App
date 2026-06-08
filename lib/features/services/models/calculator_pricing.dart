@@ -31,6 +31,47 @@ class YuridikLine {
   }
 }
 
+/// Kalkulyator tanlov varianti (rang / uslub / material) — adminkadan
+/// tahrirlanadi, mobil ilova backend'dan oladi. `meta` ranglar uchun hex.
+@immutable
+class CalcOption {
+  const CalcOption({required this.value, required this.label, this.meta});
+
+  /// Mashina qiymati: 'high_tech', 'oq', 'gisht' …
+  final String value;
+  final Map<String, String> label; // {'uz':..,'ru':..,'en':..}
+  final String? meta; // ranglar uchun '#RRGGBB', aks holda null
+
+  String localized(Locale l) => label[l.languageCode] ?? label['uz'] ?? value;
+
+  /// Hex `meta` → Color (ranglar uchun). Noto'g'ri bo'lsa null.
+  Color? get color {
+    final m = meta;
+    if (m == null) return null;
+    final hex = m.replaceAll('#', '').trim();
+    final v = hex.length == 6 ? int.tryParse(hex, radix: 16) : null;
+    return v == null ? null : Color(0xFF000000 | v);
+  }
+
+  factory CalcOption.fromJson(Map<String, dynamic> j) {
+    final lbl = (j['label'] as Map?) ?? const {};
+    return CalcOption(
+      value: j['value'] as String,
+      label: {
+        for (final loc in const ['uz', 'ru', 'en'])
+          if (lbl[loc] != null) loc: lbl[loc] as String,
+      },
+      meta: j['meta'] as String?,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'value': value,
+        'label': label,
+        if (meta != null) 'meta': meta,
+      };
+}
+
 /// Kalkulyator narxlari. [rate] kalit bo'yicha summani qaytaradi (topilmasa
 /// default). [defaults] hech qachon bo'sh emas — ekranlar null tekshirmaydi.
 @immutable
@@ -38,6 +79,7 @@ class CalculatorPricing {
   const CalculatorPricing({
     required this.rates,
     required this.yuridik,
+    this.options = const {},
     this.version,
   });
 
@@ -45,8 +87,18 @@ class CalculatorPricing {
   final Map<String, num> rates;
   final List<YuridikLine> yuridik;
 
+  /// guruh → variantlar (rang/uslub/material). Masalan `options['colors']`.
+  final Map<String, List<CalcOption>> options;
+
   /// Eng so'nggi `updated_at` (backend) — kesh yangiligini bilish uchun.
   final String? version;
+
+  /// Guruh variantlari; backend bo'sh/yetib bormagan bo'lsa default'ga tushadi.
+  List<CalcOption> optionsFor(String group) {
+    final r = options[group];
+    if (r != null && r.isNotEmpty) return r;
+    return _defaultOptions[group] ?? const [];
+  }
 
   /// Narx; topilmasa default qiymatga tushadi (har doim mavjud).
   num rate(String key) => rates[key] ?? _defaultRates[key] ?? 0;
@@ -65,6 +117,7 @@ class CalculatorPricing {
   factory CalculatorPricing.fromJson(Map<String, dynamic> j) {
     final r = (j['rates'] as Map?) ?? const {};
     final y = (j['yuridik'] as List?) ?? const [];
+    final o = (j['options'] as Map?) ?? const {};
     return CalculatorPricing(
       version: j['version'] as String?,
       rates: {
@@ -74,6 +127,13 @@ class CalculatorPricing {
         for (final item in y)
           YuridikLine.fromJson(item as Map<String, dynamic>),
       ],
+      options: {
+        for (final e in o.entries)
+          e.key as String: [
+            for (final item in (e.value as List? ?? const []))
+              CalcOption.fromJson(item as Map<String, dynamic>),
+          ],
+      },
     );
   }
 
@@ -83,12 +143,17 @@ class CalculatorPricing {
         'yuridik': [
           for (final line in yuridik) {'key': line.key, 'value': line.value},
         ],
+        'options': {
+          for (final e in options.entries)
+            e.key: [for (final o in e.value) o.toJson()],
+        },
       };
 
   /// Hard-code default — `online calculator.doc` qiymatlari (backend bilan bir xil seed).
-  static const CalculatorPricing defaults = CalculatorPricing(
+  static final CalculatorPricing defaults = CalculatorPricing(
     rates: _defaultRates,
     yuridik: _defaultYuridikLines,
+    options: _defaultOptions,
   );
 }
 
@@ -170,3 +235,80 @@ const List<YuridikLine> _defaultYuridikLines = [
     'en': '5–20% commission',
   }),
 ];
+
+// ────────────────────────────────────────────────────────────────────────
+// Default optionlar (ranglar / uslublar / materiallar) — backend
+// `calculator_options` seed bilan AYNAN bir xil. Adminkadan tahrirlanadi;
+// backend yetib bormaganda shu ro'yxat ishlatiladi.
+// ────────────────────────────────────────────────────────────────────────
+
+CalcOption _o(String value, String uz, String ru, String en, [String? meta]) =>
+    CalcOption(value: value, label: {'uz': uz, 'ru': ru, 'en': en}, meta: meta);
+
+final Map<String, List<CalcOption>> _defaultOptions = {
+  'colors': [
+    _o('oq', 'Oq', 'Белый', 'White', '#FFFFFF'),
+    _o('bej', 'Bej', 'Бежевый', 'Beige', '#E6D8C3'),
+    _o('kulrang', 'Kulrang', 'Серый', 'Gray', '#9AA0A6'),
+    _o('qora', 'Qora', 'Чёрный', 'Black', '#222222'),
+    _o('jigarrang', 'Jigarrang', 'Коричневый', 'Brown', '#8B5A2B'),
+    _o('yogoch', 'Yog\'och', 'Дерево', 'Wood', '#C89B6C'),
+    _o('kok', 'Ko\'k', 'Синий', 'Blue', '#2F6FED'),
+    _o('moviy', 'Moviy', 'Голубой', 'Light blue', '#56CCF2'),
+    _o('yashil', 'Yashil', 'Зелёный', 'Green', '#3BA55D'),
+    _o('sariq', 'Sariq', 'Жёлтый', 'Yellow', '#F2C94C'),
+    _o('toq_sariq', 'To\'q sariq', 'Оранжевый', 'Orange', '#E8821E'),
+    _o('qizil', 'Qizil', 'Красный', 'Red', '#E0492A'),
+    _o('pushti', 'Pushti', 'Розовый', 'Pink', '#E58FB0'),
+    _o('binafsha', 'Binafsha', 'Фиолетовый', 'Purple', '#7C5CBF'),
+  ],
+  'arxitektura.style': [
+    _o('high_tech', 'High-tech', 'High-tech', 'High-tech'),
+    _o('klassik', 'Klassik', 'Классика', 'Classic'),
+    _o('neoklassik', 'Neoklassik', 'Неоклассика', 'Neoclassical'),
+    _o('minimalizm', 'Minimalizm', 'Минимализм', 'Minimalism'),
+    _o('loft', 'Loft', 'Loft', 'Loft'),
+  ],
+  'arxitektura.facade_material': [
+    _o('gisht', 'G\'isht', 'Кирпич', 'Brick'),
+    _o('tosh', 'Tosh', 'Камень', 'Stone'),
+    _o('kompozit', 'Kompozit panellar', 'Композитные панели', 'Composite panels'),
+    _o('shisha', 'Shisha', 'Стекло', 'Glass'),
+    _o('boyoq', 'Fasad bo\'yoqlari', 'Фасадная краска', 'Facade paint'),
+  ],
+  'dizayn.interior.style': [
+    _o('high_tech', 'High-tech', 'High-tech', 'High-tech'),
+    _o('klassik', 'Klassik', 'Классика', 'Classic'),
+    _o('neoklassik', 'Neoklassik', 'Неоклассика', 'Neoclassical'),
+    _o('minimalizm', 'Minimalizm', 'Минимализм', 'Minimalism'),
+    _o('loft', 'Loft', 'Loft', 'Loft'),
+    _o('boshqa', 'Boshqa', 'Другое', 'Other'),
+  ],
+  'dizayn.interior.material': [
+    _o('boyoq', 'Bo\'yoq', 'Краска', 'Paint'),
+    _o('tosh', 'Tosh', 'Камень', 'Stone'),
+    _o('kompozit', 'Kompozit panellar', 'Композитные панели', 'Composite panels'),
+    _o('shisha', 'Shisha', 'Стекло', 'Glass'),
+    _o('bambuk', 'Bambuk panellar', 'Бамбуковые панели', 'Bamboo panels'),
+  ],
+  'dizayn.floor_material': [
+    _o('laminat', 'Laminat', 'Ламинат', 'Laminate'),
+    _o('tosh', 'Tosh', 'Камень', 'Stone'),
+    _o('kafel', 'Kafel', 'Плитка', 'Tile'),
+    _o('boshqa', 'Boshqa', 'Другое', 'Other'),
+  ],
+  'dizayn.exterior.style': [
+    _o('high_tech', 'High-tech', 'High-tech', 'High-tech'),
+    _o('klassik', 'Klassik', 'Классика', 'Classic'),
+    _o('neoklassik', 'Neoklassik', 'Неоклассика', 'Neoclassical'),
+    _o('minimalizm', 'Minimalizm', 'Минимализм', 'Minimalism'),
+    _o('loft', 'Loft', 'Loft', 'Loft'),
+    _o('modern', 'Modern', 'Модерн', 'Modern'),
+  ],
+  'dizayn.exterior.material': [
+    _o('boyoq', 'Bo\'yoq', 'Краска', 'Paint'),
+    _o('tosh', 'Tosh', 'Камень', 'Stone'),
+    _o('kompozit', 'Kompozit panellar', 'Композитные панели', 'Composite panels'),
+    _o('shisha', 'Shisha', 'Стекло', 'Glass'),
+  ],
+};

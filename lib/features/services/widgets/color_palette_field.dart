@@ -8,24 +8,8 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
-
-/// (nom, rang) juftliklari — interyer/eksteryer uchun keng tarqalgan ranglar.
-const List<({String name, Color color})> kColorSwatches = [
-  (name: 'Oq', color: Color(0xFFFFFFFF)),
-  (name: 'Bej', color: Color(0xFFE6D8C3)),
-  (name: 'Kulrang', color: Color(0xFF9AA0A6)),
-  (name: 'Qora', color: Color(0xFF222222)),
-  (name: 'Jigarrang', color: Color(0xFF8B5A2B)),
-  (name: 'Yog\'och', color: Color(0xFFC89B6C)),
-  (name: 'Ko\'k', color: Color(0xFF2F6FED)),
-  (name: 'Moviy', color: Color(0xFF56CCF2)),
-  (name: 'Yashil', color: Color(0xFF3BA55D)),
-  (name: 'Sariq', color: Color(0xFFF2C94C)),
-  (name: 'To\'q sariq', color: Color(0xFFE8821E)),
-  (name: 'Qizil', color: Color(0xFFE0492A)),
-  (name: 'Pushti', color: Color(0xFFE58FB0)),
-  (name: 'Binafsha', color: Color(0xFF7C5CBF)),
-];
+import '../data/calculator_pricing_store.dart';
+import '../models/calculator_pricing.dart';
 
 const String _kDetailSep = ' — ';
 
@@ -50,8 +34,14 @@ class ColorPaletteField extends StatefulWidget {
 }
 
 class _ColorPaletteFieldState extends State<ColorPaletteField> {
+  // Tanlangan mashina qiymatlari ('oq', 'bej' …) — tildan mustaqil.
   final Set<String> _selected = {};
   late final TextEditingController _detail;
+  Locale _locale = const Locale('uz');
+
+  // Ranglar katalogi (backend → kesh → default fallback).
+  List<CalcOption> get _opts =>
+      calculatorPricingNotifier.value.optionsFor('colors');
 
   @override
   void initState() {
@@ -64,21 +54,25 @@ class _ColorPaletteFieldState extends State<ColorPaletteField> {
       namesPart = initial.substring(0, sepIdx);
       detailPart = initial.substring(sepIdx + _kDetailSep.length);
     }
-    final known = {for (final s in kColorSwatches) s.name};
+    final opts = _opts;
     final leftover = <String>[];
     for (final raw in namesPart.split(',')) {
       final n = raw.trim();
       if (n.isEmpty) continue;
-      if (known.contains(n)) {
-        _selected.add(n);
+      // Qiymat yoki har qanday tildagi label bo'yicha moslashtiramiz.
+      final match = opts.where((o) =>
+          o.value == n ||
+          o.label.values.any((lbl) => lbl.toLowerCase() == n.toLowerCase()));
+      if (match.isNotEmpty) {
+        _selected.add(match.first.value);
       } else {
         leftover.add(n);
       }
     }
-    // Tanlanmagan (palitrada yo'q) nomlar izohga qo'shiladi.
     if (leftover.isNotEmpty) {
-      detailPart =
-          detailPart.isEmpty ? leftover.join(', ') : '${leftover.join(', ')}, $detailPart';
+      detailPart = detailPart.isEmpty
+          ? leftover.join(', ')
+          : '${leftover.join(', ')}, $detailPart';
     }
     _detail = TextEditingController(text: detailPart);
     _detail.addListener(_emit);
@@ -92,10 +86,10 @@ class _ColorPaletteFieldState extends State<ColorPaletteField> {
   }
 
   void _emit() {
-    // Palitra tartibida tanlangan nomlar.
+    // Katalog tartibida tanlangan ranglar — joriy tildagi nomlar.
     final names = [
-      for (final s in kColorSwatches)
-        if (_selected.contains(s.name)) s.name,
+      for (final o in _opts)
+        if (_selected.contains(o.value)) o.localized(_locale),
     ].join(', ');
     final detail = _detail.text.trim();
     final combined = detail.isEmpty
@@ -104,9 +98,9 @@ class _ColorPaletteFieldState extends State<ColorPaletteField> {
     widget.onChanged(combined);
   }
 
-  void _toggle(String name) {
+  void _toggle(String value) {
     setState(() {
-      if (!_selected.add(name)) _selected.remove(name);
+      if (!_selected.add(value)) _selected.remove(value);
     });
     _emit();
   }
@@ -114,6 +108,7 @@ class _ColorPaletteFieldState extends State<ColorPaletteField> {
   @override
   Widget build(BuildContext context) {
     final l = Localizations.localeOf(context);
+    _locale = l;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final labelColor = isDark ? Colors.white : AppColors.textBlack;
     final swatchBorder =
@@ -137,13 +132,13 @@ class _ColorPaletteFieldState extends State<ColorPaletteField> {
           spacing: 12,
           runSpacing: 12,
           children: [
-            for (final s in kColorSwatches)
+            for (final o in _opts)
               _Swatch(
-                name: s.name,
-                color: s.color,
-                selected: _selected.contains(s.name),
+                name: o.localized(l),
+                color: o.color ?? const Color(0xFF9AA0A6),
+                selected: _selected.contains(o.value),
                 idleBorder: swatchBorder,
-                onTap: () => _toggle(s.name),
+                onTap: () => _toggle(o.value),
               ),
           ],
         ),

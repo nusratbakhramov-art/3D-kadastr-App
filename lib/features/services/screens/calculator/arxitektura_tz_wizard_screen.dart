@@ -25,6 +25,8 @@ import '../../../home/user_profile.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_architecture_order_service.dart';
 import '../../api_cadastre_service.dart';
+import '../../data/calculator_pricing_store.dart';
+import '../../models/calculator_pricing.dart';
 import '../../models/architecture_order_draft.dart';
 import '../../widgets/cadastre_lookup_field.dart';
 import '../../widgets/color_palette_field.dart';
@@ -205,6 +207,18 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   static String _trimNum(double v) =>
       v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
+  // Katalog (backend → kesh → default) — adminkadan tahrirlanadigan variantlar.
+  static List<CalcOption> _catalog(String group) =>
+      calculatorPricingNotifier.value.optionsFor(group);
+
+  static String _catalogLabel(List<CalcOption> opts, String? v, Locale l) {
+    if (v == null) return '';
+    for (final o in opts) {
+      if (o.value == v) return o.localized(l);
+    }
+    return v;
+  }
 
   @override
   void dispose() {
@@ -716,25 +730,21 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   // ── Step 5: Arxitektura yechimlari ───────────────────────────────────
   Widget _buildStep5(Locale l) {
+    final styleOpts = _catalog('arxitektura.style');
+    final facadeOpts = _catalog('arxitektura.facade_material');
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.architectureAndDesign(l)),
       WizardChipPicker<String>(
         label: _Strings.styleLabel(l),
-        options: const [
-          'high_tech',
-          'klassik',
-          'neoklassik',
-          'minimalizm',
-          'loft',
-        ],
-        labelOf: (s) => _designStyleLabel(s, l),
+        options: [for (final o in styleOpts) o.value],
+        labelOf: (s) => _catalogLabel(styleOpts, s, l),
         value: _draft.architecture.style,
         onChanged: (v) => setState(() => _draft.architecture.style = v),
       ),
       WizardChipPicker<String>(
         label: _Strings.facadeMaterialLabel(l),
-        options: const ['gisht', 'tosh', 'kompozit', 'shisha', 'boyoq'],
-        labelOf: (s) => _facadeMaterialLabel(s, l),
+        options: [for (final o in facadeOpts) o.value],
+        labelOf: (s) => _catalogLabel(facadeOpts, s, l),
         value: _draft.architecture.facadeMaterial,
         onChanged: (v) =>
             setState(() => _draft.architecture.facadeMaterial = v),
@@ -1052,51 +1062,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     };
   }
 
-  static String _designStyleLabel(String s, Locale l) => switch (s) {
-        'high_tech' => 'High-tech',
-        'klassik' => switch (l.languageCode) {
-            'ru' => 'Классика',
-            'en' => 'Classic',
-            _ => 'Klassik',
-          },
-        'neoklassik' => switch (l.languageCode) {
-            'ru' => 'Неоклассика',
-            'en' => 'Neoclassic',
-            _ => 'Neoklassik',
-          },
-        'minimalizm' => switch (l.languageCode) {
-            'ru' => 'Минимализм',
-            'en' => 'Minimalism',
-            _ => 'Minimalizm',
-          },
-        'loft' => 'Loft',
-        _ => s,
-      };
-
-  static String _facadeMaterialLabel(String s, Locale l) => switch (s) {
-        'gisht' => _Strings.materialBrick(l),
-        'tosh' => switch (l.languageCode) {
-            'ru' => 'Камень',
-            'en' => 'Stone',
-            _ => 'Tosh',
-          },
-        'kompozit' => switch (l.languageCode) {
-            'ru' => 'Композитные панели',
-            'en' => 'Composite panels',
-            _ => 'Kompozit panellar',
-          },
-        'shisha' => switch (l.languageCode) {
-            'ru' => 'Стекло',
-            'en' => 'Glass',
-            _ => 'Shisha',
-          },
-        'boyoq' => switch (l.languageCode) {
-            'ru' => 'Фасадные краски',
-            'en' => 'Facade paints',
-            _ => 'Fasad bo\'yoqlari',
-          },
-        _ => s,
-      };
 
 }
 
