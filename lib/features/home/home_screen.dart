@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
+import '../support/support_service.dart';
+import '../support/support_sheet.dart';
 import '../market/market_controller.dart';
 import '../market/models/market_listing.dart';
 import '../market/listing_detail_screen.dart';
@@ -46,6 +48,10 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final MarketController _marketController;
+  final SupportService _supportService = SupportService();
+  SupportInfo _supportInfo = const SupportInfo(
+    phone: SupportService.fallbackPhone,
+  );
 
   @override
   void initState() {
@@ -54,6 +60,16 @@ class _HomeScreenState extends State<HomeScreen> {
       locale: widget.locale.languageCode,
     );
     unawaited(_marketController.initialize());
+    unawaited(_loadSupportInfo());
+  }
+
+  Future<void> _loadSupportInfo() async {
+    final info = await _supportService.fetchInfo();
+    if (mounted) setState(() => _supportInfo = info);
+  }
+
+  void _openSupport() {
+    showSupportSheet(context, locale: widget.locale, info: _supportInfo);
   }
 
   void _onListingTap(MarketListing listing) {
@@ -156,6 +172,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onLoginTap: widget.onLoginTap,
                             onAvatarTap: widget.onOpenProfile,
                             onBellTap: widget.onOpenNotifications,
+                            onSupportTap: _openSupport,
                           );
                         },
                       );
