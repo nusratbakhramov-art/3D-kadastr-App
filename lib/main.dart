@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +10,7 @@ import 'features/home/user_profile.dart';
 import 'features/notifications/notification_model.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
+import 'features/services/data/calculator_pricing_store.dart';
 import 'features/settings/locale_storage.dart';
 import 'features/settings/settings_state.dart';
 import 'features/shell/main_shell.dart';
@@ -18,6 +21,11 @@ import 'theme/app_theme.dart';
 void main() {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
+  // Faqat portret rejim — ilova hech qachon yon (landscape) aylanmaydi.
+  SystemChrome.setPreferredOrientations(const [
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
   // Foydalanuvchi profili AuthStorage'dan KadastrApp.initState ichida
   // yuklanadi (saqlangan sessiya bo'lsa). Mehmon (login qilmagan) holatda
   // userProfileNotifier null bo'lib qoladi va Profil ekranida "Kirish" tugmasi
@@ -152,12 +160,33 @@ class _AppRootState extends State<_AppRoot> {
   }
 
   Future<void> _bootstrap() async {
+    // Kalkulyator narxlarini keshdan darhol o'qib, fonda backend'dan
+    // yangilaymiz. Fire-and-forget — splash/bootstrap vaqtiga ta'sir qilmaydi
+    // (notifier boshlang'ich qiymati = defaults, offline xavfsiz).
+    unawaited(CalculatorPricingStore.instance.loadCachedThenRefresh());
+
     // Avval saqlangan locale ni yuklab, app bo'ylab qo'llaymiz. Bu
     // localeNotifier'ni o'zgartiradi va MaterialApp rebuild bo'lib, butun
     // widget tree yangi til bilan tarjima qilinadi.
     final savedLocale = await const LocaleStorage().load();
-    if (savedLocale != null && savedLocale != localeNotifier.value) {
-      localeNotifier.value = savedLocale;
+    if (savedLocale != null) {
+      // Foydalanuvchi tilni qo'lda tanlagan — o'shanga rioya qilamiz.
+      if (savedLocale != localeNotifier.value) {
+        localeNotifier.value = savedLocale;
+      }
+    } else {
+      // Foydalanuvchi tanlamagan — QURILMA tilini kuzatamiz (App Store 2.1(a):
+      // qurilma ruscha bo'lsa, ilova ham ruscha ochilsin). Qo'llab-quvvatlanadigan
+      // til (uz/ru/en) bo'lsa o'sha, aks holda default uz.
+      final deviceLang =
+          WidgetsBinding.instance.platformDispatcher.locale.languageCode;
+      const supported = {'uz', 'ru', 'en'};
+      final resolved = supported.contains(deviceLang)
+          ? Locale(deviceLang)
+          : const Locale('uz');
+      if (resolved != localeNotifier.value) {
+        localeNotifier.value = resolved;
+      }
     }
 
     final done = await widget.onboardingStorage.hasCompleted();

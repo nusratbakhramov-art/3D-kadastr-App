@@ -83,17 +83,18 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
     return buf.toString();
   }
 
+  static bool _isDigitChar(String c) {
+    if (c.isEmpty) return false;
+    final code = c.codeUnitAt(0);
+    return code >= 0x30 && code <= 0x39;
+  }
+
   void _handleChange(String raw) {
+    // Mask formatter already shaped raw → 'XX XXX-XX-XX'. We only mirror
+    // the digits into the model and fire onChanged.
     final digits = raw.replaceAll(RegExp(r'\D'), '');
     final clipped = digits.length > 9 ? digits.substring(0, 9) : digits;
     final wasIncomplete = _ctrl.digits.length < 9;
-    final formatted = _format(clipped);
-    if (_text.text != formatted) {
-      _text.value = TextEditingValue(
-        text: formatted,
-        selection: TextSelection.collapsed(offset: formatted.length),
-      );
-    }
     _ctrl.setDigits(clipped);
     if (wasIncomplete && clipped.length == 9) {
       HapticFeedback.selectionClick();
@@ -154,7 +155,7 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
                       keyboardType: TextInputType.number,
                       autofocus: true,
                       maxLines: 1,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      inputFormatters: [_PhoneMaskFormatter()],
                       cursorColor: const Color(0xFF00E135),
                       style: style,
                       decoration: const InputDecoration(
@@ -171,6 +172,65 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Formats raw input into `XX XXX-XX-XX` (9-digit UZ mobile, no country
+/// code) and — crucially — maps the cursor through the format so mid-string
+/// edits don't jump the caret to the end.
+class _PhoneMaskFormatter extends TextInputFormatter {
+  static const _maxDigits = 9;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Digits the user wants on the left side of the cursor — anchors the
+    // caret across reformat so backspacing or inserting in the middle
+    // keeps the cursor where the user expects it.
+    final rawCursor = newValue.selection.baseOffset.clamp(
+      0,
+      newValue.text.length,
+    );
+    final digitsBeforeCursor = newValue.text
+        .substring(0, rawCursor)
+        .replaceAll(RegExp(r'\D'), '')
+        .length;
+
+    final allDigits =
+        newValue.text.replaceAll(RegExp(r'\D'), '');
+    final clipped = allDigits.length > _maxDigits
+        ? allDigits.substring(0, _maxDigits)
+        : allDigits;
+
+    final buf = StringBuffer();
+    for (var i = 0; i < clipped.length; i++) {
+      if (i == 2) {
+        buf.write(' ');
+      } else if (i == 5 || i == 7) {
+        buf.write('-');
+      }
+      buf.write(clipped[i]);
+    }
+    final formatted = buf.toString();
+
+    // Walk the formatted string until we've passed `digitsBeforeCursor`
+    // digits — that's where the caret belongs now. Separators contribute
+    // to the offset but not to the digit count.
+    final targetDigits = digitsBeforeCursor.clamp(0, clipped.length);
+    var seen = 0;
+    var pos = 0;
+    while (pos < formatted.length && seen < targetDigits) {
+      if (_PhoneInputFieldState._isDigitChar(formatted[pos])) seen++;
+      pos++;
+    }
+
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: pos),
+      composing: TextRange.empty,
     );
   }
 }

@@ -151,7 +151,12 @@ class _AiResultScreenState extends State<AiResultScreen> {
         if (mounted) {
           setState(() {
             _loading = false;
-            _error = 'AI baholash uchun avval tizimga kiring.';
+            _error = switch (Localizations.localeOf(context).languageCode) {
+              'ru' =>
+                'Чтобы воспользоваться AI оценкой, сначала войдите в систему.',
+              'en' => 'Please sign in first to use AI valuation.',
+              _ => 'AI baholash uchun avval tizimga kiring.',
+            };
           });
         }
         return;
@@ -178,7 +183,8 @@ class _AiResultScreenState extends State<AiResultScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Tarmoq xatosi: $e';
+        _error =
+            '${_AiResultStrings.networkError(localeNotifier.value)}: $e';
       });
     }
   }
@@ -422,7 +428,7 @@ class _PriceCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _fmtUzs(result.estimatedValue),
+            _fmtUzs(result.estimatedValue, locale),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
@@ -432,7 +438,7 @@ class _PriceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${_AiResultStrings.range(locale)}: ${_fmtUzs(result.rangeLow)} – ${_fmtUzs(result.rangeHigh)}',
+            '${_AiResultStrings.range(locale)}: ${_fmtUzs(result.rangeLow, locale)} – ${_fmtUzs(result.rangeHigh, locale)}',
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 13,
@@ -547,7 +553,7 @@ class _BreakdownCard extends StatelessWidget {
           // Asosiy narx (1 m² ↔ jami)
           _BreakdownRow(
             label: _AiResultStrings.basePricePerSqm(locale),
-            valueText: _fmtUzs(result.breakdown.basePricePerSqm),
+            valueText: _fmtUzs(result.breakdown.basePricePerSqm, locale),
             badge: '1 m²',
             badgeColor: Colors.transparent,
             badgeTextColor: AppColors.splashGreen,
@@ -557,7 +563,7 @@ class _BreakdownCard extends StatelessWidget {
           Container(height: 1, color: divider),
           _BreakdownRow(
             label: _AiResultStrings.baseValue(locale),
-            valueText: _fmtUzs(result.breakdown.baseValue),
+            valueText: _fmtUzs(result.breakdown.baseValue, locale),
             badge: null,
             badgeColor: Colors.transparent,
             badgeTextColor: AppColors.splashGreen,
@@ -570,7 +576,7 @@ class _BreakdownCard extends StatelessWidget {
             _BreakdownRow(
               label: adjustments[i].name,
               valueText: '${adjustments[i].delta >= 0 ? '+' : ''}'
-                  '${_fmtUzs(adjustments[i].delta)}',
+                  '${_fmtUzs(adjustments[i].delta, locale)}',
               badge: '${adjustments[i].percent >= 0 ? '+' : ''}'
                   '${adjustments[i].percent.toStringAsFixed(adjustments[i].percent.truncateToDouble() == adjustments[i].percent ? 0 : 1)}%',
               badgeColor: Colors.transparent,
@@ -659,6 +665,7 @@ class _ApproachesCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
     final divider = isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
@@ -709,7 +716,7 @@ class _ApproachesCard extends StatelessWidget {
                   Text(
                     approaches[i].value == null
                         ? '—'
-                        : _fmtUzs(approaches[i].value!),
+                        : _fmtUzs(approaches[i].value!, locale),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -1012,7 +1019,7 @@ class _BreakdownSkeletonState extends State<_BreakdownSkeleton>
 // Helpers + i18n
 // ────────────────────────────────────────────────────────────────────────
 
-String _fmtUzs(num value) {
+String _fmtUzs(num value, Locale l) {
   // Group thousands with non-breaking spaces for readability.
   final rounded = value.abs().round();
   final s = rounded.toString();
@@ -1022,10 +1029,22 @@ String _fmtUzs(num value) {
     buf.write(s[i]);
   }
   final sign = value < 0 ? '-' : '';
-  return '$sign${buf.toString()} so\'m';
+  return '$sign${buf.toString()} ${_AiResultStrings.soum(l)}';
 }
 
 class _AiResultStrings {
+  static String soum(Locale l) => switch (l.languageCode) {
+        'ru' => 'сум',
+        'en' => 'soum',
+        _ => 'so\'m',
+      };
+
+  static String networkError(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сетевая ошибка',
+        'en' => 'Network error',
+        _ => 'Tarmoq xatosi',
+      };
+
   static String appBarTitle(Locale l) => switch (l.languageCode) {
         'ru' => 'AI Оценка',
         'en' => 'AI Valuation',

@@ -1,13 +1,16 @@
 import 'architecture_order_draft.dart';
 
 enum ScanObjectType {
-  turarJoy('Turar joy'),
-  noturarJoy('Noturar joy'),
-  ombor('Ombor'),
-  sanoat('Sanoat obyektlari');
+  turarJoy('Turar joy', 'residential'),
+  noturarJoy('Noturar joy', 'non_residential'),
+  ombor('Ombor', 'warehouse'),
+  sanoat('Sanoat obyektlari', 'industrial');
 
-  const ScanObjectType(this.label);
+  const ScanObjectType(this.label, this.wire);
   final String label;
+
+  /// Backend `ObjectType` enum value (matches app/models/scan.py).
+  final String wire;
 }
 
 class ScanDraft {

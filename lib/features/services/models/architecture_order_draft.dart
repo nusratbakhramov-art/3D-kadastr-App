@@ -6,6 +6,8 @@ library;
 
 import 'package:flutter/foundation.dart';
 
+import 'ai_baholash_bundle.dart' show AiLocationInfo, AiRoom;
+
 // ────────────────────────────────────────────────────────────────────────
 // Enums (backend ArchitectureObjectType bilan mos)
 // ────────────────────────────────────────────────────────────────────────
@@ -36,19 +38,6 @@ enum ConstructionType {
 // ────────────────────────────────────────────────────────────────────────
 // Sub-models (details JSONB ichidagi bo'limlar)
 // ────────────────────────────────────────────────────────────────────────
-
-class RoomEntry {
-  RoomEntry({required this.name, this.count, this.areaSqm});
-  String name;
-  int? count;
-  double? areaSqm;
-
-  Map<String, dynamic> toJson() => {
-        'name': name,
-        if (count != null) 'count': count,
-        if (areaSqm != null) 'area_sqm': areaSqm,
-      };
-}
 
 class ArchitectureDesignDraft {
   ArchitectureDesignDraft();
@@ -160,10 +149,10 @@ class ArchitectureOrderDraft extends ChangeNotifier {
   String cadastreNumber = '';
   double? landAreaSqm;
   String landUsePurpose = '';
-  // Hudud picker (AI baholash uchun aniqroq filter sifatida ishlatiladi).
-  // OLX market_listings region kalitlariga moslashtirilgan: tashkent_city,
-  // tashkent_region, andijan, bukhara, fergana, jizzakh, namangan, navoi,
-  // kashkadarya, karakalpakstan, samarkand, syrdarya, surkhandarya, khorezm.
+  // Xaritadan tanlangan manzil (koordinatalar bilan). `address` matni shundan
+  // to'ldiriladi; koordinatalar `details.location` ichida saqlanadi.
+  AiLocationInfo? location;
+  // Viloyat / tuman tanlovi (arxitektura TZ wizardidagi joylashuv qadami).
   String? viloyat;
   String? tuman;
 
@@ -181,8 +170,8 @@ class ArchitectureOrderDraft extends ChangeNotifier {
   // Qurilish yili — AI baholashda eskirish koeffitsienti uchun muhim faktor.
   int? constructionYear;
 
-  // Step 3 — Xonalar tarkibi
-  final List<RoomEntry> rooms = [];
+  // Step 3 — Xonalar tarkibi (AI baholash bilan bir xil model)
+  final List<AiRoom> rooms = [];
 
   // Steps 4-7 — sub-models
   final ArchitectureDesignDraft architecture = ArchitectureDesignDraft();
@@ -221,8 +210,6 @@ class ArchitectureOrderDraft extends ChangeNotifier {
       if (landAreaSqm != null) 'land_area_sqm': landAreaSqm,
       if (landUsePurpose.trim().isNotEmpty)
         'land_use_purpose': landUsePurpose.trim(),
-      if (viloyat != null) 'viloyat': viloyat,
-      if (tuman != null) 'tuman': tuman,
       if (constructionYear != null) 'construction_year': constructionYear,
       'object_type': objectType!.apiValue,
       if (objectSubtype.trim().isNotEmpty)
@@ -236,7 +223,19 @@ class ArchitectureOrderDraft extends ChangeNotifier {
       if (buildingAreaSqm != null) 'building_area_sqm': buildingAreaSqm,
       if (maxHeightM != null) 'max_height_m': maxHeightM,
       'details': {
-        'rooms': rooms.map((r) => r.toJson()).toList(),
+        if (location != null) 'location': location!.toJson(),
+        // Backend RoomEntry sxemasi {name, count, area_sqm} kutadi — AiRoom'ni
+        // shu shaklga moslaymiz (standart turlar uchun nom = labelUz).
+        'rooms': rooms.map((r) {
+          final name = (r.name?.trim().isNotEmpty ?? false)
+              ? r.name!.trim()
+              : r.kind.labelUz;
+          return {
+            'name': name,
+            'count': r.count,
+            if (r.area != null) 'area_sqm': r.area,
+          };
+        }).toList(),
         'architecture': architecture.toJson(),
         'constructive': constructive.toJson(),
         'engineering': engineering.toJson(),

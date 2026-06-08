@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:in_app_review/in_app_review.dart';
 
 import '../../core/api_config.dart';
+import '../../core/i18n.dart';
 import '../auth/auth_http_client.dart';
 
 import '../../theme/app_colors.dart';
@@ -21,11 +22,19 @@ import 'settings_state.dart';
 const _kAppStoreId = '6744487945';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, this.onLogoutConfirmed});
+  const SettingsScreen({
+    super.key,
+    this.onLogoutConfirmed,
+    this.onAccountDeleted,
+  });
 
   /// Called after the user confirms the logout dialog. The screen itself does
   /// not clear auth — the host wires that up.
   final VoidCallback? onLogoutConfirmed;
+
+  /// Called after the account is successfully deleted on the backend. Falls
+  /// back to [onLogoutConfirmed] if not provided.
+  final VoidCallback? onAccountDeleted;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -252,6 +261,12 @@ class _SettingsScreenState extends State<SettingsScreen>
           destructive: true,
           onTap: () => _confirmLogout(context, locale),
         ),
+        AppMenuRow(
+          icon: Icons.delete_outline_rounded,
+          label: _deleteAccountLabel(locale),
+          destructive: true,
+          onTap: () => _confirmDeleteAccount(context, locale),
+        ),
       ],
     );
   }
@@ -324,6 +339,81 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     if (confirmed == true && mounted) {
       widget.onLogoutConfirmed?.call();
+    }
+  }
+
+  String _deleteAccountLabel(Locale l) => switch (l.languageCode) {
+    'ru' => 'Удалить аккаунт',
+    'en' => 'Delete account',
+    _ => "Hisobni o'chirish",
+  };
+
+  // Hisobni o'chirish (App Store 5.1.1(v)). Backend hisobni deaktivatsiya qilib
+  // barcha sessiyalarni bekor qiladi; muvaffaqiyatda login ekraniga qaytamiz.
+  Future<void> _confirmDeleteAccount(BuildContext context, Locale locale) async {
+    String t(String ru, String en, String uz) =>
+        switch (locale.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          t('Удалить аккаунт?', 'Delete account?', "Hisobni o'chirasizmi?"),
+        ),
+        content: Text(
+          t(
+            'Ваш аккаунт и связанные данные будут удалены. Это действие необратимо.',
+            'Your account and associated data will be deleted. This action cannot be undone.',
+            "Hisobingiz va unga bog'liq ma'lumotlar o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.",
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t('Отмена', 'Cancel', 'Bekor qilish')),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFFE74C4C),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t('Удалить', 'Delete', "O'chirish")),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      final res = await AuthHttpClient()
+          .delete(Uri.parse('${ApiConfig.baseUrl}/profile/'))
+          .timeout(const Duration(seconds: 15));
+      if (!context.mounted) return;
+      if (res.statusCode == 200) {
+        AppToast.success(
+          context,
+          t('Аккаунт удалён', 'Account deleted', "Hisob o'chirildi"),
+        );
+        (widget.onAccountDeleted ?? widget.onLogoutConfirmed)?.call();
+      } else {
+        AppToast.error(
+          context,
+          t(
+            'Не удалось удалить аккаунт',
+            'Could not delete account',
+            "Hisobni o'chirib bo'lmadi",
+          ),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        AppToast.error(
+          context,
+          t(
+            'Не удалось удалить аккаунт',
+            'Could not delete account',
+            "Hisobni o'chirib bo'lmadi",
+          ),
+        );
+      }
     }
   }
 }
@@ -498,7 +588,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
       if (res.statusCode == 200) {
         setState(() { _otpSent = true; _loading = false; });
       } else {
-        setState(() { _error = 'Xatolik yuz berdi'; _loading = false; });
+        setState(() { _error = L.errorOccurred(localeNotifier.value); _loading = false; });
       }
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
@@ -520,11 +610,16 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
       if (res.statusCode == 200) {
         if (mounted) {
           Navigator.pop(context);
-          AppToast.success(context, 'Telefon raqam yangilandi');
+          final locale = localeNotifier.value;
+          AppToast.success(context, switch (locale.languageCode) {
+            'ru' => 'Номер телефона обновлён',
+            'en' => 'Phone number updated',
+            _ => 'Telefon raqam yangilandi',
+          });
         }
       } else {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
-        setState(() { _error = (body['detail'] as String?) ?? 'Xatolik yuz berdi'; _loading = false; });
+        setState(() { _error = (body['detail'] as String?) ?? L.errorOccurred(localeNotifier.value); _loading = false; });
       }
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
@@ -533,6 +628,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Container(
@@ -556,7 +652,11 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              'Telefon raqamni o\'zgartirish',
+              switch (locale.languageCode) {
+                'ru' => 'Изменить номер телефона',
+                'en' => 'Change phone number',
+                _ => 'Telefon raqamni o\'zgartirish',
+              },
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -586,7 +686,11 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 decoration: InputDecoration(
-                  hintText: 'OTP kodi',
+                  hintText: switch (locale.languageCode) {
+                    'ru' => 'OTP код',
+                    'en' => 'OTP code',
+                    _ => 'OTP kodi',
+                  },
                   counterText: '',
                   filled: true,
                   fillColor: ColorTokens.iconBg(context),
@@ -859,7 +963,7 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
                   children: [
                     Icon(Icons.wifi_off_rounded, size: 32, color: ColorTokens.secondaryText(context)),
                     const SizedBox(height: 12),
-                    TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); unawaited(_load()); }, child: const Text('Qayta urinish')),
+                    TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); unawaited(_load()); }, child: Text(L.retry(Localizations.localeOf(context)))),
                   ],
                 ),
               ),

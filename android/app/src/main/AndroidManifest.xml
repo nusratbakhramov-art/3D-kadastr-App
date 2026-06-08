@@ -1,7 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Backend API'ga ulanish uchun. Flutter buni faqat debug/profile
+         manifestga avtomatik qo'shadi — release APK'da internet bo'lmasligi
+         uchun shu yerda ham e'lon qilamiz. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Xaritada joriy joylashuvni aniqlash uchun (geolocator). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- Faqat telefonlar uchun: Google Play'da planshet, soat (Wear OS),
+         Android TV va Chromebook'larni chiqarib tashlaymiz. Telefon "hardware"
+         talab qilinishi shu qurilmalarni filtrlaydi. Ilova telefoniya API'sini
+         ishlatmaydi — bu faqat Play distribution filtri uchun. -->
+    <uses-feature
+        android:name="android.hardware.telephony"
+        android:required="true" />
+    <!-- Touchscreen talab qilinadi (TV/leanback qurilmalarni ham filtrlaydi). -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="true" />
+
     <application
         android:label="3D kadastr"
         android:name="${applicationName}"

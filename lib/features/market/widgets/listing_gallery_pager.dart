@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/remote_image.dart';
 import 'fullscreen_gallery.dart';
 
 class ListingGalleryPager extends StatefulWidget {
@@ -81,34 +82,10 @@ class _ListingGalleryPagerState extends State<ListingGalleryPager> {
                         initialIndex: i,
                       );
                     },
-                    child: Image.network(
-                    widget.images[i],
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                      color: bg,
-                      child: Center(
-                        child: Icon(
-                          Icons.broken_image_outlined,
-                          size: 40,
-                          color: (isDark ? Colors.white : Colors.black)
-                              .withValues(alpha: 0.4),
-                        ),
-                      ),
+                    child: RemoteImage(
+                      url: widget.images[i],
+                      memCacheWidth: 1200,
                     ),
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return ColoredBox(
-                        color: bg,
-                        child: const Center(
-                          child: SizedBox(
-                            width: 26,
-                            height: 26,
-                            child: CircularProgressIndicator(strokeWidth: 2.4),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
                   );
                 },
               ),

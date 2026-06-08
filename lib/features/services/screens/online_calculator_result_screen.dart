@@ -3,7 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../auth/auth_storage.dart';
+import '../../auth/widgets/login_required_sheet.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../api_calculator_order_service.dart';
 import '../models/calculator_draft.dart';
 import '../widgets/service_app_bar.dart';
 
@@ -32,6 +35,12 @@ class _OnlineCalculatorResultScreenState
   bool _loading = true;
   Timer? _timer;
 
+  // "Ariza topshirish" submit state (only for the plain online-calculator
+  // flow — architecture uses its own onPlaceOrder wizard).
+  final CalculatorOrderApiService _orders = CalculatorOrderApiService();
+  bool _orderSubmitting = false;
+  bool _orderSubmitted = false;
+
   @override
   void initState() {
     super.initState();
@@ -44,7 +53,36 @@ class _OnlineCalculatorResultScreenState
   @override
   void dispose() {
     _timer?.cancel();
+    _orders.dispose();
     super.dispose();
+  }
+
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _submitOrder() async {
+    if (_orderSubmitting || _orderSubmitted) return;
+    if (!await ensureLoggedIn(context)) return;
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null || token.isEmpty) return;
+    if (!mounted) return;
+    setState(() => _orderSubmitting = true);
+    try {
+      await _orders.submit(result: widget.result, token: token);
+      if (!mounted) return;
+      setState(() {
+        _orderSubmitting = false;
+        _orderSubmitted = true;
+      });
+      _snack(_Strings.orderSent(Localizations.localeOf(context)));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _orderSubmitting = false);
+      _snack(_Strings.sendError(Localizations.localeOf(context), '$e'));
+    }
   }
 
   @override
@@ -151,13 +189,25 @@ class _OnlineCalculatorResultScreenState
                                   .popUntil((r) => r.isFirst),
                               child: Text(_Strings.close(locale)),
                             ),
-                          ] else
+                          ] else ...[
                             ListingCtaButton(
-                              label: _Strings.close(locale),
-                              enabled: !_loading,
-                              onTap: () => Navigator.of(context)
-                                  .popUntil((r) => r.isFirst),
+                              label: _orderSubmitted
+                                  ? _Strings.submitted(locale)
+                                  : (_orderSubmitting
+                                      ? _Strings.submitting(locale)
+                                      : _Strings.submitOrder(locale)),
+                              enabled: !_loading &&
+                                  !_orderSubmitting &&
+                                  !_orderSubmitted,
+                              onTap: _submitOrder,
                             ),
+                            const SizedBox(height: 8),
+                            TextButton(
+                              onPressed: () => Navigator.of(context)
+                                  .popUntil((r) => r.isFirst),
+                              child: Text(_Strings.close(locale)),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -209,6 +259,41 @@ class _Strings {
         'Buyurtma berish',
         'Оформить заказ',
         'Place order',
+      );
+
+  static String submitOrder(Locale l) => _pick(
+        l,
+        'Ariza topshirish',
+        'Подать заявку',
+        'Submit application',
+      );
+
+  static String submitting(Locale l) => _pick(
+        l,
+        'Yuborilmoqda...',
+        'Отправка...',
+        'Submitting...',
+      );
+
+  static String submitted(Locale l) => _pick(
+        l,
+        'Ariza yuborildi ✓',
+        'Заявка отправлена ✓',
+        'Application sent ✓',
+      );
+
+  static String orderSent(Locale l) => _pick(
+        l,
+        'Ariza yuborildi',
+        'Заявка отправлена',
+        'Application sent',
+      );
+
+  static String sendError(Locale l, String e) => _pick(
+        l,
+        'Yuborishda xatolik: $e',
+        'Ошибка отправки: $e',
+        'Failed to send: $e',
       );
 }
 

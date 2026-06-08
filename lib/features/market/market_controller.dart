@@ -16,19 +16,27 @@ class MarketController extends ChangeNotifier {
     MarketplaceApiService? categoriesService,
     Duration searchDebounce = const Duration(milliseconds: 400),
     int pageSize = 12,
+    String localeCode = 'uz',
   }) : _repository = repository,
+       _localeCode = localeCode,
        _categoriesService = categoriesService,
        _debounce = searchDebounce,
-       _pageSize = pageSize;
+       _pageSize = pageSize {
+    _categories = [
+      MarketCategory(
+        id: kMarketCategoryAll,
+        label: _MarketControllerStrings.all(_localeCode),
+      ),
+    ];
+  }
 
   final MarketRepository _repository;
+  final String _localeCode;
   final MarketplaceApiService? _categoriesService;
   final Duration _debounce;
   final int _pageSize;
 
-  List<MarketCategory> _categories = const [
-    MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
-  ];
+  late List<MarketCategory> _categories;
   List<MarketCategory> get categories => _categories;
 
   final List<MarketListing> _items = [];
@@ -44,6 +52,7 @@ class MarketController extends ChangeNotifier {
   String _searchQuery = '';
   MarketFilters _filters = MarketFilters.empty;
   String? _error;
+  Object? _lastErrorObject;
   bool _hasMore = true;
   bool _isLoadingMore = false;
 
@@ -53,6 +62,7 @@ class MarketController extends ChangeNotifier {
   String get searchInput => _searchInput;
   MarketFilters get filters => _filters;
   String? get error => _error;
+  Object? get lastErrorObject => _lastErrorObject;
   bool get hasMore => _hasMore;
   bool get isLoadingMore => _isLoadingMore;
   int get totalCount => _totalCount;
@@ -66,20 +76,35 @@ class MarketController extends ChangeNotifier {
   Future<void> _loadCategories() async {
     final svc = _categoriesService;
     if (svc == null) return;
-    try {
-      final remote = await svc.fetchCategories();
-      if (_disposed) return;
-      final apiSlugs = remote.map((c) => c.slug).toSet();
-      _categories = [
-        const MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
-        // Always show Non-residential chip; skip if API already returns it
-        if (!apiSlugs.contains('nonresidential'))
-          const MarketCategory(id: 'nonresidential', label: "No'turar"),
-        ...remote.map((c) => MarketCategory(id: c.slug, label: c.name)),
-      ];
-      _notify();
-    } catch (_) {
-      // Silent fallback — keep the default "Barchasi" entry.
+    // Cold-start'da tarmoq ba'zan birinchi so'rovni uzadi — bir marta qayta urinamiz.
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        final remote = await svc.fetchCategories();
+        if (_disposed) return;
+        final apiSlugs = remote.map((c) => c.slug).toSet();
+        _categories = [
+          MarketCategory(
+            id: kMarketCategoryAll,
+            label: _MarketControllerStrings.all(_localeCode),
+          ),
+          // Always show Non-residential chip; skip if API already returns it
+          if (!apiSlugs.contains('nonresidential'))
+            MarketCategory(
+              id: 'nonresidential',
+              label: _MarketControllerStrings.nonResidential(_localeCode),
+            ),
+          ...remote.map((c) => MarketCategory(id: c.slug, label: c.name)),
+        ];
+        _notify();
+        return;
+      } catch (_) {
+        if (_disposed) return;
+        if (attempt == 0) {
+          await Future<void>.delayed(const Duration(seconds: 2));
+          continue;
+        }
+        // Ikkinchi urinishdan keyin ham — default "Barchasi" qoladi.
+      }
     }
   }
 
@@ -122,9 +147,17 @@ class MarketController extends ChangeNotifier {
     unawaited(_fetchFirstPage());
   }
 
-  Future<void> refresh() => _fetchFirstPage();
+  Future<void> refresh() async {
+    // Kategoriyalar cold-start'da tushib qolgan bo'lsa, pull-to-refresh tiklaydi.
+    if (_categories.length <= 1) unawaited(_loadCategories());
+    await _fetchFirstPage();
+  }
 
-  Future<void> retry() => _fetchFirstPage();
+  Future<void> retry() async {
+    // "Qayta urinish" listing bilan birga kategoriyalarni ham qayta yuklaydi.
+    unawaited(_loadCategories());
+    await _fetchFirstPage();
+  }
 
   Future<void> loadMore() async {
     if (_status != MarketStatus.success) return;
@@ -149,10 +182,11 @@ class MarketController extends ChangeNotifier {
       _totalCount = page.totalCount;
       _isLoadingMore = false;
       _notify();
-    } catch (_) {
+    } catch (e) {
       if (_disposed || token != _requestToken) return;
       _isLoadingMore = false;
-      _error = 'Yana yuklashda xatolik.';
+      _error = _MarketControllerStrings.loadMoreError(_localeCode);
+      _lastErrorObject = e;
       _notify();
     }
   }
@@ -186,10 +220,11 @@ class MarketController extends ChangeNotifier {
       _totalCount = page.totalCount;
       _status = MarketStatus.success;
       _notify();
-    } catch (_) {
+    } catch (e) {
       if (_disposed || token != _requestToken) return;
       _status = MarketStatus.error;
-      _error = 'Ma\'lumotlarni yuklab bo\'lmadi.';
+      _error = _MarketControllerStrings.loadError(_localeCode);
+      _lastErrorObject = e;
       _notify();
     }
   }
@@ -223,7 +258,36 @@ MarketController sharedMarketController({String? locale}) {
   _shared = MarketController(
     repository: ApiMarketRepository(service: svc),
     categoriesService: svc,
+    localeCode: locale ?? 'uz',
   );
   _sharedLocale = locale;
   return _shared!;
+}
+
+class _MarketControllerStrings {
+  const _MarketControllerStrings._();
+
+  static String all(String localeCode) => switch (localeCode) {
+    'ru' => 'Все',
+    'en' => 'All',
+    _ => 'Barchasi',
+  };
+
+  static String nonResidential(String localeCode) => switch (localeCode) {
+    'ru' => 'Нежилое',
+    'en' => 'Non-residential',
+    _ => "No'turar",
+  };
+
+  static String loadMoreError(String localeCode) => switch (localeCode) {
+    'ru' => 'Ошибка при подгрузке.',
+    'en' => 'Failed to load more.',
+    _ => 'Yana yuklashda xatolik.',
+  };
+
+  static String loadError(String localeCode) => switch (localeCode) {
+    'ru' => 'Не удалось загрузить данные.',
+    'en' => 'Could not load data.',
+    _ => 'Ma\'lumotlarni yuklab bo\'lmadi.',
+  };
 }

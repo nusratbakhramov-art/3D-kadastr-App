@@ -1,31 +1,45 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
+import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
+import '../api_ai_upload_service.dart';
 import '../data/room_plan_scanner.dart';
-import '../models/scan_draft.dart';
+import '../models/kadastr_3d_bundle.dart';
 import '../widgets/scan_camera_card.dart';
 import '../widgets/scan_tips_card.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
 import 'scan_diagnostics_screen.dart';
-import 'scan_metadata_screen.dart';
+import 'kadastr_3d/k3d_status_screen.dart';
+
+/// Backend route for 3D Kadastr uploads.
+const String _kUploadEndpoint = '/3d-kadastr-jobs/upload';
 
 class ScanLidarScreen extends StatefulWidget {
-  const ScanLidarScreen({super.key, required this.draft});
+  const ScanLidarScreen({super.key, required this.bundle});
 
-  final ScanDraft draft;
+  final Kadastr3dBundle bundle;
 
   @override
   State<ScanLidarScreen> createState() => _ScanLidarScreenState();
 }
 
 class _ScanLidarScreenState extends State<ScanLidarScreen> {
+  final AiUploadService _uploads = AiUploadService();
   ScanCardState _state = ScanCardState.idle;
   RoomScanResult? _scanResult;
+  bool _uploading = false;
+
+  @override
+  void dispose() {
+    _uploads.dispose();
+    super.dispose();
+  }
 
   Future<void> _startScan() async {
     if (_state == ScanCardState.scanning) return;
@@ -56,6 +70,8 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
         _scanResult = result;
         _state = ScanCardState.done;
       });
+      // Skan tayyor bo'lishi bilan USDZ faylni serverga yuklaymiz.
+      await _uploadScan(result);
     } on RoomPlanScannerException catch (e) {
       if (!mounted) return;
       setState(() => _state = ScanCardState.idle);
@@ -70,11 +86,55 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
     }
   }
 
+  Future<void> _uploadScan(RoomScanResult result) async {
+    // Phase 7 (v24): saved_raw rejimida USDZ fayl bo'lmaydi (filePath null),
+    // faqat savedScanId saqlanadi — yuklash o'tkazib yuboriladi.
+    final path = result.filePath;
+    if (path == null) return;
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null || token.isEmpty) {
+      if (mounted) AppToast.error(context, L.authRequired(localeNotifier.value));
+      return;
+    }
+    setState(() => _uploading = true);
+    try {
+      final keys = await _uploads.upload(
+        category: UploadCategory.scan3d,
+        filePaths: [path],
+        token: token,
+        endpoint: _kUploadEndpoint,
+      );
+      if (!mounted) return;
+      setState(() {
+        widget.bundle.scanKeys
+          ..clear()
+          ..addAll(keys);
+      });
+    } catch (e) {
+      if (mounted) {
+        AppToast.error(context, switch (localeNotifier.value.languageCode) {
+          'ru' => 'Не удалось загрузить скан: $e',
+          'en' => 'Failed to upload scan: $e',
+          _ => 'Skan yuklanmadi: $e',
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
   void _continue() {
     if (_state != ScanCardState.done) return;
-    final draft = widget.draft.copyWith(scanCompleted: true);
+    if (widget.bundle.scanKeys.isEmpty) {
+      // Yuklash tugamagan yoki muvaffaqiyatsiz — qayta urinib ko'ramiz.
+      if (_scanResult != null) _uploadScan(_scanResult!);
+      return;
+    }
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => ScanMetadataScreen(draft: draft)),
+      MaterialPageRoute<void>(
+        builder: (_) => K3dStatusScreen(bundle: widget.bundle),
+      ),
     );
   }
 
@@ -115,7 +175,7 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 4, activeIndex: 2),
+                      child: const StepProgressBar(count: 6, activeIndex: 5),
                     ),
                     Expanded(
                       child: ListView(
@@ -174,10 +234,12 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _state == ScanCardState.done
-                            ? _ScanLidarStrings.ctaContinue(locale)
-                            : _ScanLidarStrings.ctaStart(locale),
-                        enabled: _state != ScanCardState.scanning,
+                        label: _uploading
+                            ? 'Skan yuklanmoqda…'
+                            : (_state == ScanCardState.done
+                                ? _ScanLidarStrings.ctaContinue(locale)
+                                : _ScanLidarStrings.ctaStart(locale)),
+                        enabled: _state != ScanCardState.scanning && !_uploading,
                         onTap: _state == ScanCardState.done
                             ? _continue
                             : _startScan,

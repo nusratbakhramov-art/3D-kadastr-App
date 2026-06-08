@@ -57,21 +57,25 @@ class _ProfileStepState extends State<ProfileStep> {
   bool get _formValid => _nameValid && _dob != null && _gender != null;
 
   void _submit() {
-    if (!_formValid) {
-      setState(() => _nameTouched = true);
-      return;
+    // Ism / tug'ilgan sana / jins — IXTIYORIY (App Store 5.1.1(v) talabi).
+    // To'liq to'ldirilsa profilni saqlaymiz; aks holda profilsiz kiramiz
+    // (backend completeProfile faqat to'liq profilni qabul qiladi).
+    if (_formValid) {
+      widget.onSubmit(
+        UserProfile(
+          fullName: _name.text.trim(),
+          dateOfBirth: _dob!,
+          gender: _gender!,
+        ),
+      );
+    } else {
+      widget.onSkip();
     }
-    widget.onSubmit(
-      UserProfile(
-        fullName: _name.text.trim(),
-        dateOfBirth: _dob!,
-        gender: _gender!,
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final labelColor = isDark
         ? Colors.white70
@@ -89,7 +93,7 @@ class _ProfileStepState extends State<ProfileStep> {
     final showNameError = _nameTouched && !_nameValid;
 
     return AuthScaffold(
-      title: "O'zingiz haqingizda",
+      title: _ProfileStepStrings.title(locale),
       iconAsset: 'assets/images/auth/user.png',
       onBack: widget.onBack,
       onSkip: widget.onSkip,
@@ -98,7 +102,12 @@ class _ProfileStepState extends State<ProfileStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "To'liq ism",
+              _ProfileStepStrings.optionalHint(locale),
+              style: TextStyle(color: labelColor, fontSize: 13, height: 1.35),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              _ProfileStepStrings.fullName(locale),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
@@ -115,7 +124,7 @@ class _ProfileStepState extends State<ProfileStep> {
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 style: TextStyle(color: inputTextColor, fontSize: 16),
                 decoration: InputDecoration(
-                  hintText: "To'liq ismingizni kiriting",
+                  hintText: _ProfileStepStrings.fullNameHint(locale),
                   hintStyle: TextStyle(color: hintColor),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
@@ -128,13 +137,16 @@ class _ProfileStepState extends State<ProfileStep> {
             ),
             const SizedBox(height: 16),
             Text(
-              "Tug'ilgan sana",
+              _ProfileStepStrings.dob(locale),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
             DobField(value: _dob, onChanged: (d) => setState(() => _dob = d)),
             const SizedBox(height: 16),
-            Text('Jins', style: TextStyle(color: labelColor, fontSize: 14)),
+            Text(
+              _ProfileStepStrings.gender(locale),
+              style: TextStyle(color: labelColor, fontSize: 14),
+            ),
             const SizedBox(height: 8),
             GenderToggle(
               value: _gender,
@@ -144,11 +156,60 @@ class _ProfileStepState extends State<ProfileStep> {
         ),
       ),
       bottom: PrimaryCta(
-        label: 'Kirish',
-        enabled: _formValid,
+        label: _ProfileStepStrings.login(locale),
+        enabled: !widget.loading,
         loading: widget.loading,
         onPressed: _submit,
       ),
     );
   }
+}
+
+class _ProfileStepStrings {
+  const _ProfileStepStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'О себе',
+    'en' => 'About you',
+    _ => "O'zingiz haqingizda",
+  };
+
+  static String optionalHint(Locale l) => switch (l.languageCode) {
+    'ru' =>
+      'Эти поля необязательны — можно заполнить позже в настройках или просто нажать «Войти».',
+    'en' =>
+      'These fields are optional — you can fill them later in Settings or just tap “Log in”.',
+    _ =>
+      "Bu maydonlar ixtiyoriy — keyinroq Sozlamalarda to'ldirishingiz yoki shunchaki “Kirish”ni bosishingiz mumkin.",
+  };
+
+  static String fullName(Locale l) => switch (l.languageCode) {
+    'ru' => 'Полное имя',
+    'en' => 'Full name',
+    _ => "To'liq ism",
+  };
+
+  static String fullNameHint(Locale l) => switch (l.languageCode) {
+    'ru' => 'Введите полное имя',
+    'en' => 'Enter your full name',
+    _ => "To'liq ismingizni kiriting",
+  };
+
+  static String dob(Locale l) => switch (l.languageCode) {
+    'ru' => 'Дата рождения',
+    'en' => 'Date of birth',
+    _ => "Tug'ilgan sana",
+  };
+
+  static String gender(Locale l) => switch (l.languageCode) {
+    'ru' => 'Пол',
+    'en' => 'Gender',
+    _ => 'Jins',
+  };
+
+  static String login(Locale l) => switch (l.languageCode) {
+    'ru' => 'Войти',
+    'en' => 'Log in',
+    _ => 'Kirish',
+  };
 }

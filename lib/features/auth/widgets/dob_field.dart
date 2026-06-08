@@ -16,7 +16,7 @@ class DobField extends StatelessWidget {
 
   Future<void> _pick(BuildContext context) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final locale = Localizations.maybeLocaleOf(context);
+    final locale = Localizations.localeOf(context);
     final now = DateTime.now();
     final initial = value ?? DateTime(now.year - 20, now.month, now.day);
 
@@ -51,7 +51,7 @@ class DobField extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          'Tug‘ilgan sana',
+                          _DobFieldStrings.sheetTitle(locale),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: textColor,
@@ -105,8 +105,8 @@ class DobField extends StatelessWidget {
                         elevation: 0,
                       ),
                       onPressed: () => Navigator.of(ctx).pop(tempPicked),
-                      child: const Text(
-                        'Tasdiqlash',
+                      child: Text(
+                        _DobFieldStrings.confirm(locale),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -123,12 +123,11 @@ class DobField extends StatelessWidget {
     );
 
     if (picked != null) onChanged(picked);
-    // ignore unused locale (CupertinoDatePicker uses ambient localization)
-    locale?.toString();
   }
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fieldBg = isDark
         ? Colors.white.withValues(alpha: 0.04)
@@ -143,7 +142,9 @@ class DobField extends StatelessWidget {
     final iconColor = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : AppColors.textBlack.withValues(alpha: 0.6);
-    final text = value == null ? 'kk.oo.yyyy' : _format(value!);
+    final text = value == null
+        ? _DobFieldStrings.placeholder(locale)
+        : _format(value!);
     final faded = value == null;
     return Material(
       color: fieldBg,
@@ -176,4 +177,26 @@ class DobField extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DobFieldStrings {
+  const _DobFieldStrings._();
+
+  static String sheetTitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Дата рождения',
+    'en' => 'Date of birth',
+    _ => 'Tug‘ilgan sana',
+  };
+
+  static String confirm(Locale l) => switch (l.languageCode) {
+    'ru' => 'Подтвердить',
+    'en' => 'Confirm',
+    _ => 'Tasdiqlash',
+  };
+
+  static String placeholder(Locale l) => switch (l.languageCode) {
+    'ru' => 'дд.мм.гггг',
+    'en' => 'dd.mm.yyyy',
+    _ => 'kk.oo.yyyy',
+  };
 }

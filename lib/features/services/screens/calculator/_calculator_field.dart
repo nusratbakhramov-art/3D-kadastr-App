@@ -117,7 +117,29 @@ class CalculatorSectionLabel extends StatelessWidget {
   }
 }
 
+/// Foydalanuvchi kiritgan raqamni xavfsiz o'qish.
+///
+/// Mingliklar ajratuvchisi (vergul yoki bo'sh joy), o'nlik vergul va tasodifiy
+/// ortiqcha belgilarni normallashtiradi — shunda "1 200,5" yoki "1,2.3" kabi
+/// kiritishlar jimgina `null` ga aylanib qolmaydi.
 double? parseAmount(String s) {
-  if (s.trim().isEmpty) return null;
-  return double.tryParse(s.replaceAll(',', '.'));
+  var t = s.trim();
+  if (t.isEmpty) return null;
+  // Faqat raqam, nuqta va vergulni qoldiramiz.
+  t = t.replaceAll(RegExp(r'[^0-9.,]'), '');
+  if (t.isEmpty) return null;
+  if (t.contains(',') && t.contains('.')) {
+    // Ikkalasi ham bo'lsa — vergul mingliklar ajratuvchisi deb olinadi.
+    t = t.replaceAll(',', '');
+  } else {
+    t = t.replaceAll(',', '.');
+  }
+  // Bir nechta nuqta bo'lsa, birinchisini o'nlik sifatida saqlaymiz.
+  final firstDot = t.indexOf('.');
+  if (firstDot != -1) {
+    final intPart = t.substring(0, firstDot);
+    final fracPart = t.substring(firstDot + 1).replaceAll('.', '');
+    t = '$intPart.$fracPart';
+  }
+  return double.tryParse(t);
 }

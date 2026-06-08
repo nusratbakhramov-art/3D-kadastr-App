@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_storage.dart';
+import '../settings/settings_state.dart';
 import 'api_marketplace_service.dart';
 import 'listing_3d_viewer_screen.dart';
 import 'models/market_listing.dart';
@@ -82,7 +83,11 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
     if (_downloadingFileId != null) return;
     final id = widget.listing.backendId;
     if (id == null) {
-      AppToast.error(context, 'Model ID topilmadi');
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'ID модели не найден',
+        'en' => 'Model ID not found',
+        _ => 'Model ID topilmadi',
+      });
       return;
     }
     setState(() => _downloadingFileId = file.id);
@@ -90,7 +95,11 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
       final session = await widget.authStorage.loadSession();
       if (session.token == null) {
         if (!mounted) return;
-        AppToast.error(context, 'Yuklab olish uchun tizimga kiring');
+        AppToast.error(context, switch (localeNotifier.value.languageCode) {
+          'ru' => 'Войдите в систему, чтобы скачать',
+          'en' => 'Sign in to download',
+          _ => 'Yuklab olish uchun tizimga kiring',
+        });
         return;
       }
       final info = await _api.getDownloadUrl(
@@ -119,10 +128,18 @@ class _ListingDetailScreenState extends State<ListingDetailScreen> {
         sharePositionOrigin: origin,
       );
       if (!mounted) return;
-      AppToast.success(context, '$filename tayyor');
+      AppToast.success(context, switch (localeNotifier.value.languageCode) {
+        'ru' => '$filename готов',
+        'en' => '$filename ready',
+        _ => '$filename tayyor',
+      });
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, 'Yuklab olishda xatolik: $e');
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка при загрузке: $e',
+        'en' => 'Download error: $e',
+        _ => 'Yuklab olishda xatolik: $e',
+      });
     } finally {
       if (mounted) setState(() => _downloadingFileId = null);
     }

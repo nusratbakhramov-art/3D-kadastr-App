@@ -6,8 +6,11 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../auth/auth_storage.dart';
-import '../services/api_ai_valuation_service.dart';
+import '../settings/settings_state.dart';
+import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_architecture_order_service.dart';
+import '../services/api_calculator_order_service.dart';
+import '../services/api_kadastr_3d_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import 'application_detail_screen.dart';
 import '../market/models/market_listing.dart' show MarketCategory;
@@ -180,37 +183,61 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final ordersFuture = ArchitectureOrderApiService()
         .list(token: token, page: 1, size: 100)
         .then(
-          (page) => page.items
-              .map(_orderToApplicationItem)
-              .toList(growable: false),
+          (page) =>
+              page.items.map(_orderToApplicationItem).toList(growable: false),
         )
         .catchError((_) => <ApplicationItem>[]);
 
-    final confirmationsFuture = AiValuationApiService()
-        .listConfirmations()
+    // AI Baholash arizalari = async valuation JOBS (`GET /ai-valuations`).
+    // Eski kod `/valuations/ai/confirmations` (admin tasdiqlash arizalari)
+    // ni o'qigan — bu boshqa jadval, shuning uchun oddiy AI baholash hech
+    // qachon ko'rinmasdi. Endi foydalanuvchining baholash job'larini olamiz.
+    final aiJobsFuture = AiValuationJobService()
+        .list(token: token)
         .then(
-          (list) =>
-              list.map(_confirmationToApplicationItem).toList(growable: false),
+          (list) => list.map(_aiJobToApplicationItem).toList(growable: false),
         )
         .catchError((_) => <ApplicationItem>[]);
 
     final photogrammetryFuture = PhotogrammetryApiService()
         .listJobs()
         .then(
+          (list) => list
+              .map(_photogrammetryToApplicationItem)
+              .toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
+    // Kalkulyator arizalari (`GET /services/calculator/orders`).
+    final calcFuture = CalculatorOrderApiService()
+        .list(token: token)
+        .then(
+          (list) => list.map(_calcToApplicationItem).toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
+    // 3D Kadastr arizalari (`GET /3d-kadastr-jobs`).
+    final kadastr3dFuture = Kadastr3dJobService()
+        .list(token: token)
+        .then(
           (list) =>
-              list.map(_photogrammetryToApplicationItem).toList(growable: false),
+              list.map(_kadastr3dToApplicationItem).toList(growable: false),
         )
         .catchError((_) => <ApplicationItem>[]);
 
     final results = await Future.wait([
       ordersFuture,
-      confirmationsFuture,
+      aiJobsFuture,
       photogrammetryFuture,
+      calcFuture,
+      kadastr3dFuture,
     ]);
     final combined = <ApplicationItem>[
       ...results[0],
       ...results[1],
       ...results[2],
+      ...results[3],
+      ...results[4],
     ];
     // Yangidan eskigacha tartiblash — sanalar string sifatida saqlangan,
     // lekin DD.MM.YYYY format saqlanadi → teskari sort.
@@ -219,37 +246,191 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   }
 
   static ApplicationItem _orderToApplicationItem(OrderSummary o) {
+    final lang = localeNotifier.value.languageCode;
+    final group = _statusToGroup(o.status);
+    final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'arch_${o.id}',
-      // Backend hozir faqat arxitektura buyurtmasini qaytaradi —
-      // 3D kadastr/AI baholash uchun alohida endpoint'lar keyinroq.
       serviceId: 'arch',
-      serviceLabel: 'Arxitektura TZ',
-      statusGroup: _statusToGroup(o.status),
-      addressLabel: 'Manzil',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'arch'),
+      statusGroup: group,
+      addressLabel: _ApplicationsStrings.address(lang),
       addressValue: (o.address ?? o.cadastreNumber ?? '—'),
-      dateLabel: 'Ariza sanasi',
-      dateValue: _formatDate(o.createdAt),
-      timeline: const <ApplicationTimelineStep>[],
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateValue: date,
+      detailRows: [
+        (_ApplicationsStrings.address(lang), o.address ?? '—'),
+        if (o.cadastreNumber != null)
+          (_ApplicationsStrings.cadastreNumber(lang), o.cadastreNumber!),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
+      ],
+      timeline: _basicTimeline(group, o.createdAt),
     );
   }
 
-  static ApplicationItem _confirmationToApplicationItem(
-    AiConfirmationSummary c,
-  ) {
+  static ApplicationItem _aiJobToApplicationItem(AiJobSummary j) {
+    final lang = localeNotifier.value.languageCode;
+    final hasValue = j.estimatedValue != null;
+    final group = _aiJobStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
     return ApplicationItem(
-      id: 'aival_${c.id}',
+      id: 'aival_${j.id}',
       serviceId: 'ai_eval',
-      serviceLabel: 'AI Baholash',
-      statusGroup: _confirmationStatusToGroup(c.status),
-      addressLabel: 'Taxminiy qiymat',
-      addressValue: _formatUzs(c.aiEstimatedValue),
-      dateLabel: 'Ariza sanasi',
-      dateValue: _formatDate(c.createdAt),
-      typeLabel: c.finalValue != null ? 'Tasdiqlangan qiymat' : null,
-      typeValue: c.finalValue != null ? _formatUzs(c.finalValue!) : null,
-      timeline: const <ApplicationTimelineStep>[],
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'ai_eval'),
+      statusGroup: group,
+      addressLabel: hasValue
+          ? _ApplicationsStrings.estimatedValue(lang)
+          : _ApplicationsStrings.cadastreNumber(lang),
+      addressValue: hasValue
+          ? _formatUzs(j.estimatedValue!)
+          : (j.cadastreNumber ?? '—'),
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateValue: date,
+      typeLabel: hasValue && j.cadastreNumber != null
+          ? _ApplicationsStrings.cadastre(lang)
+          : null,
+      typeValue: hasValue ? j.cadastreNumber : null,
+      detailRows: [
+        if (j.cadastreNumber != null)
+          (_ApplicationsStrings.cadastreNumber(lang), j.cadastreNumber!),
+        if (hasValue)
+          (_ApplicationsStrings.estimatedValue(lang), _formatUzs(j.estimatedValue!)),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
+      ],
+      timeline: _basicTimeline(group, j.createdAt),
     );
+  }
+
+  static ApplicationItem _calcToApplicationItem(CalculatorOrderSummary o) {
+    final lang = localeNotifier.value.languageCode;
+    final group = _calcStatusToGroup(o.status);
+    final date = _formatDate(o.createdAt);
+    return ApplicationItem(
+      id: 'calc_${o.id}',
+      serviceId: 'calc',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'calc'),
+      statusGroup: group,
+      addressLabel: _ApplicationsStrings.type(lang),
+      addressValue: o.categoryTitle,
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateValue: date,
+      typeLabel: _ApplicationsStrings.price(lang),
+      typeValue: _formatUzs(o.totalUzs),
+      detailRows: [
+        (_ApplicationsStrings.type(lang), o.categoryTitle),
+        (_ApplicationsStrings.price(lang), _formatUzs(o.totalUzs)),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
+      ],
+      timeline: _basicTimeline(group, o.createdAt),
+    );
+  }
+
+  static ApplicationItem _kadastr3dToApplicationItem(Kadastr3dJobSummary j) {
+    final lang = localeNotifier.value.languageCode;
+    final group = _kadastr3dStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
+    final objectType = _objectTypeLabel(j.objectType);
+    return ApplicationItem(
+      id: 'kad3d_${j.id}',
+      serviceId: 'kad_3d',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'kad_3d'),
+      statusGroup: group,
+      addressLabel: _ApplicationsStrings.cadastreNumber(lang),
+      addressValue: j.cadastreNumber ?? '—',
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateValue: date,
+      typeLabel: objectType != null
+          ? _ApplicationsStrings.objectType(lang)
+          : null,
+      typeValue: objectType,
+      detailRows: [
+        if (j.cadastreNumber != null)
+          (_ApplicationsStrings.cadastreNumber(lang), j.cadastreNumber!),
+        if (objectType != null)
+          (_ApplicationsStrings.objectType(lang), objectType),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
+      ],
+      timeline: _basicTimeline(group, j.createdAt),
+    );
+  }
+
+  static ApplicationStatusGroup _kadastr3dStatusToGroup(Kadastr3dJobStatus s) {
+    return switch (s) {
+      Kadastr3dJobStatus.completed => ApplicationStatusGroup.completed,
+      Kadastr3dJobStatus.failed => ApplicationStatusGroup.cancelled,
+      Kadastr3dJobStatus.processing => ApplicationStatusGroup.inProgress,
+      Kadastr3dJobStatus.submitted => ApplicationStatusGroup.sent,
+    };
+  }
+
+  static String? _objectTypeLabel(String? wire) {
+    final lang = localeNotifier.value.languageCode;
+    return switch (wire) {
+      'residential' => _ApplicationsStrings.residential(lang),
+      'non_residential' => _ApplicationsStrings.nonResidential(lang),
+      'warehouse' => _ApplicationsStrings.warehouse(lang),
+      'industrial' => _ApplicationsStrings.industrial(lang),
+      _ => null,
+    };
+  }
+
+  static String _groupLabel(ApplicationStatusGroup g) {
+    final lang = localeNotifier.value.languageCode;
+    return switch (g) {
+      ApplicationStatusGroup.sent => _ApplicationsStrings.submitted(lang),
+      ApplicationStatusGroup.inProgress => _ApplicationsStrings.inProgress(lang),
+      ApplicationStatusGroup.completed => _ApplicationsStrings.ready(lang),
+      ApplicationStatusGroup.cancelled => _ApplicationsStrings.cancelled(lang),
+    };
+  }
+
+  /// Minimal honest timeline from what we know (creation + current status).
+  /// We don't have a per-step history from the backend, so we surface the
+  /// accepted step always, and the report-ready step when completed.
+  static List<ApplicationTimelineStep> _basicTimeline(
+    ApplicationStatusGroup group,
+    DateTime createdAt,
+  ) {
+    if (group == ApplicationStatusGroup.cancelled) {
+      return [
+        ApplicationTimelineStep(
+          status: ApplicationTimelineStatus.accepted,
+          at: createdAt,
+          completed: true,
+        ),
+      ];
+    }
+    return [
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.accepted,
+        at: createdAt,
+        completed: true,
+      ),
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.sentToSystem,
+        at: createdAt,
+        completed: true,
+      ),
+      ApplicationTimelineStep(
+        status: ApplicationTimelineStatus.reportReady,
+        at: createdAt,
+        completed: group == ApplicationStatusGroup.completed,
+      ),
+    ];
+  }
+
+  static ApplicationStatusGroup _calcStatusToGroup(String status) {
+    return switch (status) {
+      'done' => ApplicationStatusGroup.completed,
+      'cancelled' => ApplicationStatusGroup.cancelled,
+      'processing' => ApplicationStatusGroup.inProgress,
+      // 'submitted' (and anything else) → freshly sent.
+      _ => ApplicationStatusGroup.sent,
+    };
   }
 
   static ApplicationStatusGroup _statusToGroup(String status) {
@@ -260,10 +441,10 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     };
   }
 
-  static ApplicationStatusGroup _confirmationStatusToGroup(String status) {
-    return switch (status) {
-      'approved' || 'adjusted' => ApplicationStatusGroup.completed,
-      'rejected' => ApplicationStatusGroup.cancelled,
+  static ApplicationStatusGroup _aiJobStatusToGroup(AiJobStatus s) {
+    return switch (s) {
+      AiJobStatus.completed => ApplicationStatusGroup.completed,
+      AiJobStatus.failed => ApplicationStatusGroup.cancelled,
       _ => ApplicationStatusGroup.inProgress,
     };
   }
@@ -271,22 +452,38 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static ApplicationItem _photogrammetryToApplicationItem(
     PhotogrammetryJobSummary j,
   ) {
+    final lang = localeNotifier.value.languageCode;
+    final group = _photogrammetryStatusToGroup(j.status);
+    final date = _formatDate(j.createdAt);
+    final photoCountValue =
+        '${j.photoCount} ${_ApplicationsStrings.pcsUnit(lang)}';
     return ApplicationItem(
       id: 'photo_${j.id}',
       serviceId: 'kad_3d',
-      serviceLabel: '3D Skan',
-      statusGroup: _photogrammetryStatusToGroup(j.status),
-      addressLabel: 'Foto soni',
-      addressValue: '${j.photoCount} ta',
-      dateLabel: 'Yuborilgan',
-      dateValue: _formatDate(j.createdAt),
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, '3d_scan'),
+      statusGroup: group,
+      addressLabel: _ApplicationsStrings.photoCount(lang),
+      addressValue: photoCountValue,
+      dateLabel: _ApplicationsStrings.submitted(lang),
+      dateValue: date,
       typeLabel: j.isCompleted
-          ? '3D model'
-          : (j.status == 'failed' ? 'Xato' : 'Holat'),
+          ? _ApplicationsStrings.model3d(lang)
+          : (j.status == 'failed'
+              ? _ApplicationsStrings.error(lang)
+              : _ApplicationsStrings.status(lang)),
       typeValue: j.isCompleted
-          ? 'Tayyor'
+          ? _ApplicationsStrings.ready(lang)
           : (j.errorMessage ?? _photogrammetryStatusLabel(j.status)),
-      timeline: const <ApplicationTimelineStep>[],
+      detailRows: [
+        (_ApplicationsStrings.photoCount(lang), photoCountValue),
+        (_ApplicationsStrings.status(lang), _photogrammetryStatusLabel(j.status)),
+        if (j.errorMessage != null)
+          (_ApplicationsStrings.error(lang), j.errorMessage!),
+        (_ApplicationsStrings.submitted(lang), date),
+      ],
+      // Completed photogrammetry jobs have a downloadable 3D model.
+      hasDeliverable: j.isCompleted,
+      timeline: _basicTimeline(group, j.createdAt),
     );
   }
 
@@ -299,24 +496,26 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   }
 
   static String _photogrammetryStatusLabel(String status) {
+    final lang = localeNotifier.value.languageCode;
     return switch (status) {
-      'pending' => 'Navbatda',
-      'processing' => 'Ishlamoqda',
-      'completed' => 'Tayyor',
-      'failed' => 'Xato',
-      'cancelled' => 'Bekor qilingan',
+      'pending' => _ApplicationsStrings.queued(lang),
+      'processing' => _ApplicationsStrings.processing(lang),
+      'completed' => _ApplicationsStrings.ready(lang),
+      'failed' => _ApplicationsStrings.error(lang),
+      'cancelled' => _ApplicationsStrings.cancelled(lang),
       _ => status,
     };
   }
 
   static String _formatUzs(double value) {
+    final lang = localeNotifier.value.languageCode;
     final s = value.round().toString();
     final buf = StringBuffer();
     for (var i = 0; i < s.length; i++) {
       if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
       buf.write(s[i]);
     }
-    return '${buf.toString()} so\'m';
+    return '${buf.toString()} ${_ApplicationsStrings.soumUnit(lang)}';
   }
 
   static String _formatDate(DateTime dt) {
@@ -412,6 +611,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    final locale = Localizations.localeOf(context);
 
     return Scaffold(
       backgroundColor: ColorTokens.scaffoldBg(context),
@@ -431,9 +631,10 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const _Title(),
+                          _Title(locale: locale),
                           const SizedBox(height: 14),
                           _ServiceChips(
+                            locale: locale,
                             selectedId: _selectedServiceId,
                             onChanged: _onServiceChanged,
                           ),
@@ -451,12 +652,12 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                   else if (_loadError != null)
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _ErrorState(message: _loadError!),
+                      child: _ErrorState(locale: locale, message: _loadError!),
                     )
                   else if (_initialized && _items.isEmpty)
-                    const SliverFillRemaining(
+                    SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _EmptyState(),
+                      child: _EmptyState(locale: locale),
                     )
                   else if (_initialized)
                     SliverPadding(
@@ -780,13 +981,15 @@ class _SlidingGradientTransform extends GradientTransform {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.locale});
+
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Text(
-        'Arizalar topilmadi',
+        _ApplicationsStrings.empty(locale),
         style: TextStyle(
           fontFamily: 'MTSCompact',
           fontWeight: FontWeight.w500,
@@ -799,7 +1002,8 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message});
+  const _ErrorState({required this.locale, required this.message});
+  final Locale locale;
   final String message;
 
   @override
@@ -817,7 +1021,7 @@ class _ErrorState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Yuklab boʻlmadi',
+              _ApplicationsStrings.loadFailed(locale),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -843,12 +1047,14 @@ class _ErrorState extends StatelessWidget {
 }
 
 class _Title extends StatelessWidget {
-  const _Title();
+  const _Title({required this.locale});
+
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
     return Text(
-      'Arizalar',
+      _ApplicationsStrings.title(locale),
       style: TextStyle(
         fontFamily: 'MTSCompact',
         fontWeight: FontWeight.w700,
@@ -861,8 +1067,13 @@ class _Title extends StatelessWidget {
 }
 
 class _ServiceChips extends StatelessWidget {
-  const _ServiceChips({required this.selectedId, required this.onChanged});
+  const _ServiceChips({
+    required this.locale,
+    required this.selectedId,
+    required this.onChanged,
+  });
 
+  final Locale locale;
   final String selectedId;
   final ValueChanged<String> onChanged;
 
@@ -870,13 +1081,252 @@ class _ServiceChips extends StatelessWidget {
   Widget build(BuildContext context) {
     return CategoryChips(
       categories: applicationServiceChips
-          .map((chip) => MarketCategory(id: chip.id, label: chip.label))
+          .map(
+            (chip) => MarketCategory(
+              id: chip.id,
+              label: _ApplicationsStrings.serviceChip(locale, chip.id),
+            ),
+          )
           .toList(growable: false),
       selectedId: selectedId,
       onSelected: onChanged,
       padding: EdgeInsets.zero,
     );
   }
+}
+
+class _ApplicationsStrings {
+  const _ApplicationsStrings._();
+
+  static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'Заявки',
+    'en' => 'Applications',
+    _ => 'Arizalar',
+  };
+
+  static String empty(Locale l) => switch (l.languageCode) {
+    'ru' => 'Заявки не найдены',
+    'en' => 'No applications found',
+    _ => 'Arizalar topilmadi',
+  };
+
+  static String loadFailed(Locale l) => switch (l.languageCode) {
+    'ru' => 'Не удалось загрузить',
+    'en' => 'Failed to load',
+    _ => 'Yuklab boʻlmadi',
+  };
+
+  static String serviceChip(Locale l, String id) => switch (id) {
+    'all' => switch (l.languageCode) {
+      'ru' => 'Все',
+      'en' => 'All',
+      _ => 'Barchasi',
+    },
+    'kad_3d' => switch (l.languageCode) {
+      'ru' => '3D кадастр',
+      'en' => '3D cadastre',
+      _ => '3D Kadastr',
+    },
+    'ai_eval' => switch (l.languageCode) {
+      'ru' => 'AI оценка',
+      'en' => 'AI valuation',
+      _ => 'AI Baholash',
+    },
+    'calc' => switch (l.languageCode) {
+      'ru' => 'Калькулятор',
+      'en' => 'Calculator',
+      _ => 'Kalkulyator',
+    },
+    _ => id,
+  };
+
+  // ---------------------------------------------------------------------------
+  // Static mapper helpers (no BuildContext available → take a language code).
+  // These mirror the switch (l.languageCode) style above. Uzbek = default.
+  // ---------------------------------------------------------------------------
+
+  static String serviceLabel(String lang, String serviceId) =>
+      switch (serviceId) {
+        'arch' => switch (lang) {
+          'ru' => 'Архитектура ТЗ',
+          'en' => 'Architecture TZ',
+          _ => 'Arxitektura TZ',
+        },
+        'ai_eval' => switch (lang) {
+          'ru' => 'AI оценка',
+          'en' => 'AI valuation',
+          _ => 'AI Baholash',
+        },
+        'calc' => switch (lang) {
+          'ru' => 'Калькулятор',
+          'en' => 'Calculator',
+          _ => 'Kalkulyator',
+        },
+        'kad_3d' => switch (lang) {
+          'ru' => '3D кадастр',
+          'en' => '3D cadastre',
+          _ => '3D Kadastr',
+        },
+        // photogrammetry reuses 'kad_3d' serviceId but has its own label
+        '3d_scan' => switch (lang) {
+          'ru' => '3D скан',
+          'en' => '3D scan',
+          _ => '3D Skan',
+        },
+        _ => serviceId,
+      };
+
+  static String address(String lang) => switch (lang) {
+    'ru' => 'Адрес',
+    'en' => 'Address',
+    _ => 'Manzil',
+  };
+
+  static String estimatedValue(String lang) => switch (lang) {
+    'ru' => 'Примерная стоимость',
+    'en' => 'Estimated value',
+    _ => 'Taxminiy qiymat',
+  };
+
+  static String cadastreNumber(String lang) => switch (lang) {
+    'ru' => 'Кадастровый номер',
+    'en' => 'Cadastre number',
+    _ => 'Kadastr raqami',
+  };
+
+  static String cadastre(String lang) => switch (lang) {
+    'ru' => 'Кадастр',
+    'en' => 'Cadastre',
+    _ => 'Kadastr',
+  };
+
+  static String type(String lang) => switch (lang) {
+    'ru' => 'Тип',
+    'en' => 'Type',
+    _ => 'Turi',
+  };
+
+  static String photoCount(String lang) => switch (lang) {
+    'ru' => 'Кол-во фото',
+    'en' => 'Photo count',
+    _ => 'Foto soni',
+  };
+
+  static String applicationDate(String lang) => switch (lang) {
+    'ru' => 'Дата заявки',
+    'en' => 'Application date',
+    _ => 'Ariza sanasi',
+  };
+
+  static String submitted(String lang) => switch (lang) {
+    'ru' => 'Отправлено',
+    'en' => 'Submitted',
+    _ => 'Yuborilgan',
+  };
+
+  static String status(String lang) => switch (lang) {
+    'ru' => 'Статус',
+    'en' => 'Status',
+    _ => 'Holat',
+  };
+
+  static String price(String lang) => switch (lang) {
+    'ru' => 'Цена',
+    'en' => 'Price',
+    _ => 'Narx',
+  };
+
+  static String objectType(String lang) => switch (lang) {
+    'ru' => 'Тип объекта',
+    'en' => 'Object type',
+    _ => 'Obyekt turi',
+  };
+
+  static String model3d(String lang) => switch (lang) {
+    'ru' => '3D модель',
+    'en' => '3D model',
+    _ => '3D model',
+  };
+
+  static String error(String lang) => switch (lang) {
+    'ru' => 'Ошибка',
+    'en' => 'Error',
+    _ => 'Xato',
+  };
+
+  static String inProgress(String lang) => switch (lang) {
+    'ru' => 'В процессе',
+    'en' => 'In progress',
+    _ => 'Jarayonda',
+  };
+
+  static String ready(String lang) => switch (lang) {
+    'ru' => 'Готово',
+    'en' => 'Ready',
+    _ => 'Tayyor',
+  };
+
+  static String cancelled(String lang) => switch (lang) {
+    'ru' => 'Отменено',
+    'en' => 'Cancelled',
+    _ => 'Bekor qilingan',
+  };
+
+  static String residential(String lang) => switch (lang) {
+    'ru' => 'Жилое',
+    'en' => 'Residential',
+    _ => 'Turar joy',
+  };
+
+  static String nonResidential(String lang) => switch (lang) {
+    'ru' => 'Нежилое',
+    'en' => 'Non-residential',
+    _ => 'Noturar joy',
+  };
+
+  static String warehouse(String lang) => switch (lang) {
+    'ru' => 'Склад',
+    'en' => 'Warehouse',
+    _ => 'Ombor',
+  };
+
+  static String industrial(String lang) => switch (lang) {
+    'ru' => 'Промышленное',
+    'en' => 'Industrial',
+    _ => 'Sanoat',
+  };
+
+  static String queued(String lang) => switch (lang) {
+    'ru' => 'В очереди',
+    'en' => 'Queued',
+    _ => 'Navbatda',
+  };
+
+  static String processing(String lang) => switch (lang) {
+    'ru' => 'Обрабатывается',
+    'en' => 'Processing',
+    _ => 'Ishlamoqda',
+  };
+
+  static String viewResult(String lang) => switch (lang) {
+    'ru' => 'Посмотреть результат',
+    'en' => 'View result',
+    _ => 'Natijani ko‘rish',
+  };
+
+  /// Currency-unit suffix word only ("so'm" / "сум" / "soum").
+  static String soumUnit(String lang) => switch (lang) {
+    'ru' => 'сум',
+    'en' => 'soum',
+    _ => 'so\'m',
+  };
+
+  /// Quantity-unit suffix word only ("ta" / "шт" / "pcs").
+  static String pcsUnit(String lang) => switch (lang) {
+    'ru' => 'шт',
+    'en' => 'pcs',
+    _ => 'ta',
+  };
 }
 
 class _ApplicationCard extends StatelessWidget {
@@ -887,7 +1337,8 @@ class _ApplicationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = _StatusStyle.fromGroup(item.statusGroup);
+    final lang = Localizations.localeOf(context).languageCode;
+    final status = _StatusStyle.fromGroup(item.statusGroup, lang);
     final showResultButton =
         item.statusGroup == ApplicationStatusGroup.completed;
 
@@ -957,7 +1408,9 @@ class _ApplicationCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              'Natijani ko‘rish',
+                              _ApplicationsStrings.viewResult(
+                                Localizations.localeOf(context).languageCode,
+                              ),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
@@ -966,10 +1419,10 @@ class _ApplicationCard extends StatelessWidget {
                               ),
                             ),
                             SizedBox(width: 6),
-                            SvgPicture.asset(
-                              'assets/icons/arrow.svg',
-                              width: 20,
-                              height: 20,
+                            const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 20,
+                              color: Colors.black,
                             ),
                           ],
                         ),
@@ -1047,24 +1500,30 @@ class _StatusStyle {
   final Color fgColor;
   final String iconAsset;
 
-  static _StatusStyle fromGroup(ApplicationStatusGroup group) =>
+  static _StatusStyle fromGroup(ApplicationStatusGroup group, String lang) =>
       switch (group) {
-        ApplicationStatusGroup.inProgress => const _StatusStyle(
-          label: 'Jarayonda',
-          bgColor: Color(0xFFFCEDE3),
-          fgColor: Color(0xFFF27523),
+        ApplicationStatusGroup.sent => _StatusStyle(
+          label: _ApplicationsStrings.submitted(lang),
+          bgColor: const Color(0xFFE2ECFD),
+          fgColor: const Color(0xFF2B7FFF),
           iconAsset: 'assets/icons/application-pending.svg',
         ),
-        ApplicationStatusGroup.completed => const _StatusStyle(
-          label: 'Tayyor',
-          bgColor: Color(0xFFD5F3E0),
-          fgColor: Color(0xFF00B447),
+        ApplicationStatusGroup.inProgress => _StatusStyle(
+          label: _ApplicationsStrings.inProgress(lang),
+          bgColor: const Color(0xFFFCEDE3),
+          fgColor: const Color(0xFFF27523),
+          iconAsset: 'assets/icons/application-pending.svg',
+        ),
+        ApplicationStatusGroup.completed => _StatusStyle(
+          label: _ApplicationsStrings.ready(lang),
+          bgColor: const Color(0xFFD5F3E0),
+          fgColor: const Color(0xFF00B447),
           iconAsset: 'assets/icons/application-ready.svg',
         ),
-        ApplicationStatusGroup.cancelled => const _StatusStyle(
-          label: 'Bekor qilingan',
-          bgColor: Color(0xFFF8E1E1),
-          fgColor: Color(0xFFEF4444),
+        ApplicationStatusGroup.cancelled => _StatusStyle(
+          label: _ApplicationsStrings.cancelled(lang),
+          bgColor: const Color(0xFFF8E1E1),
+          fgColor: const Color(0xFFEF4444),
           iconAsset: 'assets/icons/application-cancelled.svg',
         ),
       };
@@ -1078,9 +1537,7 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark
-        ? style.fgColor.withValues(alpha: 0.18)
-        : style.bgColor;
+    final bg = isDark ? style.fgColor.withValues(alpha: 0.18) : style.bgColor;
     return Container(
       height: 24,
       padding: const EdgeInsets.fromLTRB(3, 3, 8, 3),

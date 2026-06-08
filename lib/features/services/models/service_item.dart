@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-enum ServiceId { kadastr3d, aiValuation, calculator }
+enum ServiceId { kadastr3d, aiValuation, calculator, smetaPro }
 
 class ServiceItem {
   const ServiceItem({
@@ -65,5 +65,17 @@ class ServiceStrings {
     'ru' => 'Расчёт стоимости архитектуры, дизайна и строительства.',
     'en' => 'Calculate architecture, design and construction costs.',
     _ => 'Arxitektura, dizayn, qurilish narxlarini hisoblash.',
+  };
+
+  static String smetaProTitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'ABC смета (для смет)',
+    'en' => 'ABC smeta (for estimators)',
+    _ => 'ABC smeta (smetчиklar uchun)',
+  };
+
+  static String smetaProSubtitle(Locale l) => switch (l.languageCode) {
+    'ru' => 'Профессиональная смета по СНиР через ABC-UZ. Форма N5/N6.',
+    'en' => 'Professional СНиР smeta priced by ABC-UZ. Form N5/N6 output.',
+    _ => "СНиР bo'yicha professional smeta — ABC-UZ asosida. Forma N5/N6 ведомость.",
   };
 }

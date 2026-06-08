@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
-import '../../widgets/app_toast.dart';
-import '../onboarding/onboarding_page_data.dart';
+import '../auth/widgets/login_required_sheet.dart';
 import 'models/service_item.dart';
-import 'screens/ai_scan_screen.dart';
+import 'screens/ai_cadastre_screen.dart';
 import 'screens/kadastr_3d_screen.dart';
+import 'screens/online_calculator_screen.dart';
+import 'screens/smeta/smeta_editor_screen.dart';
 import 'widgets/service_card.dart';
 
 class ServicesScreen extends StatefulWidget {
@@ -85,6 +86,14 @@ class _ServicesScreenState extends State<ServicesScreen>
         subtitle: ServiceStrings.calculatorSubtitle(locale),
         asset: 'assets/images/services/calculator.png',
         accent: const Color(0xFF22D3EE),
+        layout: ServiceLayout.wide,
+      ),
+      ServiceItem(
+        id: ServiceId.smetaPro,
+        title: ServiceStrings.smetaProTitle(locale),
+        subtitle: ServiceStrings.smetaProSubtitle(locale),
+        asset: 'assets/images/services/calculator.png',
+        accent: const Color(0xFFF59E0B),
         layout: ServiceLayout.wide,
       ),
     ];
@@ -191,21 +200,32 @@ class _ServicesScreenState extends State<ServicesScreen>
     );
   }
 
-  void _open(BuildContext context, ServiceItem item) {
+  Future<void> _open(BuildContext context, ServiceItem item) async {
     switch (item.id) {
       case ServiceId.kadastr3d:
         Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()),
         );
       case ServiceId.aiValuation:
-        // AI Baholash — to'liq flow:
-        // 1) Foto'lar yig'iladi, 2) ArxitekturaTzWizard 9 stepda metadata,
-        // 3) AiResultScreen real natija ko'rsatadi.
+        // AI Baholash needs an account (davreest.uz lookup + job submit).
+        // Gate the entry with a login drawer before the wizard opens.
+        if (!await ensureLoggedIn(
+          context,
+        )) {
+          return;
+        }
+        if (!context.mounted) return;
         Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const AiScanScreen()),
+          MaterialPageRoute<void>(builder: (_) => const AiCadastreScreen()),
         );
       case ServiceId.calculator:
-        AppToast.success(context, AppLocale.comingSoonLabel(widget.locale));
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
+        );
+      case ServiceId.smetaPro:
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const SmetaEditorScreen()),
+        );
     }
   }
 }

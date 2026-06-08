@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../theme/app_colors.dart';
+import '../../data/calculator_pricing_store.dart';
+import '../../models/calculator_pricing.dart';
 import '../../widgets/service_app_bar.dart';
 
 class YuridikScreen extends StatelessWidget {
@@ -15,7 +17,6 @@ class YuridikScreen extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
     final locale = Localizations.localeOf(context);
-    final services = _YuridikItem.all(locale);
 
     return Scaffold(
       backgroundColor: bg,
@@ -37,28 +38,34 @@ class YuridikScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     Expanded(
-                      child: ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                        children: [
-                          Text(
-                            _Strings.note(locale),
-                            style: TextStyle(
-                              fontFamily: 'MTSText',
-                              fontSize: 13,
-                              height: 1.4,
-                              color: subColor,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          for (var i = 0; i < services.length; i++) ...[
-                            _ServiceCard(
-                              item: services[i],
-                              titleColor: headingColor,
-                              subColor: subColor,
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                        ],
+                      child: ValueListenableBuilder<CalculatorPricing>(
+                        valueListenable: calculatorPricingNotifier,
+                        builder: (context, pricing, _) {
+                          final services = _YuridikItem.all(locale, pricing);
+                          return ListView(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                            children: [
+                              Text(
+                                _Strings.note(locale),
+                                style: TextStyle(
+                                  fontFamily: 'MTSText',
+                                  fontSize: 13,
+                                  height: 1.4,
+                                  color: subColor,
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              for (var i = 0; i < services.length; i++) ...[
+                                _ServiceCard(
+                                  item: services[i],
+                                  titleColor: headingColor,
+                                  subColor: subColor,
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -82,7 +89,7 @@ class _YuridikItem {
   final String description;
   final String price;
 
-  static List<_YuridikItem> all(Locale l) => [
+  static List<_YuridikItem> all(Locale l, CalculatorPricing pricing) => [
         _YuridikItem(
           title: _pick(l, 'Yuridik maslahat', 'Юридическая консультация',
               'Legal consultation'),
@@ -92,7 +99,7 @@ class _YuridikItem {
             'Разовая консультация по вопросу или ситуации',
             'One-time consultation on a question or matter',
           ),
-          price: _pick(l, "500 000 so'm", '500 000 сум', '500,000 UZS'),
+          price: pricing.yuridikValue('yuridik.maslahat', l),
         ),
         _YuridikItem(
           title: _pick(
@@ -103,7 +110,7 @@ class _YuridikItem {
             'Договор, заявление, иск, ответ и другие документы',
             'Contract, application, claim, response and other documents',
           ),
-          price: _pick(l, "1 500 000 so'm", '1 500 000 сум', '1,500,000 UZS'),
+          price: pricing.yuridikValue('yuridik.hujjat', l),
         ),
         _YuridikItem(
           title: _pick(
@@ -118,12 +125,7 @@ class _YuridikItem {
             'По гражданским, экономическим, уголовным делам',
             'For civil, economic, criminal cases',
           ),
-          price: _pick(
-            l,
-            "5 000 000 – 20 000 000 so'm",
-            '5 000 000 – 20 000 000 сум',
-            '5,000,000 – 20,000,000 UZS',
-          ),
+          price: pricing.yuridikValue('yuridik.sud', l),
         ),
         _YuridikItem(
           title: _pick(
@@ -138,12 +140,7 @@ class _YuridikItem {
             'Постоянное юридическое сопровождение (за месяц)',
             'Continuous legal support (per month)',
           ),
-          price: _pick(
-            l,
-            "2 000 000 – 20 000 000 so'm/oy",
-            '2 000 000 – 20 000 000 сум/мес',
-            '2,000,000 – 20,000,000 UZS/month',
-          ),
+          price: pricing.yuridikValue('yuridik.autsorsing', l),
         ),
         _YuridikItem(
           title: _pick(
@@ -154,7 +151,7 @@ class _YuridikItem {
             'Открытие ООО, получение лицензии и др.',
             'LLC formation, licensing and more',
           ),
-          price: _pick(l, "3 000 000 so'm", '3 000 000 сум', '3,000,000 UZS'),
+          price: pricing.yuridikValue('yuridik.royxat', l),
         ),
         _YuridikItem(
           title: _pick(
@@ -169,7 +166,7 @@ class _YuridikItem {
             'Возврат дебиторской задолженности — от объёма работ',
             'Recovery of receivables — based on workload',
           ),
-          price: _pick(l, '5–20% komissiya', '5–20% комиссия', '5–20% commission'),
+          price: pricing.yuridikValue('yuridik.qarz', l),
         ),
       ];
 }

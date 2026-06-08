@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/i18n.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
@@ -416,6 +417,7 @@ class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
       child: Column(
@@ -423,10 +425,10 @@ class _ErrorState extends StatelessWidget {
         children: [
           Icon(Icons.wifi_off_rounded, size: 40, color: ColorTokens.secondaryText(context)),
           const SizedBox(height: 12),
-          Text('Xatolik yuz berdi', textAlign: TextAlign.center,
+          Text(L.errorOccurred(locale), textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'MTSCompact', fontWeight: FontWeight.w700, fontSize: 16, color: ColorTokens.primaryText(context))),
           const SizedBox(height: 12),
-          TextButton(onPressed: onRetry, child: const Text('Qayta urinish')),
+          TextButton(onPressed: onRetry, child: Text(L.retry(locale))),
         ],
       ),
     );

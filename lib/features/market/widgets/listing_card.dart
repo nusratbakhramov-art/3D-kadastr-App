@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/remote_image.dart';
 import '../models/market_listing.dart';
 
 class ListingCard extends StatelessWidget {
@@ -13,6 +14,7 @@ class ListingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark ? const Color(0xFF121617) : Colors.white;
     final titleColor = isDark ? Colors.white : AppColors.textBlack;
@@ -71,13 +73,15 @@ class ListingCard extends StatelessWidget {
                           left: 8,
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: AppColors.splashGreen,
                               borderRadius: BorderRadius.circular(8),
                             ),
-                            child: const Text(
-                              'Bepul',
+                            child: Text(
+                              _ListingCardStrings.free(locale),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
@@ -124,6 +128,7 @@ class ListingCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     _BatafsilButton(
+                      locale: locale,
                       onTap: () {
                         HapticFeedback.selectionClick();
                         onTap(listing);
@@ -229,8 +234,9 @@ class _MetaRow extends StatelessWidget {
 }
 
 class _BatafsilButton extends StatelessWidget {
-  const _BatafsilButton({required this.onTap});
+  const _BatafsilButton({required this.locale, required this.onTap});
 
+  final Locale locale;
   final VoidCallback onTap;
 
   @override
@@ -241,13 +247,13 @@ class _BatafsilButton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: const SizedBox(
+        child: SizedBox(
           height: 34,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                'Batafsil',
+                _ListingCardStrings.details(locale),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
@@ -277,26 +283,22 @@ class _ListingImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFFEEF1F4),
-      child: Image.network(
-        url,
-        fit: BoxFit.cover,
-        cacheWidth: 480,
-        gaplessPlayback: true,
-        frameBuilder: (context, child, frame, wasSync) {
-          if (wasSync) return child;
-          return AnimatedOpacity(
-            opacity: frame == null ? 0 : 1,
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOut,
-            child: child,
-          );
-        },
-        errorBuilder: (context, _, _) => const Center(
-          child: Icon(Icons.image_outlined, size: 28, color: Color(0xFFB4B9BF)),
-        ),
-      ),
-    );
+    return RemoteImage(url: url, memCacheWidth: 480);
   }
+}
+
+class _ListingCardStrings {
+  const _ListingCardStrings._();
+
+  static String free(Locale l) => switch (l.languageCode) {
+    'ru' => 'Бесплатно',
+    'en' => 'Free',
+    _ => 'Bepul',
+  };
+
+  static String details(Locale l) => switch (l.languageCode) {
+    'ru' => 'Подробнее',
+    'en' => 'Details',
+    _ => 'Batafsil',
+  };
 }

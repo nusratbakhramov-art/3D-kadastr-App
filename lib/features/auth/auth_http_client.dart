@@ -69,10 +69,18 @@ class AuthHttpClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    // Har qanday so'rovni qayta yuborilishi mumkin bo'lgan (replayable) shaklga
+    // keltiramiz — multipart ham. Body bir marta byte'larga o'qiladi, shunda
+    // 401 dan keyin retry uchun nusxa olishimiz mumkin.
+    final replayable = await _toReplayable(request);
+
     // 1. Access tokenni qo'shish.
     final session = await _storage.loadSession();
-    final attached = await _attachToken(request, session.token);
-    final res = await _inner.send(attached);
+    final firstAttempt = await _attachToken(
+      _cloneRequest(replayable),
+      session.token,
+    );
+    final res = await _inner.send(firstAttempt);
 
     // 2. 401 bo'lsa, refresh va retry.
     if (res.statusCode != 401) {
@@ -107,25 +115,48 @@ class AuthHttpClient extends http.BaseClient {
     // 3. Yangi token bilan original so'rovni qayta yuboramiz.
     final retrySession = await _storage.loadSession();
     final retried = await _attachToken(
-      _cloneRequest(request),
+      _cloneRequest(replayable),
       retrySession.token,
     );
-    return _inner.send(retried);
+    final retryRes = await _inner.send(retried);
+
+    // Refresh muvaffaqiyatli bo'lsa-yu, retry baribir 401 bo'lsa — sessiya
+    // haqiqatan ham yaroqsiz. Sessiyani tozalab, UI ni logout ga yo'naltiramiz
+    // (cheksiz refresh loop'ining oldini olamiz).
+    if (retryRes.statusCode == 401) {
+      await _storage.clear();
+      onSessionExpired?.call();
+    }
+    return retryRes;
   }
 
-  /// Original so'rovni nusxa qiladi (StreamedRequest body bir marta o'qib bo'lgach
-  /// qayta yuborish uchun).
-  http.BaseRequest _cloneRequest(http.BaseRequest src) {
+  /// Har qanday `BaseRequest` ni body'si byte sifatida saqlangan `http.Request`
+  /// ga aylantiradi — shunda so'rovni bir necha marta yuborish (retry) mumkin.
+  /// Multipart so'rovlarni ham qo'llab-quvvatlaydi: `finalize()` content-type
+  /// header'iga boundary'ni yozadi, shuning uchun finalize'dan keyin header'ni
+  /// o'qiymiz.
+  Future<http.Request> _toReplayable(http.BaseRequest src) async {
     if (src is http.Request) {
-      return http.Request(src.method, src.url)
-        ..headers.addAll(src.headers)
-        ..bodyBytes = src.bodyBytes
-        ..followRedirects = src.followRedirects
-        ..maxRedirects = src.maxRedirects
-        ..persistentConnection = src.persistentConnection;
+      return src;
     }
-    // Boshqa request turlar (multipart va h.k.) hozir qo'llab-quvvatlanmaydi.
-    return src;
+    final bytes = await src.finalize().toBytes();
+    return http.Request(src.method, src.url)
+      ..headers.addAll(src.headers)
+      ..bodyBytes = bytes
+      ..followRedirects = src.followRedirects
+      ..maxRedirects = src.maxRedirects
+      ..persistentConnection = src.persistentConnection;
+  }
+
+  /// Replayable `http.Request` dan yangi nusxa yaratadi (har send uchun yangi
+  /// Request kerak — bitta Request faqat bir marta finalize qilinadi).
+  http.Request _cloneRequest(http.Request src) {
+    return http.Request(src.method, src.url)
+      ..headers.addAll(src.headers)
+      ..bodyBytes = src.bodyBytes
+      ..followRedirects = src.followRedirects
+      ..maxRedirects = src.maxRedirects
+      ..persistentConnection = src.persistentConnection;
   }
 
   Future<http.BaseRequest> _attachToken(

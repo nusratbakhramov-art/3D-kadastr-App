@@ -18,12 +18,13 @@ class GenderToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     return Row(
       children: [
         Expanded(
           child: _Pill(
             selected: value == Gender.male,
-            label: 'Erkak',
+            label: _GenderToggleStrings.male(locale),
             accentColor: const Color(0xFF4DA3FF),
             onTap: () => _select(Gender.male),
           ),
@@ -32,7 +33,7 @@ class GenderToggle extends StatelessWidget {
         Expanded(
           child: _Pill(
             selected: value == Gender.female,
-            label: 'Ayol',
+            label: _GenderToggleStrings.female(locale),
             accentColor: const Color(0xFFE57BB9),
             onTap: () => _select(Gender.female),
           ),
@@ -40,6 +41,22 @@ class GenderToggle extends StatelessWidget {
       ],
     );
   }
+}
+
+class _GenderToggleStrings {
+  const _GenderToggleStrings._();
+
+  static String male(Locale l) => switch (l.languageCode) {
+    'ru' => 'Мужчина',
+    'en' => 'Male',
+    _ => 'Erkak',
+  };
+
+  static String female(Locale l) => switch (l.languageCode) {
+    'ru' => 'Женщина',
+    'en' => 'Female',
+    _ => 'Ayol',
+  };
 }
 
 class _Pill extends StatelessWidget {

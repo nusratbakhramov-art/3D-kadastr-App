@@ -3,12 +3,15 @@ import 'package:flutter/services.dart';
 
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
+import '../../data/calculator_pricing_store.dart';
 import '../../models/calculator_draft.dart';
+import '../../models/design_order_draft.dart';
 import '../../widgets/choice_tile.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/style_chip.dart';
 import '../online_calculator_result_screen.dart';
 import '_calculator_field.dart';
+import 'dizayn_tz_wizard_screen.dart';
 
 class DizaynFormScreen extends StatefulWidget {
   const DizaynFormScreen({super.key});
@@ -45,17 +48,57 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
     if (!_ready) return;
     HapticFeedback.lightImpact();
     final locale = Localizations.localeOf(context);
+    final objectType = _objectType!;
+    final style = _style!;
+    final area = parseAmount(_area.text)!;
     final result = computeDizayn(
-      objectType: _objectType!,
-      style: _style!,
-      areaM2: parseAmount(_area.text)!,
+      objectType: objectType,
+      style: style,
+      areaM2: area,
+      pricing: calculatorPricingNotifier.value,
       locale: locale,
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => OnlineCalculatorResultScreen(result: result),
+        builder: (ctx) => OnlineCalculatorResultScreen(
+          result: result,
+          placeOrderLabel: _Strings.placeTzOrder(locale),
+          onPlaceOrder: () {
+            final draft = _draftFromCalculator(objectType, style, area);
+            Navigator.of(ctx).push(
+              MaterialPageRoute<void>(
+                builder: (_) => DizaynTzWizardScreen(initialDraft: draft),
+              ),
+            );
+          },
+        ),
       ),
     );
+  }
+
+  /// Calculator natijasidan TZ wizard uchun boshlang'ich draft:
+  /// obyekt turi, uslub va maydonni oldindan to'ldirib qo'yamiz.
+  static DizaynOrderDraft _draftFromCalculator(
+    DizaynObjectType objectType,
+    DizaynStyle style,
+    double area,
+  ) {
+    final draft = DizaynOrderDraft();
+    // Kalkulatorda faqat turar/noturar bor — wizardda aniqroq tur tanlanadi.
+    draft.objectType = objectType == DizaynObjectType.turar
+        ? DizObjectType.yakka
+        : DizObjectType.ofis;
+    draft.interior.style = switch (style) {
+      DizaynStyle.highTech => 'high_tech',
+      DizaynStyle.klassik => 'klassik',
+      DizaynStyle.neoklassik => 'neoklassik',
+      DizaynStyle.minimalizm => 'minimalizm',
+      DizaynStyle.loft => 'loft',
+      DizaynStyle.japandi => 'boshqa',
+    };
+    draft.designAreaSqm = area;
+    draft.interiorAreaSqm = area;
+    return draft;
   }
 
   @override
@@ -184,4 +227,11 @@ class _Strings {
 
   static String calculate(Locale l) =>
       _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
+
+  static String placeTzOrder(Locale l) => _pick(
+        l,
+        "So'rovnomani to'ldirish",
+        'Заполнить анкету',
+        'Fill questionnaire',
+      );
 }

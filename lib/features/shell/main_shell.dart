@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth_flow_screen.dart';
 import '../auth/auth_storage.dart';
+import '../auth/widgets/login_required_sheet.dart';
 import '../applications/applications_screen.dart';
 import '../help/help_screen.dart';
 import '../home/home_screen.dart';
@@ -14,11 +15,11 @@ import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
 import '../scans/saved_scans_screen.dart';
-import '../services/screens/ai_scan_screen.dart';
+import '../services/screens/ai_cadastre_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
+import '../services/screens/online_calculator_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
-import '../../widgets/app_toast.dart';
 import 'app_bottom_nav.dart';
 
 class MainShell extends StatefulWidget {
@@ -102,7 +103,9 @@ class _MainShellState extends State<MainShell> {
   Future<void> _openSettings() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(onLogoutConfirmed: _handleLogout),
+        builder: (_) => SettingsScreen(
+          onLogoutConfirmed: _handleLogout,
+        ),
       ),
     );
   }
@@ -162,13 +165,24 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _openAiValuation() async {
+    // AI Baholash needs an account — gate with a login drawer before the
+    // wizard opens (kadastr → client → location → purpose → intake → result).
+    if (!await ensureLoggedIn(
+      context,
+      storage: widget.authStorage,
+    )) {
+      return;
+    }
+    if (!mounted) return;
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AiScanScreen()));
+    ).push(MaterialPageRoute<void>(builder: (_) => const AiCadastreScreen()));
   }
 
   void _openCalculator() {
-    AppToast.success(context, AppLocale.comingSoonLabel(widget.locale));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
+    );
   }
 
   void _openMarketTab() => _onTabChanged(2);

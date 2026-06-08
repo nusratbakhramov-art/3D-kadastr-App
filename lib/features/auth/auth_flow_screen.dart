@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../../core/network_error_handler.dart';
 import '../../widgets/app_toast.dart';
 import '../home/user_profile.dart' as home;
+import '../settings/settings_state.dart';
 import 'api_auth_service.dart';
 import 'auth_service.dart';
 import 'auth_storage.dart';
@@ -60,6 +62,13 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
+      final shown = await NetworkErrorHandler.maybeShow(
+        context,
+        e,
+        onRetry: () => _handlePhoneSubmit(phone),
+      );
+      if (!mounted) return;
+      if (shown) return;
       AppToast.error(context, e.message);
     }
   }
@@ -74,7 +83,11 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       ),
     );
     if (!mounted) return;
-    AppToast.success(context, "Siz kiritgan tasdiqlash kodi to'g'ri kiritildi!");
+    AppToast.success(context, switch (localeNotifier.value.languageCode) {
+      'ru' => 'Введённый код подтверждения верный!',
+      'en' => 'The verification code you entered is correct!',
+      _ => "Siz kiritgan tasdiqlash kodi to'g'ri kiritildi!",
+    });
     if (result.isNewUser) {
       setState(() => _step = _AuthStep.profile);
     } else {
@@ -125,6 +138,13 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() => _submitting = false);
+      final shown = await NetworkErrorHandler.maybeShow(
+        context,
+        e,
+        onRetry: () => _handleProfileSubmit(profile),
+      );
+      if (!mounted) return;
+      if (shown) return;
       AppToast.error(context, e.message);
     }
   }

@@ -9,6 +9,7 @@ import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_http_client.dart';
+import '../settings/settings_state.dart';
 import '../scans/splat_viewer_screen.dart';
 import '../services/api_photogrammetry_service.dart';
 import '../services/data/room_plan_scanner.dart';
@@ -40,7 +41,12 @@ Future<String> _ensureResultCached({
   final req = http.Request('GET', Uri.parse(downloadUrl));
   final res = await client.send(req);
   if (res.statusCode != 200) {
-    throw HttpException('Yuklab olish xatosi (${res.statusCode})');
+    throw HttpException(
+      _DetailStrings.downloadError(
+        localeNotifier.value.languageCode,
+        res.statusCode,
+      ),
+    );
   }
   final total = res.contentLength ?? -1;
   // Write to a tmp file first; rename on success so partials don't poison cache.
@@ -61,6 +67,132 @@ Future<String> _ensureResultCached({
   return filePath;
 }
 
+/// Localized strings for the application detail screen. Uzbek = default.
+class _DetailStrings {
+  const _DetailStrings._();
+
+  static String applications(String lang) => switch (lang) {
+    'ru' => 'Заявки',
+    'en' => 'Applications',
+    _ => 'Arizalar',
+  };
+
+  static String applicationStatus(String lang) => switch (lang) {
+    'ru' => 'Статус заявки',
+    'en' => 'Application status',
+    _ => 'Ariza holati',
+  };
+
+  static String aboutApplication(String lang) => switch (lang) {
+    'ru' => 'О заявке',
+    'en' => 'About application',
+    _ => 'Ariza haqida',
+  };
+
+  static String applicationDetails(String lang) => switch (lang) {
+    'ru' => 'Данные заявки',
+    'en' => 'Application details',
+    _ => 'Ariza maʼlumotlari',
+  };
+
+  static String report(String lang) => switch (lang) {
+    'ru' => 'Отчёт',
+    'en' => 'Report',
+    _ => 'Hisobot',
+  };
+
+  static String noData(String lang) => switch (lang) {
+    'ru' => 'Данные отсутствуют',
+    'en' => 'No data available',
+    _ => 'Maʼlumot mavjud emas',
+  };
+
+  static String noTimelineYet(String lang) => switch (lang) {
+    'ru' => 'Данные о процессе ещё отсутствуют',
+    'en' => 'No process information yet',
+    _ => 'Jarayon maʼlumotlari hali yoʻq',
+  };
+
+  static String contactSpecialist(String lang) => switch (lang) {
+    'ru' => 'Связаться со специалистом',
+    'en' => 'Contact a specialist',
+    _ => 'Mutaxasis bilan bog\'lanish',
+  };
+
+  static String viewViaAr(String lang) => switch (lang) {
+    'ru' => 'Посмотреть через AR',
+    'en' => 'View via AR',
+    _ => 'AR orqali ko\'rish',
+  };
+
+  static String download(String lang) => switch (lang) {
+    'ru' => 'Скачать',
+    'en' => 'Download',
+    _ => 'Yuklash',
+  };
+
+  static String view(String lang) => switch (lang) {
+    'ru' => 'Открыть',
+    'en' => 'Open',
+    _ => 'Ko\'rish',
+  };
+
+  static String model3d(String lang) => switch (lang) {
+    'ru' => '3D модель',
+    'en' => '3D model',
+    _ => '3D Model',
+  };
+
+  static String roomPlanViewerOpens(String lang) => switch (lang) {
+    'ru' => 'Откроется просмотрщик RoomPlan',
+    'en' => 'RoomPlan viewer will open',
+    _ => 'RoomPlan viewer ochiladi',
+  };
+
+  static String downloading(String lang) => switch (lang) {
+    'ru' => 'Загрузка…',
+    'en' => 'Downloading…',
+    _ => 'Yuklab olinmoqda…',
+  };
+
+  static String downloadError(String lang, int statusCode) => switch (lang) {
+    'ru' => 'Ошибка загрузки ($statusCode)',
+    'en' => 'Download error ($statusCode)',
+    _ => 'Yuklab olish xatosi ($statusCode)',
+  };
+
+  // Timeline step labels.
+  static String accepted(String lang) => switch (lang) {
+    'ru' => 'Заявка принята',
+    'en' => 'Application accepted',
+    _ => 'Ariza qabul qilindi',
+  };
+
+  static String sentToSystem(String lang) => switch (lang) {
+    'ru' => 'Отправлено в систему',
+    'en' => 'Sent to system',
+    _ => 'Tizimga yuborildi',
+  };
+
+  static String assignedSpecialist(String lang) => switch (lang) {
+    'ru' => 'Назначен специалист',
+    'en' => 'Specialist assigned',
+    _ => 'Mutaxassisga tayinlandi',
+  };
+
+  static String scanned(String lang) => switch (lang) {
+    'ru' => 'Сканировано',
+    'en' => 'Scanned',
+    _ => 'Skan qilindi',
+  };
+
+  static String reportReady(String lang) => switch (lang) {
+    'ru' => 'Отчёт готов',
+    'en' => 'Report ready',
+    _ => 'Hisobot tayyorlandi',
+  };
+}
+
 class ApplicationDetailScreen extends StatefulWidget {
   const ApplicationDetailScreen({super.key, required this.item});
 
@@ -76,6 +208,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
     final steps = widget.item.timeline
         .where((s) => s.completed)
         .toList(growable: false);
@@ -88,7 +221,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AppHeaderBack(
-                title: 'Arizalar',
+                title: _DetailStrings.applications(lang),
                 onBack: () => Navigator.of(context).maybePop(),
               ),
               const SizedBox(height: 2),
@@ -107,8 +240,8 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
               SegmentedTabs<_DetailTab>(
                 values: _DetailTab.values,
                 labelOf: (t) => switch (t) {
-                  _DetailTab.status => 'Ariza holati',
-                  _DetailTab.about => 'Ariza haqida',
+                  _DetailTab.status => _DetailStrings.applicationStatus(lang),
+                  _DetailTab.about => _DetailStrings.aboutApplication(lang),
                 },
                 selected: _tab,
                 onChanged: (next) => setState(() => _tab = next),
@@ -135,12 +268,13 @@ class _StatusTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _TimelineCard(steps: steps),
         const SizedBox(height: 14),
-        const _PrimaryBlackAction(label: "Mutaxasis bilan bog'lanish"),
+        _PrimaryBlackAction(label: _DetailStrings.contactSpecialist(lang)),
       ],
     );
   }
@@ -167,7 +301,9 @@ class _TimelineCard extends StatelessWidget {
             _TimelineRow(step: visible[i], showTail: i != visible.length - 1),
           if (visible.isEmpty)
             Text(
-              'Jarayon maʼlumotlari hali yoʻq',
+              _DetailStrings.noTimelineYet(
+                Localizations.localeOf(context).languageCode,
+              ),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w500,
@@ -189,7 +325,8 @@ class _TimelineRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = _TimelineStyle.fromStatus(step.status);
+    final lang = Localizations.localeOf(context).languageCode;
+    final style = _TimelineStyle.fromStatus(step.status, lang);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -264,34 +401,36 @@ class _TimelineStyle {
   final IconData icon;
   final Color bg;
 
-  static _TimelineStyle fromStatus(ApplicationTimelineStatus status) =>
-      switch (status) {
-        ApplicationTimelineStatus.accepted => const _TimelineStyle(
-          label: 'Ariza qabul qilindi',
-          icon: Icons.description_outlined,
-          bg: Color(0xFF18B4E8),
-        ),
-        ApplicationTimelineStatus.sentToSystem => const _TimelineStyle(
-          label: 'Tizimga yuborildi',
-          icon: Icons.send_rounded,
-          bg: Color(0xFF6A16F6),
-        ),
-        ApplicationTimelineStatus.assignedSpecialist => const _TimelineStyle(
-          label: 'Mutaxassisga tayinlandi',
-          icon: Icons.badge_outlined,
-          bg: Color(0xFFFF9800),
-        ),
-        ApplicationTimelineStatus.scanned => const _TimelineStyle(
-          label: 'Skan qilindi',
-          icon: Icons.crop_free_rounded,
-          bg: Color(0xFF03C050),
-        ),
-        ApplicationTimelineStatus.reportReady => const _TimelineStyle(
-          label: 'Hisobot tayyorlandi',
-          icon: Icons.description_outlined,
-          bg: Color(0xFF1A9BF4),
-        ),
-      };
+  static _TimelineStyle fromStatus(
+    ApplicationTimelineStatus status,
+    String lang,
+  ) => switch (status) {
+    ApplicationTimelineStatus.accepted => _TimelineStyle(
+      label: _DetailStrings.accepted(lang),
+      icon: Icons.description_outlined,
+      bg: const Color(0xFF18B4E8),
+    ),
+    ApplicationTimelineStatus.sentToSystem => _TimelineStyle(
+      label: _DetailStrings.sentToSystem(lang),
+      icon: Icons.send_rounded,
+      bg: const Color(0xFF6A16F6),
+    ),
+    ApplicationTimelineStatus.assignedSpecialist => _TimelineStyle(
+      label: _DetailStrings.assignedSpecialist(lang),
+      icon: Icons.badge_outlined,
+      bg: const Color(0xFFFF9800),
+    ),
+    ApplicationTimelineStatus.scanned => _TimelineStyle(
+      label: _DetailStrings.scanned(lang),
+      icon: Icons.crop_free_rounded,
+      bg: const Color(0xFF03C050),
+    ),
+    ApplicationTimelineStatus.reportReady => _TimelineStyle(
+      label: _DetailStrings.reportReady(lang),
+      icon: Icons.description_outlined,
+      bg: const Color(0xFF1A9BF4),
+    ),
+  };
 }
 
 class _AboutTab extends StatelessWidget {
@@ -301,24 +440,16 @@ class _AboutTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const rows = <(String, String)>[
-      ('Obyekt', "Ko'p qavatli xonadon, 3 xona"),
-      ('Manzil', 'Toshkent sh., Chilonzor t., 7-mavze'),
-      ('Maydon', '120.5 m²'),
-      ('Qavat', '5/9'),
-      ('Kadastr qiymati', '385 mln'),
-      ('Kadastr raqami', '10:06:0310101:012:0001'),
-      ('Skan sanasi', '02.04.2026'),
-      ('Hisobot sanasi', '02.04.2026'),
-      ('Skan aniqligi', '±2 sm'),
-      ('Mutaxassis', 'Abdullayev J.'),
-    ];
+    final lang = Localizations.localeOf(context).languageCode;
+    final rows = item.detailRows;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Hisobot',
+          item.hasDeliverable
+              ? _DetailStrings.report(lang)
+              : _DetailStrings.applicationDetails(lang),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -334,29 +465,47 @@ class _AboutTab extends StatelessWidget {
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: ColorTokens.outline(context), width: 0.6),
           ),
-          child: Column(
-            children: [
-              for (var i = 0; i < rows.length; i++) ...[
-                _InfoRow(label: rows[i].$1, value: rows[i].$2),
-                if (i != rows.length - 1)
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: ColorTokens.divider(context),
+          child: rows.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    _DetailStrings.noData(lang),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                      color: ColorTokens.secondaryText(context),
+                    ),
                   ),
-              ],
-            ],
+                )
+              : Column(
+                  children: [
+                    for (var i = 0; i < rows.length; i++) ...[
+                      _InfoRow(label: rows[i].$1, value: rows[i].$2),
+                      if (i != rows.length - 1)
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: ColorTokens.divider(context),
+                        ),
+                    ],
+                  ],
+                ),
+        ),
+        // The downloadable report / 3D model / AR view only exist for a
+        // finished deliverable (completed photogrammetry scan). For jobs that
+        // are still just submitted, we don't fake a report.
+        if (item.hasDeliverable) ...[
+          const SizedBox(height: 14),
+          const _FileCard(),
+          const SizedBox(height: 14),
+          _ModelCard(item: item),
+          const SizedBox(height: 18),
+          _PrimaryGreenAction(
+            label: _DetailStrings.viewViaAr(lang),
+            item: item,
           ),
-        ),
-        const SizedBox(height: 14),
-        const _FileCard(),
-        const SizedBox(height: 14),
-        _ModelCard(item: item),
-        const SizedBox(height: 18),
-        _PrimaryGreenAction(
-          label: "AR orqali ko'rish",
-          item: item,
-        ),
+        ],
       ],
     );
   }
@@ -475,7 +624,9 @@ class _FileCard extends StatelessWidget {
             ),
           ),
           _MiniPillButton(
-            label: 'Yuklash',
+            label: _DetailStrings.download(
+              Localizations.localeOf(context).languageCode,
+            ),
             fg: const Color(0xFF03B54F),
             bg: isDark
                 ? const Color(0xFF03B54F).withValues(alpha: 0.18)
@@ -523,7 +674,11 @@ class _ModelCardState extends State<_ModelCard> {
     if (_loading) return;
     final jobId = _photogrammetryJobId;
     if (jobId == null) {
-      AppToast.success(context, '3D model bu ariza turida mavjud emas');
+      AppToast.success(context, switch (localeNotifier.value.languageCode) {
+        'ru' => '3D-модель недоступна для этого типа заявки',
+        'en' => '3D model is not available for this application type',
+        _ => '3D model bu ariza turida mavjud emas',
+      });
       return;
     }
 
@@ -535,17 +690,30 @@ class _ModelCardState extends State<_ModelCard> {
 
       if (!job.isCompleted) {
         if (!mounted) return;
+        final locale = localeNotifier.value;
         AppToast.success(
           context,
           job.status == 'failed'
-              ? '3D model qurib bo\'lmadi: ${job.errorMessage ?? 'xato'}'
-              : '3D model hali tayyor emas (${job.status}). Iltimos, kuting.',
+              ? switch (locale.languageCode) {
+                  'ru' => 'Не удалось построить 3D-модель: ${job.errorMessage ?? 'ошибка'}',
+                  'en' => 'Failed to build 3D model: ${job.errorMessage ?? 'error'}',
+                  _ => '3D model qurib bo\'lmadi: ${job.errorMessage ?? 'xato'}',
+                }
+              : switch (locale.languageCode) {
+                  'ru' => '3D-модель ещё не готова (${job.status}). Пожалуйста, подождите.',
+                  'en' => '3D model is not ready yet (${job.status}). Please wait.',
+                  _ => '3D model hali tayyor emas (${job.status}). Iltimos, kuting.',
+                },
         );
         return;
       }
       if (job.downloadUrl == null) {
         if (!mounted) return;
-        AppToast.error(context, 'Download URL kelmadi');
+        AppToast.error(context, switch (localeNotifier.value.languageCode) {
+          'ru' => 'URL для загрузки не получен',
+          'en' => 'Download URL not received',
+          _ => 'Download URL kelmadi',
+        });
         return;
       }
 
@@ -589,7 +757,11 @@ class _ModelCardState extends State<_ModelCard> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, 'Xato: $e');
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
     } finally {
       if (mounted) {
         setState(() {
@@ -604,6 +776,7 @@ class _ModelCardState extends State<_ModelCard> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
     return InkWell(
       onTap: _onTap,
       borderRadius: BorderRadius.circular(24),
@@ -641,7 +814,7 @@ class _ModelCardState extends State<_ModelCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '3D Model',
+                  _DetailStrings.model3d(lang),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -653,11 +826,11 @@ class _ModelCardState extends State<_ModelCard> {
                 const SizedBox(height: 2),
                 Text(
                   !_loading
-                      ? 'RoomPlan viewer ochiladi'
+                      ? _DetailStrings.roomPlanViewerOpens(lang)
                       : _total > 0
-                          ? 'Yuklab olinmoqda… ${(_progress! * 100).toStringAsFixed(0)}% '
+                          ? '${_DetailStrings.downloading(lang)} ${(_progress! * 100).toStringAsFixed(0)}% '
                               '(${_fmtBytes(_received)} / ${_fmtBytes(_total)})'
-                          : 'Yuklab olinmoqda… ${_fmtBytes(_received)}',
+                          : '${_DetailStrings.downloading(lang)} ${_fmtBytes(_received)}',
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w400,
@@ -684,7 +857,7 @@ class _ModelCardState extends State<_ModelCard> {
           ),
           if (!_loading)
             _MiniPillButton(
-              label: "Ko'rish",
+              label: _DetailStrings.view(lang),
               fg: ColorTokens.primaryText(context),
               bg: ColorTokens.iconBg(context),
               iconAsset: 'assets/icons/chevron-right.svg',
@@ -799,7 +972,11 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
     if (_loading) return;
     final id = widget.item.id;
     if (!id.startsWith('photo_')) {
-      AppToast.success(context, 'AR ko\'rish bu ariza turida mavjud emas');
+      AppToast.success(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'AR-просмотр недоступен для этого типа заявки',
+        'en' => 'AR view is not available for this application type',
+        _ => 'AR ko\'rish bu ariza turida mavjud emas',
+      });
       return;
     }
     final jobId = int.tryParse(id.substring('photo_'.length));
@@ -811,7 +988,11 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
       final job = await api.getJob(jobId);
       if (!job.isCompleted || job.downloadUrl == null) {
         if (!mounted) return;
-        AppToast.success(context, '3D model hali tayyor emas');
+        AppToast.success(context, switch (localeNotifier.value.languageCode) {
+          'ru' => '3D-модель ещё не готова',
+          'en' => '3D model is not ready yet',
+          _ => '3D model hali tayyor emas',
+        });
         return;
       }
       final format = job.resultFormat ?? 'usdz';
@@ -841,7 +1022,11 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, 'Xato: $e');
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
     } finally {
       if (mounted) setState(() => _loading = false);
     }
