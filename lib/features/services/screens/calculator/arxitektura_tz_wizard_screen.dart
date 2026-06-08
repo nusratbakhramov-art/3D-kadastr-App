@@ -19,14 +19,17 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../../core/i18n.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../home/user_profile.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_architecture_order_service.dart';
-import '../../models/ai_baholash_bundle.dart' show AiRoom, RoomKind;
+import '../../api_cadastre_service.dart';
 import '../../models/architecture_order_draft.dart';
+import '../../widgets/cadastre_lookup_field.dart';
+import '../../widgets/color_palette_field.dart';
+import '../../widgets/location_picker_field.dart';
+import '../../widgets/rooms_selector.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
 import '../../widgets/wizard_field.dart';
@@ -77,15 +80,15 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   late final TextEditingController _phone;
   late final TextEditingController _email;
 
-  // Step 2 — viloyat/tuman faqat UI uchun (modelda saqlanmaydi; manzil
-  // matni `_address` orqali yuboriladi).
-  String? _viloyat;
-  String? _tuman;
+  // Step 2 — manzil xaritadan tanlanadi (`_draft.location`); `_address` matni
+  // shundan to'ldiriladi.
   late final TextEditingController _objectName;
   late final TextEditingController _address;
   late final TextEditingController _cadastreNumber;
   late final TextEditingController _landArea;
   late final TextEditingController _landUsePurpose;
+  // Yer maydoni o'lchov birligi: 'm2' yoki 'sotix' (1 sotix = 100 m²).
+  String _landUnit = 'm2';
 
   // Step 3
   late final TextEditingController _floors;
@@ -94,9 +97,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   late final TextEditingController _maxHeight;
   late final TextEditingController _objectSubtype;
   late final TextEditingController _constructionYear;
-
-  // Step 4
-  late final TextEditingController _colors;
 
   // Step 5
   late final TextEditingController _roofMaterial;
@@ -156,7 +156,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       text: _draft.constructionYear?.toString() ?? '',
     );
 
-    _colors = TextEditingController(text: _draft.architecture.colors ?? '');
     _roofMaterial = TextEditingController(
       text: _draft.constructive.roofMaterial ?? '',
     );
@@ -176,6 +175,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     // o'zgarganda butun ekranni qayta hisoblash uchun listenerlar.
     for (final c in [
       _customerName,
+      _tin,
       _phone,
       _floors,
       _totalArea,
@@ -189,11 +189,29 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     if (mounted) setState(() {});
   }
 
+  // Kadastr lookup natijasidan manzil va maydonni avtomatik to'ldiramiz.
+  void _onCadastreResult(CadastreLookupResult r) {
+    setState(() {
+      if ((r.address ?? '').trim().isNotEmpty) {
+        _address.text = r.address!.trim();
+      }
+      final area = r.totalArea ?? r.livingArea;
+      if (area != null && area > 0) {
+        _landUnit = 'm2';
+        _totalArea.text = _trimNum(area);
+      }
+    });
+  }
+
+  static String _trimNum(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toString();
+
   @override
   void dispose() {
     _pageController.dispose();
     for (final c in [
       _customerName,
+      _tin,
       _phone,
       _floors,
       _totalArea,
@@ -217,7 +235,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       _maxHeight,
       _objectSubtype,
       _constructionYear,
-      _colors,
       _roofMaterial,
       _parkingCount,
       _sketchDays,
@@ -229,12 +246,19 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     super.dispose();
   }
 
+  // STIR (9) yoki INN (14) — kiritilgan bo'lsa, uzunligi shu ikkitadan biri.
+  bool get _tinValid {
+    final t = _tin.text.trim();
+    return t.isEmpty || t.length == 9 || t.length == 14;
+  }
+
   // ── Validatsiya per-step ─────────────────────────────────────────────
   bool get _canAdvance {
     switch (_stepIndex) {
       case 0:
         return _customerName.text.trim().length >= 2 &&
-            _phone.text.trim().length >= 5;
+            _phone.text.trim().length >= 5 &&
+            _tinValid;
       case 2:
         return _draft.objectType != null;
       default:
@@ -253,7 +277,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     _draft.objectName = _objectName.text;
     _draft.address = _address.text;
     _draft.cadastreNumber = _cadastreNumber.text;
-    _draft.landAreaSqm = _parseDouble(_landArea.text);
+    final landVal = _parseDouble(_landArea.text);
+    _draft.landAreaSqm = landVal == null
+        ? null
+        : (_landUnit == 'sotix' ? landVal * 100 : landVal);
     _draft.landUsePurpose = _landUsePurpose.text;
 
     _draft.floors = _parseInt(_floors.text);
@@ -263,8 +290,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     _draft.objectSubtype = _objectSubtype.text;
     _draft.constructionYear = _parseInt(_constructionYear.text);
 
-    _draft.architecture.colors =
-        _colors.text.trim().isEmpty ? null : _colors.text.trim();
+    // Ranglar ColorPaletteField orqali to'g'ridan-to'g'ri draftga yoziladi.
     _draft.constructive.roofMaterial = _roofMaterial.text.trim().isEmpty
         ? null
         : _roofMaterial.text.trim();
@@ -365,9 +391,19 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: const Color(0xFFE0492A)),
-    );
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(msg),
+          backgroundColor: const Color(0xFFE0492A),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      );
   }
 
   // ── UI ───────────────────────────────────────────────────────────────
@@ -493,6 +529,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         controller: _tin,
         placeholder: '300000000',
         numericOnly: true,
+        maxLength: 14,
+        errorText: _tinValid ? null : _Strings.tinError(l),
       ),
       WizardField(
         label: _Strings.phoneLabel(l),
@@ -512,9 +550,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   // ── Step 2: Obyekt va manzil ─────────────────────────────────────────
   Widget _buildStep2(Locale l) {
-    final tumanlar = _viloyat == null
-        ? const <String>[]
-        : _tumanlarByViloyat[_viloyat!] ?? const <String>[];
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.objectAndAddress(l)),
       WizardField(
@@ -522,56 +557,36 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         controller: _objectName,
         placeholder: _Strings.objectNamePlaceholder(l),
       ),
-      WizardField(
+      LocationPickerField(
         label: _Strings.addressLabel(l),
-        controller: _address,
-        placeholder: 'Toshkent sh., Yakkasaroy t., …',
-        maxLines: 2,
+        value: _draft.location,
+        onChanged: (loc) => setState(() {
+          _draft.location = loc;
+          if (loc.addressText != null) {
+            _address.text = loc.addressText!;
+          }
+        }),
       ),
-      WizardChipPicker<String>(
-        label: _Strings.regionLabel(l),
-        required: true,
-        options: _viloyatKeys,
-        labelOf: (k) => _viloyatLabel(k, l),
-        value: _viloyat,
-        onChanged: (v) {
-          setState(() {
-            _viloyat = v;
-            // Yangi viloyat tanlansa, tuman avvalgi viloyatga tegishli bo'lsa
-            // tozalanadi.
-            if (v != null) {
-              final allowed = _tumanlarByViloyat[v] ?? const <String>[];
-              if (_tuman != null && !allowed.contains(_tuman)) {
-                _tuman = null;
-              }
-            } else {
-              _tuman = null;
-            }
-          });
-        },
+      // Kadastr raqami — raqam kiritilsa, manzil va maydon avtomatik to'ladi.
+      CadastreLookupField(
+        controller: _cadastreNumber,
+        label: _Strings.cadastreNumberLabel(l),
+        onResult: _onCadastreResult,
       ),
-      if (tumanlar.isNotEmpty)
-        WizardChipPicker<String>(
-          label: _Strings.districtLabel(l),
-          options: tumanlar,
-          labelOf: (s) => s,
-          value: _tuman,
-          onChanged: (v) => setState(() => _tuman = v),
-        ),
-      // Kadastr raqami avvalgi step'da kiritilgan bo'lsa, qayta so'ramaymiz.
-      if (_cadastreNumber.text.trim().isEmpty)
-        WizardField(
-          label: _Strings.cadastreNumberLabel(l),
-          controller: _cadastreNumber,
-          placeholder: '10:09:00:001',
-        ),
       WizardField(
         label: _Strings.landAreaLabel(l),
         controller: _landArea,
         placeholder: '500',
-        suffix: _Strings.unitSqm(l),
+        suffix: _landUnit == 'sotix' ? 'sotix' : _Strings.unitSqm(l),
         numericOnly: true,
         allowDecimal: true,
+      ),
+      WizardChipPicker<String>(
+        label: _Strings.landUnitLabel(l),
+        options: const ['m2', 'sotix'],
+        labelOf: (s) => s == 'sotix' ? 'sotix' : _Strings.unitSqm(l),
+        value: _landUnit,
+        onChanged: (v) => setState(() => _landUnit = v ?? 'm2'),
       ),
       WizardField(
         label: _Strings.landUsePurposeLabel(l),
@@ -685,114 +700,18 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   Widget _buildStep4(Locale l) {
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.roomsComposition(l)),
-      _buildRoomsEditor(),
+      RoomsSelector(
+        rooms: _draft.rooms,
+        locale: l,
+        showArea: true,
+        subtitle: switch (l.languageCode) {
+          'ru' => 'Выберите типы комнат, укажите кол-во и площадь (м²)',
+          'en' => 'Pick room types, enter count and area (m²)',
+          _ => 'Xona turlarini tanlang, soni va maydonini (m²) kiriting',
+        },
+        onChanged: () => setState(() {}),
+      ),
     ]);
-  }
-
-  Widget _buildRoomsEditor() {
-    final locale = Localizations.localeOf(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
-    final textColor = isDark ? Colors.white : AppColors.textBlack;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        for (int i = 0; i < _draft.rooms.length; i++)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: fill,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: border),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: TextFormField(
-                      initialValue: _draft.rooms[i].name,
-                      onChanged: (v) => _draft.rooms[i].name = v,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        hintText: L.roomName(locale),
-                      ),
-                      style: TextStyle(color: textColor, fontSize: 14),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 50,
-                    child: TextFormField(
-                      initialValue: _draft.rooms[i].count.toString(),
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                      ],
-                      onChanged: (v) =>
-                          _draft.rooms[i].count = int.tryParse(v) ?? 1,
-                      decoration: InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        hintText: switch (locale.languageCode) {
-                          'ru' => 'Кол-во',
-                          'en' => 'Qty',
-                          _ => 'Soni',
-                        },
-                      ),
-                      style: TextStyle(color: textColor, fontSize: 14),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 70,
-                    child: TextFormField(
-                      initialValue: _draft.rooms[i].area?.toString() ?? '',
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
-                      ],
-                      onChanged: (v) => _draft.rooms[i].area =
-                          double.tryParse(v.replaceAll(',', '.')),
-                      decoration: const InputDecoration(
-                        isDense: true,
-                        border: InputBorder.none,
-                        hintText: 'm²',
-                      ),
-                      style: TextStyle(color: textColor, fontSize: 14),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () =>
-                        setState(() => _draft.rooms.removeAt(i)),
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    color: const Color(0xFFE0492A),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: () => setState(
-              () => _draft.rooms.add(AiRoom(kind: RoomKind.other, name: '')),
-            ),
-            icon: const Icon(Icons.add, size: 18),
-            label: Text(switch (locale.languageCode) {
-              'ru' => 'Добавить комнату',
-              'en' => 'Add room',
-              _ => 'Xona qo\'shish',
-            }),
-            style: TextButton.styleFrom(foregroundColor: AppColors.splashGreen),
-          ),
-        ),
-      ],
-    );
   }
 
   // ── Step 5: Arxitektura yechimlari ───────────────────────────────────
@@ -820,10 +739,11 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         onChanged: (v) =>
             setState(() => _draft.architecture.facadeMaterial = v),
       ),
-      WizardField(
+      ColorPaletteField(
         label: _Strings.colorsLabel(l),
-        controller: _colors,
-        placeholder: _Strings.colorsPlaceholder(l),
+        value: _draft.architecture.colors,
+        onChanged: (v) =>
+            _draft.architecture.colors = v.trim().isEmpty ? null : v.trim(),
       ),
       WizardSwitchTile(
         label: _Strings.need3dVisualization(l),
@@ -1178,132 +1098,6 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         _ => s,
       };
 
-  // ── Viloyat / tuman katalogi ─────────────────────────────────────────
-  // Kalitlar OLX scraper region kalitlariga (`OlxUzScraper._REGION_IDS`)
-  // mos keladi — backend AI baholash filteri uchun.
-  static const List<String> _viloyatKeys = [
-    'tashkent_city',
-    'tashkent_region',
-    'andijan',
-    'bukhara',
-    'fergana',
-    'jizzakh',
-    'namangan',
-    'navoi',
-    'kashkadarya',
-    'karakalpakstan',
-    'samarkand',
-    'syrdarya',
-    'surkhandarya',
-    'khorezm',
-  ];
-
-  static String _viloyatLabel(String key, Locale l) {
-    final ru = l.languageCode == 'ru';
-    final en = l.languageCode == 'en';
-    return switch (key) {
-      'tashkent_city' => ru
-          ? 'г. Ташкент'
-          : en
-              ? 'Tashkent city'
-              : 'Toshkent shahri',
-      'tashkent_region' => ru
-          ? 'Ташкентская область'
-          : en
-              ? 'Tashkent region'
-              : 'Toshkent viloyati',
-      'andijan' => ru
-          ? 'Андижан'
-          : en
-              ? 'Andijan'
-              : 'Andijon',
-      'bukhara' => ru
-          ? 'Бухара'
-          : en
-              ? 'Bukhara'
-              : 'Buxoro',
-      'fergana' => ru
-          ? 'Фергана'
-          : en
-              ? 'Fergana'
-              : 'Farg\'ona',
-      'jizzakh' => ru
-          ? 'Джизак'
-          : en
-              ? 'Jizzakh'
-              : 'Jizzax',
-      'namangan' => ru
-          ? 'Наманган'
-          : en
-              ? 'Namangan'
-              : 'Namangan',
-      'navoi' => ru
-          ? 'Навои'
-          : en
-              ? 'Navoi'
-              : 'Navoiy',
-      'kashkadarya' => ru
-          ? 'Кашкадарья'
-          : en
-              ? 'Kashkadarya'
-              : 'Qashqadaryo',
-      'karakalpakstan' => ru
-          ? 'Каракалпакстан'
-          : en
-              ? 'Karakalpakstan'
-              : 'Qoraqalpog\'iston',
-      'samarkand' => ru
-          ? 'Самарканд'
-          : en
-              ? 'Samarkand'
-              : 'Samarqand',
-      'syrdarya' => ru
-          ? 'Сырдарья'
-          : en
-              ? 'Syrdarya'
-              : 'Sirdaryo',
-      'surkhandarya' => ru
-          ? 'Сурхандарья'
-          : en
-              ? 'Surkhandarya'
-              : 'Surxondaryo',
-      'khorezm' => ru
-          ? 'Хорезм'
-          : en
-              ? 'Khorezm'
-              : 'Xorazm',
-      _ => key,
-    };
-  }
-
-  static const Map<String, List<String>> _tumanlarByViloyat = {
-    'tashkent_city': [
-      'Bektemir',
-      'Chilonzor',
-      'Mirobod',
-      'Mirzo Ulug\'bek',
-      'Olmazor',
-      'Sirg\'ali',
-      'Shayxontohur',
-      'Uchtepa',
-      'Yakkasaroy',
-      'Yashnobod',
-      'Yunusobod',
-    ],
-    'tashkent_region': [
-      'Bekobod',
-      'Bo\'ka',
-      'Chinoz',
-      'Ohangaron',
-      'Olmaliq',
-      'Parkent',
-      'Piskent',
-      'Quyichirchiq',
-      'O\'rtachirchiq',
-      'Yangiyo\'l',
-      'Zangiota',
-    ],
-  };
 }
 
 // ── Localized UI strings ────────────────────────────────────────────────
@@ -1451,6 +1245,12 @@ class _Strings {
         _ => 'STIR / INN',
       };
 
+  static String tinError(Locale l) => switch (l.languageCode) {
+        'ru' => '9 (СТИР) или 14 (ИНН) цифр',
+        'en' => 'Must be 9 (TIN) or 14 (PINFL) digits',
+        _ => '9 (STIR) yoki 14 (INN) raqamdan iborat bo\'lsin',
+      };
+
   static String phoneLabel(Locale l) => switch (l.languageCode) {
         'ru' => 'Телефон',
         'en' => 'Phone',
@@ -1482,16 +1282,10 @@ class _Strings {
         _ => 'Manzil',
       };
 
-  static String regionLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Область',
-        'en' => 'Region',
-        _ => 'Viloyat',
-      };
-
-  static String districtLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Район',
-        'en' => 'District',
-        _ => 'Tuman',
+  static String landUnitLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Единица измерения',
+        'en' => 'Unit',
+        _ => 'O\'lchov birligi',
       };
 
   static String cadastreNumberLabel(Locale l) => switch (l.languageCode) {
@@ -1642,12 +1436,6 @@ class _Strings {
         'ru' => 'Цвета',
         'en' => 'Colors',
         _ => 'Ranglar',
-      };
-
-  static String colorsPlaceholder(Locale l) => switch (l.languageCode) {
-        'ru' => 'Бежевый, белый, дерево',
-        'en' => 'Beige, white, wood',
-        _ => 'Bej, oq, yog\'och',
       };
 
   static String need3dVisualization(Locale l) => switch (l.languageCode) {

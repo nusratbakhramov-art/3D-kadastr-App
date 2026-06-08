@@ -62,5 +62,11 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <!-- Bosh sahifadagi "qo'ng'iroq" tugmasi tel: orqali terish ilovasini
+             ochishi uchun (Android 11+ package visibility). -->
+        <intent>
+            <action android:name="android.intent.action.DIAL"/>
+            <data android:scheme="tel"/>
+        </intent>
     </queries>
 </manifest>

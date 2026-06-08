@@ -10,6 +10,7 @@ import '../settings/settings_state.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_architecture_order_service.dart';
 import '../services/api_calculator_order_service.dart';
+import '../services/api_design_order_service.dart';
 import '../services/api_kadastr_3d_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import 'application_detail_screen.dart';
@@ -188,6 +189,15 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         )
         .catchError((_) => <ApplicationItem>[]);
 
+    // Dizayn TZ buyurtmalari (`GET /services/design/orders`).
+    final designFuture = DesignOrderApiService()
+        .list(token: token, page: 1, size: 100)
+        .then(
+          (page) =>
+              page.items.map(_designToApplicationItem).toList(growable: false),
+        )
+        .catchError((_) => <ApplicationItem>[]);
+
     // AI Baholash arizalari = async valuation JOBS (`GET /ai-valuations`).
     // Eski kod `/valuations/ai/confirmations` (admin tasdiqlash arizalari)
     // ni o'qigan — bu boshqa jadval, shuning uchun oddiy AI baholash hech
@@ -231,6 +241,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       photogrammetryFuture,
       calcFuture,
       kadastr3dFuture,
+      designFuture,
     ]);
     final combined = <ApplicationItem>[
       ...results[0],
@@ -238,6 +249,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       ...results[2],
       ...results[3],
       ...results[4],
+      ...results[5],
     ];
     // Yangidan eskigacha tartiblash — sanalar string sifatida saqlangan,
     // lekin DD.MM.YYYY format saqlanadi → teskari sort.
@@ -251,7 +263,9 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'arch_${o.id}',
-      serviceId: 'arch',
+      // Arxitektura/Dizayn TZ — kalkulyator xizmatlari, "Kalkulyator" chipi
+      // ostida ko'rsatamiz (serviceLabel kartada turini ko'rsatadi).
+      serviceId: 'calc',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'arch'),
       statusGroup: group,
       addressLabel: _ApplicationsStrings.address(lang),
@@ -262,6 +276,29 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         (_ApplicationsStrings.address(lang), o.address ?? '—'),
         if (o.cadastreNumber != null)
           (_ApplicationsStrings.cadastreNumber(lang), o.cadastreNumber!),
+        (_ApplicationsStrings.status(lang), _groupLabel(group)),
+        (_ApplicationsStrings.applicationDate(lang), date),
+      ],
+      timeline: _basicTimeline(group, o.createdAt),
+    );
+  }
+
+  static ApplicationItem _designToApplicationItem(DesignOrderSummary o) {
+    final lang = localeNotifier.value.languageCode;
+    final group = _statusToGroup(o.status);
+    final date = _formatDate(o.createdAt);
+    return ApplicationItem(
+      id: 'design_${o.id}',
+      serviceId: 'calc',
+      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'design'),
+      statusGroup: group,
+      addressLabel: _ApplicationsStrings.address(lang),
+      addressValue: o.address ?? '—',
+      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateValue: date,
+      detailRows: [
+        if (o.address != null)
+          (_ApplicationsStrings.address(lang), o.address!),
         (_ApplicationsStrings.status(lang), _groupLabel(group)),
         (_ApplicationsStrings.applicationDate(lang), date),
       ],
@@ -1151,6 +1188,11 @@ class _ApplicationsStrings {
           'ru' => 'Архитектура ТЗ',
           'en' => 'Architecture TZ',
           _ => 'Arxitektura TZ',
+        },
+        'design' => switch (lang) {
+          'ru' => 'Дизайн ТЗ',
+          'en' => 'Design TZ',
+          _ => 'Dizayn TZ',
         },
         'ai_eval' => switch (lang) {
           'ru' => 'AI оценка',

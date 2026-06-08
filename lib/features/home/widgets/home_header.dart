@@ -15,6 +15,7 @@ class HomeHeader extends StatelessWidget {
     this.onBellTap,
     this.onLoginTap,
     this.onAvatarTap,
+    this.onSupportTap,
   });
 
   final UserProfile? profile;
@@ -24,6 +25,7 @@ class HomeHeader extends StatelessWidget {
   final VoidCallback? onBellTap;
   final VoidCallback? onLoginTap;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onSupportTap;
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +76,12 @@ class HomeHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
+        _SupportButton(
+          isDark: isDark,
+          tooltip: _HomeStrings.supportTooltip(locale),
+          onTap: onSupportTap,
+        ),
+        const SizedBox(width: 8),
         if (isGuest)
           _LoginButton(
             label: _HomeStrings.loginLabel(locale),
@@ -86,6 +94,50 @@ class HomeHeader extends StatelessWidget {
             onTap: onBellTap,
           ),
       ],
+    );
+  }
+}
+
+class _SupportButton extends StatelessWidget {
+  const _SupportButton({
+    required this.isDark,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final String tooltip;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final backgroundColor = isDark ? const Color(0xFF1A1F21) : Colors.white;
+    final iconColor = isDark ? AppColors.splashGreen : AppColors.brandGreenDark;
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.support_agent_rounded,
+              size: 23,
+              color: iconColor,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -278,6 +330,12 @@ class _HomeStrings {
     'ru' => 'Войти',
     'en' => 'Log in',
     _ => 'Kirish',
+  };
+
+  static String supportTooltip(Locale locale) => switch (locale.languageCode) {
+    'ru' => 'Поддержка',
+    'en' => 'Support',
+    _ => 'Yordam',
   };
 
   static String formatDate(Locale locale, DateTime date) {
