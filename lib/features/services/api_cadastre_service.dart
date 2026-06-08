@@ -32,6 +32,17 @@ class CadastreLookupResult {
   final double? totalArea; // m²
   final double? livingArea; // m²
   final double? cadastreValue; // so'm
+
+  /// Draft payload'dan qayta tiklash (resume). `bundle.toJson()['kadastr']`ga mos.
+  factory CadastreLookupResult.fromJson(Map<String, dynamic> j) =>
+      CadastreLookupResult(
+        cadastreNumber: j['cadastre_number']?.toString() ?? '',
+        address: j['address'] as String?,
+        objectTypeHint: j['object_type_hint'] as String?,
+        totalArea: (j['total_area'] as num?)?.toDouble(),
+        livingArea: (j['living_area'] as num?)?.toDouble(),
+        cadastreValue: (j['cadastre_value'] as num?)?.toDouble(),
+      );
 }
 
 class CadastreLookupException implements Exception {

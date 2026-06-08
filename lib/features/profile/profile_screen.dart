@@ -305,9 +305,9 @@ class _ProfileStrings {
   };
 
   static String myScans(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мои сканирования',
-    'en' => 'My scans',
-    _ => 'Mening skanerlarim',
+    'ru' => 'Мои заявки',
+    'en' => 'My applications',
+    _ => 'Mening arizalarim',
   };
 
   static String ratings(Locale l) => switch (l.languageCode) {

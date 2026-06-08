@@ -14,7 +14,7 @@ import '../payments/payments_screen.dart';
 import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
-import '../scans/saved_scans_screen.dart';
+import '../services/screens/ai_drafts_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
@@ -145,11 +145,11 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _openScans() async {
-    // Phase 7: SavedScansScreen — raw skanlar + outputs history.
-    // (MyScansScreen eski USDZ-only ekran, hozir foydalanilmaydi.)
+    // Real oqim: lokal "Mening skanlarim" o'rniga backend draftlar
+    // ("Mening arizalarim"). Skanlar endi ariza ichida backendda saqlanadi.
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SavedScansScreen()));
+    ).push(MaterialPageRoute<void>(builder: (_) => const AiDraftsScreen()));
   }
 
   Future<void> _openPayments() async {

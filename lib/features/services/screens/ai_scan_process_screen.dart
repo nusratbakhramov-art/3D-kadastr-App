@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../scans/saved_scan_service.dart';
+import '../ai_draft_saver.dart';
+import '../api_ai_upload_service.dart';
 import '../data/room_plan_scanner.dart';
 import '../models/ai_scan_result.dart';
 import '../widgets/service_app_bar.dart';
@@ -30,6 +33,7 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
   _ProcStage _stage = _ProcStage.idle;
   AiScanResult? _result;
   String? _error;
+  bool _uploading = false;
 
   int get _scanId => widget.scan.savedScanId!;
 
@@ -83,17 +87,44 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
     }
   }
 
-  void _continue() {
+  Future<void> _continue() async {
     final r = _result;
-    if (r == null) return;
+    if (r == null || _uploading) return;
     HapticFeedback.lightImpact();
-    // Skan oqimi tugadi — kadastr qadamiga o'tamiz va skanni almashtiramiz
-    // (process ekraniga qaytish kerak emas).
+    setState(() => _uploading = true);
+    // USDZ ni backendga yuklaymiz (best-effort) → kalit draft ustunida saqlanadi.
+    final scanKey = await _uploadUsdz(r.usdzPath);
+    // Skandan keyin DRAFT ariza (skan kaliti + keyingi qadam = kadastr).
+    final draftId =
+        await createAiDraft(currentStep: 'cadastre', scanUsdzKey: scanKey);
+    if (!mounted) return;
+    setState(() => _uploading = false);
+    // Skan oqimi tugadi — kadastr qadamiga o'tamiz (process ekraniga qaytmaymiz).
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => AiCadastreScreen(scan: r),
+        builder: (_) => AiCadastreScreen(scan: r, draftId: draftId),
       ),
     );
+  }
+
+  /// USDZ ni backendga yuklaydi (best-effort). Kalit yoki null qaytaradi.
+  Future<String?> _uploadUsdz(String path) async {
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null || token.isEmpty) return null;
+    final svc = AiUploadService();
+    try {
+      final keys = await svc.upload(
+        category: UploadCategory.scanModel,
+        filePaths: [path],
+        token: token,
+      );
+      return keys.isNotEmpty ? keys.first : null;
+    } catch (_) {
+      return null; // yuklash muvaffaqiyatsiz bo'lsa ham oqim davom etadi
+    } finally {
+      svc.dispose();
+    }
   }
 
   Future<void> _viewModel() async {
@@ -140,6 +171,7 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
   }
 
   Widget _buildCta(Locale l) {
+    if (_uploading) return const _BusyButton();
     switch (_stage) {
       case _ProcStage.done:
         return ListingCtaButton(label: _S.continueLabel(l), onTap: _continue);

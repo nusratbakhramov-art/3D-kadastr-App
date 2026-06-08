@@ -20,6 +20,7 @@ import '../../../core/i18n.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../ai_draft_saver.dart';
 import '../data/geocoder_client.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
@@ -240,13 +241,15 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
 
   // ── Confirm / submit ─────────────────────────────────────────────────
 
-  void _confirm() {
+  Future<void> _confirm() async {
     HapticFeedback.lightImpact();
     widget.bundle.location = AiLocationInfo(
       lat: _center.latitude,
       lng: _center.longitude,
       addressText: _addressText,
     );
+    await saveAiDraftStep(widget.bundle, 'purpose'); // qadam saqlash
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AiPurposeScreen(bundle: widget.bundle),

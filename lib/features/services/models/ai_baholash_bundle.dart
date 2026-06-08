@@ -14,6 +14,7 @@ class AiBaholashBundle {
   AiBaholashBundle({
     required this.kadastr,
     this.scan,
+    this.draftId,
     this.client,
     this.location,
     this.purpose = ValuationPurpose.sale,
@@ -33,6 +34,10 @@ class AiBaholashBundle {
   /// 3D LiDAR skan natijasi (AI Baholashning birinchi qadami). Mobil-only
   /// fazada faqat lokalda saqlanadi — toJson hozircha yubormaydi.
   final AiScanResult? scan;
+
+  /// Backend DRAFT ariza id (skandan keyin yaratiladi). Har qadamda
+  /// `updateDraft` shu id bilan saqlanadi. null = draft yo'q (login/offline).
+  int? draftId;
 
   AiClientInfo? client;
   AiLocationInfo? location;
@@ -80,6 +85,38 @@ class AiBaholashBundle {
         if (kadastrKeys.isNotEmpty) 'kadastr_keys': kadastrKeys,
         if (passportKeys.isNotEmpty) 'passport_keys': passportKeys,
       };
+
+  /// Draft `request_payload`'dan bundle qayta tiklash (resume). `draftId` —
+  /// davom ettirilayotgan ariza id'si.
+  factory AiBaholashBundle.fromJson(Map<String, dynamic> j, {int? draftId}) {
+    final k = (j['kadastr'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final bundle = AiBaholashBundle(
+      kadastr: CadastreLookupResult.fromJson(k),
+      draftId: draftId,
+      purpose: ValuationPurpose.fromWire(j['purpose'] as String?),
+      floor: (j['floor'] as num?)?.toInt(),
+      totalFloors: (j['total_floors'] as num?)?.toInt(),
+      rooms: ((j['rooms'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => AiRoom.fromJson(e.cast<String, dynamic>()))
+          .toList(),
+      imageKeys:
+          ((j['image_keys'] as List?) ?? const []).map((e) => '$e').toList(),
+      kadastrKeys:
+          ((j['kadastr_keys'] as List?) ?? const []).map((e) => '$e').toList(),
+      passportKeys:
+          ((j['passport_keys'] as List?) ?? const []).map((e) => '$e').toList(),
+    );
+    final c = j['client'];
+    if (c is Map) {
+      bundle.client = AiClientInfo.fromJson(c.cast<String, dynamic>());
+    }
+    final loc = j['location'];
+    if (loc is Map) {
+      bundle.location = AiLocationInfo.fromJson(loc.cast<String, dynamic>());
+    }
+    return bundle;
+  }
 }
 
 /// Baholash maqsadi — mirrors backend `ValuationPurpose`.
@@ -92,6 +129,9 @@ enum ValuationPurpose {
 
   const ValuationPurpose(this.wire);
   final String wire;
+
+  static ValuationPurpose fromWire(String? w) => ValuationPurpose.values
+      .firstWhere((p) => p.wire == w, orElse: () => ValuationPurpose.sale);
 
   String get labelUz => switch (this) {
         ValuationPurpose.sale => 'Sotish',
@@ -149,6 +189,16 @@ enum ValuationPurpose {
 /// One room in the optional breakdown. Mirrors backend `RoomInput`.
 class AiRoom {
   AiRoom({required this.kind, this.name, this.count = 1, this.area});
+
+  factory AiRoom.fromJson(Map<String, dynamic> j) => AiRoom(
+        kind: RoomKind.values.firstWhere(
+          (k) => k.wire == j['kind'],
+          orElse: () => RoomKind.other,
+        ),
+        name: j['name'] as String?,
+        count: (j['count'] as num?)?.toInt() ?? 1,
+        area: (j['area'] as num?)?.toDouble(),
+      );
 
   RoomKind kind;
   String? name;
@@ -211,6 +261,13 @@ class AiClientInfo {
     required this.email,
   });
 
+  factory AiClientInfo.fromJson(Map<String, dynamic> j) => AiClientInfo(
+        name: j['name']?.toString() ?? '',
+        stir: j['stir']?.toString() ?? '',
+        phone: j['phone']?.toString() ?? '',
+        email: j['email']?.toString() ?? '',
+      );
+
   /// Free text — person name or company name.
   final String name;
 
@@ -237,6 +294,12 @@ class AiLocationInfo {
     required this.lng,
     this.addressText,
   });
+
+  factory AiLocationInfo.fromJson(Map<String, dynamic> j) => AiLocationInfo(
+        lat: (j['lat'] as num?)?.toDouble() ?? 0,
+        lng: (j['lng'] as num?)?.toDouble() ?? 0,
+        addressText: j['address_text'] as String?,
+      );
 
   final double lat;
   final double lng;

@@ -14,6 +14,7 @@ import '../../core/api_config.dart';
 
 /// Mirrors `AiValuationJobStatus` on the backend. Strings match exactly.
 enum AiJobStatus {
+  draft,
   queued,
   gatheringInfo,
   aiPricing,
@@ -22,6 +23,8 @@ enum AiJobStatus {
 
   static AiJobStatus parse(String raw) {
     switch (raw) {
+      case 'draft':
+        return AiJobStatus.draft;
       case 'queued':
         return AiJobStatus.queued;
       case 'gathering_info':
@@ -40,6 +43,8 @@ enum AiJobStatus {
 
   bool get isTerminal =>
       this == AiJobStatus.completed || this == AiJobStatus.failed;
+
+  bool get isDraft => this == AiJobStatus.draft;
 }
 
 class AiJobSnapshot {
@@ -47,6 +52,7 @@ class AiJobSnapshot {
     required this.id,
     required this.status,
     required this.requestPayload,
+    this.currentStep,
     this.resultPayload,
     this.errorMessage,
     this.nearbyListingsCount = 0,
@@ -56,6 +62,7 @@ class AiJobSnapshot {
   final int id;
   final AiJobStatus status;
   final Map<String, dynamic> requestPayload;
+  final String? currentStep; // DRAFT: qaysi qadamda qolgan
   final Map<String, dynamic>? resultPayload;
   final String? errorMessage;
   final int nearbyListingsCount;
@@ -67,6 +74,7 @@ class AiJobSnapshot {
         requestPayload:
             (json['request_payload'] as Map?)?.cast<String, dynamic>() ??
                 const {},
+        currentStep: json['current_step'] as String?,
         resultPayload:
             (json['result_payload'] as Map?)?.cast<String, dynamic>(),
         errorMessage: json['error_message'] as String?,
@@ -84,6 +92,7 @@ class AiJobSummary {
     required this.createdAt,
     this.cadastreNumber,
     this.estimatedValue,
+    this.currentStep,
   });
 
   final int id;
@@ -91,6 +100,7 @@ class AiJobSummary {
   final DateTime createdAt;
   final String? cadastreNumber;
   final double? estimatedValue;
+  final String? currentStep; // DRAFT: qaysi qadamda qolgan (resume)
 
   factory AiJobSummary.fromJson(Map<String, dynamic> json) => AiJobSummary(
         id: json['id'] as int,
@@ -99,6 +109,7 @@ class AiJobSummary {
             DateTime.fromMillisecondsSinceEpoch(0),
         cadastreNumber: json['cadastre_number'] as String?,
         estimatedValue: (json['estimated_value'] as num?)?.toDouble(),
+        currentStep: json['current_step'] as String?,
       );
 }
 
@@ -191,6 +202,95 @@ class AiValuationJobService {
     return AiJobSnapshot.fromJson(
       jsonDecode(res.body) as Map<String, dynamic>,
     );
+  }
+
+  // ── Draft ariza (real oqim) ──────────────────────────────────────────
+
+  /// Skandan keyin DRAFT ariza yaratadi (request_payload = qisman bundle).
+  Future<AiJobSnapshot> createDraft({
+    required Map<String, dynamic> payload,
+    String? currentStep,
+    String? scanUsdzKey,
+    required String token,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations/draft');
+    final res = await _client
+        .post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'payload': payload,
+            if (currentStep != null) 'current_step': currentStep,
+            if (scanUsdzKey != null) 'scan_usdz_key': scanUsdzKey,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw AiValuationApiException(
+        _extractDetail(res) ?? 'HTTP ${res.statusCode}',
+        statusCode: res.statusCode,
+      );
+    }
+    return AiJobSnapshot.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// DRAFT arizani yangilaydi (qadam + qisman bundle saqlash).
+  Future<AiJobSnapshot> updateDraft(
+    int id, {
+    required Map<String, dynamic> payload,
+    String? currentStep,
+    required String token,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations/$id/draft');
+    final res = await _client
+        .patch(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'payload': payload,
+            if (currentStep != null) 'current_step': currentStep,
+          }),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 200) {
+      throw AiValuationApiException(
+        _extractDetail(res) ?? 'HTTP ${res.statusCode}',
+        statusCode: res.statusCode,
+      );
+    }
+    return AiJobSnapshot.fromJson(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// Tugallanmagan (DRAFT) arizalar — "Mening arizalarim" ro'yxati.
+  Future<List<AiJobSummary>> listDrafts({required String token}) async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations/drafts');
+    final res = await _client
+        .get(
+          uri,
+          headers: {
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+        )
+        .timeout(const Duration(seconds: 15));
+    if (res.statusCode != 200) {
+      throw AiValuationApiException(
+        _extractDetail(res) ?? 'HTTP ${res.statusCode}',
+        statusCode: res.statusCode,
+      );
+    }
+    final body = jsonDecode(res.body) as List<dynamic>;
+    return body
+        .map((e) => AiJobSummary.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   void dispose() => _client.close();

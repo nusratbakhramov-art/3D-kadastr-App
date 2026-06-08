@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import '../../../theme/app_colors.dart';
 import '../../home/user_profile.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../ai_draft_saver.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -98,7 +99,7 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
         _emailErr == null;
   }
 
-  void _continue() {
+  Future<void> _continue() async {
     final l = Localizations.localeOf(context);
     setState(() {
       _attemptedSubmit = true;
@@ -118,6 +119,8 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
       phone: _normalizePhone(_phoneCtrl.text),
       email: _emailCtrl.text.trim().toLowerCase(),
     );
+    await saveAiDraftStep(widget.bundle, 'location'); // qadam saqlash
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AiLocationScreen(bundle: widget.bundle),

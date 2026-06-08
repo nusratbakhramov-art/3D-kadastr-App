@@ -22,6 +22,7 @@ import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
+import '../ai_draft_saver.dart';
 import '../api_ai_upload_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
@@ -252,28 +253,17 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   }
 
   // ── Submit ──────────────────────────────────────────────────────────
-  void _calculate() {
+  Future<void> _calculate() async {
     HapticFeedback.lightImpact();
     setState(() => _submitting = true);
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AiStatusScreen(bundle: widget.bundle),
-      ),
-    ).then((_) {
-      if (mounted) setState(() => _submitting = false);
-    });
-  }
-
-  /// Validatsiyani chetlab o'tib hisoblash/status qadamiga o'tadi — kerakli
-  /// hujjat/qavat to'ldirilmagan bo'lsa ham. Payment integratsiyasi / test
-  /// uchun. (Backend yetishmagan inputlarni default bilan to'ldiradi.)
-  void _skip() {
-    HapticFeedback.lightImpact();
-    Navigator.of(context).push(
+    await saveAiDraftStep(widget.bundle, 'payment'); // oxirgi qadam: to'lov
+    if (!mounted) return;
+    await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AiStatusScreen(bundle: widget.bundle),
       ),
     );
+    if (mounted) setState(() => _submitting = false);
   }
 
   @override
@@ -386,20 +376,6 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                             : _Strings.calculate(l),
                         enabled: _ready && !_submitting,
                         onTap: _calculate,
-                      ),
-                      const SizedBox(height: 4),
-                      TextButton(
-                        onPressed: _submitting ? null : _skip,
-                        child: Text(
-                          _Strings.skip(l),
-                          style: TextStyle(
-                            fontFamily: 'MTSText',
-                            fontSize: 14,
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.6)
-                                : const Color(0xFF8A9097),
-                          ),
-                        ),
                       ),
                     ],
                   ),
@@ -1187,12 +1163,6 @@ class _Strings {
         'ru' => 'Рассчитать',
         'en' => 'Calculate',
         _ => 'Hisoblash',
-      };
-
-  static String skip(Locale l) => switch (l.languageCode) {
-        'ru' => 'Пропустить',
-        'en' => 'Skip',
-        _ => "O'tkazib yuborish",
       };
 
   static String submitting(Locale l) => switch (l.languageCode) {

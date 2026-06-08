@@ -54,7 +54,8 @@ enum UploadCategory {
   propertyPhoto('property_photo'),
   passport('passport'),
   document('document'),
-  scan3d('scan_3d');
+  scan3d('scan_3d'),
+  scanModel('scan_model'); // teksturali USDZ 3D model
 
   const UploadCategory(this.wire);
   final String wire;

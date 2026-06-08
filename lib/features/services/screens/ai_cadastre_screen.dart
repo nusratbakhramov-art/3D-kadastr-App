@@ -7,6 +7,7 @@ import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../ai_draft_saver.dart';
 import '../api_cadastre_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../models/ai_scan_result.dart';
@@ -17,11 +18,13 @@ import 'ai_client_form_screen.dart';
 enum _LoadStatus { idle, loading, loaded, error }
 
 class AiCadastreScreen extends StatefulWidget {
-  const AiCadastreScreen({super.key, this.scan});
+  const AiCadastreScreen({super.key, this.scan, this.draftId});
 
   /// AI Baholashning 3D skan qadami natijasi (oldingi qadamdan uzatiladi).
-  /// Skan majburiy bo'lgani uchun odatda to'ldirilgan; bundle ichida saqlanadi.
   final AiScanResult? scan;
+
+  /// Skandan keyin yaratilgan DRAFT ariza id (bundle ichiga ko'chiriladi).
+  final int? draftId;
 
   @override
   State<AiCadastreScreen> createState() => _AiCadastreScreenState();
@@ -157,28 +160,16 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     }
   }
 
-  void _continue() {
+  Future<void> _continue() async {
     if (_status != _LoadStatus.loaded || _info == null) return;
     HapticFeedback.lightImpact();
-    final bundle = AiBaholashBundle(kadastr: _info!, scan: widget.scan);
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => AiClientFormScreen(bundle: bundle),
-      ),
-    );
-  }
-
-  /// Lookup natijasiz (davreest.uz topmasa) ham davom etish — kiritilgan
-  /// kadastr raqamini olib ketadi, uy maʼlumotlari boʻsh qoladi. Payment
-  /// integratsiyasi / test uchun.
-  void _skip() {
-    HapticFeedback.lightImpact();
     final bundle = AiBaholashBundle(
-      kadastr: CadastreLookupResult(
-        cadastreNumber: _cadastreController.text.trim(),
-      ),
+      kadastr: _info!,
       scan: widget.scan,
+      draftId: widget.draftId,
     );
+    await saveAiDraftStep(bundle, 'client'); // DRAFT'ni shu qadam bilan saqlash
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AiClientFormScreen(bundle: bundle),
@@ -303,30 +294,10 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          ListingCtaButton(
-                            label: _CadastreStrings.continueLabel(l),
-                            enabled: _status == _LoadStatus.loaded,
-                            onTap: _continue,
-                          ),
-                          const SizedBox(height: 4),
-                          TextButton(
-                            onPressed: _skip,
-                            child: Text(
-                              _CadastreStrings.skip(l),
-                              style: TextStyle(
-                                fontFamily: 'MTSText',
-                                fontSize: 14,
-                                color: isDark
-                                    ? Colors.white.withValues(alpha: 0.6)
-                                    : const Color(0xFF8A9097),
-                              ),
-                            ),
-                          ),
-                        ],
+                      child: ListingCtaButton(
+                        label: _CadastreStrings.continueLabel(l),
+                        enabled: _status == _LoadStatus.loaded,
+                        onTap: _continue,
                       ),
                     ),
                   ],
@@ -885,12 +856,6 @@ class _CadastreStrings {
         'ru' => 'Продолжить',
         'en' => 'Continue',
         _ => 'Davom etish',
-      };
-
-  static String skip(Locale l) => switch (l.languageCode) {
-        'ru' => 'Пропустить',
-        'en' => 'Skip',
-        _ => "O'tkazib yuborish",
       };
 
   static String helperSuffix(Locale l) => switch (l.languageCode) {

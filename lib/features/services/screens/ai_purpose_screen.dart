@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../ai_draft_saver.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/choice_tile.dart';
 import '../widgets/service_app_bar.dart';
@@ -27,9 +28,11 @@ class AiPurposeScreen extends StatefulWidget {
 class _AiPurposeScreenState extends State<AiPurposeScreen> {
   late ValuationPurpose _purpose = widget.bundle.purpose;
 
-  void _next() {
+  Future<void> _next() async {
     HapticFeedback.lightImpact();
     widget.bundle.purpose = _purpose;
+    await saveAiDraftStep(widget.bundle, 'intake'); // qadam saqlash
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AiIntakeScreen(bundle: widget.bundle),
