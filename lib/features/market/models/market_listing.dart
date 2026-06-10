@@ -35,6 +35,7 @@ class MarketListing {
     required this.district,
     required this.areaM2,
     required this.categoryId,
+    this.floor,
     this.categoryLabel,
     this.gallery = const [],
     this.description,
@@ -50,6 +51,11 @@ class MarketListing {
   final String district;
   final int areaM2;
   final String categoryId;
+
+  /// Obyekt qavati (nullable — barcha e'lonlarda bo'lavermaydi). Filtr faqat
+  /// qiymat mavjud bo'lganda qo'llanadi.
+  final int? floor;
+
   final String? categoryLabel;
 
   /// Additional images for the detail view. By convention, the primary

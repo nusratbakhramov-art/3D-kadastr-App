@@ -10,6 +10,7 @@ import 'features/home/user_profile.dart';
 import 'features/notifications/notification_model.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
+import 'features/market/data/market_regions_store.dart';
 import 'features/services/data/calculator_pricing_store.dart';
 import 'features/settings/locale_storage.dart';
 import 'features/settings/settings_state.dart';
@@ -164,6 +165,10 @@ class _AppRootState extends State<_AppRoot> {
     // yangilaymiz. Fire-and-forget — splash/bootstrap vaqtiga ta'sir qilmaydi
     // (notifier boshlang'ich qiymati = defaults, offline xavfsiz).
     unawaited(CalculatorPricingStore.instance.loadCachedThenRefresh());
+
+    // Market filtridagi tumanlar ro'yxati ham admin paneldan keladi — keshdan
+    // o'qib, fonda yangilaymiz (offline xavfsiz, default = kMarketDistricts).
+    unawaited(MarketRegionsStore.instance.loadCachedThenRefresh());
 
     // Avval saqlangan locale ni yuklab, app bo'ylab qo'llaymiz. Bu
     // localeNotifier'ni o'zgartiradi va MaterialApp rebuild bo'lib, butun

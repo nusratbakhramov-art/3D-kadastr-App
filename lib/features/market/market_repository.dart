@@ -74,6 +74,7 @@ class FakeMarketRepository implements MarketRepository {
         title: _titles[k % _titles.length],
         district: kMarketDistricts[k % kMarketDistricts.length],
         areaM2: 52 + (k % 11) * 7,
+        floor: 1 + (k % 16),
         categoryId: _categoryIds[k % _categoryIds.length],
         gallery: gallery,
         description: _descriptions[k % _descriptions.length],
