@@ -26,7 +26,9 @@ import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_architecture_order_service.dart';
 import '../../api_cadastre_service.dart';
 import '../../data/calculator_pricing_store.dart';
+import '../../data/last_customer_store.dart';
 import '../../models/calculator_pricing.dart';
+import '../../models/ai_baholash_bundle.dart' show RoomKind;
 import '../../models/architecture_order_draft.dart';
 import '../../widgets/cadastre_lookup_field.dart';
 import '../../widgets/color_palette_field.dart';
@@ -35,6 +37,7 @@ import '../../widgets/rooms_selector.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
 import '../../widgets/wizard_field.dart';
+import '../../widgets/wizard_review_section.dart';
 import 'arxitektura_tz_success_screen.dart';
 
 /// Wizard'ning ikki ish rejimi: arxitektura buyurtmasini mutaxassisga yuborish,
@@ -70,11 +73,18 @@ class ArxitekturaTzWizardScreen extends StatefulWidget {
 }
 
 class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
-  static const int _stepCount = 9;
+  // To'ldiriladigan step'lar soni (progress bar shu sonni ko'rsatadi). Oxirgi
+  // sahifa — `_previewIndex` — bu sanoqqa kirmaydigan "Tekshirish" ekrani.
+  static const int _inputStepCount = 9;
+  static const int _previewIndex = _inputStepCount; // 9
 
   late final ArchitectureOrderDraft _draft;
   late final PageController _pageController;
   int _stepIndex = 0;
+
+  // Bo'lim qalamchasi ("✎") orqali tahrirga kirilganda, "Davom etish" o'rniga
+  // "Saqlash" ko'rsatiladi va saqlangach to'g'ridan-to'g'ri Preview'ga qaytadi.
+  bool _editReturn = false;
 
   // Step 1 controllers
   late final TextEditingController _customerName;
@@ -91,6 +101,13 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   late final TextEditingController _landUsePurpose;
   // Yer maydoni o'lchov birligi: 'm2' yoki 'sotix' (1 sotix = 100 m²).
   String _landUnit = 'm2';
+  // Maqsadli foydalanish "Boshqa" tanlanganda erkin matn ko'rsatiladi.
+  bool _landUseCustom = false;
+  // "Obyekt nomi" (ixtiyoriy) — yopiq holatda; foydalanuvchi ochsa ko'rinadi.
+  bool _showObjectName = false;
+  // Obyekt turi grid'i — kalkulyatordan tanlangan bo'lsa yopiq (yashil chip),
+  // "O'zgartirish" bosilganda to'liq ro'yxat ochiladi.
+  bool _showObjectTypeGrid = false;
 
   // Step 3
   late final TextEditingController _floors;
@@ -185,7 +202,34 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     ]) {
       c.addListener(_onCtrlChanged);
     }
+
+    // Oxirgi yuborilgan buyurtmachidan to'ldirish (profilda STIR/INN va e-mail
+    // bo'lmaganda ham qaytadan yozmaslik uchun). Bo'sh maydonlarnigina to'ldiramiz.
+    _prefillFromLastCustomer();
   }
+
+  Future<void> _prefillFromLastCustomer() async {
+    final last = await const LastCustomerStore().load();
+    if (last == null || !mounted) return;
+    setState(() {
+      if (_customerName.text.trim().isEmpty && last.name.isNotEmpty) {
+        _customerName.text = last.name;
+      }
+      if (_tin.text.trim().isEmpty && last.tin.isNotEmpty) {
+        _tin.text = last.tin;
+      }
+      if (_phone.text.trim().isEmpty && last.phone.isNotEmpty) {
+        _phone.text = last.phone;
+      }
+      if (_email.text.trim().isEmpty && last.email.isNotEmpty) {
+        _email.text = last.email;
+      }
+      _prefilledFromLast = true;
+    });
+  }
+
+  // Buyurtmachi bo'limi oxirgi arizadan to'ldirilganini ko'rsatish uchun.
+  bool _prefilledFromLast = false;
 
   void _onCtrlChanged() {
     if (mounted) setState(() {});
@@ -275,12 +319,15 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
             _tinValid;
       case 2:
         return _draft.objectType != null;
+      case _previewIndex:
+        // Preview'da "Yuborish" — barcha majburiy maydonlar to'ldirilgan bo'lsin.
+        return _draft.canSubmit;
       default:
         return true;
     }
   }
 
-  bool get _isLastStep => _stepIndex == _stepCount - 1;
+  bool get _isPreview => _stepIndex == _previewIndex;
 
   void _syncDraftFromControllers() {
     _draft.customerName = _customerName.text;
@@ -315,36 +362,57 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     _draft.notes = _notes.text;
   }
 
-  Future<void> _next() async {
-    _syncDraftFromControllers();
-    if (!_canAdvance) return;
-    HapticFeedback.lightImpact();
-
-    if (_isLastStep) {
-      await _submit();
-      return;
-    }
-
-    setState(() => _stepIndex++);
+  void _animateToPage(int index) {
+    setState(() => _stepIndex = index);
     _pageController.animateToPage(
-      _stepIndex,
+      index,
       duration: const Duration(milliseconds: 240),
       curve: Curves.easeOut,
     );
   }
 
+  /// Preview'dagi qalamcha bosilganda — shu bo'lim step'iga o'tib, "Saqlash"
+  /// rejimini yoqamiz (saqlangach Preview'ga qaytadi).
+  void _editStep(int index) {
+    HapticFeedback.lightImpact();
+    setState(() => _editReturn = true);
+    _animateToPage(index);
+  }
+
+  Future<void> _next() async {
+    _syncDraftFromControllers();
+    if (!_canAdvance) return;
+    HapticFeedback.lightImpact();
+
+    // Bo'limni tahrirlash rejimida — to'g'ridan-to'g'ri Preview'ga qaytamiz.
+    if (_editReturn) {
+      setState(() => _editReturn = false);
+      _animateToPage(_previewIndex);
+      return;
+    }
+
+    if (_isPreview) {
+      await _submit();
+      return;
+    }
+
+    _animateToPage(_stepIndex + 1);
+  }
+
   void _back() {
+    // Tahrirlash rejimidan — saqlamasdan Preview'ga qaytamiz.
+    if (_editReturn) {
+      _syncDraftFromControllers();
+      setState(() => _editReturn = false);
+      _animateToPage(_previewIndex);
+      return;
+    }
     if (_stepIndex == 0) {
       Navigator.of(context).maybePop();
       return;
     }
     HapticFeedback.lightImpact();
-    setState(() => _stepIndex--);
-    _pageController.animateToPage(
-      _stepIndex,
-      duration: const Duration(milliseconds: 240),
-      curve: Curves.easeOut,
-    );
+    _animateToPage(_stepIndex - 1);
   }
 
   Future<void> _submit() async {
@@ -388,6 +456,13 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     try {
       final api = ArchitectureOrderApiService();
       final created = await api.submit(draft: _draft, token: token);
+      // Keyingi ariza uchun buyurtmachi rekvizitlarini eslab qolamiz.
+      await const LastCustomerStore().save(LastCustomer(
+        name: _draft.customerName,
+        tin: _draft.tin,
+        phone: _draft.phone,
+        email: _draft.email,
+      ));
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
@@ -450,8 +525,11 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: StepProgressBar(
-                        count: _stepCount,
-                        activeIndex: _stepIndex,
+                        count: _inputStepCount,
+                        // Preview'da barcha step'lar bajarilgan ko'rinadi.
+                        activeIndex: _isPreview
+                            ? _inputStepCount - 1
+                            : _stepIndex,
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -469,6 +547,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                           _buildStep7(l),
                           _buildStep8(l),
                           _buildStep9(l),
+                          _buildPreview(l),
                         ],
                       ),
                     ),
@@ -477,9 +556,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
                       child: ListingCtaButton(
                         label: _submitting
                             ? _Strings.submitting(l)
-                            : (_isLastStep
-                                ? (widget.submitLabel ?? _defaultSubmitLabel(l))
-                                : _Strings.continueLabel(l)),
+                            : (_editReturn
+                                ? _Strings.saveChanges(l)
+                                : (_isPreview
+                                    ? (widget.submitLabel ??
+                                        _defaultSubmitLabel(l))
+                                    : _Strings.continueLabel(l))),
                         enabled: _canAdvance && !_submitting,
                         onTap: _next,
                       ),
@@ -505,6 +587,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       6 => '7/9 — ${_Strings.crumbEngineering(l)}',
       7 => '8/9 — ${_Strings.crumbTerritory(l)}',
       8 => '9/9 — ${_Strings.crumbTimeline(l)}',
+      _previewIndex => _Strings.crumbReview(l),
       _ => '',
     };
   }
@@ -532,6 +615,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   Widget _buildStep1(Locale l) {
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.customerDetails(l)),
+      if (_prefilledFromLast) WizardPrefillHint(text: _Strings.prefilledHint(l)),
       WizardField(
         label: _Strings.customerNameLabel(l),
         controller: _customerName,
@@ -563,13 +647,17 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // ── Step 2: Obyekt va manzil ─────────────────────────────────────────
+  // Kadastr raqami birinchi — kiritilsa manzilni avtomatik to'ldiradi. Yer
+  // maydoni + o'lchov birligi bitta qatorda, maqsadli foydalanish chip orqali,
+  // ixtiyoriy "Obyekt nomi" esa pastda yopiq holatda.
   Widget _buildStep2(Locale l) {
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.objectAndAddress(l)),
-      WizardField(
-        label: _Strings.objectNameLabel(l),
-        controller: _objectName,
-        placeholder: _Strings.objectNamePlaceholder(l),
+      // Kadastr raqami — raqam kiritilsa, manzil avtomatik to'ladi.
+      CadastreLookupField(
+        controller: _cadastreNumber,
+        label: _Strings.cadastreNumberLabel(l),
+        onResult: _onCadastreResult,
       ),
       LocationPickerField(
         label: _Strings.addressLabel(l),
@@ -581,53 +669,337 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
           }
         }),
       ),
-      // Kadastr raqami — raqam kiritilsa, manzil va maydon avtomatik to'ladi.
-      CadastreLookupField(
-        controller: _cadastreNumber,
-        label: _Strings.cadastreNumberLabel(l),
-        onResult: _onCadastreResult,
-      ),
-      WizardField(
-        label: _Strings.landAreaLabel(l),
-        controller: _landArea,
-        placeholder: '500',
-        suffix: _landUnit == 'sotix' ? 'sotix' : _Strings.unitSqm(l),
-        numericOnly: true,
-        allowDecimal: true,
-      ),
-      WizardChipPicker<String>(
-        label: _Strings.landUnitLabel(l),
-        options: const ['m2', 'sotix'],
-        labelOf: (s) => s == 'sotix' ? 'sotix' : _Strings.unitSqm(l),
-        value: _landUnit,
-        onChanged: (v) => setState(() => _landUnit = v ?? 'm2'),
-      ),
-      WizardField(
-        label: _Strings.landUsePurposeLabel(l),
-        controller: _landUsePurpose,
-        placeholder: _Strings.landUsePurposePlaceholder(l),
-      ),
+      _landAreaField(l),
+      _landUsePurposeField(l),
+      _optionalObjectNameField(l),
     ]);
+  }
+
+  // Yer maydoni — son maydoni + ichki m²/sotix segmentli toggle (bitta qator).
+  Widget _landAreaField(Locale l) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final labelColor = isDark ? Colors.white : AppColors.textBlack;
+    final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final hintColor = isDark
+        ? Colors.white.withValues(alpha: 0.45)
+        : const Color(0xFFB4B9BF);
+
+    // Segmentli toggle — faqat yashil indikator suriladi (ikki alohida
+    // konteynerni qayta bo'yash "miltillash"ini oldini olish uchun).
+    const double toggleW = 122;
+    const double toggleH = 34;
+    Widget unitToggle() {
+      Widget pill(String unit, String label) {
+        final selected = _landUnit == unit;
+        return Expanded(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _landUnit = unit),
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 160),
+                style: TextStyle(
+                  fontFamily: 'MTSText',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: selected ? Colors.white : hintColor,
+                ),
+                child: Text(label),
+              ),
+            ),
+          ),
+        );
+      }
+
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        width: toggleW,
+        height: toggleH,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF15191B) : const Color(0xFFF1F2F4),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Stack(
+          children: [
+            AnimatedAlign(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              alignment: _landUnit == 'm2'
+                  ? Alignment.centerLeft
+                  : Alignment.centerRight,
+              child: Container(
+                width: (toggleW - 6) / 2,
+                height: toggleH - 6,
+                decoration: BoxDecoration(
+                  color: AppColors.splashGreen,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                pill('m2', _Strings.unitSqm(l)),
+                pill('sotix', 'sotix'),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _Strings.landAreaLabel(l),
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            height: 1.25,
+            color: labelColor,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: border),
+          ),
+          padding: const EdgeInsets.only(left: 14, right: 6),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _landArea,
+                  onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                  ],
+                  style: TextStyle(
+                    fontFamily: 'MTSText',
+                    fontSize: 14.5,
+                    color: textColor,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    hintText: '500',
+                    hintStyle: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontSize: 14.5,
+                      color: hintColor,
+                    ),
+                  ),
+                ),
+              ),
+              unitToggle(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Yerning maqsadli foydalanishi — chip tanlash, "Boshqa" erkin matn ochadi.
+  Widget _landUsePurposeField(Locale l) {
+    final labelColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : AppColors.textBlack;
+    final opts = <(String, String)>[
+      ('turar_joy', _Strings.landUseResidential(l)),
+      ('ishlab_chiqarish', _Strings.landUseProduction(l)),
+      ('savdo', _Strings.landUseCommercial(l)),
+      ('aralash', _Strings.landUseMixed(l)),
+    ];
+    final current = _landUsePurpose.text.trim();
+    String? selectedKey;
+    for (final (k, label) in opts) {
+      if (label == current) selectedKey = k;
+    }
+    final isOther =
+        _landUseCustom || (current.isNotEmpty && selectedKey == null);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _Strings.landUsePurposeLabel(l),
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            height: 1.25,
+            color: labelColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final (k, label) in opts)
+              _choiceChip(label, !isOther && selectedKey == k, () {
+                setState(() {
+                  _landUseCustom = false;
+                  _landUsePurpose.text = label;
+                });
+              }),
+            _choiceChip(_Strings.landUseOther(l), isOther, () {
+              setState(() {
+                _landUseCustom = true;
+                _landUsePurpose.text = '';
+              });
+            }),
+          ],
+        ),
+        if (isOther) ...[
+          const SizedBox(height: 12),
+          WizardField(
+            label: _Strings.landUseOther(l),
+            controller: _landUsePurpose,
+            placeholder: _Strings.landUsePurposePlaceholder(l),
+          ),
+        ],
+      ],
+    );
+  }
+
+  // Ixtiyoriy "Obyekt nomi" — yopiq holatda; matn bo'lsa avtomatik ochiq.
+  Widget _optionalObjectNameField(Locale l) {
+    final show = _showObjectName || _objectName.text.trim().isNotEmpty;
+    if (show) {
+      return WizardField(
+        label: _Strings.objectNameLabel(l),
+        controller: _objectName,
+        placeholder: _Strings.objectNamePlaceholder(l),
+      );
+    }
+    return InkWell(
+      onTap: () => setState(() => _showObjectName = true),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Row(
+          children: [
+            const Icon(Icons.add_rounded,
+                size: 18, color: AppColors.splashGreen),
+            const SizedBox(width: 6),
+            Text(
+              _Strings.addObjectNameOptional(l),
+              style: const TextStyle(
+                fontFamily: 'MTSText',
+                fontWeight: FontWeight.w600,
+                fontSize: 13.5,
+                color: AppColors.splashGreen,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Bitta tanlov chipi. `showCheck` — ko'p tanlovli (multi-select) guruhlarda
+  // tanlanganini aniqroq ko'rsatish uchun belgi qo'shadi.
+  Widget _choiceChip(String label, bool selected, VoidCallback onTap,
+      {bool showCheck = false}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final idleBorder =
+        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final idleBg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final idleText =
+        isDark ? Colors.white.withValues(alpha: 0.85) : AppColors.textBlack;
+    return Material(
+      color: selected ? AppColors.splashGreen : idleBg,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+                color: selected ? AppColors.splashGreen : idleBorder),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (showCheck && selected) ...[
+                const Icon(Icons.check, size: 15, color: Colors.white),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'MTSText',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: selected ? Colors.white : idleText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Ko'p tanlovli "xususiyatlar" guruhi — bir nechta boolean'ni alohida
+  // switch qatorlari o'rniga ixcham chip wrap sifatida ko'rsatadi.
+  Widget _featureChips(
+    String label,
+    List<(String, bool, VoidCallback)> items,
+  ) {
+    final labelColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : AppColors.textBlack;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            height: 1.25,
+            color: labelColor,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final (lbl, sel, tap) in items)
+              _choiceChip(lbl, sel, () {
+                HapticFeedback.selectionClick();
+                tap();
+              }, showCheck: true),
+          ],
+        ),
+      ],
+    );
   }
 
   // ── Step 3: Loyiha haqida ────────────────────────────────────────────
   Widget _buildStep3(Locale l) {
+    // Qurilish yili faqat rekonstruksiyada (yoki AI baholashda — mavjud
+    // bino qiymati uchun) muhim; yangi qurilishda ko'rsatilmaydi.
+    final showYear = _draft.constructionType == ConstructionType.rekonstruksiya ||
+        widget.mode == WizardMode.aiValuation;
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.projectGeneralInfo(l)),
-      WizardChipPicker<ArchObjectType>(
-        label: _Strings.objectTypeLabel(l),
-        required: true,
-        options: ArchObjectType.values,
-        labelOf: (t) => _objectTypeLabel(t, l),
-        value: _draft.objectType,
-        onChanged: (v) => setState(() => _draft.objectType = v),
-      ),
-      if (_draft.objectType == ArchObjectType.boshqa)
-        WizardField(
-          label: _Strings.objectSubtypeLabel(l),
-          controller: _objectSubtype,
-          placeholder: _Strings.objectSubtypePlaceholder(l),
-        ),
+      _objectTypePicker(l),
       WizardChipPicker<ConstructionType>(
         label: _Strings.constructionTypeLabel(l),
         options: ConstructionType.values,
@@ -661,12 +1033,13 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
           ),
         ],
       ),
-      WizardField(
-        label: _Strings.constructionYearLabel(l),
-        controller: _constructionYear,
-        placeholder: '2018',
-        numericOnly: true,
-      ),
+      if (showYear)
+        WizardField(
+          label: _Strings.constructionYearLabel(l),
+          controller: _constructionYear,
+          placeholder: '2018',
+          numericOnly: true,
+        ),
       Row(
         children: [
           Expanded(
@@ -710,6 +1083,97 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     ]);
   }
 
+  // Obyekt turi — kalkulyatordan tanlangan bo'lsa yopiq ko'rinish (yashil chip
+  // + "O'zgartirish"); aks holda (masalan AI baholash) to'liq ro'yxat ochiq.
+  Widget _objectTypePicker(Locale l) {
+    final labelColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white
+        : AppColors.textBlack;
+    final expanded = _showObjectTypeGrid || _draft.objectType == null;
+
+    Widget header() => Row(
+          children: [
+            Text(
+              _Strings.objectTypeLabel(l),
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                height: 1.25,
+                color: labelColor,
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Text('*',
+                  style: TextStyle(color: Color(0xFFE0492A), fontSize: 14)),
+            ),
+          ],
+        );
+
+    final children = <Widget>[];
+    if (expanded) {
+      children.add(WizardChipPicker<ArchObjectType>(
+        label: _Strings.objectTypeLabel(l),
+        required: true,
+        options: ArchObjectType.values,
+        labelOf: (t) => _objectTypeLabel(t, l),
+        value: _draft.objectType,
+        onChanged: (v) => setState(() {
+          _draft.objectType = v;
+          // Tanlangach yopib qo'yamiz (kompakt ko'rinishga qaytadi).
+          if (v != null) _showObjectTypeGrid = false;
+        }),
+      ));
+    } else {
+      children.add(
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            header(),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                _choiceChip(_objectTypeLabel(_draft.objectType!, l), true,
+                    () => setState(() => _showObjectTypeGrid = true)),
+                const SizedBox(width: 12),
+                InkWell(
+                  onTap: () => setState(() => _showObjectTypeGrid = true),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 4, vertical: 6),
+                    child: Text(
+                      _Strings.changeLabel(l),
+                      style: const TextStyle(
+                        fontFamily: 'MTSText',
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13.5,
+                        color: AppColors.splashGreen,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+    if (_draft.objectType == ArchObjectType.boshqa) {
+      children.add(const SizedBox(height: 14));
+      children.add(WizardField(
+        label: _Strings.objectSubtypeLabel(l),
+        controller: _objectSubtype,
+        placeholder: _Strings.objectSubtypePlaceholder(l),
+      ));
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: children,
+    );
+  }
+
   // ── Step 4: Xonalar tarkibi ──────────────────────────────────────────
   Widget _buildStep4(Locale l) {
     return _scrollableStep([
@@ -734,6 +1198,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     final facadeOpts = _catalog('arxitektura.facade_material');
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.architectureAndDesign(l)),
+      _OptionalStepHint(text: _Strings.designOptionalHint(l)),
       WizardChipPicker<String>(
         label: _Strings.styleLabel(l),
         options: [for (final o in styleOpts) o.value],
@@ -749,17 +1214,19 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         onChanged: (v) =>
             setState(() => _draft.architecture.facadeMaterial = v),
       ),
-      ColorPaletteField(
-        label: _Strings.colorsLabel(l),
-        value: _draft.architecture.colors,
-        onChanged: (v) =>
-            _draft.architecture.colors = v.trim().isEmpty ? null : v.trim(),
-      ),
+      // 3D vizualizatsiya — narx/ko'lamga ta'sir qiladigan yagona tanlov;
+      // rang panelidan past ko'milib qolmasligi uchun yuqorida.
       WizardSwitchTile(
         label: _Strings.need3dVisualization(l),
         value: _draft.architecture.has3dVisualization,
         onChanged: (v) =>
             setState(() => _draft.architecture.has3dVisualization = v),
+      ),
+      ColorPaletteField(
+        label: _Strings.colorsLabel(l),
+        value: _draft.architecture.colors,
+        onChanged: (v) =>
+            _draft.architecture.colors = v.trim().isEmpty ? null : v.trim(),
       ),
     ]);
   }
@@ -768,6 +1235,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   Widget _buildStep6(Locale l) {
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.constructiveSolutions(l)),
+      _OptionalStepHint(text: _Strings.technicalOptionalHint(l)),
       WizardChipPicker<String>(
         label: _Strings.constructiveSchemeLabel(l),
         options: const ['karkas', 'monolit', 'gisht', 'aralash', 'metall'],
@@ -838,13 +1306,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   // ── Step 7: Muhandislik tizimlari ────────────────────────────────────
   Widget _buildStep7(Locale l) {
+    final eng = _draft.engineering;
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.engineeringSystems(l)),
-      WizardSwitchTile(
-        label: _Strings.backupGenerator(l),
-        value: _draft.engineering.hasGenerator,
-        onChanged: (v) => setState(() => _draft.engineering.hasGenerator = v),
-      ),
+      _OptionalStepHint(text: _Strings.technicalOptionalHint(l)),
       WizardChipPicker<String>(
         label: _Strings.waterSourceLabel(l),
         options: const ['markaziy', 'quduq'],
@@ -895,67 +1360,72 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         onChanged: (v) =>
             setState(() => _draft.engineering.airConditioning = v),
       ),
-      WizardSwitchTile(
-        label: _Strings.fireSafetySystem(l),
-        value: _draft.engineering.hasFireSystem,
-        onChanged: (v) => setState(() => _draft.engineering.hasFireSystem = v),
-      ),
-      WizardSwitchTile(
-        label: _Strings.alarmSystem(l),
-        value: _draft.engineering.hasAlarm,
-        onChanged: (v) => setState(() => _draft.engineering.hasAlarm = v),
-      ),
-      WizardSwitchTile(
-        label: _Strings.videoSurveillance(l),
-        value: _draft.engineering.hasVideoSurveillance,
-        onChanged: (v) =>
-            setState(() => _draft.engineering.hasVideoSurveillance = v),
-      ),
-      WizardSwitchTile(
-        label: _Strings.solarPanels(l),
-        value: _draft.engineering.hasSolarPanels,
-        onChanged: (v) =>
-            setState(() => _draft.engineering.hasSolarPanels = v),
-      ),
+      _featureChips(_Strings.extraSystemsLabel(l), [
+        (
+          _Strings.backupGenerator(l),
+          eng.hasGenerator,
+          () => setState(() => eng.hasGenerator = !eng.hasGenerator)
+        ),
+        (
+          _Strings.fireSafetySystem(l),
+          eng.hasFireSystem,
+          () => setState(() => eng.hasFireSystem = !eng.hasFireSystem)
+        ),
+        (
+          _Strings.alarmSystem(l),
+          eng.hasAlarm,
+          () => setState(() => eng.hasAlarm = !eng.hasAlarm)
+        ),
+        (
+          _Strings.videoSurveillance(l),
+          eng.hasVideoSurveillance,
+          () => setState(() => eng.hasVideoSurveillance = !eng.hasVideoSurveillance)
+        ),
+        (
+          _Strings.solarPanels(l),
+          eng.hasSolarPanels,
+          () => setState(() => eng.hasSolarPanels = !eng.hasSolarPanels)
+        ),
+      ]),
     ]);
   }
 
   // ── Step 8: Hudud rejalashtirish ─────────────────────────────────────
   Widget _buildStep8(Locale l) {
+    final t = _draft.territory;
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.territoryPlanning(l)),
-      WizardSwitchTile(
-        label: _Strings.parking(l),
-        value: _draft.territory.hasParking,
-        onChanged: (v) => setState(() => _draft.territory.hasParking = v),
-      ),
-      if (_draft.territory.hasParking)
+      _OptionalStepHint(text: _Strings.designOptionalHint(l)),
+      _featureChips(_Strings.territoryFeaturesLabel(l), [
+        (
+          _Strings.parking(l),
+          t.hasParking,
+          () => setState(() => t.hasParking = !t.hasParking)
+        ),
+        (
+          _Strings.walkways(l),
+          t.hasPaths,
+          () => setState(() => t.hasPaths = !t.hasPaths)
+        ),
+        (
+          _Strings.landscapeDesign(l),
+          t.hasLandscape,
+          () => setState(() => t.hasLandscape = !t.hasLandscape)
+        ),
+        (_Strings.pool(l), t.hasPool, () => setState(() => t.hasPool = !t.hasPool)),
+        (
+          _Strings.territoryLighting(l),
+          t.hasLighting,
+          () => setState(() => t.hasLighting = !t.hasLighting)
+        ),
+      ]),
+      if (t.hasParking)
         WizardField(
           label: _Strings.parkingSpacesLabel(l),
           controller: _parkingCount,
           placeholder: '4',
           numericOnly: true,
         ),
-      WizardSwitchTile(
-        label: _Strings.walkways(l),
-        value: _draft.territory.hasPaths,
-        onChanged: (v) => setState(() => _draft.territory.hasPaths = v),
-      ),
-      WizardSwitchTile(
-        label: _Strings.landscapeDesign(l),
-        value: _draft.territory.hasLandscape,
-        onChanged: (v) => setState(() => _draft.territory.hasLandscape = v),
-      ),
-      WizardSwitchTile(
-        label: _Strings.pool(l),
-        value: _draft.territory.hasPool,
-        onChanged: (v) => setState(() => _draft.territory.hasPool = v),
-      ),
-      WizardSwitchTile(
-        label: _Strings.territoryLighting(l),
-        value: _draft.territory.hasLighting,
-        onChanged: (v) => setState(() => _draft.territory.hasLighting = v),
-      ),
     ]);
   }
 
@@ -995,6 +1465,265 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         maxLines: 5,
       ),
     ]);
+  }
+
+  // ── Preview / Tekshirish ─────────────────────────────────────────────
+  // Yuborishdan oldin to'ldirilgan ma'lumotlarning umumiy ko'rinishi. Har
+  // bo'lim qalamcha ("✎") orqali to'g'ridan-to'g'ri tahrirga ochiladi va
+  // saqlangach shu yerga qaytadi (foydalanuvchi qaytadan o'tib chiqmaydi).
+  Widget _buildPreview(Locale l) {
+    final d = _draft;
+    final styleOpts = _catalog('arxitektura.style');
+    final facadeOpts = _catalog('arxitektura.facade_material');
+
+    String c(String? v, String Function(String) f) =>
+        (v == null || v.isEmpty) ? '' : f(v);
+
+    // Step 0 — Buyurtmachi
+    final customer = <(String, String)>[
+      (_Strings.customerNameLabel(l), d.customerName.trim()),
+      if (d.tin.trim().isNotEmpty) (_Strings.tinLabel(l), d.tin.trim()),
+      (_Strings.phoneLabel(l), d.phone.trim()),
+      if (d.email.trim().isNotEmpty) ('E-mail', d.email.trim()),
+    ];
+
+    // Step 1 — Obyekt va manzil
+    final object = <(String, String)>[
+      if (d.objectName.trim().isNotEmpty)
+        (_Strings.objectNameLabel(l), d.objectName.trim()),
+      if (d.address.trim().isNotEmpty)
+        (_Strings.addressLabel(l), d.address.trim()),
+      if (d.cadastreNumber.trim().isNotEmpty)
+        (_Strings.cadastreNumberLabel(l), d.cadastreNumber.trim()),
+      if (d.landAreaSqm != null)
+        (_Strings.landAreaLabel(l), '${_trimNum(d.landAreaSqm!)} ${_Strings.unitSqm(l)}'),
+      if (d.landUsePurpose.trim().isNotEmpty)
+        (_Strings.landUsePurposeLabel(l), d.landUsePurpose.trim()),
+    ];
+
+    // Step 2 — Loyiha
+    final project = <(String, String)>[
+      if (d.objectType != null)
+        (_Strings.objectTypeLabel(l), _objectTypeLabel(d.objectType!, l)),
+      (
+        _Strings.constructionTypeLabel(l),
+        d.constructionType == ConstructionType.yangi
+            ? _Strings.constructionNew(l)
+            : _Strings.constructionReconstruction(l)
+      ),
+      if (d.floors != null) (_Strings.floorsCountLabel(l), '${d.floors}'),
+      if (d.maxHeightM != null)
+        (_Strings.maxHeightLabel(l), '${_trimNum(d.maxHeightM!)} ${_Strings.unitM(l)}'),
+      if (d.constructionYear != null)
+        (_Strings.constructionYearLabel(l), '${d.constructionYear}'),
+      if (d.totalAreaSqm != null)
+        (_Strings.totalAreaLabel(l), '${_trimNum(d.totalAreaSqm!)} ${_Strings.unitSqm(l)}'),
+      if (d.buildingAreaSqm != null)
+        (_Strings.buildingAreaLabel(l), '${_trimNum(d.buildingAreaSqm!)} ${_Strings.unitSqm(l)}'),
+    ];
+    final projectChips = <String>[
+      if (d.hasBasement) _Strings.hasBasement(l),
+      if (d.hasMansard) _Strings.hasMansard(l),
+      if (d.hasUndergroundParking) _Strings.hasUndergroundParking(l),
+    ];
+
+    // Step 3 — Xonalar
+    final roomChips = [
+      for (final r in d.rooms)
+        '${r.kind == RoomKind.other ? (r.name?.trim().isNotEmpty ?? false ? r.name!.trim() : r.kind.label(l)) : r.kind.label(l)}'
+            ' ×${r.count}${r.area != null ? ' · ${_trimNum(r.area!)} ${_Strings.unitSqm(l)}' : ''}',
+    ];
+
+    // Step 4 — Arxitektura yechimlari
+    final arch = <(String, String)>[
+      if (d.architecture.style != null)
+        (_Strings.styleLabel(l), _catalogLabel(styleOpts, d.architecture.style, l)),
+      if (d.architecture.facadeMaterial != null)
+        (
+          _Strings.facadeMaterialLabel(l),
+          _catalogLabel(facadeOpts, d.architecture.facadeMaterial, l)
+        ),
+      if ((d.architecture.colors ?? '').trim().isNotEmpty)
+        (_Strings.colorsLabel(l), d.architecture.colors!.trim()),
+    ];
+    final archChips = <String>[
+      if (d.architecture.has3dVisualization) _Strings.need3dVisualization(l),
+    ];
+
+    // Step 5 — Konstruktiv
+    final constructive = <(String, String)>[
+      if (d.constructive.scheme != null)
+        (_Strings.constructiveSchemeLabel(l), c(d.constructive.scheme, (s) => switch (s) {
+              'karkas' => _Strings.schemeFrame(l),
+              'monolit' => _Strings.schemeMonolith(l),
+              'gisht' => _Strings.materialBrick(l),
+              'aralash' => _Strings.schemeMixed(l),
+              'metall' => _Strings.materialMetal(l),
+              _ => s,
+            })),
+      if (d.constructive.foundation != null)
+        (_Strings.foundationLabel(l), c(d.constructive.foundation, (s) => switch (s) {
+              'ustun' => _Strings.foundationColumn(l),
+              'lenta' => _Strings.foundationStrip(l),
+              'plita' => _Strings.foundationSlab(l),
+              'svay' => _Strings.foundationPile(l),
+              _ => s,
+            })),
+      if (d.constructive.walls != null)
+        (_Strings.wallMaterialLabel(l), c(d.constructive.walls, (s) => switch (s) {
+              'gisht' => _Strings.materialBrick(l),
+              'gazoblok' => _Strings.materialAerocrete(l),
+              'beton' => _Strings.materialConcrete(l),
+              'sendvich_panel' => _Strings.materialSandwichPanel(l),
+              _ => s,
+            })),
+      if (d.constructive.ceiling != null)
+        (_Strings.ceilingLabel(l), c(d.constructive.ceiling, (s) => switch (s) {
+              'temir_beton' => _Strings.ceilingReinforcedConcrete(l),
+              'yogoch' => _Strings.materialWood(l),
+              'metall' => _Strings.materialMetal(l),
+              _ => s,
+            })),
+      if (d.constructive.roofType != null)
+        (_Strings.roofTypeLabel(l), d.constructive.roofType == 'yassi'
+            ? _Strings.roofFlat(l)
+            : _Strings.roofPitched(l)),
+      if ((d.constructive.roofMaterial ?? '').trim().isNotEmpty)
+        (_Strings.roofMaterialLabel(l), d.constructive.roofMaterial!.trim()),
+    ];
+
+    // Step 6 — Muhandislik
+    final eng = <(String, String)>[
+      if (d.engineering.waterSource != null)
+        (_Strings.waterSourceLabel(l), d.engineering.waterSource == 'markaziy'
+            ? _Strings.central(l)
+            : _Strings.well(l)),
+      if (d.engineering.sewage != null)
+        (_Strings.sewageLabel(l), d.engineering.sewage == 'markaziy'
+            ? _Strings.central(l)
+            : _Strings.septic(l)),
+      if (d.engineering.heating != null)
+        (_Strings.heatingLabel(l), c(d.engineering.heating, (s) => switch (s) {
+              'gaz' => _Strings.heatingGas(l),
+              'elektr' => _Strings.heatingElectric(l),
+              'qozonxona' => _Strings.heatingBoiler(l),
+              _ => s,
+            })),
+      if (d.engineering.ventilation != null)
+        (_Strings.ventilationLabel(l), d.engineering.ventilation == 'tabiiy'
+            ? _Strings.ventilationNatural(l)
+            : _Strings.ventilationMechanical(l)),
+      if (d.engineering.airConditioning != null)
+        (_Strings.airConditioningLabel(l), d.engineering.airConditioning!.toUpperCase()),
+    ];
+    final engChips = <String>[
+      if (d.engineering.hasGenerator) _Strings.backupGenerator(l),
+      if (d.engineering.hasFireSystem) _Strings.fireSafetySystem(l),
+      if (d.engineering.hasAlarm) _Strings.alarmSystem(l),
+      if (d.engineering.hasVideoSurveillance) _Strings.videoSurveillance(l),
+      if (d.engineering.hasSolarPanels) _Strings.solarPanels(l),
+    ];
+
+    // Step 7 — Hudud
+    final territoryChips = <String>[
+      if (d.territory.hasParking)
+        '${_Strings.parking(l)}${d.territory.parkingCount != null ? ' ×${d.territory.parkingCount}' : ''}',
+      if (d.territory.hasPaths) _Strings.walkways(l),
+      if (d.territory.hasLandscape) _Strings.landscapeDesign(l),
+      if (d.territory.hasPool) _Strings.pool(l),
+      if (d.territory.hasLighting) _Strings.territoryLighting(l),
+    ];
+
+    // Step 8 — Muddatlar va izoh
+    final timeline = <(String, String)>[
+      if (d.timeline.sketchDays != null)
+        (_Strings.sketchProjectLabel(l), '${d.timeline.sketchDays} ${_Strings.unitDays(l)}'),
+      if (d.timeline.workingDays != null)
+        (_Strings.workingProjectLabel(l), '${d.timeline.workingDays} ${_Strings.unitDays(l)}'),
+      if (d.notes.trim().isNotEmpty) (_Strings.notesLabel(l), d.notes.trim()),
+    ];
+
+    final missingRequired = !d.canSubmit;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      children: [
+        Text(
+          _Strings.reviewIntro(l),
+          style: TextStyle(
+            fontFamily: 'MTSText',
+            fontSize: 13,
+            color: Theme.of(context).brightness == Brightness.dark
+                ? const Color(0xFF9BA1A6)
+                : const Color(0xFF6C7278),
+          ),
+        ),
+        const SizedBox(height: 14),
+        WizardReviewSection(
+          title: _Strings.customerDetails(l),
+          onEdit: () => _editStep(0),
+          rows: customer,
+          warning: (d.customerName.trim().length < 2 || d.phone.trim().length < 5)
+              ? _Strings.fillRequired(l)
+              : null,
+        ),
+        WizardReviewSection(
+          title: _Strings.objectAndAddress(l),
+          onEdit: () => _editStep(1),
+          rows: object,
+        ),
+        WizardReviewSection(
+          title: _Strings.projectGeneralInfo(l),
+          onEdit: () => _editStep(2),
+          rows: project,
+          chips: projectChips,
+          warning: d.objectType == null ? _Strings.fillRequired(l) : null,
+        ),
+        WizardReviewSection(
+          title: _Strings.roomsComposition(l),
+          onEdit: () => _editStep(3),
+          chips: roomChips,
+        ),
+        WizardReviewSection(
+          title: _Strings.architectureAndDesign(l),
+          onEdit: () => _editStep(4),
+          rows: arch,
+          chips: archChips,
+        ),
+        WizardReviewSection(
+          title: _Strings.constructiveSolutions(l),
+          onEdit: () => _editStep(5),
+          rows: constructive,
+        ),
+        WizardReviewSection(
+          title: _Strings.engineeringSystems(l),
+          onEdit: () => _editStep(6),
+          rows: eng,
+          chips: engChips,
+        ),
+        WizardReviewSection(
+          title: _Strings.territoryPlanning(l),
+          onEdit: () => _editStep(7),
+          chips: territoryChips,
+        ),
+        WizardReviewSection(
+          title: _Strings.timelines(l),
+          onEdit: () => _editStep(8),
+          rows: timeline,
+        ),
+        if (missingRequired) ...[
+          const SizedBox(height: 4),
+          Text(
+            _Strings.fillRequired(l),
+            style: const TextStyle(
+              fontFamily: 'MTSText',
+              fontSize: 12.5,
+              color: Color(0xFFE0492A),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────
@@ -1065,6 +1794,31 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
 }
 
+// Bo'lim ixtiyoriy ekanini bildiruvchi yumshoq izoh (majburiy emas — to'ldirsa
+// bo'ladi, bo'lmasa davom etish mumkin).
+class _OptionalStepHint extends StatelessWidget {
+  const _OptionalStepHint({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+    return Row(
+      children: [
+        Icon(Icons.info_outline_rounded, size: 15, color: muted),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontFamily: 'MTSText', fontSize: 12.5, color: muted),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Localized UI strings ────────────────────────────────────────────────
 class _Strings {
   const _Strings._();
@@ -1080,6 +1834,32 @@ class _Strings {
         'ru' => 'Отправка…',
         'en' => 'Submitting…',
         _ => 'Yuborilmoqda…',
+      };
+
+  static String saveChanges(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сохранить',
+        'en' => 'Save',
+        _ => 'Saqlash',
+      };
+
+  static String prefilledHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Заполнено по последней заявке — можно изменить',
+        'en' => 'Filled from your last order — you can edit it',
+        _ => 'Oxirgi arizangizdan to\'ldirildi — o\'zgartirsangiz bo\'ladi',
+      };
+
+  static String crumbReview(Locale l) => switch (l.languageCode) {
+        'ru' => 'Проверка и отправка',
+        'en' => 'Review and submit',
+        _ => 'Tekshirish va yuborish',
+      };
+
+  static String reviewIntro(Locale l) => switch (l.languageCode) {
+        'ru' =>
+          'Проверьте данные перед отправкой. Нажмите ✎, чтобы изменить раздел.',
+        'en' => 'Check the details before submitting. Tap ✎ to edit a section.',
+        _ =>
+          'Yuborishdan oldin ma\'lumotlarni tekshiring. Bo\'limni o\'zgartirish uchun ✎ ni bosing.',
       };
 
   static String submit(Locale l) => switch (l.languageCode) {
@@ -1247,12 +2027,6 @@ class _Strings {
         _ => 'Manzil',
       };
 
-  static String landUnitLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Единица измерения',
-        'en' => 'Unit',
-        _ => 'O\'lchov birligi',
-      };
-
   static String cadastreNumberLabel(Locale l) => switch (l.languageCode) {
         'ru' => 'Кадастровый номер',
         'en' => 'Cadastre number',
@@ -1273,9 +2047,75 @@ class _Strings {
 
   static String landUsePurposePlaceholder(Locale l) =>
       switch (l.languageCode) {
-        'ru' => 'жилая / производственная',
-        'en' => 'residential / production',
-        _ => 'turar joy / ishlab chiqarish',
+        'ru' => 'Например: садоводство',
+        'en' => 'E.g. gardening',
+        _ => 'Masalan: bog\'dorchilik',
+      };
+
+  static String landUseResidential(Locale l) => switch (l.languageCode) {
+        'ru' => 'Жилая',
+        'en' => 'Residential',
+        _ => 'Turar joy',
+      };
+
+  static String landUseProduction(Locale l) => switch (l.languageCode) {
+        'ru' => 'Производственная',
+        'en' => 'Production',
+        _ => 'Ishlab chiqarish',
+      };
+
+  static String landUseCommercial(Locale l) => switch (l.languageCode) {
+        'ru' => 'Торговая',
+        'en' => 'Commercial',
+        _ => 'Savdo',
+      };
+
+  static String landUseMixed(Locale l) => switch (l.languageCode) {
+        'ru' => 'Смешанная',
+        'en' => 'Mixed',
+        _ => 'Aralash',
+      };
+
+  static String landUseOther(Locale l) => switch (l.languageCode) {
+        'ru' => 'Другое',
+        'en' => 'Other',
+        _ => 'Boshqa',
+      };
+
+  static String designOptionalHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Необязательно — заполните, если есть пожелания',
+        'en' => 'Optional — fill in if you have preferences',
+        _ => 'Ixtiyoriy — afzalliklaringiz bo\'lsa to\'ldiring',
+      };
+
+  static String technicalOptionalHint(Locale l) => switch (l.languageCode) {
+        'ru' => 'Необязательно — заполните, если знаете (иначе решит архитектор)',
+        'en' => 'Optional — fill in if you know (the architect decides otherwise)',
+        _ => 'Ixtiyoriy — agar bilsangiz to\'ldiring (aks holda arxitektor hal qiladi)',
+      };
+
+  static String extraSystemsLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Дополнительные системы',
+        'en' => 'Additional systems',
+        _ => 'Qo\'shimcha tizimlar',
+      };
+
+  static String territoryFeaturesLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Что разместить на участке',
+        'en' => 'What to include on the plot',
+        _ => 'Hududda nimalar bo\'lsin',
+      };
+
+  static String changeLabel(Locale l) => switch (l.languageCode) {
+        'ru' => 'Изменить',
+        'en' => 'Change',
+        _ => 'O\'zgartirish',
+      };
+
+  static String addObjectNameOptional(Locale l) => switch (l.languageCode) {
+        'ru' => 'Добавить название объекта (необязательно)',
+        'en' => 'Add object name (optional)',
+        _ => 'Obyekt nomi qo\'shish (ixtiyoriy)',
       };
 
   // Step 3 — Project

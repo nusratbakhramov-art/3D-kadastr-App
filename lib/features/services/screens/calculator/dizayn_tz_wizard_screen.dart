@@ -24,6 +24,7 @@ import '../../../settings/settings_state.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_design_order_service.dart';
 import '../../data/calculator_pricing_store.dart';
+import '../../data/last_customer_store.dart';
 import '../../models/calculator_pricing.dart';
 import '../../models/design_order_draft.dart';
 import '../../widgets/service_app_bar.dart';
@@ -31,6 +32,7 @@ import '../../widgets/step_progress_bar.dart';
 import '../../widgets/color_palette_field.dart';
 import '../../widgets/location_picker_field.dart';
 import '../../widgets/wizard_field.dart';
+import '../../widgets/wizard_review_section.dart';
 import 'arxitektura_tz_success_screen.dart';
 
 class DizaynTzWizardScreen extends StatefulWidget {
@@ -44,11 +46,18 @@ class DizaynTzWizardScreen extends StatefulWidget {
 }
 
 class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
-  static const int _stepCount = 7;
+  static const int _inputStepCount = 7;
+  static const int _previewIndex = _inputStepCount; // 7
 
   late final DizaynOrderDraft _draft;
   late final PageController _pageController;
   int _stepIndex = 0;
+
+  // Bo'lim qalamchasi orqali tahrirga kirilganda — "Davom etish" o'rniga
+  // "Saqlash" va saqlangach to'g'ridan-to'g'ri Preview'ga qaytadi.
+  bool _editReturn = false;
+  // Buyurtmachi bo'limi oxirgi arizadan to'ldirilganini ko'rsatish uchun.
+  bool _prefilledFromLast = false;
 
   // Step 1 controllers
   late final TextEditingController _customerName;
@@ -138,6 +147,29 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     for (final c in _gating) {
       c.addListener(_onCtrlChanged);
     }
+
+    // Oxirgi yuborilgan buyurtmachidan to'ldirish (faqat bo'sh maydonlar).
+    _prefillFromLastCustomer();
+  }
+
+  Future<void> _prefillFromLastCustomer() async {
+    final last = await const LastCustomerStore().load();
+    if (last == null || !mounted) return;
+    setState(() {
+      if (_customerName.text.trim().isEmpty && last.name.isNotEmpty) {
+        _customerName.text = last.name;
+      }
+      if (_tin.text.trim().isEmpty && last.tin.isNotEmpty) {
+        _tin.text = last.tin;
+      }
+      if (_phone.text.trim().isEmpty && last.phone.isNotEmpty) {
+        _phone.text = last.phone;
+      }
+      if (_email.text.trim().isEmpty && last.email.isNotEmpty) {
+        _email.text = last.email;
+      }
+      _prefilledFromLast = true;
+    });
   }
 
   void _onCtrlChanged() {
@@ -190,12 +222,14 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
             _tinValid;
       case 1:
         return _draft.objectType != null;
+      case _previewIndex:
+        return _draft.canSubmit;
       default:
         return true;
     }
   }
 
-  bool get _isLastStep => _stepIndex == _stepCount - 1;
+  bool get _isPreview => _stepIndex == _previewIndex;
 
   void _syncDraftFromControllers() {
     _draft.customerName = _customerName.text;
@@ -223,36 +257,54 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     _draft.notes = _notes.text;
   }
 
-  Future<void> _next() async {
-    _syncDraftFromControllers();
-    if (!_canAdvance) return;
-    HapticFeedback.lightImpact();
-
-    if (_isLastStep) {
-      await _submit();
-      return;
-    }
-
-    setState(() => _stepIndex++);
+  void _animateToPage(int index) {
+    setState(() => _stepIndex = index);
     _pageController.animateToPage(
-      _stepIndex,
+      index,
       duration: const Duration(milliseconds: 240),
       curve: Curves.easeOut,
     );
   }
 
+  /// Preview'dagi qalamcha bosilganda — shu bo'lim step'iga "Saqlash" rejimida.
+  void _editStep(int index) {
+    HapticFeedback.lightImpact();
+    setState(() => _editReturn = true);
+    _animateToPage(index);
+  }
+
+  Future<void> _next() async {
+    _syncDraftFromControllers();
+    if (!_canAdvance) return;
+    HapticFeedback.lightImpact();
+
+    if (_editReturn) {
+      setState(() => _editReturn = false);
+      _animateToPage(_previewIndex);
+      return;
+    }
+
+    if (_isPreview) {
+      await _submit();
+      return;
+    }
+
+    _animateToPage(_stepIndex + 1);
+  }
+
   void _back() {
+    if (_editReturn) {
+      _syncDraftFromControllers();
+      setState(() => _editReturn = false);
+      _animateToPage(_previewIndex);
+      return;
+    }
     if (_stepIndex == 0) {
       Navigator.of(context).maybePop();
       return;
     }
     HapticFeedback.lightImpact();
-    setState(() => _stepIndex--);
-    _pageController.animateToPage(
-      _stepIndex,
-      duration: const Duration(milliseconds: 240),
-      curve: Curves.easeOut,
-    );
+    _animateToPage(_stepIndex - 1);
   }
 
   Locale get _locale =>
@@ -290,6 +342,13 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     final api = DesignOrderApiService();
     try {
       final created = await api.submit(draft: _draft, token: token);
+      // Keyingi ariza uchun buyurtmachi rekvizitlarini eslab qolamiz.
+      await const LastCustomerStore().save(LastCustomer(
+        name: _draft.customerName,
+        tin: _draft.tin,
+        phone: _draft.phone,
+        email: _draft.email,
+      ));
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
@@ -352,8 +411,9 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
                       child: StepProgressBar(
-                        count: _stepCount,
-                        activeIndex: _stepIndex,
+                        count: _inputStepCount,
+                        activeIndex:
+                            _isPreview ? _inputStepCount - 1 : _stepIndex,
                       ),
                     ),
                     Expanded(
@@ -368,6 +428,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
                           _buildStep5(),
                           _buildStep6(),
                           _buildStep7(),
+                          _buildPreview(s),
                         ],
                       ),
                     ),
@@ -376,7 +437,9 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
                       child: ListingCtaButton(
                         label: _submitting
                             ? s.submitting
-                            : (_isLastStep ? s.submit : s.continueLabel),
+                            : (_editReturn
+                                ? s.saveChanges
+                                : (_isPreview ? s.submit : s.continueLabel)),
                         enabled: _canAdvance && !_submitting,
                         onTap: _next,
                       ),
@@ -400,6 +463,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
       4 => '5/7 — ${s.crumbEngineering}',
       5 => '6/7 — ${s.crumbExterior}',
       6 => '7/7 — ${s.crumbTimeline}',
+      _previewIndex => s.crumbReview,
       _ => '',
     };
   }
@@ -418,6 +482,7 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     final s = _Strings(_locale);
     return _scrollableStep([
       WizardSectionTitle(text: s.customerDetails),
+      if (_prefilledFromLast) WizardPrefillHint(text: s.prefilledHint),
       WizardField(
         label: s.fullNameOrCompany,
         controller: _customerName,
@@ -823,6 +888,189 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     ]);
   }
 
+  // ── Preview / Tekshirish ─────────────────────────────────────────────
+  // Yuborishdan oldin to'ldirilgan ma'lumotlarning umumiy ko'rinishi. Har
+  // bo'lim qalamcha ("✎") orqali to'g'ridan-to'g'ri tahrirga ochiladi.
+  Widget _buildPreview(_Strings s) {
+    final d = _draft;
+    final interiorStyleOpts = _catalog('dizayn.interior.style');
+    final interiorMatOpts = _catalog('dizayn.interior.material');
+    final floorMatOpts = _catalog('dizayn.floor_material');
+    final exteriorStyleOpts = _catalog('dizayn.exterior.style');
+    final exteriorMatOpts = _catalog('dizayn.exterior.material');
+
+    String num(double? v) =>
+        v == null ? '' : (v == v.roundToDouble() ? v.toInt().toString() : '$v');
+
+    // Step 0 — Buyurtmachi
+    final customer = <(String, String)>[
+      (s.fullNameOrCompany, d.customerName.trim()),
+      if (d.tin.trim().isNotEmpty) ('STIR / INN', d.tin.trim()),
+      (s.phone, d.phone.trim()),
+      if (d.email.trim().isNotEmpty) ('E-mail', d.email.trim()),
+    ];
+
+    // Step 1 — Obyekt va o'lchamlar
+    final object = <(String, String)>[
+      if (d.objectName.trim().isNotEmpty) (s.objectName, d.objectName.trim()),
+      if (d.address.trim().isNotEmpty) (s.address, d.address.trim()),
+      if (d.objectType != null) (s.objectType, _objectTypeLabel(d.objectType!, s)),
+      (
+        s.designType,
+        d.designType == DizDesignType.yangi ? s.designNew : s.designReconstruction
+      ),
+      if (d.floors != null) (s.floorsCount, '${d.floors}'),
+      if (d.roomsCount != null) (s.roomsCount, '${d.roomsCount}'),
+      if (d.totalAreaSqm != null) (s.totalArea, '${num(d.totalAreaSqm)} m²'),
+      if (d.interiorAreaSqm != null) (s.interiorArea, '${num(d.interiorAreaSqm)} m²'),
+      if (d.designAreaSqm != null) (s.designArea, '${num(d.designAreaSqm)} m²'),
+      if (d.ceilingHeightM != null) (s.ceilingHeight, '${num(d.ceilingHeightM)} m'),
+    ];
+    final objectChips = <String>[
+      if (d.hasBasement) s.hasBasement,
+      if (d.hasMansard) s.hasMansard,
+    ];
+
+    // Step 2 — Qo'shimcha xonalar
+    final extra = <(String, String)>[
+      if (d.extraRooms.trim().isNotEmpty) (s.extraRoomsLabel, d.extraRooms.trim()),
+    ];
+
+    // Step 3 — Interyer
+    final interior = <(String, String)>[
+      if (d.interior.style != null)
+        (s.style, _catalogLabel(interiorStyleOpts, d.interior.style)),
+      if (d.interior.interiorMaterial != null)
+        (s.interiorMaterial,
+            _catalogLabel(interiorMatOpts, d.interior.interiorMaterial)),
+      if (d.interior.floorMaterial != null)
+        (s.floorMaterial, _catalogLabel(floorMatOpts, d.interior.floorMaterial)),
+      if ((d.interior.colors ?? '').trim().isNotEmpty)
+        (s.colors, d.interior.colors!.trim()),
+    ];
+    final interiorChips = <String>[
+      if (d.interior.has3dVisualization) s.need3dVisualization,
+      if (d.interior.hasWorkingDrawings) s.projectWorkingDrawings,
+      if (d.interior.hasAuthorSupervision) s.authorSupervision,
+    ];
+
+    // Step 4 — Muhandislik
+    final engineering = <(String, String)>[
+      if (d.engineering.partitionMaterial != null)
+        (s.partitionLabel, s.materialLabel(d.engineering.partitionMaterial!)),
+      if (d.engineering.airConditioning != null)
+        (s.airConditioning, s.acLabel(d.engineering.airConditioning!)),
+    ];
+    final engineeringChips = <String>[
+      if (d.engineering.hasElectricalDrawings) s.electricalDrawings,
+      if (d.engineering.hasPlumbingDrawings) s.plumbingDrawings,
+      if (d.engineering.hasDemolitionPlan) s.demolitionPlan,
+      if (d.engineering.hasMontagePlan) s.montagePlan,
+      if (d.engineering.hasGypsumPlan) s.gypsumPlan,
+      if (d.engineering.hasFireSystem) s.fireSystem,
+      if (d.engineering.hasVideoSurveillance) s.videoSurveillance,
+      if (d.engineering.hasFurnitureLayout) s.furnitureLayout,
+    ];
+
+    // Step 5 — Eksteryer
+    final exterior = <(String, String)>[
+      if (d.exterior.style != null)
+        (s.style, _catalogLabel(exteriorStyleOpts, d.exterior.style)),
+      if (d.exterior.exteriorMaterial != null)
+        (s.exteriorMaterial,
+            _catalogLabel(exteriorMatOpts, d.exterior.exteriorMaterial)),
+      if ((d.exterior.colors ?? '').trim().isNotEmpty)
+        (s.colors, d.exterior.colors!.trim()),
+    ];
+    final exteriorChips = <String>[
+      if (d.exterior.hasParking)
+        '${s.parking}${d.exterior.parkingCount != null ? ' ×${d.exterior.parkingCount}' : ''}',
+      if (d.exterior.hasPaths) s.paths,
+      if (d.exterior.hasLandscape) s.landscapeDesign,
+      if (d.exterior.hasPool) s.pool,
+      if (d.exterior.hasLighting) s.areaLighting,
+    ];
+
+    // Step 6 — Muddatlar va izoh
+    final timeline = <(String, String)>[
+      if (d.timeline.designDays != null)
+        (s.designProject, '${d.timeline.designDays} ${s.daysUnit}'),
+      if (d.timeline.workingDrawingsDays != null)
+        (s.workingDrawings, '${d.timeline.workingDrawingsDays} ${s.daysUnit}'),
+      if (d.notes.trim().isNotEmpty) (s.notes, d.notes.trim()),
+    ];
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      children: [
+        Text(
+          s.reviewIntro,
+          style: TextStyle(
+            fontFamily: 'MTSText',
+            fontSize: 13,
+            color: isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278),
+          ),
+        ),
+        const SizedBox(height: 14),
+        WizardReviewSection(
+          title: s.customerDetails,
+          onEdit: () => _editStep(0),
+          rows: customer,
+          warning: (d.customerName.trim().length < 2 || d.phone.trim().length < 5)
+              ? s.fillRequiredFields
+              : null,
+        ),
+        WizardReviewSection(
+          title: s.objectAndDimensions,
+          onEdit: () => _editStep(1),
+          rows: object,
+          chips: objectChips,
+          warning: d.objectType == null ? s.fillRequiredFields : null,
+        ),
+        WizardReviewSection(
+          title: s.extraRoomsTitle,
+          onEdit: () => _editStep(2),
+          rows: extra,
+        ),
+        WizardReviewSection(
+          title: s.interiorDesign,
+          onEdit: () => _editStep(3),
+          rows: interior,
+          chips: interiorChips,
+        ),
+        WizardReviewSection(
+          title: s.engineeringSystems,
+          onEdit: () => _editStep(4),
+          rows: engineering,
+          chips: engineeringChips,
+        ),
+        WizardReviewSection(
+          title: s.exteriorDesign,
+          onEdit: () => _editStep(5),
+          rows: exterior,
+          chips: exteriorChips,
+        ),
+        WizardReviewSection(
+          title: s.timeline,
+          onEdit: () => _editStep(6),
+          rows: timeline,
+        ),
+        if (!d.canSubmit) ...[
+          const SizedBox(height: 4),
+          Text(
+            s.fillRequiredFields,
+            style: const TextStyle(
+              fontFamily: 'MTSText',
+              fontSize: 12.5,
+              color: Color(0xFFE0492A),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   // ── Label helpers ────────────────────────────────────────────────────
   static String _objectTypeLabel(DizObjectType t, _Strings s) => switch (t) {
         DizObjectType.yakka => s.objTypeYakka,
@@ -865,6 +1113,17 @@ class _Strings {
   String get appBarTitle => _s('Дизайн ТЗ', 'Design TZ', 'Dizayn TZ');
   String get continueLabel => _s('Продолжить', 'Continue', 'Davom etish');
   String get submit => _s('Отправить', 'Submit', 'Yuborish');
+  String get saveChanges => _s('Сохранить', 'Save', 'Saqlash');
+  String get crumbReview => _s(
+      'Проверка и отправка', 'Review and submit', 'Tekshirish va yuborish');
+  String get reviewIntro => _s(
+      'Проверьте данные перед отправкой. Нажмите ✎, чтобы изменить раздел.',
+      'Check the details before submitting. Tap ✎ to edit a section.',
+      'Yuborishdan oldin ma\'lumotlarni tekshiring. Bo\'limni o\'zgartirish uchun ✎ ni bosing.');
+  String get prefilledHint => _s(
+      'Заполнено по последней заявке — можно изменить',
+      'Filled from your last order — you can edit it',
+      'Oxirgi arizangizdan to\'ldirildi — o\'zgartirsangiz bo\'ladi');
   String get submitting => _s('Отправка…', 'Submitting…', 'Yuborilmoqda…');
 
   // Step crumbs

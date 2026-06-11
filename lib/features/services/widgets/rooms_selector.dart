@@ -402,8 +402,17 @@ class _RoomCountRow extends StatelessWidget {
             ),
           ),
           if (showArea && areaController != null) ...[
-            SizedBox(
-              width: 58,
+            // Maydon (m²) — bu yashik tahrirlanadigan ekanini ko'rsatish uchun
+            // ramka + ichki fon beriladi (avval oddiy kulrang "m²" yorlig'iga
+            // o'xshab, bosib bo'lmaydigandek ko'rinardi).
+            Container(
+              width: 76,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF15191B) : const Color(0xFFF4F5F7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: border),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: TextField(
                 controller: areaController,
                 textAlign: TextAlign.center,
@@ -421,9 +430,15 @@ class _RoomCountRow extends StatelessWidget {
                 ),
                 decoration: InputDecoration(
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 9),
                   border: InputBorder.none,
-                  hintText: 'm²',
+                  suffixText: 'm²',
+                  suffixStyle: TextStyle(
+                    fontFamily: 'MTSText',
+                    fontSize: 12,
+                    color: hintColor,
+                  ),
+                  hintText: '0',
                   hintStyle: TextStyle(
                     fontFamily: 'MTSText',
                     fontSize: 13,
@@ -432,7 +447,7 @@ class _RoomCountRow extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 4),
+            const SizedBox(width: 8),
           ],
           stepBtn(minusIcon, onMinus, minusColor),
           SizedBox(
