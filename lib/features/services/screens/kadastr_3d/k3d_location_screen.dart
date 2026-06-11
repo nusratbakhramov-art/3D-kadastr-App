@@ -24,6 +24,7 @@ import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/geocoder_client.dart';
 import '../../models/ai_baholash_bundle.dart' show AiLocationInfo;
 import '../../models/kadastr_3d_bundle.dart';
+import '../../widgets/map_zoom_controls.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
 import '../scan_object_type_screen.dart';
@@ -264,6 +265,11 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
                     ),
                   ),
                   const Center(child: _CenterPin()),
+                  Positioned(
+                    right: 28,
+                    bottom: 12,
+                    child: MapZoomControls(controller: _mapController),
+                  ),
                   if (_suggestions.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),

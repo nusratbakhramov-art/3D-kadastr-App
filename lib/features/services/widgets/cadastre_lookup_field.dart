@@ -8,6 +8,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
@@ -229,9 +230,51 @@ class _ResultSummary extends StatelessWidget {
       if (info.totalArea != null) '${info.totalArea} m²',
     ];
     if (parts.isEmpty) return const SizedBox.shrink();
-    return Text(
-      parts.join(' · '),
-      style: TextStyle(fontFamily: 'MTSText', fontSize: 12, height: 1.3, color: sub),
+    final text = parts.join(' · ');
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'MTSText',
+              fontSize: 12,
+              height: 1.3,
+              color: sub,
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        // Manzil/maydonni nusxalash — kichik, bilinar-bilinmas tugma.
+        InkWell(
+          onTap: () async {
+            await Clipboard.setData(ClipboardData(text: text));
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(
+                    _CadastreStrings.copied(Localizations.localeOf(context)),
+                  ),
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(milliseconds: 1200),
+                  margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              );
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.all(4),
+            child: Icon(Icons.copy_rounded, size: 15, color: sub),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -255,5 +298,11 @@ class _CadastreStrings {
         'ru' => 'Ошибка при поиске',
         'en' => 'Search error',
         _ => 'Qidirishda xatolik',
+      };
+
+  static String copied(Locale l) => switch (l.languageCode) {
+        'ru' => 'Скопировано',
+        'en' => 'Copied',
+        _ => 'Nusxalandi',
       };
 }

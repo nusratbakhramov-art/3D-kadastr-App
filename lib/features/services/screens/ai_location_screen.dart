@@ -21,6 +21,7 @@ import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../data/geocoder_client.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../widgets/map_zoom_controls.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
 import 'ai_purpose_screen.dart';
@@ -269,6 +270,11 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
                     ),
                   ),
                   const Center(child: _CenterPin()),
+                  Positioned(
+                    right: 28,
+                    bottom: 12,
+                    child: MapZoomControls(controller: _mapController),
+                  ),
                   if (_suggestions.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),

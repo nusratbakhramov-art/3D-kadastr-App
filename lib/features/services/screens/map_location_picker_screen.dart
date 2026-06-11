@@ -13,6 +13,7 @@ import 'package:latlong2/latlong.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../widgets/map_zoom_controls.dart';
 import '../widgets/service_app_bar.dart';
 
 class MapLocationPickerScreen extends StatefulWidget {
@@ -180,7 +181,7 @@ class _MapLocationPickerScreenState extends State<MapLocationPickerScreen> {
                   Positioned(
                     right: 12,
                     top: 12,
-                    child: _ZoomControls(controller: _controller),
+                    child: MapZoomControls(controller: _controller),
                   ),
                   Positioned(
                     right: 12,
@@ -232,50 +233,6 @@ class _PinIcon extends StatelessWidget {
           blurRadius: 6,
           offset: Offset(0, 2),
         ),
-      ],
-    );
-  }
-}
-
-class _ZoomControls extends StatelessWidget {
-  const _ZoomControls({required this.controller});
-  final MapController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final fg = isDark ? Colors.white : AppColors.textBlack;
-
-    Widget btn(IconData icon, VoidCallback onTap) => Material(
-          color: bg,
-          shape: const CircleBorder(),
-          clipBehavior: Clip.antiAlias,
-          elevation: 2,
-          child: InkWell(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              onTap();
-            },
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: Icon(icon, color: fg, size: 22),
-            ),
-          ),
-        );
-
-    return Column(
-      children: [
-        btn(Icons.add, () {
-          final c = controller.camera;
-          controller.move(c.center, (c.zoom + 1).clamp(4, 18));
-        }),
-        const SizedBox(height: 8),
-        btn(Icons.remove, () {
-          final c = controller.camera;
-          controller.move(c.center, (c.zoom - 1).clamp(4, 18));
-        }),
       ],
     );
   }
