@@ -23,6 +23,7 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../ai_draft_saver.dart';
 import '../data/geocoder_client.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../widgets/map_zoom_controls.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
 import 'ai_purpose_screen.dart';
@@ -316,11 +317,19 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
                   const Center(child: _CenterPin()),
                   Positioned(
                     right: 28,
-                    bottom: 16,
-                    child: _MyLocationButton(
-                      isDark: isDark,
-                      busy: _locating,
-                      onTap: _goToCurrentLocation,
+                    bottom: 12,
+                    // Zoom (+/−) + "mening joylashuvim" — ikkalasi ustma-ust.
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MapZoomControls(controller: _mapController),
+                        const SizedBox(height: 12),
+                        _MyLocationButton(
+                          isDark: isDark,
+                          busy: _locating,
+                          onTap: _goToCurrentLocation,
+                        ),
+                      ],
                     ),
                   ),
                   if (_suggestions.isNotEmpty)

@@ -59,6 +59,27 @@ class MarketplaceApiService {
     return h;
   }
 
+  /// Tumanlar (regionlar) ro'yxati — admin paneldan boshqariladi.
+  /// `GET /marketplace/regions`. Javob string ro'yxati yoki {name|title}
+  /// obyektlari bo'lishi mumkin — ikkalasini ham qo'llab-quvvatlaymiz.
+  Future<List<String>> fetchRegions() async {
+    final uri = Uri.parse('$_baseUrl/marketplace/regions');
+    final res = await _client.get(uri, headers: _headers()).timeout(_timeout);
+    if (res.statusCode != 200) _throw(res);
+    final body = jsonDecode(res.body);
+    final list = body is Map ? (body['items'] as List? ?? const []) : body as List;
+    final out = <String>[];
+    for (final raw in list) {
+      if (raw is String) {
+        if (raw.trim().isNotEmpty) out.add(raw.trim());
+      } else if (raw is Map) {
+        final name = (raw['name'] ?? raw['title'] ?? raw['label']) as String?;
+        if (name != null && name.trim().isNotEmpty) out.add(name.trim());
+      }
+    }
+    return out;
+  }
+
   Future<List<MarketCategoryRemote>> fetchCategories() async {
     final uri = Uri.parse('$_baseUrl/marketplace/categories');
     final res = await _client.get(uri, headers: _headers()).timeout(_timeout);

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../data/market_regions_store.dart';
 import '../models/market_filters.dart';
 
 Future<MarketFilters?> showMarketFilterSheet(
@@ -27,20 +28,20 @@ class _FilterSheet extends StatefulWidget {
 }
 
 class _FilterSheetState extends State<_FilterSheet> {
-  late RangeValues _price;
   late RangeValues _area;
+  late RangeValues _floor;
   late Set<String> _districts;
 
   @override
   void initState() {
     super.initState();
-    _price = RangeValues(
-      (widget.initial.priceMin ?? kMarketPriceFloor).toDouble(),
-      (widget.initial.priceMax ?? kMarketPriceCeil).toDouble(),
-    );
     _area = RangeValues(
       (widget.initial.areaMin ?? kMarketAreaFloor).toDouble(),
       (widget.initial.areaMax ?? kMarketAreaCeil).toDouble(),
+    );
+    _floor = RangeValues(
+      (widget.initial.floorMin ?? kMarketFloorFloor).toDouble(),
+      (widget.initial.floorMax ?? kMarketFloorCeil).toDouble(),
     );
     _districts = {...widget.initial.districts};
   }
@@ -48,26 +49,25 @@ class _FilterSheetState extends State<_FilterSheet> {
   void _reset() {
     HapticFeedback.selectionClick();
     setState(() {
-      _price = const RangeValues(
-        kMarketPriceFloor + 0.0,
-        kMarketPriceCeil + 0.0,
-      );
       _area = const RangeValues(kMarketAreaFloor + 0.0, kMarketAreaCeil + 0.0);
+      _floor =
+          const RangeValues(kMarketFloorFloor + 0.0, kMarketFloorCeil + 0.0);
       _districts.clear();
     });
   }
 
   void _apply() {
     HapticFeedback.lightImpact();
-    final priceDefault =
-        _price.start <= kMarketPriceFloor && _price.end >= kMarketPriceCeil;
     final areaDefault =
         _area.start <= kMarketAreaFloor && _area.end >= kMarketAreaCeil;
+    final floorDefault =
+        _floor.start <= kMarketFloorFloor && _floor.end >= kMarketFloorCeil;
     final result = MarketFilters(
-      priceMin: priceDefault ? null : _price.start.round(),
-      priceMax: priceDefault ? null : _price.end.round(),
+      // Narx filtri hozircha yashirilgan — qiymat o'rnatilmaydi.
       areaMin: areaDefault ? null : _area.start.round(),
       areaMax: areaDefault ? null : _area.end.round(),
+      floorMin: floorDefault ? null : _floor.start.round(),
+      floorMax: floorDefault ? null : _floor.end.round(),
       districts: Set.unmodifiable(_districts),
     );
     Navigator.of(context).pop(result);
@@ -140,30 +140,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                   controller: scrollController,
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
                   children: [
-                    _SectionLabel(text: _FilterStrings.price(l), color: fg),
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        '${_fmtInt(_price.start.round())} — ${_fmtInt(_price.end.round())} UZS',
-                        style: TextStyle(
-                          fontFamily: 'MTSCompact',
-                          fontWeight: FontWeight.w500,
-                          fontSize: 13,
-                          color: muted,
-                        ),
-                      ),
-                    ),
-                    SliderTheme(
-                      data: _sliderTheme(fg),
-                      child: RangeSlider(
-                        values: _price,
-                        min: kMarketPriceFloor.toDouble(),
-                        max: kMarketPriceCeil.toDouble(),
-                        divisions: 40,
-                        onChanged: (v) => setState(() => _price = v),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
+                    // Narx (price) filtri hozircha yashirilgan — kelajakda
+                    // admin paneldan dinamik filtrlar bilan qaytariladi.
                     _SectionLabel(text: _FilterStrings.area(l), color: fg),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
@@ -187,31 +165,60 @@ class _FilterSheetState extends State<_FilterSheet> {
                         onChanged: (v) => setState(() => _area = v),
                       ),
                     ),
+                    const SizedBox(height: 14),
+                    _SectionLabel(text: _FilterStrings.floor(l), color: fg),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '${_floor.start.round()} — ${_floor.end.round()} ${_FilterStrings.floorUnit(l)}',
+                        style: TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontWeight: FontWeight.w500,
+                          fontSize: 13,
+                          color: muted,
+                        ),
+                      ),
+                    ),
+                    SliderTheme(
+                      data: _sliderTheme(fg),
+                      child: RangeSlider(
+                        values: _floor,
+                        min: kMarketFloorFloor.toDouble(),
+                        max: kMarketFloorCeil.toDouble(),
+                        divisions: kMarketFloorCeil - kMarketFloorFloor,
+                        onChanged: (v) => setState(() => _floor = v),
+                      ),
+                    ),
                     const SizedBox(height: 18),
                     _SectionLabel(text: _FilterStrings.districts(l), color: fg),
                     const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final d in kMarketDistricts)
-                          _DistrictChip(
-                            label: _FilterStrings.district(l, d),
-                            selected: _districts.contains(d),
-                            onTap: () {
-                              HapticFeedback.selectionClick();
-                              setState(() {
-                                if (_districts.contains(d)) {
-                                  _districts.remove(d);
-                                } else {
-                                  _districts.add(d);
-                                }
-                              });
-                            },
-                            fg: fg,
-                            bg: chipBg,
-                          ),
-                      ],
+                    // Tumanlar admin paneldan (API) keladi — `marketRegionsNotifier`
+                    // orqali. Yangilanganda ro'yxat avtomatik qayta chiziladi.
+                    ValueListenableBuilder<List<String>>(
+                      valueListenable: marketRegionsNotifier,
+                      builder: (context, regions, _) => Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final d in regions)
+                            _DistrictChip(
+                              label: _FilterStrings.district(l, d),
+                              selected: _districts.contains(d),
+                              onTap: () {
+                                HapticFeedback.selectionClick();
+                                setState(() {
+                                  if (_districts.contains(d)) {
+                                    _districts.remove(d);
+                                  } else {
+                                    _districts.add(d);
+                                  }
+                                });
+                              },
+                              fg: fg,
+                              bg: chipBg,
+                            ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -260,17 +267,6 @@ class _FilterSheetState extends State<_FilterSheet> {
     trackHeight: 4,
     showValueIndicator: ShowValueIndicator.never,
   );
-
-  String _fmtInt(int v) {
-    final s = v.toString();
-    final buf = StringBuffer();
-    for (var i = 0; i < s.length; i++) {
-      buf.write(s[i]);
-      final remaining = s.length - i - 1;
-      if (remaining > 0 && remaining % 3 == 0) buf.write(' ');
-    }
-    return buf.toString();
-  }
 }
 
 class _FilterStrings {
@@ -286,10 +282,15 @@ class _FilterStrings {
     'en' => 'Clear',
     _ => 'Tozalash',
   };
-  static String price(Locale l) => switch (l.languageCode) {
-    'ru' => 'Цена (UZS)',
-    'en' => 'Price (UZS)',
-    _ => 'Narx (UZS)',
+  static String floor(Locale l) => switch (l.languageCode) {
+    'ru' => 'Этаж',
+    'en' => 'Floor',
+    _ => 'Qavat',
+  };
+  static String floorUnit(Locale l) => switch (l.languageCode) {
+    'ru' => 'эт.',
+    'en' => 'fl.',
+    _ => 'qavat',
   };
   static String area(Locale l) => switch (l.languageCode) {
     'ru' => 'Площадь (м²)',
