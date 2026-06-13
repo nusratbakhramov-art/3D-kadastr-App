@@ -21,6 +21,7 @@ import UniformTypeIdentifiers
 import RealityKit
 import CoreMotion
 import AVFoundation
+import os  // os_proc_available_memory() — Phase 18 xotira-adaptiv atlas
 #if canImport(RoomPlan)
 import RoomPlan
 #endif
@@ -2729,13 +2730,37 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // 2. StreamingTSDF init
         // Phase 11: voxelSize 0.05 → 0.025 (2x maydaroq). Divan kabi yumshoq/mayda
         // mebel qiya burchakdan olinganda 5cm voxel yupqa/chala yuza berardi.
-        // 2.5cm voxel detail va hole-fill geometriyani yaxshilaydi (8x voxel,
-        // ~120-190MB — offline reprocess'da xotira yetarli).
+        // 2.5cm voxel detail va hole-fill geometriyani yaxshilaydi.
+        //
+        // Phase 18 (xotira xavfsizligi): grid xotirasi = gridX·gridY·gridZ · 24 bayt
+        // (sdf 4 + weight 4 + color 16). 2.5cm'da grid xona hajmiga kub bo'lib o'sadi:
+        // kichik xona (~6×3×6=108m³) ~166MB — yaxshi; lekin katta xona (~12×3×12)
+        // ~660MB → atlas+fotolar ustiga qo'shilsa iPhone 14 Pro'ni jetsam qiladi
+        // (texturing'dan keyin app crash → keyingi ochilishda plugin-register crash
+        // loop, in_app_review "qurbon"). Yechim: voxel SONINI byudjetga cap qilamiz
+        // va katta xonada voxel'ni avtomatik kattalashtiramiz (kub-ildiz masshtab).
+        // ~10M voxel ≈ 240MB — atlas(4K)+fotolarga joy qoldiradi.
+        let maxVoxels = Float(ProcessInfo.processInfo.environment["KADASTR_TSDF_MAX_VOXELS"]
+            .flatMap { Int($0) } ?? 10_000_000)
+        let baseVoxel: Float = 0.025
+        let volume = extents.x * extents.y * extents.z
+        let projected = volume / (baseVoxel * baseVoxel * baseVoxel)
+        // projected > byudjet bo'lsa: voxelSize = cbrt(volume / maxVoxels) (grid'ni
+        // aynan byudjetga tushiradi). Hech qachon baseVoxel'dan maydaroq emas.
+        let voxelSize = projected > maxVoxels
+            ? max(baseVoxel, cbrtf(volume / maxVoxels))
+            : baseVoxel
+        if voxelSize > baseVoxel {
+            NSLog("KADASTR TSDF: katta xona (%.0fm³) — voxel %.0fmm→%.0fmm "
+                  + "(%.1fM→~%.1fM voxel, xotira cap)",
+                  volume, baseVoxel * 1000, voxelSize * 1000,
+                  projected / 1e6, maxVoxels / 1e6)
+        }
         guard let tsdf = StreamingTSDF(
             centerWorld: center,
             extents: extents,
-            voxelSize: 0.025,
-            truncation: 0.08,
+            voxelSize: voxelSize,
+            truncation: max(0.08, voxelSize * 3.2),  // truncation ≥ ~3 voxel — coarse grid'da SDF band yupqa qolmasligi uchun
             maxIntegrationDepth: 4.0,
         ) else {
             return nil
@@ -3669,7 +3694,22 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // bo'lgan, pose accurate.
         let hiResThreshold: Float = 2000
         let hiResCameras = cameras.filter { $0.imageW >= hiResThreshold }
-        let usedCameras = hiResCameras.count >= 30 ? hiResCameras : cameras
+        let preCapCameras = hiResCameras.count >= 30 ? hiResCameras : cameras
+
+        // Phase 18 (xotira xavfsizligi): kamera soniga UPPER CAP. atlas bake batch'lanadi,
+        // lekin computeExposureGains() va planar cache BARCHA kamerani bir vaqtda
+        // xotirada ushlaydi → 200 foto'da peak ~1.1GB ustiga chiqib iPhone 14 Pro'ni
+        // jetsam qiladi (texturing crash → keyingi ochilishda plugin-register crash loop).
+        // ~140 kamera tekstura qoplashi uchun yetarli (zich skan ham). Oshsa: eng o'tkir
+        // (sharpness) kadrlar tanlanadi — bluri kadrlar baribir tekstura sifatini buzardi.
+        let maxCams = Int(ProcessInfo.processInfo.environment["KADASTR_MAX_BAKE_CAMS"] ?? "") ?? 140
+        let usedCameras: [CameraView]
+        if preCapCameras.count > maxCams {
+            usedCameras = Array(preCapCameras.sorted { $0.sharpness > $1.sharpness }.prefix(maxCams))
+            NSLog("KADASTR atlas bake: \(preCapCameras.count) kamera → \(maxCams) cap (eng o'tkir tanlandi, xotira xavfsizligi)")
+        } else {
+            usedCameras = preCapCameras
+        }
         NSLog("KADASTR atlas bake: \(usedCameras.count)/\(cameras.count) cameras (hi-res filter: w≥\(Int(hiResThreshold)))")
 
         // CameraView → AtlasBakeInputCamera. Depth URL = photo'ning yonida.
@@ -3706,18 +3746,29 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
                     gridZ: s.gridZ,
                 )
             }
+            // Phase 18 (xotira xavfsizligi): atlas parametrlarini MAVJUD xotiraga moslash.
+            // 4K atlas (pos/nrm readback ~536MB) + 12MP foto batch + mesh → peak ~1.1GB,
+            // iPhone 14 Pro entitlement'siz chegarasida. Qurilma bosim ostida bo'lsa
+            // (os_proc_available_memory past) yoki mesh katta bo'lsa → 2K atlas + yarim-res
+            // foto (peak ~2.5× kam) → jetsam/crash o'rniga biroz pastroq tiniqlik.
+            // os_proc_available_memory() = jetsam'gacha qolgan bayt (0 = o'lchab bo'lmadi).
+            let availMB = Int(os_proc_available_memory() / (1024 * 1024))
+            let bigMesh = globalTris.count > 200_000
+            let safeMode = availMB > 0 && (availMB < 1400 || bigMesh)
+            let atlasRes = safeMode ? 2048 : 4096
+            let dsFactor = safeMode ? 2 : 1
+            NSLog("KADASTR atlas: \(safeMode ? "XOTIRA-XAVFSIZ (2K, yarim-res)" : "to'liq 4K/12MP") — "
+                  + "\(availMB)MB mavjud, mesh=\(globalTris.count) tri")
             bakeResult = try MetalAtlasBaker.bake(
                 positions: globalVerts,
                 normals: globalNormals,
                 triangles: globalTris,
                 cameras: bakeCameras,
-                // POLYCAM-DARAJALI TINIQLIK: 4096 atlas (Polycam zichligi — matn/tile
-                // o'qiladi). Avval 4096 OOM berardi, lekin bake() memory-refaktoridan
-                // keyin (nrm/pos/buferlarni fazama-faza free + scratch'ni kech ajratish)
-                // peak ~1.5 GB → ~1.1 GB → entitlement'siz sig'adi. Fotolar TO'LIQ 12MP.
-                atlasResolution: 4096,           // 4K Polycam zichligi (refaktor bilan OOM yo'q)
+                // POLYCAM-DARAJALI TINIQLIK: 4K atlas (Polycam zichligi — matn/tile o'qiladi),
+                // mavjud xotira yetganda. Past xotira/katta mesh'da 2K'ga tushadi (yuqoriga qarang).
+                atlasResolution: atlasRes,
                 cameraBatchSize: 2,              // 12MP × 2 ≈ 96 MB per batch
-                downsampleFactor: 1,             // to'liq 4032×3024 (tiniqlik uchun)
+                downsampleFactor: dsFactor,      // to'liq 4032×3024 yoki yarim (xotiraга qarab)
                 voxelColor: voxelVolume,         // Phase 2: gray patches → voxel color
                 useCubeProjectionUV: false,      // xatlas (sifatli, teshiksiz). Cube UV oblik yuzalarni parchalaydi — yaroqsiz.
                 progress: { p, msg in
