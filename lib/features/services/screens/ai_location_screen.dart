@@ -73,8 +73,14 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     _mapController = MapController();
     _geocoder = GeocoderClient();
     _searchCtrl.addListener(_onSearchChanged);
-    // Kick off initial reverse-geocode for the default center.
-    _scheduleReverse();
+    // Auto-place the pin at the property's real location (geocoded from the
+    // davreestr cadastre address) once the map is laid out. Otherwise the user
+    // is left on the Tashkent default and can submit the wrong spot — which
+    // pulls comps from the wrong area and badly skews the valuation. Deferred
+    // to post-frame so the MapController is attached before we move it.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initFromCadastreAddress();
+    });
   }
 
   @override
@@ -87,6 +93,65 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     _geocoder.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  // ── Initial location (auto-locate from cadastre address) ─────────────
+
+  /// Geocode the davreestr cadastre address and drop the pin there, so the
+  /// valuation uses comps from the property's real area instead of the Tashkent
+  /// default. davreestr addresses are very specific (…-uy, Korpus, -xonadon)
+  /// and often miss an exact geocode, so we try the full address then coarser
+  /// variants (region → tuman → MFY). Falls back to the default center + a
+  /// reverse-geocode if nothing resolves.
+  Future<void> _initFromCadastreAddress() async {
+    final address = widget.bundle.kadastr.address?.trim() ?? '';
+    if (address.isEmpty) {
+      _scheduleReverse();
+      return;
+    }
+    setState(() => _resolving = true);
+    for (final q in _addressQueries(address)) {
+      try {
+        final results = await _geocoder.autocomplete(q);
+        if (!mounted) return;
+        if (results.isNotEmpty) {
+          final s = results.first;
+          setState(() {
+            _center = LatLng(s.lat, s.lng);
+            // Keep the authoritative davreestr address as the confirmed text.
+            _addressText = address;
+            _resolving = false;
+          });
+          try {
+            _mapController.move(_center, 16);
+          } catch (_) {
+            // Map not attached yet — the next build picks up _center.
+          }
+          return;
+        }
+      } catch (_) {
+        // Try the next, coarser variant.
+      }
+    }
+    // No geocode hit — fall back to the default center + reverse-geocode.
+    if (!mounted) return;
+    setState(() => _resolving = false);
+    _scheduleReverse();
+  }
+
+  /// Full address first, then coarser fallbacks: drop the most specific
+  /// trailing segments (house / korpus / apartment), keeping region → MFY so a
+  /// miss on the exact house still lands us in the right district.
+  List<String> _addressQueries(String address) {
+    final queries = <String>[address];
+    final parts = address
+        .split(',')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    if (parts.length > 3) queries.add(parts.take(3).join(', '));
+    if (parts.length > 2) queries.add(parts.take(2).join(', '));
+    return queries;
   }
 
   // ── Search (autocomplete) ────────────────────────────────────────────
