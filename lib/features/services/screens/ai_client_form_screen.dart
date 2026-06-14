@@ -51,8 +51,7 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
       // Coming back from a later step — restore what was entered.
       _nameCtrl.text = c.name;
       _stirCtrl.text = c.stir;
-      _phoneCtrl.text =
-          c.phone.isEmpty ? '' : _formatPhoneForDisplay(c.phone);
+      _phoneCtrl.text = c.phone.isEmpty ? '' : _formatPhoneForDisplay(c.phone);
       _emailCtrl.text = c.email;
     } else {
       // First visit — prefill from the logged-in user's account (editable).
@@ -123,6 +122,7 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
     if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'ai/location'),
         builder: (_) => AiLocationScreen(bundle: widget.bundle),
       ),
     );
@@ -155,14 +155,16 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                     const SizedBox(height: 8),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: StepProgressBar(count: 4, activeIndex: 1),
+                      child: StepProgressBar(count: 6, activeIndex: 1),
                     ),
                     Expanded(
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
-                          _FieldLabel(_ClientFormStrings.nameLabel(l),
-                              isDark: isDark),
+                          _FieldLabel(
+                            _ClientFormStrings.nameLabel(l),
+                            isDark: isDark,
+                          ),
                           const SizedBox(height: 8),
                           _AppTextField(
                             controller: _nameCtrl,
@@ -173,8 +175,10 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                             errorText: _nameErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(_ClientFormStrings.stirLabel(l),
-                              isDark: isDark),
+                          _FieldLabel(
+                            _ClientFormStrings.stirLabel(l),
+                            isDark: isDark,
+                          ),
                           const SizedBox(height: 4),
                           Text(
                             _ClientFormStrings.stirHint(l),
@@ -199,8 +203,10 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                             errorText: _stirErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(_ClientFormStrings.phoneLabel(l),
-                              isDark: isDark),
+                          _FieldLabel(
+                            _ClientFormStrings.phoneLabel(l),
+                            isDark: isDark,
+                          ),
                           const SizedBox(height: 8),
                           _AppTextField(
                             controller: _phoneCtrl,
@@ -211,8 +217,10 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                             errorText: _phoneErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(_ClientFormStrings.emailLabel(l),
-                              isDark: isDark),
+                          _FieldLabel(
+                            _ClientFormStrings.emailLabel(l),
+                            isDark: isDark,
+                          ),
                           const SizedBox(height: 8),
                           _AppTextField(
                             controller: _emailCtrl,
@@ -364,15 +372,13 @@ class _AppTextField extends StatelessWidget {
           keyboardType: keyboardType,
           inputFormatters: inputFormatters,
           textCapitalization: textCapitalization,
-          style: TextStyle(
-            fontFamily: 'MTSText',
-            fontSize: 15,
-            color: text,
-          ),
+          style: TextStyle(fontFamily: 'MTSText', fontSize: 15, color: text),
           decoration: InputDecoration(
             isDense: true,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
             hintText: placeholder,
             hintStyle: TextStyle(
               fontFamily: 'MTSText',
@@ -423,8 +429,10 @@ class _PhoneMaskFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final rawCursor =
-        newValue.selection.baseOffset.clamp(0, newValue.text.length);
+    final rawCursor = newValue.selection.baseOffset.clamp(
+      0,
+      newValue.text.length,
+    );
     final digitsBeforeCursor = newValue.text
         .substring(0, rawCursor)
         .replaceAll(RegExp(r'\D'), '')
@@ -433,7 +441,8 @@ class _PhoneMaskFormatter extends TextInputFormatter {
     var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
     // Strip leading 998 so the operator-part is what we count from.
     if (digits.startsWith('998')) digits = digits.substring(3);
-    if (digits.length > _maxOpDigits) digits = digits.substring(0, _maxOpDigits);
+    if (digits.length > _maxOpDigits)
+      digits = digits.substring(0, _maxOpDigits);
 
     final buf = StringBuffer('+998 ');
     for (var i = 0; i < digits.length; i++) {
@@ -445,8 +454,7 @@ class _PhoneMaskFormatter extends TextInputFormatter {
 
     // Caret: count digits in formatted up to original-cursor's digit count,
     // counting only post-prefix digits (the visible `998` is fixed).
-    final preCount =
-        digitsBeforeCursor > 3 ? digitsBeforeCursor - 3 : 0;
+    final preCount = digitsBeforeCursor > 3 ? digitsBeforeCursor - 3 : 0;
     var seen = 0;
     var pos = '+998 '.length;
     while (pos < formatted.length && seen < preCount) {
@@ -466,104 +474,104 @@ class _ClientFormStrings {
   const _ClientFormStrings._();
 
   static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'Заказчик',
-        'en' => 'Client',
-        _ => 'Buyurtmachi',
-      };
+    'ru' => 'Заказчик',
+    'en' => 'Client',
+    _ => 'Buyurtmachi',
+  };
 
   static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Введите свои данные',
-        'en' => 'Enter your details',
-        _ => 'Maʼlumotlaringizni kiriting',
-      };
+    'ru' => 'Введите свои данные',
+    'en' => 'Enter your details',
+    _ => 'Maʼlumotlaringizni kiriting',
+  };
 
   static String nameLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Имя / Компания',
-        'en' => 'Name / Company',
-        _ => 'Ism / Kompaniya',
-      };
+    'ru' => 'Имя / Компания',
+    'en' => 'Name / Company',
+    _ => 'Ism / Kompaniya',
+  };
 
   static String namePlaceholder(Locale l) => switch (l.languageCode) {
-        'ru' => 'Тошпулат Тошпулатов или ООО «ABC»',
-        'en' => 'Toshpoʻlat Toshpoʻlatov or "ABC" LLC',
-        _ => 'Toshpoʻlat Toshpoʻlatov yoki "ABC" MChJ',
-      };
+    'ru' => 'Тошпулат Тошпулатов или ООО «ABC»',
+    'en' => 'Toshpoʻlat Toshpoʻlatov or "ABC" LLC',
+    _ => 'Toshpoʻlat Toshpoʻlatov yoki "ABC" MChJ',
+  };
 
   static String stirLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'ИНН или ПИНФЛ',
-        'en' => 'TIN or PINFL',
-        _ => 'STIR yoki JSHSHIR',
-      };
+    'ru' => 'ИНН или ПИНФЛ',
+    'en' => 'TIN or PINFL',
+    _ => 'STIR yoki JSHSHIR',
+  };
 
   static String stirHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Юридическое лицо: 9 цифр. Физическое лицо: 14 цифр.',
-        'en' => 'Legal entity: 9 digits. Individual: 14 digits.',
-        _ => 'Yuridik shaxs: 9 raqam. Jismoniy shaxs: 14 raqam.',
-      };
+    'ru' => 'Юридическое лицо: 9 цифр. Физическое лицо: 14 цифр.',
+    'en' => 'Legal entity: 9 digits. Individual: 14 digits.',
+    _ => 'Yuridik shaxs: 9 raqam. Jismoniy shaxs: 14 raqam.',
+  };
 
   static String phoneLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Телефон',
-        'en' => 'Phone',
-        _ => 'Telefon',
-      };
+    'ru' => 'Телефон',
+    'en' => 'Phone',
+    _ => 'Telefon',
+  };
 
   static String emailLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Email (необязательно)',
-        'en' => 'Email (optional)',
-        _ => 'Email (ixtiyoriy)',
-      };
+    'ru' => 'Email (необязательно)',
+    'en' => 'Email (optional)',
+    _ => 'Email (ixtiyoriy)',
+  };
 
   static String continueLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
+    'ru' => 'Продолжить',
+    'en' => 'Continue',
+    _ => 'Davom etish',
+  };
 
   static String nameRequired(Locale l) => switch (l.languageCode) {
-        'ru' => 'Укажите имя',
-        'en' => 'Name is required',
-        _ => 'Ism kerak',
-      };
+    'ru' => 'Укажите имя',
+    'en' => 'Name is required',
+    _ => 'Ism kerak',
+  };
 
   static String tooShort(Locale l) => switch (l.languageCode) {
-        'ru' => 'Слишком коротко',
-        'en' => 'Too short',
-        _ => 'Juda qisqa',
-      };
+    'ru' => 'Слишком коротко',
+    'en' => 'Too short',
+    _ => 'Juda qisqa',
+  };
 
   static String stirRequired(Locale l) => switch (l.languageCode) {
-        'ru' => 'Укажите ИНН или ПИНФЛ',
-        'en' => 'TIN or PINFL is required',
-        _ => 'STIR yoki JSHSHIR kerak',
-      };
+    'ru' => 'Укажите ИНН или ПИНФЛ',
+    'en' => 'TIN or PINFL is required',
+    _ => 'STIR yoki JSHSHIR kerak',
+  };
 
   static String digitsOnly(Locale l) => switch (l.languageCode) {
-        'ru' => 'Только цифры',
-        'en' => 'Digits only',
-        _ => 'Faqat raqamlar',
-      };
+    'ru' => 'Только цифры',
+    'en' => 'Digits only',
+    _ => 'Faqat raqamlar',
+  };
 
   static String stirLength(Locale l) => switch (l.languageCode) {
-        'ru' => 'Должно быть ровно 9 или 14 цифр',
-        'en' => 'Must be exactly 9 or 14 digits',
-        _ => "Aniq 9 yoki 14 raqam boʻlishi kerak",
-      };
+    'ru' => 'Должно быть ровно 9 или 14 цифр',
+    'en' => 'Must be exactly 9 or 14 digits',
+    _ => "Aniq 9 yoki 14 raqam boʻlishi kerak",
+  };
 
   static String phoneRequired(Locale l) => switch (l.languageCode) {
-        'ru' => 'Укажите телефон',
-        'en' => 'Phone is required',
-        _ => 'Telefon kerak',
-      };
+    'ru' => 'Укажите телефон',
+    'en' => 'Phone is required',
+    _ => 'Telefon kerak',
+  };
 
   static String phoneFormat(Locale l) => switch (l.languageCode) {
-        'ru' => 'Формат UZ: +998 XX XXX-XX-XX',
-        'en' => 'UZ format: +998 XX XXX-XX-XX',
-        _ => 'UZ formati: +998 XX XXX-XX-XX',
-      };
+    'ru' => 'Формат UZ: +998 XX XXX-XX-XX',
+    'en' => 'UZ format: +998 XX XXX-XX-XX',
+    _ => 'UZ formati: +998 XX XXX-XX-XX',
+  };
 
   static String emailInvalid(Locale l) => switch (l.languageCode) {
-        'ru' => 'Неверный email',
-        'en' => 'Invalid email',
-        _ => "Email notoʻgʻri",
-      };
+    'ru' => 'Неверный email',
+    'en' => 'Invalid email',
+    _ => "Email notoʻgʻri",
+  };
 }

@@ -214,7 +214,9 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     setState(() {
       _suggestions = const [];
       _center = LatLng(s.lat, s.lng);
-      _addressText = s.description.isEmpty ? s.name : '${s.name}, ${s.description}';
+      _addressText = s.description.isEmpty
+          ? s.name
+          : '${s.name}, ${s.description}';
     });
     _mapController.move(_center, 17);
     // Even though we already have the description text, run reverse so the
@@ -318,6 +320,7 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'ai/purpose'),
         builder: (_) => AiPurposeScreen(bundle: widget.bundle),
       ),
     );
@@ -346,7 +349,7 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
             const SizedBox(height: 8),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: StepProgressBar(count: 4, activeIndex: 2),
+              child: StepProgressBar(count: 6, activeIndex: 2),
             ),
             const SizedBox(height: 12),
             Padding(
@@ -538,8 +541,7 @@ class _SearchInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final border =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final text = isDark ? Colors.white : AppColors.textBlack;
     final hint = isDark
         ? Colors.white.withValues(alpha: 0.45)
@@ -552,14 +554,12 @@ class _SearchInput extends StatelessWidget {
       style: TextStyle(fontFamily: 'MTSText', fontSize: 15, color: text),
       decoration: InputDecoration(
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        hintText: L.searchAddress(Localizations.localeOf(context)),
-        hintStyle: TextStyle(
-          fontFamily: 'MTSText',
-          fontSize: 15,
-          color: hint,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
         ),
+        hintText: L.searchAddress(Localizations.localeOf(context)),
+        hintStyle: TextStyle(fontFamily: 'MTSText', fontSize: 15, color: hint),
         filled: true,
         fillColor: fill,
         prefixIcon: Icon(Icons.search, color: hint),
@@ -576,18 +576,21 @@ class _SearchInput extends StatelessWidget {
                 ),
               )
             : (controller.text.isEmpty
-                ? null
-                : IconButton(
-                    icon: Icon(Icons.close, color: hint, size: 20),
-                    onPressed: () => controller.clear(),
-                  )),
+                  ? null
+                  : IconButton(
+                      icon: Icon(Icons.close, color: hint, size: 20),
+                      onPressed: () => controller.clear(),
+                    )),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.splashGreen, width: 1.4),
+          borderSide: const BorderSide(
+            color: AppColors.splashGreen,
+            width: 1.4,
+          ),
         ),
       ),
     );
@@ -608,8 +611,7 @@ class _SuggestionList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bg = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final divider =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
+    final divider = isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
     final text = isDark ? Colors.white : AppColors.textBlack;
     final sub = isDark
         ? Colors.white.withValues(alpha: 0.6)
@@ -627,8 +629,10 @@ class _SuggestionList extends StatelessWidget {
             InkWell(
               onTap: () => onTap(items[i]),
               child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
                 child: Row(
                   children: [
                     Icon(
@@ -718,8 +722,7 @@ class _AddressBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fill = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final border =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final text = isDark ? Colors.white : AppColors.textBlack;
     final sub = isDark
         ? Colors.white.withValues(alpha: 0.6)
@@ -788,28 +791,28 @@ class _AiLocationStrings {
   const _AiLocationStrings._();
 
   static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Расположение',
-        'en' => 'Location',
-        _ => 'Joylashuv',
-      };
+    'ru' => 'Расположение',
+    'en' => 'Location',
+    _ => 'Joylashuv',
+  };
 
   static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отметьте расположение объекта на карте',
-        'en' => 'Mark the object location on the map',
-        _ => 'Obyekt joylashuvini xaritada belgilang',
-      };
+    'ru' => 'Отметьте расположение объекта на карте',
+    'en' => 'Mark the object location on the map',
+    _ => 'Obyekt joylashuvini xaritada belgilang',
+  };
 
   static String confirm(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подтвердить и отправить',
-        'en' => 'Confirm and submit',
-        _ => 'Tasdiqlash va yuborish',
-      };
+    'ru' => 'Подтвердить и отправить',
+    'en' => 'Confirm and submit',
+    _ => 'Tasdiqlash va yuborish',
+  };
 
   static String detecting(Locale l) => switch (l.languageCode) {
-        'ru' => 'Определение адреса...',
-        'en' => 'Detecting address...',
-        _ => 'Manzil aniqlanmoqda...',
-      };
+    'ru' => 'Определение адреса...',
+    'en' => 'Detecting address...',
+    _ => 'Manzil aniqlanmoqda...',
+  };
 
   static String notFound(Locale l) => switch (l.languageCode) {
         'ru' => 'Адрес не найден',

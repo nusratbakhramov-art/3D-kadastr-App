@@ -209,18 +209,21 @@ class _ServicesScreenState extends State<ServicesScreen>
       case ServiceId.aiValuation:
         // AI Baholash needs an account (davreest.uz lookup + job submit).
         // Gate the entry with a login drawer before the wizard opens.
-        if (!await ensureLoggedIn(
-          context,
-        )) {
+        if (!await ensureLoggedIn(context)) {
           return;
         }
         if (!context.mounted) return;
         Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const AiCadastreScreen()),
+          MaterialPageRoute<void>(
+            settings: const RouteSettings(name: 'ai/cadastre'),
+            builder: (_) => const AiCadastreScreen(),
+          ),
         );
       case ServiceId.calculator:
         Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
+          MaterialPageRoute<void>(
+            builder: (_) => const OnlineCalculatorScreen(),
+          ),
         );
       case ServiceId.smetaPro:
         Navigator.of(context).push(

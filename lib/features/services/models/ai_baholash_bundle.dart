@@ -24,10 +24,16 @@ class AiBaholashBundle {
     List<String>? imageKeys,
     List<String>? kadastrKeys,
     List<String>? passportKeys,
-  })  : rooms = rooms ?? <AiRoom>[],
-        imageKeys = imageKeys ?? <String>[],
-        kadastrKeys = kadastrKeys ?? <String>[],
-        passportKeys = passportKeys ?? <String>[];
+    List<String>? imagePaths,
+    List<String>? kadastrPaths,
+    List<String>? passportPaths,
+  }) : rooms = rooms ?? <AiRoom>[],
+       imageKeys = imageKeys ?? <String>[],
+       kadastrKeys = kadastrKeys ?? <String>[],
+       passportKeys = passportKeys ?? <String>[],
+       imagePaths = imagePaths ?? <String>[],
+       kadastrPaths = kadastrPaths ?? <String>[],
+       passportPaths = passportPaths ?? <String>[];
 
   final CadastreLookupResult kadastr;
 
@@ -58,6 +64,13 @@ class AiBaholashBundle {
   final List<String> imageKeys; // property photos (property_photo)
   final List<String> kadastrKeys; // kadastr docs (kadastr)
   final List<String> passportKeys; // owner ID (passport)
+
+  /// Local on-device file paths, index-aligned with the *Keys lists above.
+  /// Transient — NOT serialized. Used only to render thumbnails on the review
+  /// step and to restore the intake tiles when the user navigates back to edit.
+  final List<String> imagePaths;
+  final List<String> kadastrPaths;
+  final List<String> passportPaths;
 
   Map<String, dynamic> toJson() => {
         'kadastr': {
@@ -134,56 +147,56 @@ enum ValuationPurpose {
       .firstWhere((p) => p.wire == w, orElse: () => ValuationPurpose.sale);
 
   String get labelUz => switch (this) {
-        ValuationPurpose.sale => 'Sotish',
-        ValuationPurpose.mortgage => 'Ipoteka / kredit',
-        ValuationPurpose.insurance => "Sug'urta",
-        ValuationPurpose.court => 'Sud / nizo',
-        ValuationPurpose.tax => 'Soliq',
-      };
+    ValuationPurpose.sale => 'Sotish',
+    ValuationPurpose.mortgage => 'Ipoteka / kredit',
+    ValuationPurpose.insurance => "Sug'urta",
+    ValuationPurpose.court => 'Sud / nizo',
+    ValuationPurpose.tax => 'Soliq',
+  };
 
   String get hintUz => switch (this) {
-        ValuationPurpose.sale => 'Bozor narxi asosida',
-        ValuationPurpose.mortgage => 'Bank garovi uchun',
-        ValuationPurpose.insurance => 'Qayta tiklash qiymati',
-        ValuationPurpose.court => '3 yondashuv teng',
-        ValuationPurpose.tax => 'Kadastr asosida',
-      };
+    ValuationPurpose.sale => 'Bozor narxi asosida',
+    ValuationPurpose.mortgage => 'Bank garovi uchun',
+    ValuationPurpose.insurance => 'Qayta tiklash qiymati',
+    ValuationPurpose.court => '3 yondashuv teng',
+    ValuationPurpose.tax => 'Kadastr asosida',
+  };
 
   String label(Locale l) => switch (l.languageCode) {
-        'ru' => switch (this) {
-            ValuationPurpose.sale => 'Продажа',
-            ValuationPurpose.mortgage => 'Ипотека / кредит',
-            ValuationPurpose.insurance => 'Страхование',
-            ValuationPurpose.court => 'Суд / спор',
-            ValuationPurpose.tax => 'Налог',
-          },
-        'en' => switch (this) {
-            ValuationPurpose.sale => 'Sale',
-            ValuationPurpose.mortgage => 'Mortgage / loan',
-            ValuationPurpose.insurance => 'Insurance',
-            ValuationPurpose.court => 'Court / dispute',
-            ValuationPurpose.tax => 'Tax',
-          },
-        _ => labelUz,
-      };
+    'ru' => switch (this) {
+      ValuationPurpose.sale => 'Продажа',
+      ValuationPurpose.mortgage => 'Ипотека / кредит',
+      ValuationPurpose.insurance => 'Страхование',
+      ValuationPurpose.court => 'Суд / спор',
+      ValuationPurpose.tax => 'Налог',
+    },
+    'en' => switch (this) {
+      ValuationPurpose.sale => 'Sale',
+      ValuationPurpose.mortgage => 'Mortgage / loan',
+      ValuationPurpose.insurance => 'Insurance',
+      ValuationPurpose.court => 'Court / dispute',
+      ValuationPurpose.tax => 'Tax',
+    },
+    _ => labelUz,
+  };
 
   String hint(Locale l) => switch (l.languageCode) {
-        'ru' => switch (this) {
-            ValuationPurpose.sale => 'По рыночной цене',
-            ValuationPurpose.mortgage => 'Для банковского залога',
-            ValuationPurpose.insurance => 'Восстановительная стоимость',
-            ValuationPurpose.court => '3 подхода равны',
-            ValuationPurpose.tax => 'На основе кадастра',
-          },
-        'en' => switch (this) {
-            ValuationPurpose.sale => 'Based on market price',
-            ValuationPurpose.mortgage => 'For bank collateral',
-            ValuationPurpose.insurance => 'Replacement value',
-            ValuationPurpose.court => '3 approaches equal',
-            ValuationPurpose.tax => 'Cadastre-based',
-          },
-        _ => hintUz,
-      };
+    'ru' => switch (this) {
+      ValuationPurpose.sale => 'По рыночной цене',
+      ValuationPurpose.mortgage => 'Для банковского залога',
+      ValuationPurpose.insurance => 'Восстановительная стоимость',
+      ValuationPurpose.court => '3 подхода равны',
+      ValuationPurpose.tax => 'На основе кадастра',
+    },
+    'en' => switch (this) {
+      ValuationPurpose.sale => 'Based on market price',
+      ValuationPurpose.mortgage => 'For bank collateral',
+      ValuationPurpose.insurance => 'Replacement value',
+      ValuationPurpose.court => '3 approaches equal',
+      ValuationPurpose.tax => 'Cadastre-based',
+    },
+    _ => hintUz,
+  };
 }
 
 /// One room in the optional breakdown. Mirrors backend `RoomInput`.
@@ -206,11 +219,11 @@ class AiRoom {
   double? area;
 
   Map<String, dynamic> toJson() => {
-        'kind': kind.wire,
-        if (name != null && name!.trim().isNotEmpty) 'name': name!.trim(),
-        'count': count,
-        if (area != null) 'area': area,
-      };
+    'kind': kind.wire,
+    if (name != null && name!.trim().isNotEmpty) 'name': name!.trim(),
+    'count': count,
+    if (area != null) 'area': area,
+  };
 }
 
 /// Room types — mirrors backend `RoomKind`.
@@ -229,28 +242,28 @@ enum RoomKind {
   final String labelUz;
 
   String label(Locale l) => switch (l.languageCode) {
-        'ru' => switch (this) {
-            RoomKind.living => 'Гостиная',
-            RoomKind.bedroom => 'Спальня',
-            RoomKind.kitchen => 'Кухня',
-            RoomKind.bathroom => 'Ванная',
-            RoomKind.hallway => 'Коридор',
-            RoomKind.balcony => 'Балкон',
-            RoomKind.storage => 'Кладовая',
-            RoomKind.other => 'Другое',
-          },
-        'en' => switch (this) {
-            RoomKind.living => 'Living room',
-            RoomKind.bedroom => 'Bedroom',
-            RoomKind.kitchen => 'Kitchen',
-            RoomKind.bathroom => 'Bathroom',
-            RoomKind.hallway => 'Hallway',
-            RoomKind.balcony => 'Balcony',
-            RoomKind.storage => 'Storage',
-            RoomKind.other => 'Other',
-          },
-        _ => labelUz,
-      };
+    'ru' => switch (this) {
+      RoomKind.living => 'Гостиная',
+      RoomKind.bedroom => 'Спальня',
+      RoomKind.kitchen => 'Кухня',
+      RoomKind.bathroom => 'Ванная',
+      RoomKind.hallway => 'Коридор',
+      RoomKind.balcony => 'Балкон',
+      RoomKind.storage => 'Кладовая',
+      RoomKind.other => 'Другое',
+    },
+    'en' => switch (this) {
+      RoomKind.living => 'Living room',
+      RoomKind.bedroom => 'Bedroom',
+      RoomKind.kitchen => 'Kitchen',
+      RoomKind.bathroom => 'Bathroom',
+      RoomKind.hallway => 'Hallway',
+      RoomKind.balcony => 'Balcony',
+      RoomKind.storage => 'Storage',
+      RoomKind.other => 'Other',
+    },
+    _ => labelUz,
+  };
 }
 
 class AiClientInfo {
@@ -281,11 +294,11 @@ class AiClientInfo {
   final String email;
 
   Map<String, dynamic> toJson() => {
-        'name': name,
-        'stir': stir,
-        'phone': phone,
-        'email': email,
-      };
+    'name': name,
+    'stir': stir,
+    'phone': phone,
+    'email': email,
+  };
 }
 
 class AiLocationInfo {
@@ -309,8 +322,8 @@ class AiLocationInfo {
   final String? addressText;
 
   Map<String, dynamic> toJson() => {
-        'lat': lat,
-        'lng': lng,
-        if (addressText != null) 'address_text': addressText,
-      };
+    'lat': lat,
+    'lng': lng,
+    if (addressText != null) 'address_text': addressText,
+  };
 }

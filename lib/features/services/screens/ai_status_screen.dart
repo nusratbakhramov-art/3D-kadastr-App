@@ -22,7 +22,6 @@ import '../../payments/ai_payment_sheet.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
-import '../widgets/step_progress_bar.dart';
 
 class AiStatusScreen extends StatefulWidget {
   const AiStatusScreen({super.key, required this.bundle});
@@ -70,8 +69,9 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _submitError =
-            _AiStatusStrings.errLogin(Localizations.localeOf(context));
+        _submitError = _AiStatusStrings.errLogin(
+          Localizations.localeOf(context),
+        );
       });
       return;
     }
@@ -113,8 +113,11 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      final handled =
-          await NetworkErrorHandler.maybeShow(context, e, onRetry: _submit);
+      final handled = await NetworkErrorHandler.maybeShow(
+        context,
+        e,
+        onRetry: _submit,
+      );
       if (!mounted) return;
       if (handled) return;
       setState(() {
@@ -184,7 +187,6 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
         isDark: isDark,
         title: _AiStatusStrings.appBarTitle(l),
         subtitle: _AiStatusStrings.submittingSubtitle(l),
-        progressIndex: 3,
         child: _SpinnerBlock(label: _AiStatusStrings.submitting(l)),
       );
     }
@@ -193,7 +195,6 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
         isDark: isDark,
         title: _AiStatusStrings.appBarTitle(l),
         subtitle: _AiStatusStrings.notSubmitted(l),
-        progressIndex: 3,
         child: _ErrorBlock(message: _submitError!, onRetry: _submit),
       );
     }
@@ -203,7 +204,6 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
         isDark: isDark,
         title: _AiStatusStrings.appBarTitle(l),
         subtitle: _AiStatusStrings.fetchingStatus(l),
-        progressIndex: 3,
         child: _SpinnerBlock(label: _AiStatusStrings.fetchingStatus(l)),
       );
     }
@@ -212,7 +212,6 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
         isDark: isDark,
         title: _AiStatusStrings.appBarTitle(l),
         subtitle: _AiStatusStrings.errorSubtitle(l),
-        progressIndex: 3,
         child: _ErrorBlock(
           message: snap.errorMessage ?? _AiStatusStrings.unknownError(l),
           onRetry: _submit,
@@ -226,7 +225,6 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       isDark: isDark,
       title: _AiStatusStrings.appBarTitle(l),
       subtitle: _AiStatusStrings.calculating(l),
-      progressIndex: 3,
       child: _ProgressView(snapshot: snap, isDark: isDark),
     );
   }
@@ -235,9 +233,10 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
     required bool isDark,
     required String title,
     required String subtitle,
-    required int progressIndex,
     required Widget child,
   }) {
+    // No step bar here — this is the processing/result screen, not an input
+    // step. The wizard progress bar lives on the input steps (Cadastre…Review).
     return Column(
       children: [
         Padding(
@@ -245,10 +244,6 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
           child: ServiceAppBar(title: title, subtitle: subtitle),
         ),
         const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: StepProgressBar(count: 4, activeIndex: progressIndex),
-        ),
         Expanded(child: child),
       ],
     );
@@ -277,11 +272,13 @@ class _ProgressView extends StatelessWidget {
         ),
         _StepRow(
           label: _AiStatusStrings.stepGathering(l),
-          done: snapshot.status == AiJobStatus.aiPricing ||
+          done:
+              snapshot.status == AiJobStatus.aiPricing ||
               snapshot.status == AiJobStatus.completed,
           active: snapshot.status == AiJobStatus.gatheringInfo,
           isDark: isDark,
-          details: snapshot.status == AiJobStatus.gatheringInfo ||
+          details:
+              snapshot.status == AiJobStatus.gatheringInfo ||
                   snapshot.nearbyListingsCount > 0 ||
                   snapshot.nearbyPoisCount > 0
               ? _AiStatusStrings.gatheringDetails(
@@ -347,15 +344,21 @@ class _StepRow extends StatelessWidget {
             width: 28,
             height: 28,
             child: done
-                ? const Icon(Icons.check_circle,
-                    color: AppColors.splashGreen, size: 24)
+                ? const Icon(
+                    Icons.check_circle,
+                    color: AppColors.splashGreen,
+                    size: 24,
+                  )
                 : active
-                    ? const CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        color: AppColors.splashGreen,
-                      )
-                    : Icon(Icons.radio_button_unchecked,
-                        color: sub.withValues(alpha: 0.5), size: 24),
+                ? const CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: AppColors.splashGreen,
+                  )
+                : Icon(
+                    Icons.radio_button_unchecked,
+                    color: sub.withValues(alpha: 0.5),
+                    size: 24,
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -404,10 +407,7 @@ class _SpinnerBlock extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             label,
-            style: const TextStyle(
-              fontFamily: 'MTSText',
-              fontSize: 14,
-            ),
+            style: const TextStyle(fontFamily: 'MTSText', fontSize: 14),
           ),
         ],
       ),
@@ -426,8 +426,7 @@ class _ErrorBlock extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline,
-              size: 56, color: Color(0xFFE0492A)),
+          const Icon(Icons.error_outline, size: 56, color: Color(0xFFE0492A)),
           const SizedBox(height: 16),
           Text(
             message,
@@ -477,64 +476,74 @@ class _ResultView extends StatelessWidget {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
-          child: Row(
-            children: [
-              IconButton(
-                icon: Icon(
-                  Icons.arrow_back,
-                  color: isDark ? Colors.white : AppColors.textBlack,
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(0, 0, 0, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.arrow_back,
+                        color: isDark ? Colors.white : AppColors.textBlack,
+                      ),
+                      onPressed: () =>
+                          Navigator.of(context).popUntil((r) => r.isFirst),
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        _AiStatusStrings.resultTitle(l),
+                        style: TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 18,
+                          color: isDark ? Colors.white : AppColors.textBlack,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                onPressed: () =>
-                    Navigator.of(context).popUntil((r) => r.isFirst),
               ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  _AiStatusStrings.resultTitle(l),
-                  style: TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                    color: isDark ? Colors.white : AppColors.textBlack,
-                  ),
-                ),
+              const SizedBox(height: 8),
+              _PriceCard(
+                estimated: estimated,
+                low: low,
+                high: high,
+                confidence: confidence,
+                isDark: isDark,
+                locale: l,
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 8),
-        _PriceCard(
-          estimated: estimated,
-          low: low,
-          high: high,
-          confidence: confidence,
-          isDark: isDark,
-          locale: l,
-        ),
               // AI narrative summary (plain Uzbek), if the LLM produced one.
-              if ((result['summary'] as String?)?.trim().isNotEmpty ?? false) ...[
+              if ((result['summary'] as String?)?.trim().isNotEmpty ??
+                  false) ...[
                 const SizedBox(height: 14),
-                _SummaryCard(text: (result['summary'] as String).trim(), isDark: isDark),
+                _SummaryCard(
+                  text: (result['summary'] as String).trim(),
+                  isDark: isDark,
+                ),
               ],
               // 3-approach breakdown (cost / income / comparison + weights).
               if (result['approaches'] is Map) ...[
                 const SizedBox(height: 18),
-                _SectionTitle(_AiStatusStrings.approachesTitle(l),
-                    isDark: isDark),
+                _SectionTitle(
+                  _AiStatusStrings.approachesTitle(l),
+                  isDark: isDark,
+                ),
                 const SizedBox(height: 8),
                 _ApproachesCard(
-                  approaches: (result['approaches'] as Map).cast<String, dynamic>(),
+                  approaches: (result['approaches'] as Map)
+                      .cast<String, dynamic>(),
                   isDark: isDark,
                 ),
               ],
               // Comparables actually used (the market approach evidence).
-              if ((result['comparables_preview'] as List?)?.isNotEmpty ?? false) ...[
+              if ((result['comparables_preview'] as List?)?.isNotEmpty ??
+                  false) ...[
                 const SizedBox(height: 18),
-                _SectionTitle(_AiStatusStrings.comparablesTitle(l),
-                    isDark: isDark),
+                _SectionTitle(
+                  _AiStatusStrings.comparablesTitle(l),
+                  isDark: isDark,
+                ),
                 const SizedBox(height: 8),
                 _ComparablesCard(
                   comparables: (result['comparables_preview'] as List)
@@ -620,11 +629,7 @@ class _PriceCard extends StatelessWidget {
         children: [
           Text(
             _AiStatusStrings.estimatedValue(locale),
-            style: TextStyle(
-              fontFamily: 'MTSText',
-              fontSize: 13,
-              color: sub,
-            ),
+            style: TextStyle(fontFamily: 'MTSText', fontSize: 13, color: sub),
           ),
           const SizedBox(height: 6),
           Text(
@@ -639,19 +644,13 @@ class _PriceCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             _AiStatusStrings.soum(locale),
-            style: TextStyle(
-              fontFamily: 'MTSText',
-              fontSize: 13,
-              color: sub,
-            ),
+            style: TextStyle(fontFamily: 'MTSText', fontSize: 13, color: sub),
           ),
           if (low != null && high != null) ...[
             const SizedBox(height: 16),
             Row(
               children: [
-                Icon(Icons.straighten,
-                    size: 16,
-                    color: AppColors.splashGreen),
+                Icon(Icons.straighten, size: 16, color: AppColors.splashGreen),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
@@ -698,14 +697,13 @@ class _ConfidenceBar extends StatelessWidget {
   final Locale locale;
   @override
   Widget build(BuildContext context) {
-    final track =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final track = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final pct = (value.clamp(0.0, 1.0) * 100).round();
     final label = pct >= 70
         ? _AiStatusStrings.confHigh(locale)
         : (pct >= 45
-            ? _AiStatusStrings.confMedium(locale)
-            : _AiStatusStrings.confLow(locale));
+              ? _AiStatusStrings.confMedium(locale)
+              : _AiStatusStrings.confLow(locale));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -739,8 +737,7 @@ class _ConfidenceBar extends StatelessWidget {
             value: value.clamp(0.0, 1.0),
             minHeight: 8,
             backgroundColor: track,
-            valueColor:
-                const AlwaysStoppedAnimation(AppColors.splashGreen),
+            valueColor: const AlwaysStoppedAnimation(AppColors.splashGreen),
           ),
         ),
       ],
@@ -785,7 +782,11 @@ class _SummaryCard extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.auto_awesome, size: 18, color: AppColors.splashGreen),
+          const Icon(
+            Icons.auto_awesome,
+            size: 18,
+            color: AppColors.splashGreen,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -846,9 +847,11 @@ class _ApproachesCard extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
 
-    final weights = (approaches['weights'] as Map?)?.cast<String, dynamic>() ?? const {};
+    final weights =
+        (approaches['weights'] as Map?)?.cast<String, dynamic>() ?? const {};
     final cost = (approaches['cost_approach'] as Map?)?.cast<String, dynamic>();
-    final income = (approaches['income_approach'] as Map?)?.cast<String, dynamic>();
+    final income = (approaches['income_approach'] as Map?)
+        ?.cast<String, dynamic>();
     final comparison = _d(approaches['comparison_value']);
 
     final values = <String, double?>{
@@ -866,19 +869,27 @@ class _ApproachesCard extends StatelessWidget {
           children: [
             Expanded(
               flex: 5,
-              child: Text(_label(key, locale),
-                  style: TextStyle(
-                      fontFamily: 'MTSCompact', fontSize: 13, color: text)),
+              child: Text(
+                _label(key, locale),
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontSize: 13,
+                  color: text,
+                ),
+              ),
             ),
             Expanded(
               flex: 3,
-              child: Text(_fmt(values[key], locale),
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: text)),
+              child: Text(
+                _fmt(values[key], locale),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: text,
+                ),
+              ),
             ),
             const SizedBox(width: 10),
             Container(
@@ -887,12 +898,15 @@ class _ApproachesCard extends StatelessWidget {
                 color: AppColors.splashGreen.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text('${(w * 100).round()}%',
-                  style: const TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.splashGreen)),
+              child: Text(
+                '${(w * 100).round()}%',
+                style: const TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.splashGreen,
+                ),
+              ),
             ),
           ],
         ),
@@ -913,22 +927,30 @@ class _ApproachesCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                    switch (locale.languageCode) {
-                      'ru' => 'Подход',
-                      'en' => 'Approach',
-                      _ => 'Yondashuv',
-                    },
-                    style: TextStyle(
-                        fontFamily: 'MTSCompact', fontSize: 11, color: sub)),
-              ),
-              Text(
                   switch (locale.languageCode) {
-                    'ru' => 'Значение · Вес',
-                    'en' => 'Value · Weight',
-                    _ => 'Qiymat · Og\'irlik',
+                    'ru' => 'Подход',
+                    'en' => 'Approach',
+                    _ => 'Yondashuv',
                   },
                   style: TextStyle(
-                      fontFamily: 'MTSCompact', fontSize: 11, color: sub)),
+                    fontFamily: 'MTSCompact',
+                    fontSize: 11,
+                    color: sub,
+                  ),
+                ),
+              ),
+              Text(
+                switch (locale.languageCode) {
+                  'ru' => 'Значение · Вес',
+                  'en' => 'Value · Weight',
+                  _ => 'Qiymat · Og\'irlik',
+                },
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontSize: 11,
+                  color: sub,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -976,8 +998,9 @@ class _ComparablesCard extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
 
-    final visibleCount =
-        comparables.length > _maxVisible ? _maxVisible : comparables.length;
+    final visibleCount = comparables.length > _maxVisible
+        ? _maxVisible
+        : comparables.length;
     final extra = comparables.length - visibleCount;
 
     return Container(
@@ -989,8 +1012,14 @@ class _ComparablesCard extends StatelessWidget {
       child: Column(
         children: [
           for (var i = 0; i < visibleCount; i++)
-            _row(comparables[i], i != visibleCount - 1 || extra > 0, text, sub,
-                border, locale),
+            _row(
+              comparables[i],
+              i != visibleCount - 1 || extra > 0,
+              text,
+              sub,
+              border,
+              locale,
+            ),
           if (extra > 0)
             Container(
               width: double.infinity,
@@ -1010,8 +1039,14 @@ class _ComparablesCard extends StatelessWidget {
     );
   }
 
-  Widget _row(Map<String, dynamic> c, bool divider, Color text, Color sub,
-      Color border, Locale locale) {
+  Widget _row(
+    Map<String, dynamic> c,
+    bool divider,
+    Color text,
+    Color sub,
+    Color border,
+    Locale locale,
+  ) {
     final price = _d(c['price_uzs']);
     final area = _d(c['area_sqm']);
     final psm = _d(c['price_per_sqm']);
@@ -1027,14 +1062,13 @@ class _ComparablesCard extends StatelessWidget {
 
     return InkWell(
       onTap: (url != null && url.isNotEmpty)
-          ? () => launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)
+          ? () =>
+                launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication)
           : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          border: divider
-              ? Border(bottom: BorderSide(color: border))
-              : null,
+          border: divider ? Border(bottom: BorderSide(color: border)) : null,
         ),
         child: Row(
           children: [
@@ -1112,8 +1146,9 @@ class _PoiSummaryState extends State<_PoiSummary> {
     final sub = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
-    final dividerColor =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final dividerColor = isDark
+        ? const Color(0xFF2C3133)
+        : const Color(0xFFE3E5E8);
 
     final rows = widget.pois.entries
         .where((e) => e.value is List && (e.value as List).isNotEmpty)
@@ -1134,8 +1169,13 @@ class _PoiSummaryState extends State<_PoiSummary> {
     );
   }
 
-  Widget _category(MapEntry<String, dynamic> r, bool divider, Color text,
-      Color sub, Color dividerColor) {
+  Widget _category(
+    MapEntry<String, dynamic> r,
+    bool divider,
+    Color text,
+    Color sub,
+    Color dividerColor,
+  ) {
     final kind = r.key;
     final list = r.value as List;
     final isOpen = _open.contains(kind);
@@ -1171,8 +1211,11 @@ class _PoiSummaryState extends State<_PoiSummary> {
                   ),
                 ),
                 const SizedBox(width: 6),
-                Icon(isOpen ? Icons.expand_less : Icons.expand_more,
-                    size: 18, color: sub),
+                Icon(
+                  isOpen ? Icons.expand_less : Icons.expand_more,
+                  size: 18,
+                  color: sub,
+                ),
               ],
             ),
           ),
@@ -1184,11 +1227,9 @@ class _PoiSummaryState extends State<_PoiSummary> {
   }
 
   Widget _places(List raw, Color sub, Color text) {
-    final places = raw
-        .whereType<Map>()
-        .map((e) => e.cast<String, dynamic>())
-        .toList()
-      ..sort((a, b) => _distOf(a).compareTo(_distOf(b)));
+    final places =
+        raw.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList()
+          ..sort((a, b) => _distOf(a).compareTo(_distOf(b)));
     final shown = places.take(_maxPlaces).toList();
     final extra = places.length - shown.length;
     return Padding(
@@ -1322,76 +1363,76 @@ class _AiStatusStrings {
   const _AiStatusStrings._();
 
   static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI оценка',
-        'en' => 'AI valuation',
-        _ => 'AI Baholash',
-      };
+    'ru' => 'AI оценка',
+    'en' => 'AI valuation',
+    _ => 'AI Baholash',
+  };
 
   static String submittingSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Запрос отправляется...',
-        'en' => 'Submitting the request...',
-        _ => 'So\'rov yuborilmoqda...',
-      };
+    'ru' => 'Запрос отправляется...',
+    'en' => 'Submitting the request...',
+    _ => 'So\'rov yuborilmoqda...',
+  };
 
   static String submitting(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отправка...',
-        'en' => 'Submitting...',
-        _ => 'Yuborilmoqda...',
-      };
+    'ru' => 'Отправка...',
+    'en' => 'Submitting...',
+    _ => 'Yuborilmoqda...',
+  };
 
   static String notSubmitted(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не отправлено',
-        'en' => 'Not submitted',
-        _ => 'Yuborilmadi',
-      };
+    'ru' => 'Не отправлено',
+    'en' => 'Not submitted',
+    _ => 'Yuborilmadi',
+  };
 
   static String fetchingStatus(Locale l) => switch (l.languageCode) {
-        'ru' => 'Получение статуса...',
-        'en' => 'Fetching status...',
-        _ => 'Holat olinmoqda...',
-      };
+    'ru' => 'Получение статуса...',
+    'en' => 'Fetching status...',
+    _ => 'Holat olinmoqda...',
+  };
 
   static String errorSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Ошибка',
-        'en' => 'Error',
-        _ => 'Xatolik',
-      };
+    'ru' => 'Ошибка',
+    'en' => 'Error',
+    _ => 'Xatolik',
+  };
 
   static String unknownError(Locale l) => switch (l.languageCode) {
-        'ru' => 'Неизвестная ошибка',
-        'en' => 'Unknown error',
-        _ => 'Noma\'lum xatolik',
-      };
+    'ru' => 'Неизвестная ошибка',
+    'en' => 'Unknown error',
+    _ => 'Noma\'lum xatolik',
+  };
 
   static String calculating(Locale l) => switch (l.languageCode) {
-        'ru' => 'Расчёт...',
-        'en' => 'Calculating...',
-        _ => 'Hisoblanmoqda...',
-      };
+    'ru' => 'Расчёт...',
+    'en' => 'Calculating...',
+    _ => 'Hisoblanmoqda...',
+  };
 
   static String errLogin(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сначала войдите в систему',
-        'en' => 'Please sign in first',
-        _ => 'Avval tizimga kiring',
-      };
+    'ru' => 'Сначала войдите в систему',
+    'en' => 'Please sign in first',
+    _ => 'Avval tizimga kiring',
+  };
 
   static String invalidData(Locale l) => switch (l.languageCode) {
-        'ru' => 'Проверьте введённые данные и попробуйте снова',
-        'en' => 'Please check the entered data and try again',
-        _ => 'Kiritilgan ma\'lumotlarni tekshirib, qayta urinib ko\'ring',
-      };
+    'ru' => 'Проверьте введённые данные и попробуйте снова',
+    'en' => 'Please check the entered data and try again',
+    _ => 'Kiritilgan ma\'lumotlarni tekshirib, qayta urinib ko\'ring',
+  };
 
   static String stepReceived(Locale l) => switch (l.languageCode) {
-        'ru' => 'Запрос принят',
-        'en' => 'Request received',
-        _ => 'So\'rov qabul qilindi',
-      };
+    'ru' => 'Запрос принят',
+    'en' => 'Request received',
+    _ => 'So\'rov qabul qilindi',
+  };
 
   static String stepGathering(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сбор данных',
-        'en' => 'Collecting data',
-        _ => 'Ma\'lumotlar yig\'ilmoqda',
-      };
+    'ru' => 'Сбор данных',
+    'en' => 'Collecting data',
+    _ => 'Ma\'lumotlar yig\'ilmoqda',
+  };
 
   static String gatheringDetails(Locale l, int listings, int pois) =>
       switch (l.languageCode) {
@@ -1401,127 +1442,130 @@ class _AiStatusStrings {
       };
 
   static String stepPricing(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI рассчитывает цену',
-        'en' => 'AI is calculating the price',
-        _ => 'AI narx hisoblanmoqda',
-      };
+    'ru' => 'AI рассчитывает цену',
+    'en' => 'AI is calculating the price',
+    _ => 'AI narx hisoblanmoqda',
+  };
 
   static String durationHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Это может занять от 30 секунд до 2 минут.\n'
-            'Мы уведомим вас по завершении.',
-        'en' => 'This may take 30 seconds to 2 minutes.\n'
-            'We\'ll notify you when it\'s done.',
-        _ => 'Bu jarayon 30 sekund - 2 daqiqa olishi mumkin.\n'
-            'Tugagandan keyin xabar yuboramiz.',
-      };
+    'ru' =>
+      'Это может занять от 30 секунд до 2 минут.\n'
+          'Мы уведомим вас по завершении.',
+    'en' =>
+      'This may take 30 seconds to 2 minutes.\n'
+          'We\'ll notify you when it\'s done.',
+    _ =>
+      'Bu jarayon 30 sekund - 2 daqiqa olishi mumkin.\n'
+          'Tugagandan keyin xabar yuboramiz.',
+  };
 
   static String resultTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Результат AI оценки',
-        'en' => 'AI valuation result',
-        _ => 'AI Baholash natijasi',
-      };
+    'ru' => 'Результат AI оценки',
+    'en' => 'AI valuation result',
+    _ => 'AI Baholash natijasi',
+  };
 
   static String estimatedValue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Примерная стоимость',
-        'en' => 'Estimated value',
-        _ => 'Taxminiy qiymat',
-      };
+    'ru' => 'Примерная стоимость',
+    'en' => 'Estimated value',
+    _ => 'Taxminiy qiymat',
+  };
 
   static String soum(Locale l) => switch (l.languageCode) {
-        'ru' => 'сум',
-        'en' => 'soum',
-        _ => 'so\'m',
-      };
+    'ru' => 'сум',
+    'en' => 'soum',
+    _ => 'so\'m',
+  };
 
   static String confidenceLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Достоверность: ',
-        'en' => 'Confidence: ',
-        _ => 'Ishonchlilik: ',
-      };
+    'ru' => 'Достоверность: ',
+    'en' => 'Confidence: ',
+    _ => 'Ishonchlilik: ',
+  };
 
   static String confHigh(Locale l) => switch (l.languageCode) {
-        'ru' => 'Высокая',
-        'en' => 'High',
-        _ => 'Yuqori',
-      };
+    'ru' => 'Высокая',
+    'en' => 'High',
+    _ => 'Yuqori',
+  };
 
   static String confMedium(Locale l) => switch (l.languageCode) {
-        'ru' => 'Средняя',
-        'en' => 'Medium',
-        _ => 'O\'rtacha',
-      };
+    'ru' => 'Средняя',
+    'en' => 'Medium',
+    _ => 'O\'rtacha',
+  };
 
   static String confLow(Locale l) => switch (l.languageCode) {
-        'ru' => 'Низкая',
-        'en' => 'Low',
-        _ => 'Past',
-      };
+    'ru' => 'Низкая',
+    'en' => 'Low',
+    _ => 'Past',
+  };
 
   static String approachesTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подходы к оценке',
-        'en' => 'Valuation approaches',
-        _ => 'Baholash yondashuvlari',
-      };
+    'ru' => 'Подходы к оценке',
+    'en' => 'Valuation approaches',
+    _ => 'Baholash yondashuvlari',
+  };
 
   static String approachCost(Locale l) => switch (l.languageCode) {
-        'ru' => 'Затраты (восстановление)',
-        'en' => 'Cost (replacement)',
-        _ => 'Xarajat (qayta tiklash)',
-      };
+    'ru' => 'Затраты (восстановление)',
+    'en' => 'Cost (replacement)',
+    _ => 'Xarajat (qayta tiklash)',
+  };
 
   static String approachIncome(Locale l) => switch (l.languageCode) {
-        'ru' => 'Доход (аренда)',
-        'en' => 'Income (rent)',
-        _ => 'Daromad (ijara)',
-      };
+    'ru' => 'Доход (аренда)',
+    'en' => 'Income (rent)',
+    _ => 'Daromad (ijara)',
+  };
 
   static String approachComparison(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сравнение (рынок)',
-        'en' => 'Comparison (market)',
-        _ => 'Qiyoslash (bozor)',
-      };
+    'ru' => 'Сравнение (рынок)',
+    'en' => 'Comparison (market)',
+    _ => 'Qiyoslash (bozor)',
+  };
 
   static String comparablesTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сравниваемые объявления',
-        'en' => 'Compared listings',
-        _ => 'Solishtirilgan e\'lonlar',
-      };
+    'ru' => 'Сравниваемые объявления',
+    'en' => 'Compared listings',
+    _ => 'Solishtirilgan e\'lonlar',
+  };
 
   static String moreListings(Locale l, int n) => switch (l.languageCode) {
-        'ru' => 'Ещё $n объявлений',
-        'en' => '$n more listings',
-        _ => 'Yana $n ta e\'lon',
-      };
+    'ru' => 'Ещё $n объявлений',
+    'en' => '$n more listings',
+    _ => 'Yana $n ta e\'lon',
+  };
 
   static String poisTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Объекты поблизости',
-        'en' => 'Nearby objects',
-        _ => 'Yaqin atrofdagi obyektlar',
-      };
+    'ru' => 'Объекты поблизости',
+    'en' => 'Nearby objects',
+    _ => 'Yaqin atrofdagi obyektlar',
+  };
 
   static String poisSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Инфраструктура в радиусе 1–2 км',
-        'en' => 'Infrastructure found within a 1–2 km radius',
-        _ => '1–2 km radiusda topilgan infratuzilma',
-      };
+    'ru' => 'Инфраструктура в радиусе 1–2 км',
+    'en' => 'Infrastructure found within a 1–2 km radius',
+    _ => '1–2 km radiusda topilgan infratuzilma',
+  };
 
   static String morePlaces(Locale l, int n) => switch (l.languageCode) {
-        'ru' => 'Ещё $n',
-        'en' => '$n more',
-        _ => 'Yana $n ta',
-      };
+    'ru' => 'Ещё $n',
+    'en' => '$n more',
+    _ => 'Yana $n ta',
+  };
 
   static String unnamed(Locale l) => switch (l.languageCode) {
-        'ru' => 'Без названия',
-        'en' => 'Unnamed',
-        _ => 'Nomsiz',
-      };
+    'ru' => 'Без названия',
+    'en' => 'Unnamed',
+    _ => 'Nomsiz',
+  };
 
   static String home(Locale l) => switch (l.languageCode) {
-        'ru' => 'Главная',
-        'en' => 'Home',
-        _ => 'Asosiy sahifa',
-      };
+    'ru' => 'Главная',
+    'en' => 'Home',
+    _ => 'Asosiy sahifa',
+  };
 
   static String submitApplication(Locale l) => switch (l.languageCode) {
         'ru' => 'Подать заявку',
@@ -1530,74 +1574,74 @@ class _AiStatusStrings {
       };
 
   static String unitBln(Locale l) => switch (l.languageCode) {
-        'ru' => 'млрд',
-        'en' => 'bln',
-        _ => 'mlrd',
-      };
+    'ru' => 'млрд',
+    'en' => 'bln',
+    _ => 'mlrd',
+  };
 
   static String unitMln(Locale l) => switch (l.languageCode) {
-        'ru' => 'млн',
-        'en' => 'mln',
-        _ => 'mln',
-      };
+    'ru' => 'млн',
+    'en' => 'mln',
+    _ => 'mln',
+  };
 
   static String unitK(Locale l) => switch (l.languageCode) {
-        'ru' => 'тыс',
-        'en' => 'k',
-        _ => 'ming',
-      };
+    'ru' => 'тыс',
+    'en' => 'k',
+    _ => 'ming',
+  };
 
   static String unitPcs(Locale l) => switch (l.languageCode) {
-        'ru' => 'шт',
-        'en' => 'pcs',
-        _ => 'ta',
-      };
+    'ru' => 'шт',
+    'en' => 'pcs',
+    _ => 'ta',
+  };
 
   static String poiSchools(Locale l) => switch (l.languageCode) {
-        'ru' => 'Школы',
-        'en' => 'Schools',
-        _ => 'Maktablar',
-      };
+    'ru' => 'Школы',
+    'en' => 'Schools',
+    _ => 'Maktablar',
+  };
 
   static String poiKindergartens(Locale l) => switch (l.languageCode) {
-        'ru' => 'Детские сады',
-        'en' => 'Kindergartens',
-        _ => 'Bog\'chalar',
-      };
+    'ru' => 'Детские сады',
+    'en' => 'Kindergartens',
+    _ => 'Bog\'chalar',
+  };
 
   static String poiMetro(Locale l) => switch (l.languageCode) {
-        'ru' => 'Станции метро',
-        'en' => 'Metro stations',
-        _ => 'Metro bekatlari',
-      };
+    'ru' => 'Станции метро',
+    'en' => 'Metro stations',
+    _ => 'Metro bekatlari',
+  };
 
   static String poiParks(Locale l) => switch (l.languageCode) {
-        'ru' => 'Парки',
-        'en' => 'Parks',
-        _ => 'Bog\'lar',
-      };
+    'ru' => 'Парки',
+    'en' => 'Parks',
+    _ => 'Bog\'lar',
+  };
 
   static String poiHospitals(Locale l) => switch (l.languageCode) {
-        'ru' => 'Больницы',
-        'en' => 'Hospitals',
-        _ => 'Shifoxonalar',
-      };
+    'ru' => 'Больницы',
+    'en' => 'Hospitals',
+    _ => 'Shifoxonalar',
+  };
 
   static String poiClinics(Locale l) => switch (l.languageCode) {
-        'ru' => 'Поликлиники',
-        'en' => 'Clinics',
-        _ => 'Poliklinikalar',
-      };
+    'ru' => 'Поликлиники',
+    'en' => 'Clinics',
+    _ => 'Poliklinikalar',
+  };
 
   static String poiSupermarkets(Locale l) => switch (l.languageCode) {
-        'ru' => 'Супермаркеты',
-        'en' => 'Supermarkets',
-        _ => 'Supermarketlar',
-      };
+    'ru' => 'Супермаркеты',
+    'en' => 'Supermarkets',
+    _ => 'Supermarketlar',
+  };
 
   static String poiBusStops(Locale l) => switch (l.languageCode) {
-        'ru' => 'Автобусные остановки',
-        'en' => 'Bus stops',
-        _ => 'Avtobus bekatlari',
-      };
+    'ru' => 'Автобусные остановки',
+    'en' => 'Bus stops',
+    _ => 'Avtobus bekatlari',
+  };
 }

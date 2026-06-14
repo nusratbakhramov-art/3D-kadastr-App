@@ -14,6 +14,7 @@ import '../ai_draft_saver.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/choice_tile.dart';
 import '../widgets/service_app_bar.dart';
+import '../widgets/step_progress_bar.dart';
 import 'ai_intake_screen.dart';
 
 class AiPurposeScreen extends StatefulWidget {
@@ -35,6 +36,7 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
     if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'ai/intake'),
         builder: (_) => AiIntakeScreen(bundle: widget.bundle),
       ),
     );
@@ -60,6 +62,11 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
                     title: _PurposeStrings.title(l),
                     subtitle: _PurposeStrings.subtitle(l),
                   ),
+                ),
+                const SizedBox(height: 8),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: StepProgressBar(count: 6, activeIndex: 3),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
@@ -98,20 +105,20 @@ class _PurposeStrings {
   const _PurposeStrings._();
 
   static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'Цель оценки',
-        'en' => 'Valuation purpose',
-        _ => 'Baholash maqsadi',
-      };
+    'ru' => 'Цель оценки',
+    'en' => 'Valuation purpose',
+    _ => 'Baholash maqsadi',
+  };
 
   static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Для чего определяется стоимость?',
-        'en' => 'Why is the value being determined?',
-        _ => 'Qiymat nima uchun aniqlanmoqda?',
-      };
+    'ru' => 'Для чего определяется стоимость?',
+    'en' => 'Why is the value being determined?',
+    _ => 'Qiymat nima uchun aniqlanmoqda?',
+  };
 
   static String continueLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
+    'ru' => 'Продолжить',
+    'en' => 'Continue',
+    _ => 'Davom etish',
+  };
 }

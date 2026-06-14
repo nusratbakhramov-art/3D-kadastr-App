@@ -39,8 +39,9 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   static const _fullMaskLength = 19;
   // Base NN:NN:NN:NN:NN:NNNN, optionally followed by sub-parcel / building /
   // unit blocks, e.g. 10:09:01:01:02:5942:0001:039.
-  static final _cadastreRe =
-      RegExp(r'^\d{2}:\d{2}:\d{2}:\d{2}:\d{2}:\d{4}(:\d{1,4})*$');
+  static final _cadastreRe = RegExp(
+    r'^\d{2}:\d{2}:\d{2}:\d{2}:\d{2}:\d{4}(:\d{1,4})*$',
+  );
   final TextEditingController _cadastreController = TextEditingController();
   Timer? _loadTimer;
   _LoadStatus _status = _LoadStatus.idle;
@@ -126,7 +127,8 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
       // davreest.uz returns an all-null result for a non-existent number
       // instead of an error — treat that as "not found" so the user can't
       // continue with empty property data.
-      final hasData = (result.address?.trim().isNotEmpty ?? false) ||
+      final hasData =
+          (result.address?.trim().isNotEmpty ?? false) ||
           result.totalArea != null ||
           result.livingArea != null ||
           result.cadastreValue != null ||
@@ -177,6 +179,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'ai/client'),
         builder: (_) => AiClientFormScreen(bundle: bundle),
       ),
     );
@@ -188,8 +191,9 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final labelColor = isDark ? Colors.white : AppColors.textBlack;
-    final dividerColor =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final dividerColor = isDark
+        ? const Color(0xFF2C3133)
+        : const Color(0xFFE3E5E8);
 
     return Scaffold(
       backgroundColor: bg,
@@ -212,7 +216,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 4, activeIndex: 0),
+                      child: const StepProgressBar(count: 6, activeIndex: 0),
                     ),
                     if (widget.scanJobId != null) ...[
                       const SizedBox(height: 12),
@@ -232,8 +236,10 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
-                          _SectionLabel(_CadastreStrings.cadastreNumber(l),
-                              color: labelColor),
+                          _SectionLabel(
+                            _CadastreStrings.cadastreNumber(l),
+                            color: labelColor,
+                          ),
                           const SizedBox(height: 10),
                           _CadastreInput(
                             isDark: isDark,
@@ -246,8 +252,10 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                               _cadastreController.text.length <
                                   _fullMaskLength) ...[
                             const SizedBox(height: 16),
-                            _SectionLabel(_CadastreStrings.recentSearches(l),
-                                color: labelColor),
+                            _SectionLabel(
+                              _CadastreStrings.recentSearches(l),
+                              color: labelColor,
+                            ),
                             const SizedBox(height: 10),
                             _RecentChips(
                               numbers: _recent,
@@ -261,13 +269,13 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                             switchOutCurve: Curves.easeIn,
                             transitionBuilder: (child, animation) =>
                                 FadeTransition(
-                              opacity: animation,
-                              child: SizeTransition(
-                                sizeFactor: animation,
-                                axisAlignment: -1,
-                                child: child,
-                              ),
-                            ),
+                                  opacity: animation,
+                                  child: SizeTransition(
+                                    sizeFactor: animation,
+                                    axisAlignment: -1,
+                                    child: child,
+                                  ),
+                                ),
                             child: _status == _LoadStatus.idle
                                 ? const SizedBox.shrink(key: ValueKey('idle'))
                                 : Column(
@@ -276,8 +284,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       const SizedBox(height: 18),
-                                      Container(
-                                          height: 1, color: dividerColor),
+                                      Container(height: 1, color: dividerColor),
                                       const SizedBox(height: 18),
                                       _SectionLabel(
                                         _CadastreStrings.propertyInfo(l),
@@ -290,7 +297,8 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                                         )
                                       else if (_status == _LoadStatus.error)
                                         _LookupErrorCard(
-                                          message: _errorMsg ??
+                                          message:
+                                              _errorMsg ??
                                               _CadastreStrings.genericError(l),
                                           onRetry: _runLookup,
                                           isDark: isDark,
@@ -425,8 +433,7 @@ class _RecentChips extends StatelessWidget {
           GestureDetector(
             onTap: () => onTap(n),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
                 color: isDark
                     ? const Color(0xFF1F2426)
@@ -444,9 +451,7 @@ class _RecentChips extends StatelessWidget {
                   Icon(
                     Icons.history_rounded,
                     size: 14,
-                    color: isDark
-                        ? Colors.white70
-                        : const Color(0xFF8A9097),
+                    color: isDark ? Colors.white70 : const Color(0xFF8A9097),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -479,8 +484,9 @@ class _CadastreInput extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.45)
         : const Color(0xFFB4B9BF);
     final textColor = isDark ? Colors.white : AppColors.textBlack;
-    final borderColor =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final borderColor = isDark
+        ? const Color(0xFF2C3133)
+        : const Color(0xFFE3E5E8);
 
     return TextField(
       controller: controller,
@@ -500,8 +506,10 @@ class _CadastreInput extends StatelessWidget {
       ),
       decoration: InputDecoration(
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
         hintText: 'XX:XX:XX:XX:XX:XXXX',
         hintStyle: TextStyle(
           fontFamily: 'MTSText',
@@ -536,7 +544,10 @@ class _CadastreMaskFormatter extends TextInputFormatter {
     TextEditingValue newValue,
   ) {
     final allDigits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final digits = allDigits.substring(0, allDigits.length.clamp(0, _maxDigits));
+    final digits = allDigits.substring(
+      0,
+      allDigits.length.clamp(0, _maxDigits),
+    );
 
     // Count how many digits sit to the LEFT of the incoming caret, so we can
     // put the caret back after the same digit once the colons are re-inserted
@@ -582,7 +593,9 @@ class _CadastreMaskFormatter extends TextInputFormatter {
 
     return TextEditingValue(
       text: formatted,
-      selection: TextSelection.collapsed(offset: offset.clamp(0, formatted.length)),
+      selection: TextSelection.collapsed(
+        offset: offset.clamp(0, formatted.length),
+      ),
     );
   }
 }
@@ -648,8 +661,7 @@ class _PropertyInfoCardSkeletonState extends State<_PropertyInfoCardSkeleton>
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
     final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final divider =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
+    final divider = isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
     final baseA = isDark ? const Color(0xFF1A2024) : const Color(0xFFE7EAEE);
     final baseB = isDark ? const Color(0xFF262C31) : const Color(0xFFF2F4F7);
 
@@ -747,8 +759,7 @@ class _PropertyInfoCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final divider =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
+    final divider = isDark ? const Color(0xFF2C3133) : const Color(0xFFEEF0F2);
     final labelColor = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
@@ -893,122 +904,122 @@ class _CadastreStrings {
   const _CadastreStrings._();
 
   static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI Оценка',
-        'en' => 'AI Valuation',
-        _ => 'AI Baholash',
-      };
+    'ru' => 'AI Оценка',
+    'en' => 'AI Valuation',
+    _ => 'AI Baholash',
+  };
 
   static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Определение стоимости недвижимости',
-        'en' => 'Determine the property value',
-        _ => 'Koʻchmas mulk qiymatini aniqlash',
-      };
+    'ru' => 'Определение стоимости недвижимости',
+    'en' => 'Determine the property value',
+    _ => 'Koʻchmas mulk qiymatini aniqlash',
+  };
 
   static String cadastreNumber(Locale l) => switch (l.languageCode) {
-        'ru' => 'Кадастровый номер',
-        'en' => 'Cadastral number',
-        _ => 'Kadastr raqami',
-      };
+    'ru' => 'Кадастровый номер',
+    'en' => 'Cadastral number',
+    _ => 'Kadastr raqami',
+  };
 
   static String recentSearches(Locale l) => switch (l.languageCode) {
-        'ru' => 'Последние поиски',
-        'en' => 'Recent searches',
-        _ => 'Oxirgi qidiruvlar',
-      };
+    'ru' => 'Последние поиски',
+    'en' => 'Recent searches',
+    _ => 'Oxirgi qidiruvlar',
+  };
 
   static String propertyInfo(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сведения о доме',
-        'en' => 'Property details',
-        _ => 'Uy maʼlumotlari',
-      };
+    'ru' => 'Сведения о доме',
+    'en' => 'Property details',
+    _ => 'Uy maʼlumotlari',
+  };
 
   static String continueLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
+    'ru' => 'Продолжить',
+    'en' => 'Continue',
+    _ => 'Davom etish',
+  };
 
   static String helperSuffix(Locale l) => switch (l.languageCode) {
-        'ru' => ' получается автоматически',
-        'en' => ' is fetched automatically',
-        _ => ' dan avtomatlik olinadi',
-      };
+    'ru' => ' получается автоматически',
+    'en' => ' is fetched automatically',
+    _ => ' dan avtomatlik olinadi',
+  };
 
   static String signInFirst(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сначала войдите в систему',
-        'en' => 'Please sign in first',
-        _ => 'Avval tizimga kiring',
-      };
+    'ru' => 'Сначала войдите в систему',
+    'en' => 'Please sign in first',
+    _ => 'Avval tizimga kiring',
+  };
 
   static String notFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'По этому кадастровому номеру данные не найдены',
-        'en' => 'No data found for this cadastral number',
-        _ => "Bu kadastr raqami boʻyicha maʼlumot topilmadi",
-      };
+    'ru' => 'По этому кадастровому номеру данные не найдены',
+    'en' => 'No data found for this cadastral number',
+    _ => "Bu kadastr raqami boʻyicha maʼlumot topilmadi",
+  };
 
   static String networkError(Locale l, String err) => switch (l.languageCode) {
-        'ru' => 'Ошибка сети: $err',
-        'en' => 'Network error: $err',
-        _ => 'Tarmoq xatosi: $err',
-      };
+    'ru' => 'Ошибка сети: $err',
+    'en' => 'Network error: $err',
+    _ => 'Tarmoq xatosi: $err',
+  };
 
   static String genericError(Locale l) => switch (l.languageCode) {
-        'ru' => 'Ошибка',
-        'en' => 'Error',
-        _ => 'Xato',
-      };
+    'ru' => 'Ошибка',
+    'en' => 'Error',
+    _ => 'Xato',
+  };
 
   static String lookupFailed(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось получить данные',
-        'en' => 'Could not fetch data',
-        _ => "Maʼlumot olib boʻlmadi",
-      };
+    'ru' => 'Не удалось получить данные',
+    'en' => 'Could not fetch data',
+    _ => "Maʼlumot olib boʻlmadi",
+  };
 
   static String retry(Locale l) => switch (l.languageCode) {
-        'ru' => 'Повторить',
-        'en' => 'Try again',
-        _ => 'Qayta urinish',
-      };
+    'ru' => 'Повторить',
+    'en' => 'Try again',
+    _ => 'Qayta urinish',
+  };
 
   static String address(Locale l) => switch (l.languageCode) {
-        'ru' => 'Адрес',
-        'en' => 'Address',
-        _ => 'Manzil',
-      };
+    'ru' => 'Адрес',
+    'en' => 'Address',
+    _ => 'Manzil',
+  };
 
   static String type(Locale l) => switch (l.languageCode) {
-        'ru' => 'Тип',
-        'en' => 'Type',
-        _ => 'Turi',
-      };
+    'ru' => 'Тип',
+    'en' => 'Type',
+    _ => 'Turi',
+  };
 
   static String area(Locale l) => switch (l.languageCode) {
-        'ru' => 'Площадь',
-        'en' => 'Area',
-        _ => 'Maydon',
-      };
+    'ru' => 'Площадь',
+    'en' => 'Area',
+    _ => 'Maydon',
+  };
 
   static String livingArea(Locale l) => switch (l.languageCode) {
-        'ru' => 'Жилая площадь',
-        'en' => 'Living area',
-        _ => 'Yashash maydoni',
-      };
+    'ru' => 'Жилая площадь',
+    'en' => 'Living area',
+    _ => 'Yashash maydoni',
+  };
 
   static String cadastreValue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Кадастровая стоимость',
-        'en' => 'Cadastral value',
-        _ => 'Kadastr qiymati',
-      };
+    'ru' => 'Кадастровая стоимость',
+    'en' => 'Cadastral value',
+    _ => 'Kadastr qiymati',
+  };
 
   static String billion(Locale l) => switch (l.languageCode) {
-        'ru' => 'млрд',
-        'en' => 'bn',
-        _ => 'mlrd',
-      };
+    'ru' => 'млрд',
+    'en' => 'bn',
+    _ => 'mlrd',
+  };
 
   static String million(Locale l) => switch (l.languageCode) {
-        'ru' => 'млн',
-        'en' => 'mln',
-        _ => 'mln',
-      };
+    'ru' => 'млн',
+    'en' => 'mln',
+    _ => 'mln',
+  };
 }
