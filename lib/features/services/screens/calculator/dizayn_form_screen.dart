@@ -65,6 +65,8 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
           placeOrderLabel: _Strings.placeTzOrder(locale),
           onPlaceOrder: () {
             final draft = _draftFromCalculator(objectType, style, area);
+            // Kalkulyatorda hisoblangan narxni saqlaymiz — adminka "Итого".
+            draft.estimatedPriceUzs = result.totalUzs;
             Navigator.of(ctx).push(
               MaterialPageRoute<void>(
                 builder: (_) => DizaynTzWizardScreen(initialDraft: draft),

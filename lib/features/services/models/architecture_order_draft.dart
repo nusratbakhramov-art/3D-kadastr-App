@@ -178,6 +178,10 @@ class ArchitectureOrderDraft extends ChangeNotifier {
   final TimelineDraft timeline = TimelineDraft();
   String notes = '';
 
+  /// Onlayn kalkulyatorda hisoblangan taxminiy narx (so'm) — adminkada "Итого"
+  /// ustunida ko'rsatiladi. Backend uni `details.estimated_price_uzs`'da saqlaydi.
+  int? estimatedPriceUzs;
+
   // ── Validatsiya yordamchilari ────────────────────────────────────────
   bool get isStep1Valid =>
       customerName.trim().length >= 2 && phone.trim().length >= 5;
@@ -221,6 +225,7 @@ class ArchitectureOrderDraft extends ChangeNotifier {
       if (maxHeightM != null) 'max_height_m': maxHeightM,
       'details': {
         if (location != null) 'location': location!.toJson(),
+        if (estimatedPriceUzs != null) 'estimated_price_uzs': estimatedPriceUzs,
         // Backend RoomEntry sxemasi {name, count, area_sqm} kutadi — AiRoom'ni
         // shu shaklga moslaymiz (standart turlar uchun nom = labelUz).
         'rooms': rooms.map((r) {

@@ -164,6 +164,10 @@ class DizaynOrderDraft extends ChangeNotifier {
   final DizaynTimelineDraft timeline = DizaynTimelineDraft();
   String notes = '';
 
+  /// Onlayn kalkulyatorda hisoblangan taxminiy narx (so'm) — adminkada "Итого"
+  /// ustunida ko'rsatiladi. Backend uni `details.estimated_price_uzs`'da saqlaydi.
+  int? estimatedPriceUzs;
+
   // ── Validatsiya yordamchilari ────────────────────────────────────────
   bool get isStep1Valid =>
       customerName.trim().length >= 2 && phone.trim().length >= 5;
@@ -197,6 +201,7 @@ class DizaynOrderDraft extends ChangeNotifier {
       if (ceilingHeightM != null) 'ceiling_height_m': ceilingHeightM,
       'details': {
         if (location != null) 'location': location!.toJson(),
+        if (estimatedPriceUzs != null) 'estimated_price_uzs': estimatedPriceUzs,
         if (extraRooms.trim().isNotEmpty) 'extra_rooms': extraRooms.trim(),
         'interior': interior.toJson(),
         'engineering': engineering.toJson(),

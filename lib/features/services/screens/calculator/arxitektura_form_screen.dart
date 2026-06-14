@@ -61,6 +61,8 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
           placeOrderLabel: _Strings.placeTzOrder(locale),
           onPlaceOrder: () {
             final draft = _draftFromCalculator(selected, area);
+            // Kalkulyatorda hisoblangan narxni saqlaymiz — adminka "Итого".
+            draft.estimatedPriceUzs = result.totalUzs;
             Navigator.of(ctx).push(
               MaterialPageRoute<void>(
                 builder: (_) => ArxitekturaTzWizardScreen(initialDraft: draft),
