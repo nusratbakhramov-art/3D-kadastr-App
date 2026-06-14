@@ -9,6 +9,7 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../api_calculator_order_service.dart';
 import '../models/calculator_draft.dart';
 import '../widgets/service_app_bar.dart';
+import 'calculator/arxitektura_tz_success_screen.dart';
 
 class OnlineCalculatorResultScreen extends StatefulWidget {
   const OnlineCalculatorResultScreen({
@@ -71,13 +72,18 @@ class _OnlineCalculatorResultScreenState
     if (!mounted) return;
     setState(() => _orderSubmitting = true);
     try {
-      await _orders.submit(result: widget.result, token: token);
+      final id = await _orders.submit(result: widget.result, token: token);
       if (!mounted) return;
       setState(() {
         _orderSubmitting = false;
         _orderSubmitted = true;
       });
-      _snack(_Strings.orderSent(Localizations.localeOf(context)));
+      // Dizayn/arxitektura kabi — muvaffaqiyat ekraniga o'tamiz.
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => ArxitekturaTzSuccessScreen(orderId: id),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() => _orderSubmitting = false);
@@ -280,13 +286,6 @@ class _Strings {
         'Ariza yuborildi ✓',
         'Заявка отправлена ✓',
         'Application sent ✓',
-      );
-
-  static String orderSent(Locale l) => _pick(
-        l,
-        'Ariza yuborildi',
-        'Заявка отправлена',
-        'Application sent',
       );
 
   static String sendError(Locale l, String e) => _pick(
