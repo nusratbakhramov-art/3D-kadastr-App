@@ -16,6 +16,7 @@ import simd
 import ImageIO
 import CoreGraphics
 import CoreImage
+import Accelerate  // vImage — atlas despeckle (qora nuqtalarni olib tashlash)
 import VideoToolbox
 import UniformTypeIdentifiers
 import RealityKit
@@ -3753,11 +3754,21 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
             // foto (peak ~2.5× kam) → jetsam/crash o'rniga biroz pastroq tiniqlik.
             // os_proc_available_memory() = jetsam'gacha qolgan bayt (0 = o'lchab bo'lmadi).
             let availMB = Int(os_proc_available_memory() / (1024 * 1024))
-            let bigMesh = globalTris.count > 200_000
-            let safeMode = availMB > 0 && (availMB < 1400 || bigMesh)
-            let atlasRes = safeMode ? 2048 : 4096
-            let dsFactor = safeMode ? 2 : 1
-            NSLog("KADASTR atlas: \(safeMode ? "XOTIRA-XAVFSIZ (2K, yarim-res)" : "to'liq 4K/12MP") — "
+            // Fotolar 1920×1440 (~2.76MP), kodning eski "12MP" farazidan ~4× kichik
+            // → xotira byudjeti ancha keng. YARIM-RES sampling (ds=2) asosiy
+            // XIRALIK sababi edi — endi DOIM full-res sampling (ds=1, Polycam-dek
+            // tiniq). Faqat ATLAS o'lchami xotiraга qarab tushadi (sampling emas).
+            let bigMesh = globalTris.count > 280_000
+            let atlasRes: Int
+            if bigMesh || (availMB > 0 && availMB < 650) {
+                atlasRes = 2048
+            } else if availMB > 0 && availMB < 1100 {
+                atlasRes = 3072
+            } else {
+                atlasRes = 4096
+            }
+            let dsFactor = 1   // har doim full-res sampling (1920×1440)
+            NSLog("KADASTR atlas: \(atlasRes)px full-res(ds=1) — "
                   + "\(availMB)MB mavjud, mesh=\(globalTris.count) tri")
             bakeResult = try MetalAtlasBaker.bake(
                 positions: globalVerts,
@@ -3812,7 +3823,9 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         // ESRGAN bypass (grain/sekin); o'rniga mild CIUnsharpMask. Manba 1920×1440
         // ultra-wide bo'lgani uchun haqiqiy detail qaytmaydi, lekin qirra/tugma
         // kontrasti aniqlashadi (halo/grain'siz, Mac'da 1.8/0.5 tasdiqlangan).
-        let enhancedAtlas: UIImage = Self.sharpenAtlas(bakeResult.atlas)
+        // Despeckle (qora nuqtalar) → keyin sharpen (qora nuqta sharpen'дан OLDIN
+        // olib tashlanishi kerak, aks holda sharpen ularni kuchaytiradi).
+        let enhancedAtlas: UIImage = Self.sharpenAtlas(Self.despeckleAtlas(bakeResult.atlas))
 
         // Phase 12c: ICHKI single-sided ko'rinish. Winding (v1<->v2) + normal flip →
         // mesh ichki yuzasi front-face bo'ladi. Xona ICHIDAN qaralganda devor ichki
@@ -3842,12 +3855,17 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
         let mat = SCNMaterial()
         mat.lightingModel = .constant
         mat.isDoubleSided = false   // Phase 12c: ichki single-sided (tashqi qobiq cull)
-        mat.diffuse.contents = enhancedAtlas
-        mat.diffuse.magnificationFilter = .nearest  // sharp pixels (no bilinear blur)
-        mat.diffuse.minificationFilter = .linear    // smooth zoom-out
-        mat.diffuse.mipFilter = .none
-        mat.diffuse.wrapS = .clamp
-        mat.diffuse.wrapT = .clamp
+        // UNLIT EKSPORT (Polycam-dek): teksturani emissiveColor'ga bog'laymiz.
+        // SceneKit `.constant` USDZ eksportда yo'qoladi → UsdPreviewSurface diffuse
+        // LIT bo'lib QuickLook/viewer yoritib qoraytirardi ("yorug'lik to'g'rimas").
+        // emissive = albedo, diffuse = qora → har qanaqa viewerда tekis/yorqin foto.
+        mat.emission.contents = enhancedAtlas
+        mat.emission.magnificationFilter = .nearest  // sharp pixels (no bilinear blur)
+        mat.emission.minificationFilter = .linear    // smooth zoom-out
+        mat.emission.mipFilter = .none
+        mat.emission.wrapS = .clamp
+        mat.emission.wrapT = .clamp
+        mat.diffuse.contents = UIColor.black
         geom.materials = [mat]
         scene.rootNode.addChildNode(SCNNode(geometry: geom))
 
@@ -5088,6 +5106,63 @@ final class TexturedScanViewController: UIViewController, ARSessionDelegate, ARS
     /// detail ko'p, shuning uchun kuchliroq CIUnsharpMask matn/qirra kontrastini
     /// oshiradi. radius 1.6 (matn uchun nozikroq, keng halo yo'q) / intensity 0.9:
     /// combine (best-view high-freq) bilan birga yozuv qirralarini aniqlashtiradi.
+    /// Despeckle — yorqin yuzalardagi izolyatsiya qilingan QORA NUQTALARNI
+    /// (occlusion/depth artefakt texellari) qo'shni o'rtacha rang bilan
+    /// almashtiradi. Qorong'i obyektlar/eshik/soyaga TEGMAYDI: faqat atrofi
+    /// yorqin (blur-luma>115) va piksel undan ancha qorong'i (<55%) bo'lsa.
+    fileprivate static func despeckleAtlas(_ image: UIImage) -> UIImage {
+        guard let cg = image.cgImage else { return image }
+        let W = cg.width, H = cg.height
+        guard W > 16, H > 16 else { return image }
+        let bpr = W * 4
+        let bmp = CGImageAlphaInfo.noneSkipLast.rawValue   // RGBX, straight (premult yo'q)
+        let rgb = CGColorSpaceCreateDeviceRGB()
+        var srcPx = [UInt8](repeating: 0, count: bpr * H)
+        guard let inCtx = CGContext(data: &srcPx, width: W, height: H, bitsPerComponent: 8,
+                                    bytesPerRow: bpr, space: rgb, bitmapInfo: bmp) else { return image }
+        inCtx.draw(cg, in: CGRect(x: 0, y: 0, width: W, height: H))
+
+        // 1) Qo'shni o'rtacha (9×9 box blur) — vImage (tez, SIMD).
+        var blurPx = [UInt8](repeating: 0, count: bpr * H)
+        var convOK = true
+        srcPx.withUnsafeMutableBytes { sRaw in
+            blurPx.withUnsafeMutableBytes { bRaw in
+                var sBuf = vImage_Buffer(data: sRaw.baseAddress, height: vImagePixelCount(H),
+                                         width: vImagePixelCount(W), rowBytes: bpr)
+                var bBuf = vImage_Buffer(data: bRaw.baseAddress, height: vImagePixelCount(H),
+                                         width: vImagePixelCount(W), rowBytes: bpr)
+                let err = vImageBoxConvolve_ARGB8888(&sBuf, &bBuf, nil, 0, 0, 9, 9, nil,
+                                                     vImage_Flags(kvImageEdgeExtend))
+                if err != kvImageNoError { convOK = false }
+            }
+        }
+        if !convOK { return image }
+
+        // 2) Qora-outlier almashtirish: atrofi yorqin + piksel ancha qorong'i.
+        var replaced = 0
+        srcPx.withUnsafeMutableBufferPointer { d in
+            blurPx.withUnsafeBufferPointer { b in
+                var i = 0
+                let n = bpr * H
+                while i < n {
+                    let lum = (Int(d[i]) * 30 + Int(d[i + 1]) * 59 + Int(d[i + 2]) * 11) / 100
+                    let blum = (Int(b[i]) * 30 + Int(b[i + 1]) * 59 + Int(b[i + 2]) * 11) / 100
+                    if blum > 115 && lum < blum * 55 / 100 {
+                        d[i] = b[i]; d[i + 1] = b[i + 1]; d[i + 2] = b[i + 2]
+                        replaced += 1
+                    }
+                    i += 4
+                }
+            }
+        }
+        NSLog("KADASTR despeckle: \(replaced) qora-nuqta texel almashtirildi (\(W)×\(H))")
+
+        guard let outCtx = CGContext(data: &srcPx, width: W, height: H, bitsPerComponent: 8,
+                                     bytesPerRow: bpr, space: rgb, bitmapInfo: bmp),
+              let outCG = outCtx.makeImage() else { return image }
+        return UIImage(cgImage: outCG)
+    }
+
     fileprivate static func sharpenAtlas(_ image: UIImage) -> UIImage {
         guard let cg = image.cgImage else { return image }
         let ci = CIImage(cgImage: cg)

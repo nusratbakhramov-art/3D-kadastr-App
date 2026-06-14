@@ -18,6 +18,7 @@ import '../payments/payments_screen.dart';
 import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
+import '../scans/saved_scans_screen.dart';
 import '../services/screens/ai_drafts_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
@@ -183,6 +184,14 @@ class _MainShellState extends State<MainShell> {
     ).push(MaterialPageRoute<void>(builder: (_) => const AiDraftsScreen()));
   }
 
+  Future<void> _openSavedScans() async {
+    // Lokal "Mening skanlarim" — saqlangan raw skanlar + qayta ishlash (outputs
+    // history) bilan natijani yaxshilash/test qilish uchun.
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const SavedScansScreen()));
+  }
+
   Future<void> _openPayments() async {
     await Navigator.of(
       context,
@@ -257,6 +266,7 @@ class _MainShellState extends State<MainShell> {
             onHelpTap: _openHelp,
             onRatingsTap: _openRatings,
             onMyScansTap: _openScans,
+            onSavedScansTap: _openSavedScans,
             onPaymentsTap: _openPayments,
             onLoginTap: _openAuth,
           ),

@@ -18,6 +18,7 @@ class ProfileScreen extends StatefulWidget {
     this.onBellTap,
     this.onMyProfileTap,
     this.onMyScansTap,
+    this.onSavedScansTap,
     this.onRatingsTap,
     this.onPaymentsTap,
     this.onSettingsTap,
@@ -30,6 +31,7 @@ class ProfileScreen extends StatefulWidget {
   final VoidCallback? onBellTap;
   final VoidCallback? onMyProfileTap;
   final VoidCallback? onMyScansTap;
+  final VoidCallback? onSavedScansTap;
   final VoidCallback? onRatingsTap;
   final VoidCallback? onPaymentsTap;
   final VoidCallback? onSettingsTap;
@@ -70,6 +72,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         'assets/icons/menu-scan.svg',
         _ProfileStrings.myScans(locale),
         widget.onMyScansTap,
+      ),
+      _RowSpec(
+        'assets/icons/menu-scan.svg',
+        _ProfileStrings.mySavedScans(locale),
+        widget.onSavedScansTap,
       ),
       _RowSpec(
         'assets/icons/menu-ratings.svg',
@@ -308,6 +315,12 @@ class _ProfileStrings {
     'ru' => 'Мои заявки',
     'en' => 'My applications',
     _ => 'Mening arizalarim',
+  };
+
+  static String mySavedScans(Locale l) => switch (l.languageCode) {
+    'ru' => 'Мои сканы',
+    'en' => 'My scans',
+    _ => 'Mening skanlarim',
   };
 
   static String ratings(Locale l) => switch (l.languageCode) {
