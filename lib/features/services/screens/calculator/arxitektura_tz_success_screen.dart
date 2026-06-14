@@ -1,10 +1,22 @@
-/// Arxitektura TZ buyurtmasi muvaffaqiyatli yuborilgandan keyingi ekran.
+/// TZ / kalkulyator buyurtmasi muvaffaqiyatli yuborilgandan keyingi ekran.
+/// Dizayn, arxitektura va oddiy kalkulyator arizalari uchun umumiy.
 library;
 
 import 'package:flutter/material.dart';
 
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
+
+String _pick(Locale l, {required String uz, required String ru, required String en}) {
+  switch (l.languageCode) {
+    case 'ru':
+      return ru;
+    case 'en':
+      return en;
+    default:
+      return uz;
+  }
+}
 
 class ArxitekturaTzSuccessScreen extends StatelessWidget {
   const ArxitekturaTzSuccessScreen({super.key, required this.orderId});
@@ -19,6 +31,32 @@ class ArxitekturaTzSuccessScreen extends StatelessWidget {
     final hintColor = isDark
         ? Colors.white.withValues(alpha: 0.65)
         : const Color(0xFF6B7280);
+    final locale = Localizations.localeOf(context);
+
+    final title = _pick(
+      locale,
+      uz: 'Buyurtma qabul qilindi',
+      ru: 'Заявка принята',
+      en: 'Order received',
+    );
+    final body = _pick(
+      locale,
+      uz: 'Buyurtma raqami: #$orderId\n\n'
+          'Mutaxassislarimiz tez orada siz bilan bog\'lanib, '
+          'narx va shartlarni tasdiqlaydi.',
+      ru: 'Номер заявки: #$orderId\n\n'
+          'Наши специалисты свяжутся с вами в ближайшее время '
+          'и подтвердят стоимость и условия.',
+      en: 'Order number: #$orderId\n\n'
+          'Our specialists will contact you shortly to confirm '
+          'the price and terms.',
+    );
+    final buttonLabel = _pick(
+      locale,
+      uz: 'Asosiy ekranga',
+      ru: 'На главный экран',
+      en: 'To home',
+    );
 
     return Scaffold(
       backgroundColor: bg,
@@ -50,7 +88,7 @@ class ArxitekturaTzSuccessScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Buyurtma qabul qilindi',
+                    title,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
@@ -61,9 +99,7 @@ class ArxitekturaTzSuccessScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Buyurtma raqami: #$orderId\n\n'
-                    'Mutaxassislarimiz tez orada siz bilan bog\'lanib, '
-                    'loyiha narxi va shartlarini tasdiqlaydi.',
+                    body,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'MTSText',
@@ -74,7 +110,7 @@ class ArxitekturaTzSuccessScreen extends StatelessWidget {
                   ),
                   const Spacer(),
                   ListingCtaButton(
-                    label: 'Asosiy ekranga',
+                    label: buttonLabel,
                     enabled: true,
                     onTap: () {
                       Navigator.of(context).popUntil((route) => route.isFirst);
