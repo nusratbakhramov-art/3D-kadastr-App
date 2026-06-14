@@ -35,6 +35,10 @@ class ApplicationItem {
     this.typeValue,
     this.detailRows = const <(String, String)>[],
     this.hasDeliverable = false,
+    this.isDraft = false,
+    this.resumeJobId,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   final String id;
@@ -57,6 +61,20 @@ class ApplicationItem {
   /// file / 3D-model / AR cards are shown on the detail screen.
   final bool hasDeliverable;
 
+  /// Tugallanmagan (DRAFT) AI Baholash arizasi — kartada "Qoralama" badge va
+  /// "Davom etish" tugmasi chiqadi (natija o'rniga).
+  final bool isDraft;
+
+  /// DRAFT bo'lsa, davom ettirish uchun AI Baholash job id (resume).
+  final int? resumeJobId;
+
+  /// Ariza yaratilgan vaqt (detail'da ko'rsatiladi).
+  final DateTime createdAt;
+
+  /// Oxirgi yangilanish (status o'zgargan vaqt) — ro'yxat shu bo'yicha
+  /// saralanadi (yangisi tepada) va sana+soat shu ko'rsatiladi.
+  final DateTime updatedAt;
+
   final List<ApplicationTimelineStep> timeline;
 }
 
@@ -72,146 +90,4 @@ const List<ApplicationServiceChip> applicationServiceChips = [
   ApplicationServiceChip(id: 'kad_3d', label: '3D Kadastr'),
   ApplicationServiceChip(id: 'ai_eval', label: 'AI Baholash'),
   ApplicationServiceChip(id: 'calc', label: 'Kalkulyator'),
-];
-
-final List<ApplicationItem> mockApplicationItems = [
-  ApplicationItem(
-    id: 'app_1',
-    serviceId: 'kad_3d',
-    serviceLabel: '3D kadastr',
-    statusGroup: ApplicationStatusGroup.inProgress,
-    addressLabel: 'Manzil',
-    addressValue: 'Toshkent, Chilonzor',
-    dateLabel: 'Ariza sanasi',
-    dateValue: '02.04.2026',
-    timeline: _timelineInProgress,
-  ),
-  ApplicationItem(
-    id: 'app_2',
-    serviceId: 'ai_eval',
-    serviceLabel: 'AI Baholash',
-    statusGroup: ApplicationStatusGroup.completed,
-    addressLabel: 'Manzil',
-    addressValue: 'Toshkent, Chilonzor',
-    dateLabel: 'Ariza sanasi',
-    dateValue: '02.04.2026',
-    timeline: _timelineCompleted,
-  ),
-  ApplicationItem(
-    id: 'app_3',
-    serviceId: 'calc',
-    serviceLabel: 'Kalkulyator',
-    statusGroup: ApplicationStatusGroup.completed,
-    addressLabel: 'Turi',
-    addressValue: 'Arxitektura',
-    dateLabel: 'Ariza sanasi',
-    dateValue: '02.04.2026',
-    timeline: _timelineCompleted,
-  ),
-  ApplicationItem(
-    id: 'app_4',
-    serviceId: 'kad_3d',
-    serviceLabel: '3D kadastr',
-    statusGroup: ApplicationStatusGroup.completed,
-    addressLabel: 'Manzil',
-    addressValue: 'Toshkent, Chilonzor',
-    dateLabel: 'Ariza sanasi',
-    dateValue: '02.04.2026',
-    timeline: _timelineCompleted,
-  ),
-  ApplicationItem(
-    id: 'app_5',
-    serviceId: 'ai_eval',
-    serviceLabel: 'AI Baholash',
-    statusGroup: ApplicationStatusGroup.cancelled,
-    addressLabel: 'Manzil',
-    addressValue: 'Toshkent, Chilonzor',
-    dateLabel: 'Ariza sanasi',
-    dateValue: '02.04.2026',
-    timeline: _timelineCancelled,
-  ),
-];
-
-final List<ApplicationTimelineStep> _timelineInProgress = [
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.accepted,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.sentToSystem,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.assignedSpecialist,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.scanned,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: false,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.reportReady,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: false,
-  ),
-];
-
-final List<ApplicationTimelineStep> _timelineCompleted = [
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.accepted,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.sentToSystem,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.assignedSpecialist,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.scanned,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.reportReady,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-];
-
-final List<ApplicationTimelineStep> _timelineCancelled = [
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.accepted,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.sentToSystem,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: true,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.assignedSpecialist,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: false,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.scanned,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: false,
-  ),
-  ApplicationTimelineStep(
-    status: ApplicationTimelineStatus.reportReady,
-    at: DateTime(2025, 1, 23, 15, 1),
-    completed: false,
-  ),
 ];

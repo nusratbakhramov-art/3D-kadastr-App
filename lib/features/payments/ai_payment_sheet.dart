@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/payment_deep_links.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/app_toast.dart';
 import '../market/widgets/listing_cta_button.dart';
@@ -78,7 +79,7 @@ class _AiPaymentSheetState extends State<_AiPaymentSheet> {
     setState(() => _paying = true);
     try {
       // Hozircha faqat Payme yoqilgan.
-      final url = await _service.initiate(
+      final r = await _service.initiate(
         paymentType: PaymentCheckoutService.aiValuationType,
         provider: 'payme',
         amount: q.amount,
@@ -86,8 +87,10 @@ class _AiPaymentSheetState extends State<_AiPaymentSheet> {
         referenceId: widget.referenceId,
       );
       if (!mounted) return;
+      // App fonдан qaytganda natija ekrani ochilishi uchun id'ni eslab qolamiz.
+      PaymentDeepLinks.pendingPaymentId = r.paymentId;
       final ok =
-          await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+          await launchUrl(Uri.parse(r.url), mode: LaunchMode.externalApplication);
       if (!mounted) return;
       setState(() => _paying = false);
       if (ok) {

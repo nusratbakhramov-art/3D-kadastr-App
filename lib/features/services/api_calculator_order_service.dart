@@ -28,6 +28,7 @@ class CalculatorOrderSummary {
     required this.categoryTitle,
     required this.totalUzs,
     required this.createdAt,
+    required this.updatedAt,
   });
 
   final int id;
@@ -35,6 +36,7 @@ class CalculatorOrderSummary {
   final String categoryTitle;
   final double totalUzs;
   final DateTime createdAt;
+  final DateTime updatedAt; // oxirgi yangilanish — sort/ko'rsatish
 }
 
 class CalculatorOrderApiService {
@@ -107,6 +109,8 @@ class CalculatorOrderApiService {
 
   CalculatorOrderSummary _parseSummary(Map<String, dynamic> json) {
     final total = json['total_uzs'];
+    final created = DateTime.tryParse(json['created_at'] as String? ?? '') ??
+        DateTime.now();
     return CalculatorOrderSummary(
       id: (json['id'] as num).toInt(),
       status: json['status'] as String? ?? 'submitted',
@@ -114,8 +118,9 @@ class CalculatorOrderApiService {
       totalUzs: total is num
           ? total.toDouble()
           : (total is String ? (double.tryParse(total) ?? 0) : 0),
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
-          DateTime.now(),
+      createdAt: created,
+      updatedAt:
+          DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? created,
     );
   }
 

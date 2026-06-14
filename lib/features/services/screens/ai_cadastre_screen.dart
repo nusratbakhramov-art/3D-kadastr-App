@@ -14,17 +14,22 @@ import '../models/ai_scan_result.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
 import 'ai_client_form_screen.dart';
+import 'ai_scan_resume_screen.dart';
 
 enum _LoadStatus { idle, loading, loaded, error }
 
 class AiCadastreScreen extends StatefulWidget {
-  const AiCadastreScreen({super.key, this.scan, this.draftId});
+  const AiCadastreScreen({super.key, this.scan, this.draftId, this.scanJobId});
 
   /// AI Baholashning 3D skan qadami natijasi (oldingi qadamdan uzatiladi).
   final AiScanResult? scan;
 
   /// Skandan keyin yaratilgan DRAFT ariza id (bundle ichiga ko'chiriladi).
   final int? draftId;
+
+  /// Resume oqimi: skanlangan 3D model bor draft id. Bo'lsa, "3D modelni
+  /// ko'rish" tugmasi chiqadi (model backend'dan yuklanib QuickLook'da ochiladi).
+  final int? scanJobId;
 
   @override
   State<AiCadastreScreen> createState() => _AiCadastreScreenState();
@@ -209,6 +214,20 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: const StepProgressBar(count: 4, activeIndex: 0),
                     ),
+                    if (widget.scanJobId != null) ...[
+                      const SizedBox(height: 12),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: _ScanModelBar(
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  AiScanResumeScreen(jobId: widget.scanJobId!),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     Expanded(
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
@@ -305,6 +324,57 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// Resume oqimi banneri — "Skanlangan 3D modelni ko'rish". Bosilganda
+/// [AiScanResumeScreen] ochiladi (model QuickLook'da).
+class _ScanModelBar extends StatelessWidget {
+  const _ScanModelBar({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+    final label = switch (l.languageCode) {
+      'ru' => 'Посмотреть 3D модель',
+      'en' => 'View 3D model',
+      _ => '3D modelni ko\'rish',
+    };
+    return Material(
+      color: AppColors.splashGreen.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.view_in_ar_rounded,
+                  size: 22, color: AppColors.splashGreen),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: fg,
+                  ),
+                ),
+              ),
+              Icon(Icons.chevron_right_rounded,
+                  size: 22, color: fg.withValues(alpha: 0.5)),
+            ],
+          ),
         ),
       ),
     );

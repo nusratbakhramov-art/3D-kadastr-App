@@ -81,7 +81,17 @@ class _AiDraftsScreenState extends State<AiDraftsScreen> {
       if (!mounted) return;
       final bundle =
           AiBaholashBundle.fromJson(snap.requestPayload, draftId: snap.id);
-      await Navigator.of(context).push(_resumeRoute(bundle, snap.currentStep));
+      // Resume SAQLANGAN qadamdan boshlanadi. Skan qilingan bo'lsa (scan_usdz_key
+      // bor), saqlangan qadamda "3D modelni ko'rish" tugmasi chiqadi.
+      final scanJobId =
+          (snap.scanUsdzKey != null && snap.scanUsdzKey!.isNotEmpty)
+              ? snap.id
+              : null;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => _stepScreen(bundle, snap.currentStep, scanJobId),
+        ),
+      );
       if (mounted) _load(); // qaytib kelganda ro'yxatni yangilash
     } catch (e) {
       if (!mounted) return;
@@ -89,23 +99,27 @@ class _AiDraftsScreenState extends State<AiDraftsScreen> {
     }
   }
 
-  Route<void> _resumeRoute(AiBaholashBundle bundle, String? step) {
-    Widget screen;
+  /// Saqlangan qadam nomidan mos wizard ekranini quradi (skan qadamidan
+  /// keyingi qadamlar). `scanJobId` — skan bor bo'lsa, cadastre qadamida
+  /// "3D modelni ko'rish" tugmasi chiqadi.
+  Widget _stepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
     switch (step) {
       case 'client':
-        screen = AiClientFormScreen(bundle: bundle);
+        return AiClientFormScreen(bundle: bundle);
       case 'location':
-        screen = AiLocationScreen(bundle: bundle);
+        return AiLocationScreen(bundle: bundle);
       case 'purpose':
-        screen = AiPurposeScreen(bundle: bundle);
+        return AiPurposeScreen(bundle: bundle);
       case 'intake':
       case 'payment':
-        screen = AiIntakeScreen(bundle: bundle);
+        return AiIntakeScreen(bundle: bundle);
       default: // 'cadastre' yoki noma'lum — kadastr qadamidan
-        screen =
-            AiCadastreScreen(scan: bundle.scan, draftId: bundle.draftId);
+        return AiCadastreScreen(
+          scan: bundle.scan,
+          draftId: bundle.draftId,
+          scanJobId: scanJobId,
+        );
     }
-    return MaterialPageRoute<void>(builder: (_) => screen);
   }
 
   @override

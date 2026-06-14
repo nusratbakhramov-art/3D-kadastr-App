@@ -36,6 +36,7 @@ class DesignOrderSummary {
     required this.id,
     required this.status,
     required this.createdAt,
+    required this.updatedAt,
     this.objectType,
     this.address,
   });
@@ -43,6 +44,7 @@ class DesignOrderSummary {
   final int id;
   final String status;
   final DateTime createdAt;
+  final DateTime updatedAt; // oxirgi yangilanish — sort/ko'rsatish
   final String? objectType;
   final String? address;
 }
@@ -134,11 +136,14 @@ class DesignOrderApiService {
   }
 
   DesignOrderSummary _parseSummary(Map<String, dynamic> json) {
+    final created = DateTime.tryParse(json['created_at'] as String? ?? '') ??
+        DateTime.now();
     return DesignOrderSummary(
       id: (json['id'] as num).toInt(),
       status: json['status'] as String? ?? 'submitted',
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
-          DateTime.now(),
+      createdAt: created,
+      updatedAt:
+          DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? created,
       objectType: json['object_type'] as String?,
       address: json['address'] as String?,
     );

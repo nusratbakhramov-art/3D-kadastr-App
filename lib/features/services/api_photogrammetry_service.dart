@@ -31,6 +31,7 @@ class PhotogrammetryJobSummary {
     required this.status,
     required this.photoCount,
     required this.createdAt,
+    required this.updatedAt,
     this.errorMessage,
     this.downloadUrl,
     this.resultFormat,
@@ -38,6 +39,8 @@ class PhotogrammetryJobSummary {
   });
 
   factory PhotogrammetryJobSummary.fromJson(Map<String, dynamic> json) {
+    final created = DateTime.tryParse(json['created_at'] as String? ?? '') ??
+        DateTime.now();
     return PhotogrammetryJobSummary(
       id: (json['id'] as num).toInt(),
       status: json['status'] as String? ?? 'pending',
@@ -45,8 +48,9 @@ class PhotogrammetryJobSummary {
       errorMessage: json['error_message'] as String?,
       downloadUrl: json['download_url'] as String?,
       resultFormat: json['result_format'] as String?,
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
-          DateTime.now(),
+      createdAt: created,
+      updatedAt:
+          DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? created,
       completedAt: json['completed_at'] == null
           ? null
           : DateTime.tryParse(json['completed_at'] as String),
@@ -65,6 +69,7 @@ class PhotogrammetryJobSummary {
   /// `null` bo'lsa default `usdz` deb hisoblash mumkin (backward compat).
   final String? resultFormat;
   final DateTime createdAt;
+  final DateTime updatedAt; // oxirgi yangilanish — sort/ko'rsatish
   final DateTime? completedAt;
 
   bool get isInProgress =>

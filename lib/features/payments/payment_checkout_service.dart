@@ -40,7 +40,9 @@ class PaymentCheckoutService {
 
   /// To'lovni boshlaydi → ochish uchun checkout URL qaytaradi. `amount` server
   /// tomonda (ai_valuation uchun) majburlanadi, lekin moslik uchun yuboramiz.
-  Future<String> initiate({
+  /// To'lovni boshlaydi → ochish uchun checkout URL + payment id qaytaradi.
+  /// payment id app fonдан qaytganda status polling uchun kerak (return-to-app).
+  Future<({String url, int paymentId})> initiate({
     required String paymentType,
     required String provider,
     required num amount,
@@ -69,6 +71,16 @@ class PaymentCheckoutService {
     if (url == null || url.isEmpty) {
       throw Exception('Checkout URL bo\'sh keldi');
     }
-    return url;
+    return (url: url, paymentId: (b['payment_id'] as num).toInt());
+  }
+
+  /// To'lov holati — appga qaytgach polling uchun. `pending` / `processing` /
+  /// `completed` / `failed` / `cancelled` (yoki xatoda `unknown`).
+  Future<String> getStatus(int paymentId) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/payments/$paymentId');
+    final res = await _client.get(uri).timeout(_timeout);
+    if (res.statusCode != 200) return 'unknown';
+    final b = jsonDecode(res.body) as Map<String, dynamic>;
+    return (b['status'] as String?)?.toLowerCase() ?? 'unknown';
   }
 }

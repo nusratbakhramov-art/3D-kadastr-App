@@ -36,6 +36,7 @@ class OrderSummary {
     required this.id,
     required this.status,
     required this.createdAt,
+    required this.updatedAt,
     required this.objectType,
     required this.customerName,
     this.address,
@@ -46,6 +47,7 @@ class OrderSummary {
   final int id;
   final String status; // submitted/reviewed/quoted/accepted/rejected/draft
   final DateTime createdAt;
+  final DateTime updatedAt; // oxirgi yangilanish — sort/ko'rsatish
   final String objectType;
   final String customerName;
   final String? address;
@@ -144,11 +146,14 @@ class ArchitectureOrderApiService {
 
   OrderSummary _parseSummary(Map<String, dynamic> json) {
     final area = json['total_area_sqm'];
+    final created = DateTime.tryParse(json['created_at'] as String? ?? '') ??
+        DateTime.now();
     return OrderSummary(
       id: (json['id'] as num).toInt(),
       status: json['status'] as String? ?? 'submitted',
-      createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
-          DateTime.now(),
+      createdAt: created,
+      updatedAt:
+          DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? created,
       objectType: json['object_type'] as String? ?? 'boshqa',
       customerName: json['customer_name'] as String? ?? '',
       address: json['address'] as String?,

@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
+import 'core/payment_deep_links.dart';
 import 'features/auth/auth_storage.dart';
 import 'features/home/user_profile.dart';
 import 'features/notifications/notification_model.dart';
@@ -55,6 +56,7 @@ class KadastrApp extends StatelessWidget {
           builder: (context, locale, _) {
             return MaterialApp(
               title: 'Kadastr',
+              navigatorKey: rootNavigatorKey,
               debugShowCheckedModeBanner: false,
               locale: locale,
               supportedLocales: const [
@@ -147,7 +149,7 @@ class _AppRoot extends StatefulWidget {
 
 enum _Stage { splash, onboarding, home }
 
-class _AppRootState extends State<_AppRoot> {
+class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
   _Stage _stage = _Stage.splash;
   bool? _onboardingDone;
 
@@ -155,9 +157,27 @@ class _AppRootState extends State<_AppRoot> {
   void initState() {
     super.initState();
     _bootstrap();
+    // iOS Universal Links — to'lovdan keyin /pay-return/{id} appni ochadi.
+    PaymentDeepLinks.init();
+    // App fonдан qaytganda (Payme'dan) kutilayotgan to'lov holatini tekshiradi —
+    // native Payme `c=` universal link'ni ochmaydi, shu fallback qoplaydi.
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FlutterNativeSplash.remove();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      PaymentDeepLinks.onResumed();
+    }
   }
 
   Future<void> _bootstrap() async {

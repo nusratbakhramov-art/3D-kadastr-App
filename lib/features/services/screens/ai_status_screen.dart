@@ -76,10 +76,19 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       return;
     }
     try {
-      final id = await _api.create(
-        bundleJson: widget.bundle.toJson(),
-        token: token,
-      );
+      // MAVJUD draft bo'lsa (skan/3D model biriktirilgan) — uни yakunlaymiz
+      // (draft → queued), yangi job YARATMAYMIZ. Aks holda yangi job.
+      final draftId = widget.bundle.draftId;
+      final id = draftId != null
+          ? await _api.submitDraft(
+              draftId: draftId,
+              bundleJson: widget.bundle.toJson(),
+              token: token,
+            )
+          : await _api.create(
+              bundleJson: widget.bundle.toJson(),
+              token: token,
+            );
       if (!mounted) return;
       setState(() {
         _jobId = id;

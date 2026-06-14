@@ -7,8 +7,10 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/api_config.dart';
 
@@ -53,6 +55,7 @@ class AiJobSnapshot {
     required this.status,
     required this.requestPayload,
     this.currentStep,
+    this.scanUsdzKey,
     this.resultPayload,
     this.errorMessage,
     this.nearbyListingsCount = 0,
@@ -63,6 +66,7 @@ class AiJobSnapshot {
   final AiJobStatus status;
   final Map<String, dynamic> requestPayload;
   final String? currentStep; // DRAFT: qaysi qadamda qolgan
+  final String? scanUsdzKey; // teksturali 3D skan backend kaliti (resume ko'rish)
   final Map<String, dynamic>? resultPayload;
   final String? errorMessage;
   final int nearbyListingsCount;
@@ -75,6 +79,7 @@ class AiJobSnapshot {
             (json['request_payload'] as Map?)?.cast<String, dynamic>() ??
                 const {},
         currentStep: json['current_step'] as String?,
+        scanUsdzKey: json['scan_usdz_key'] as String?,
         resultPayload:
             (json['result_payload'] as Map?)?.cast<String, dynamic>(),
         errorMessage: json['error_message'] as String?,
@@ -90,6 +95,7 @@ class AiJobSummary {
     required this.id,
     required this.status,
     required this.createdAt,
+    required this.updatedAt,
     this.cadastreNumber,
     this.estimatedValue,
     this.currentStep,
@@ -98,19 +104,25 @@ class AiJobSummary {
   final int id;
   final AiJobStatus status;
   final DateTime createdAt;
+  final DateTime updatedAt; // oxirgi yangilanish (status o'zgargan vaqt) — sort/ko'rsatish
   final String? cadastreNumber;
   final double? estimatedValue;
   final String? currentStep; // DRAFT: qaysi qadamda qolgan (resume)
 
-  factory AiJobSummary.fromJson(Map<String, dynamic> json) => AiJobSummary(
+  factory AiJobSummary.fromJson(Map<String, dynamic> json) {
+    final created = DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    return AiJobSummary(
         id: json['id'] as int,
         status: AiJobStatus.parse(json['status']?.toString() ?? 'queued'),
-        createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0),
+        createdAt: created,
+        updatedAt:
+            DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? created,
         cadastreNumber: json['cadastre_number'] as String?,
         estimatedValue: (json['estimated_value'] as num?)?.toDouble(),
         currentStep: json['current_step'] as String?,
       );
+  }
 }
 
 class AiValuationApiException implements Exception {
@@ -134,6 +146,36 @@ class AiValuationJobService {
     required String token,
   }) async {
     final uri = Uri.parse('$_baseUrl/ai-valuations');
+    final res = await _client
+        .post(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode(bundleJson),
+        )
+        .timeout(const Duration(seconds: 30));
+    if (res.statusCode != 201 && res.statusCode != 200) {
+      throw AiValuationApiException(
+        _extractDetail(res) ?? 'HTTP ${res.statusCode}',
+        statusCode: res.statusCode,
+      );
+    }
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    return body['id'] as int;
+  }
+
+  /// MAVJUD draft arizani yakunlab navbatga qo'yadi (yangi job YARATMAYDI) —
+  /// draft skan USDZ va boshqa biriktirilgan ma'lumotlari bilan saqlanadi.
+  /// Draftli oqimda `create` o'rniga shu ishlatiladi.
+  Future<int> submitDraft({
+    required int draftId,
+    required Map<String, dynamic> bundleJson,
+    required String token,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations/$draftId/submit');
     final res = await _client
         .post(
           uri,
@@ -202,6 +244,21 @@ class AiValuationJobService {
     return AiJobSnapshot.fromJson(
       jsonDecode(res.body) as Map<String, dynamic>,
     );
+  }
+
+  /// Arizaga biriktirilgan teksturali 3D skan (USDZ) ni backend'dan yuklab,
+  /// vaqtinchalik faylga yozadi va to'liq yo'lni qaytaradi (QuickLook uchun).
+  /// Skan yo'q yoki yuklab bo'lmasa null.
+  Future<String?> downloadScanUsdz(int id, {required String token}) async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations/$id/scan');
+    final res = await _client
+        .get(uri, headers: {'Authorization': 'Bearer $token'})
+        .timeout(const Duration(seconds: 60));
+    if (res.statusCode != 200 || res.bodyBytes.isEmpty) return null;
+    final dir = await getTemporaryDirectory();
+    final file = File('${dir.path}/ai_scan_$id.usdz');
+    await file.writeAsBytes(res.bodyBytes, flush: true);
+    return file.path;
   }
 
   // ── Draft ariza (real oqim) ──────────────────────────────────────────

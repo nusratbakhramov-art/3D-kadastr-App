@@ -14,12 +14,15 @@
 		32CC4D1AA7E8BE76AA59E02B /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A3A3F096E7F204635AF1D48 /* Pods_RunnerTests.framework */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		5475C134280B9D03370FDB78 /* SavedScanStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */; };
 		558D2A0B08E3FBA514524864 /* MeshCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A2ACEB2DB629F7C6E1AD1 /* MeshCleaner.swift */; };
 		5AE8EFF78A8D420693567581 /* xatlas.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8F6FF7D10B897F198587E99D /* xatlas.cpp */; };
 		5EE77A4B9E8BCFD2E5B33FDF /* TextureAtlasBaker.metal in Sources */ = {isa = PBXBuildFile; fileRef = F1A0528038DE76FB55AB365C /* TextureAtlasBaker.metal */; };
 		6B97966732F2F557CEC825D1 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 074AE24E965FC1115F45B42A /* Pods_Runner.framework */; };
+		7466B7A4F7B1DBEC90872E7B /* ImageQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
+		887BFDCD711AB83D9C4994C7 /* RealESRGAN.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
@@ -27,17 +30,14 @@
 		AA01AECEF85AAF2094A18FC2 /* TSDFIntegrator.metal in Sources */ = {isa = PBXBuildFile; fileRef = 007386094BD73F6F526C4323 /* TSDFIntegrator.metal */; };
 		B947406B657556A6B1467D3B /* MetalAtlasBaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2F6CF0C9411BA24EFBEE5D /* MetalAtlasBaker.swift */; };
 		BA7B0B60052DEC614178159C /* StreamingTSDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1280F1A5DE6E92E674AA399E /* StreamingTSDF.swift */; };
-		7466B7A4F7B1DBEC90872E7B /* ImageQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */; };
-		887BFDCD711AB83D9C4994C7 /* RealESRGAN.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */; };
-		DF963073C9CE0722E075E6BF /* MLAtlasEnhancer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */; };
-		5475C134280B9D03370FDB78 /* SavedScanStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */; };
-		F8DC9F7558391CB1A830DAB3 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163AE41DB103B31779CDA528 /* DebugLog.swift */; };
-		C48A256C6FDDD6C9B1995FE7 /* AutoProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */; };
-		EE3DEB2DDABF71FA4D3797D3 /* CubeProjectionUV.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */; };
 		C17C222DE5363BF12028B012 /* HybridMeshBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D248C50DFE57C389A949AD /* HybridMeshBuilder.swift */; };
+		C48A256C6FDDD6C9B1995FE7 /* AutoProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */; };
 		C640DB99A9EC41B5149B2D34 /* PoseRefiner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6F616916D4C4B0C8E14AE13 /* PoseRefiner.swift */; };
 		D2522B2E52DC5F6FBB5B0568 /* TSDFReconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F86190F99F40BDF908D4F21 /* TSDFReconstructor.swift */; };
+		DF963073C9CE0722E075E6BF /* MLAtlasEnhancer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */; };
 		E24551EFB79403174BAC7930 /* XAtlasBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 6DF1BE198401ABDF945C563E /* XAtlasBridge.mm */; };
+		EE3DEB2DDABF71FA4D3797D3 /* CubeProjectionUV.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */; };
+		F8DC9F7558391CB1A830DAB3 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163AE41DB103B31779CDA528 /* DebugLog.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -69,21 +69,16 @@
 		074AE24E965FC1115F45B42A /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		118DE27624D9632CD5CC770E /* MeshHoleFiller.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshHoleFiller.swift; sourceTree = "<group>"; };
 		1280F1A5DE6E92E674AA399E /* StreamingTSDF.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreamingTSDF.swift; sourceTree = "<group>"; };
-		AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageQuality.swift; sourceTree = "<group>"; };
-		F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = "Models/RealESRGAN.mlmodelc"; sourceTree = "<group>"; };
-		C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLAtlasEnhancer.swift; sourceTree = "<group>"; };
-		DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SavedScanStorage.swift; sourceTree = "<group>"; };
-		163AE41DB103B31779CDA528 /* DebugLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
-		444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoProcessRunner.swift; sourceTree = "<group>"; };
-		B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CubeProjectionUV.swift; sourceTree = "<group>"; };
 		1411E667E068CC2A68E4D392 /* xatlas.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = xatlas.h; sourceTree = "<group>"; };
 		1498D2321E8E86230040F4C2 /* GeneratedPluginRegistrant.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GeneratedPluginRegistrant.h; sourceTree = "<group>"; };
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
+		163AE41DB103B31779CDA528 /* DebugLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		1F86190F99F40BDF908D4F21 /* TSDFReconstructor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSDFReconstructor.swift; sourceTree = "<group>"; };
 		2D0784215623EA4509A1D6BC /* LocalScanIndex.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalScanIndex.swift; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
+		444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoProcessRunner.swift; sourceTree = "<group>"; };
 		56D248C50DFE57C389A949AD /* HybridMeshBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HybridMeshBuilder.swift; sourceTree = "<group>"; };
 		645A2ACEB2DB629F7C6E1AD1 /* MeshCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshCleaner.swift; sourceTree = "<group>"; };
 		6A3A3F096E7F204635AF1D48 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -105,11 +100,16 @@
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AC05DC5FFDACEBB486FD23FC /* RoomPlanScanner.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RoomPlanScanner.swift; sourceTree = "<group>"; };
+		AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageQuality.swift; sourceTree = "<group>"; };
+		B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CubeProjectionUV.swift; sourceTree = "<group>"; };
 		BBD769A067E08B9418A44EFA /* MarchingCubesTables.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarchingCubesTables.swift; sourceTree = "<group>"; };
+		C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLAtlasEnhancer.swift; sourceTree = "<group>"; };
 		D239B79296615AB1D014B2E1 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		D6F616916D4C4B0C8E14AE13 /* PoseRefiner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PoseRefiner.swift; sourceTree = "<group>"; };
 		DD2F6CF0C9411BA24EFBEE5D /* MetalAtlasBaker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MetalAtlasBaker.swift; sourceTree = "<group>"; };
+		DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SavedScanStorage.swift; sourceTree = "<group>"; };
 		F1A0528038DE76FB55AB365C /* TextureAtlasBaker.metal */ = {isa = PBXFileReference; includeInIndex = 1; path = TextureAtlasBaker.metal; sourceTree = "<group>"; };
+		F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Models/RealESRGAN.mlmodelc; sourceTree = "<group>"; };
 		FC68AA764C6718864843519D /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -277,6 +277,7 @@
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
+				5B7876320CB002DA610EA372 /* [CP] Embed Pods Frameworks */,
 			);
 			buildRules = (
 			);
@@ -370,6 +371,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin";
+		};
+		5B7876320CB002DA610EA372 /* [CP] Embed Pods Frameworks */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-input-files.xcfilelist",
+			);
+			name = "[CP] Embed Pods Frameworks";
+			outputFileListPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks-${CONFIGURATION}-output-files.xcfilelist",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-Runner/Pods-Runner-frameworks.sh\"\n";
+			showEnvVarsInLog = 0;
 		};
 		7794E2D6A6BCA458F29C537E /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -568,6 +586,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = uz.kadastr.kadastr;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -758,6 +777,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = uz.kadastr.kadastr;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -788,6 +808,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0.0;
+				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				PRODUCT_BUNDLE_IDENTIFIER = uz.kadastr.kadastr;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

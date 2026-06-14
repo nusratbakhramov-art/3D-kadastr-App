@@ -7,6 +7,7 @@ import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../auth/auth_storage.dart';
 import '../settings/settings_state.dart';
+import '../services/ai_draft_resume.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_architecture_order_service.dart';
 import '../services/api_calculator_order_service.dart';
@@ -108,6 +109,17 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         builder: (_) => ApplicationDetailScreen(item: item),
       ),
     );
+  }
+
+  /// DRAFT AI Baholash arizasini saqlangan qadamdan davom ettiradi, qaytganda
+  /// ro'yxatni yangilaydi (draft tugallanib status o'zgargan bo'lishi mumkin).
+  Future<void> _resumeDraft(int jobId) async {
+    try {
+      await resumeAiDraft(context, jobId);
+    } catch (_) {
+      // resume ichidagi xatolar (token / tarmoq) — jim; ro'yxat o'zgarmaydi.
+    }
+    if (mounted) await _refresh();
   }
 
   List<ApplicationItem> get _sourceItems {
@@ -251,16 +263,15 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       ...results[4],
       ...results[5],
     ];
-    // Yangidan eskigacha tartiblash — sanalar string sifatida saqlangan,
-    // lekin DD.MM.YYYY format saqlanadi → teskari sort.
-    combined.sort((a, b) => b.dateValue.compareTo(a.dateValue));
+    // Yangidan eskigacha tartiblash — haqiqiy DateTime (updatedAt) bo'yicha,
+    // oxirgi yangilangani tepada.
+    combined.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     _allItems = combined;
   }
 
   static ApplicationItem _orderToApplicationItem(OrderSummary o) {
     final lang = localeNotifier.value.languageCode;
     final group = _statusToGroup(o.status);
-    final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'arch_${o.id}',
       // Arxitektura/Dizayn TZ — kalkulyator xizmatlari, "Kalkulyator" chipi
@@ -268,16 +279,19 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       serviceId: 'calc',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'arch'),
       statusGroup: group,
+      createdAt: o.createdAt,
+      updatedAt: o.updatedAt,
       addressLabel: _ApplicationsStrings.address(lang),
       addressValue: (o.address ?? o.cadastreNumber ?? '—'),
       dateLabel: _ApplicationsStrings.applicationDate(lang),
-      dateValue: date,
+      dateValue: _formatDateTime(o.updatedAt),
       detailRows: [
         (_ApplicationsStrings.address(lang), o.address ?? '—'),
         if (o.cadastreNumber != null)
           (_ApplicationsStrings.cadastreNumber(lang), o.cadastreNumber!),
         (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), date),
+        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(o.createdAt)),
+        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(o.updatedAt)),
       ],
       timeline: _basicTimeline(group, o.createdAt),
     );
@@ -286,21 +300,23 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static ApplicationItem _designToApplicationItem(DesignOrderSummary o) {
     final lang = localeNotifier.value.languageCode;
     final group = _statusToGroup(o.status);
-    final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'design_${o.id}',
       serviceId: 'calc',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'design'),
       statusGroup: group,
+      createdAt: o.createdAt,
+      updatedAt: o.updatedAt,
       addressLabel: _ApplicationsStrings.address(lang),
       addressValue: o.address ?? '—',
       dateLabel: _ApplicationsStrings.applicationDate(lang),
-      dateValue: date,
+      dateValue: _formatDateTime(o.updatedAt),
       detailRows: [
         if (o.address != null)
           (_ApplicationsStrings.address(lang), o.address!),
         (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), date),
+        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(o.createdAt)),
+        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(o.updatedAt)),
       ],
       timeline: _basicTimeline(group, o.createdAt),
     );
@@ -309,13 +325,17 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static ApplicationItem _aiJobToApplicationItem(AiJobSummary j) {
     final lang = localeNotifier.value.languageCode;
     final hasValue = j.estimatedValue != null;
+    final isDraft = j.status.isDraft;
     final group = _aiJobStatusToGroup(j.status);
-    final date = _formatDate(j.createdAt);
     return ApplicationItem(
       id: 'aival_${j.id}',
       serviceId: 'ai_eval',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'ai_eval'),
       statusGroup: group,
+      isDraft: isDraft,
+      resumeJobId: isDraft ? j.id : null,
+      createdAt: j.createdAt,
+      updatedAt: j.updatedAt,
       addressLabel: hasValue
           ? _ApplicationsStrings.estimatedValue(lang)
           : _ApplicationsStrings.cadastreNumber(lang),
@@ -323,7 +343,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
           ? _formatUzs(j.estimatedValue!)
           : (j.cadastreNumber ?? '—'),
       dateLabel: _ApplicationsStrings.applicationDate(lang),
-      dateValue: date,
+      dateValue: _formatDateTime(j.updatedAt),
       typeLabel: hasValue && j.cadastreNumber != null
           ? _ApplicationsStrings.cadastre(lang)
           : null,
@@ -334,7 +354,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         if (hasValue)
           (_ApplicationsStrings.estimatedValue(lang), _formatUzs(j.estimatedValue!)),
         (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), date),
+        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(j.createdAt)),
+        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(j.updatedAt)),
       ],
       timeline: _basicTimeline(group, j.createdAt),
     );
@@ -343,23 +364,25 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static ApplicationItem _calcToApplicationItem(CalculatorOrderSummary o) {
     final lang = localeNotifier.value.languageCode;
     final group = _calcStatusToGroup(o.status);
-    final date = _formatDate(o.createdAt);
     return ApplicationItem(
       id: 'calc_${o.id}',
       serviceId: 'calc',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'calc'),
       statusGroup: group,
+      createdAt: o.createdAt,
+      updatedAt: o.updatedAt,
       addressLabel: _ApplicationsStrings.type(lang),
       addressValue: o.categoryTitle,
       dateLabel: _ApplicationsStrings.applicationDate(lang),
-      dateValue: date,
+      dateValue: _formatDateTime(o.updatedAt),
       typeLabel: _ApplicationsStrings.price(lang),
       typeValue: _formatUzs(o.totalUzs),
       detailRows: [
         (_ApplicationsStrings.type(lang), o.categoryTitle),
         (_ApplicationsStrings.price(lang), _formatUzs(o.totalUzs)),
         (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), date),
+        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(o.createdAt)),
+        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(o.updatedAt)),
       ],
       timeline: _basicTimeline(group, o.createdAt),
     );
@@ -368,17 +391,18 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static ApplicationItem _kadastr3dToApplicationItem(Kadastr3dJobSummary j) {
     final lang = localeNotifier.value.languageCode;
     final group = _kadastr3dStatusToGroup(j.status);
-    final date = _formatDate(j.createdAt);
     final objectType = _objectTypeLabel(j.objectType);
     return ApplicationItem(
       id: 'kad3d_${j.id}',
       serviceId: 'kad_3d',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'kad_3d'),
       statusGroup: group,
+      createdAt: j.createdAt,
+      updatedAt: j.updatedAt,
       addressLabel: _ApplicationsStrings.cadastreNumber(lang),
       addressValue: j.cadastreNumber ?? '—',
       dateLabel: _ApplicationsStrings.applicationDate(lang),
-      dateValue: date,
+      dateValue: _formatDateTime(j.updatedAt),
       typeLabel: objectType != null
           ? _ApplicationsStrings.objectType(lang)
           : null,
@@ -389,7 +413,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         if (objectType != null)
           (_ApplicationsStrings.objectType(lang), objectType),
         (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), date),
+        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(j.createdAt)),
+        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(j.updatedAt)),
       ],
       timeline: _basicTimeline(group, j.createdAt),
     );
@@ -491,7 +516,6 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   ) {
     final lang = localeNotifier.value.languageCode;
     final group = _photogrammetryStatusToGroup(j.status);
-    final date = _formatDate(j.createdAt);
     final photoCountValue =
         '${j.photoCount} ${_ApplicationsStrings.pcsUnit(lang)}';
     return ApplicationItem(
@@ -499,10 +523,12 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       serviceId: 'kad_3d',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, '3d_scan'),
       statusGroup: group,
+      createdAt: j.createdAt,
+      updatedAt: j.updatedAt,
       addressLabel: _ApplicationsStrings.photoCount(lang),
       addressValue: photoCountValue,
       dateLabel: _ApplicationsStrings.submitted(lang),
-      dateValue: date,
+      dateValue: _formatDateTime(j.updatedAt),
       typeLabel: j.isCompleted
           ? _ApplicationsStrings.model3d(lang)
           : (j.status == 'failed'
@@ -516,7 +542,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         (_ApplicationsStrings.status(lang), _photogrammetryStatusLabel(j.status)),
         if (j.errorMessage != null)
           (_ApplicationsStrings.error(lang), j.errorMessage!),
-        (_ApplicationsStrings.submitted(lang), date),
+        (_ApplicationsStrings.submitted(lang), _formatDateTime(j.createdAt)),
+        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(j.updatedAt)),
       ],
       // Completed photogrammetry jobs have a downloadable 3D model.
       hasDeliverable: j.isCompleted,
@@ -555,10 +582,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     return '${buf.toString()} ${_ApplicationsStrings.soumUnit(lang)}';
   }
 
-  static String _formatDate(DateTime dt) {
+
+  static String _formatDateTime(DateTime dt) {
     final d = dt.toLocal();
     String two(int n) => n.toString().padLeft(2, '0');
-    return '${two(d.day)}.${two(d.month)}.${d.year}';
+    return '${two(d.day)}.${two(d.month)}.${d.year} ${two(d.hour)}:${two(d.minute)}';
   }
 
   Future<void> _loadMore() async {
@@ -722,6 +750,9 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                               child: _ApplicationCard(
                                 item: item,
                                 onTap: () => _openDetails(item),
+                                onResume: item.resumeJobId == null
+                                    ? null
+                                    : () => _resumeDraft(item.resumeJobId!),
                               ),
                             ),
                           );
@@ -1260,6 +1291,12 @@ class _ApplicationsStrings {
     _ => 'Ariza sanasi',
   };
 
+  static String updatedAt(String lang) => switch (lang) {
+    'ru' => 'Обновлено',
+    'en' => 'Updated',
+    _ => 'Yangilangan',
+  };
+
   static String submitted(String lang) => switch (lang) {
     'ru' => 'Отправлено',
     'en' => 'Submitted',
@@ -1356,6 +1393,18 @@ class _ApplicationsStrings {
     _ => 'Natijani ko‘rish',
   };
 
+  static String draft(String lang) => switch (lang) {
+    'ru' => 'Черновик',
+    'en' => 'Draft',
+    _ => 'Qoralama',
+  };
+
+  static String resume(String lang) => switch (lang) {
+    'ru' => 'Продолжить',
+    'en' => 'Continue',
+    _ => 'Davom etish',
+  };
+
   /// Currency-unit suffix word only ("so'm" / "сум" / "soum").
   static String soumUnit(String lang) => switch (lang) {
     'ru' => 'сум',
@@ -1371,16 +1420,73 @@ class _ApplicationsStrings {
   };
 }
 
-class _ApplicationCard extends StatelessWidget {
-  const _ApplicationCard({required this.item, required this.onTap});
+/// Kartaning pastki yashil tugmasi — "Natijani ko'rish" (completed) yoki
+/// "Davom etish" (draft).
+class _CardActionButton extends StatelessWidget {
+  const _CardActionButton({required this.label, required this.onTap});
 
-  final ApplicationItem item;
+  final String label;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFF00E135),
+      borderRadius: BorderRadius.circular(10000),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          width: double.infinity,
+          height: 32,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: Colors.black,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                const Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 20,
+                  color: Colors.black,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ApplicationCard extends StatelessWidget {
+  const _ApplicationCard({
+    required this.item,
+    required this.onTap,
+    this.onResume,
+  });
+
+  final ApplicationItem item;
+  final VoidCallback onTap;
+
+  /// DRAFT arizada "Davom etish" tugmasi bosilganda (resume).
+  final VoidCallback? onResume;
+
+  @override
+  Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
-    final status = _StatusStyle.fromGroup(item.statusGroup, lang);
+    final status = item.isDraft
+        ? _StatusStyle.draft(lang)
+        : _StatusStyle.fromGroup(item.statusGroup, lang);
     final showResultButton =
         item.statusGroup == ApplicationStatusGroup.completed;
 
@@ -1433,44 +1539,17 @@ class _ApplicationCard extends StatelessWidget {
               Divider(height: 1, thickness: 1, color: dividerColor),
               const SizedBox(height: 12),
               _MetaRow(label: '${item.dateLabel}:', value: item.dateValue),
-              if (showResultButton) ...[
+              if (item.isDraft) ...[
                 const SizedBox(height: 14),
-                Material(
-                  color: const Color(0xFF00E135),
-                  borderRadius: BorderRadius.circular(10000),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: onTap,
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 32,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              _ApplicationsStrings.viewResult(
-                                Localizations.localeOf(context).languageCode,
-                              ),
-                              style: TextStyle(
-                                fontFamily: 'MTSCompact',
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                                color: Colors.black,
-                              ),
-                            ),
-                            SizedBox(width: 6),
-                            const Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 20,
-                              color: Colors.black,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                _CardActionButton(
+                  label: _ApplicationsStrings.resume(lang),
+                  onTap: onResume ?? onTap,
+                ),
+              ] else if (showResultButton) ...[
+                const SizedBox(height: 14),
+                _CardActionButton(
+                  label: _ApplicationsStrings.viewResult(lang),
+                  onTap: onTap,
                 ),
               ],
             ],
@@ -1541,6 +1620,14 @@ class _StatusStyle {
   final Color bgColor;
   final Color fgColor;
   final String iconAsset;
+
+  /// DRAFT (tugallanmagan) ariza badge'i — "Qoralama", amber.
+  static _StatusStyle draft(String lang) => _StatusStyle(
+        label: _ApplicationsStrings.draft(lang),
+        bgColor: const Color(0xFFFBEFD6),
+        fgColor: const Color(0xFFC98A00),
+        iconAsset: 'assets/icons/application-pending.svg',
+      );
 
   static _StatusStyle fromGroup(ApplicationStatusGroup group, String lang) =>
       switch (group) {

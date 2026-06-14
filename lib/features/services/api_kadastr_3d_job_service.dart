@@ -45,6 +45,7 @@ class Kadastr3dJobSummary {
     required this.id,
     required this.status,
     required this.createdAt,
+    required this.updatedAt,
     this.cadastreNumber,
     this.objectType,
   });
@@ -52,19 +53,24 @@ class Kadastr3dJobSummary {
   final int id;
   final Kadastr3dJobStatus status;
   final DateTime createdAt;
+  final DateTime updatedAt; // oxirgi yangilanish — sort/ko'rsatish
   final String? cadastreNumber;
   final String? objectType;
 
-  factory Kadastr3dJobSummary.fromJson(Map<String, dynamic> json) =>
-      Kadastr3dJobSummary(
-        id: json['id'] as int,
-        status:
-            Kadastr3dJobStatus.parse(json['status']?.toString() ?? 'submitted'),
-        createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ??
-            DateTime.fromMillisecondsSinceEpoch(0),
-        cadastreNumber: json['cadastre_number'] as String?,
-        objectType: json['object_type'] as String?,
-      );
+  factory Kadastr3dJobSummary.fromJson(Map<String, dynamic> json) {
+    final created = DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+    return Kadastr3dJobSummary(
+      id: json['id'] as int,
+      status:
+          Kadastr3dJobStatus.parse(json['status']?.toString() ?? 'submitted'),
+      createdAt: created,
+      updatedAt:
+          DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? created,
+      cadastreNumber: json['cadastre_number'] as String?,
+      objectType: json['object_type'] as String?,
+    );
+  }
 }
 
 class Kadastr3dApiException implements Exception {
