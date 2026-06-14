@@ -6,6 +6,8 @@
     <!-- Xaritada joriy joylashuvni aniqlash uchun (geolocator). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Push xabarnomalar (Android 13+ runtime ruxsat). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Faqat telefonlar uchun: Google Play'da planshet, soat (Wear OS),
          Android TV va Chromebook'larni chiqarib tashlaymiz. Telefon "hardware"
@@ -46,6 +48,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- FCM: app fonда kelgan push qaysi kanalga tushishini belgilaydi
+             (PushNotifications._channel bilan bir xil id). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="high_importance_channel" />
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

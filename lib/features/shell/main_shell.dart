@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../core/app_navigation.dart';
+import '../../core/push_notifications.dart';
 import '../auth/auth_flow_screen.dart';
 import '../auth/auth_storage.dart';
 import '../auth/widgets/login_required_sheet.dart';
@@ -44,7 +48,26 @@ class _MainShellState extends State<MainShell> {
   final PageController _pageController = PageController();
 
   @override
+  void initState() {
+    super.initState();
+    // Push / deep-link orqali tab almashtirish signalini tinglaymiz.
+    shellTabRequest.addListener(_onShellTabRequest);
+    // Cold start: app push bosilib ochilгan bo'lsa, kutilayotgan tab bor.
+    if (shellTabRequest.value >= 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _onShellTabRequest());
+    }
+  }
+
+  void _onShellTabRequest() {
+    final i = shellTabRequest.value;
+    if (i < 0 || !mounted) return;
+    shellTabRequest.value = -1; // bir martalik — reset
+    _onTabChanged(i);
+  }
+
+  @override
   void dispose() {
+    shellTabRequest.removeListener(_onShellTabRequest);
     _pageController.dispose();
     super.dispose();
   }
@@ -98,6 +121,8 @@ class _MainShellState extends State<MainShell> {
       ),
     );
     if (mounted) setState(() {});
+    // Login bo'lган bo'lsa — FCM tokenni backendga bog'laymiz.
+    unawaited(PushNotifications.syncToken());
   }
 
   Future<void> _openSettings() async {
@@ -111,6 +136,12 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _handleLogout() async {
+    // Tokenni backenddan o'chiramiz (storage tozalanishidan oldin — auth kerak).
+    final session = await widget.authStorage.loadSession();
+    final token = session.token;
+    if (token != null) {
+      await PushNotifications.unregister(token);
+    }
     await widget.authStorage.clear();
     userProfileNotifier.value = null;
     notificationUnreadNotifier.value = 0;

@@ -6,5 +6,10 @@
 	<array>
 		<string>applinks:api.3dkadastr.uz</string>
 	</array>
+	<!-- Push xabarnomalar. APNs Auth Key (.p8) token-auth ikkala muhitda ham
+	     ishlaydi, shuning uchun debug/qurilma test uchun `development`. App Store /
+	     TestFlight uchun `production` ga o'zgartiring (yoki Release.entitlements). -->
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

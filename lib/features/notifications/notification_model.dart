@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/api_config.dart';
+
 enum NotificationType { system, payment, scan, valuation, listing }
 
 @immutable
@@ -10,6 +12,7 @@ class AppNotification {
     required this.title,
     required this.message,
     required this.at,
+    this.imageUrl,
     this.unread = true,
   });
 
@@ -18,6 +21,9 @@ class AppNotification {
   final String title;
   final String message;
   final DateTime at;
+
+  /// Ixtiyoriy rasm (adminkadan yuborilgan bildirishnomalarda). Absolyut URL.
+  final String? imageUrl;
   final bool unread;
 
   AppNotification copyWith({bool? unread}) => AppNotification(
@@ -26,9 +32,37 @@ class AppNotification {
     title: title,
     message: message,
     at: at,
+    imageUrl: imageUrl,
     unread: unread ?? this.unread,
   );
+
+  /// Backend `/profile/notifications` javobidagi bitta element.
+  factory AppNotification.fromJson(Map<String, dynamic> json) {
+    final rawImage = json['image_url'] as String?;
+    final created = json['created_at'] as String?;
+    return AppNotification(
+      id: '${json['id']}',
+      type: _typeFromString(json['notification_type'] as String?),
+      title: (json['title'] as String?) ?? '',
+      message: (json['message'] as String?) ?? '',
+      at: created != null
+          ? (DateTime.tryParse(created)?.toLocal() ?? DateTime.now())
+          : DateTime.now(),
+      imageUrl: (rawImage == null || rawImage.isEmpty)
+          ? null
+          : ApiConfig.resolveUrl(rawImage),
+      unread: !((json['is_read'] as bool?) ?? false),
+    );
+  }
 }
+
+NotificationType _typeFromString(String? t) => switch (t) {
+  'payment_status' || 'payment' => NotificationType.payment,
+  'scan_completed' || 'scan' => NotificationType.scan,
+  'valuation_done' || 'valuation_failed' || 'valuation' => NotificationType.valuation,
+  'listing' || 'moderation_result' => NotificationType.listing,
+  _ => NotificationType.system,
+};
 
 /// Globally-visible list of notifications. Bell counter is derived from this.
 final ValueNotifier<List<AppNotification>> notificationsNotifier =
@@ -66,4 +100,3 @@ int unreadNotificationCount() =>
   ),
   NotificationType.listing => (Icons.list_alt_rounded, const Color(0xFFF59E0B)),
 };
-

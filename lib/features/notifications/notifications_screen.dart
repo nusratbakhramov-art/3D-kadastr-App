@@ -1,13 +1,16 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
-import '../../widgets/app_reveal.dart';
 import '../home/user_profile.dart';
 import '../settings/settings_state.dart';
+import 'notification_date.dart';
+import 'notification_detail_screen.dart';
 import 'notification_model.dart';
+import 'notifications_api.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -16,10 +19,40 @@ class NotificationsScreen extends StatefulWidget {
   State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _NotificationsScreenState extends State<NotificationsScreen>
-    with SingleTickerProviderStateMixin, RevealEntryMixin<NotificationsScreen> {
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  final NotificationsApi _api = NotificationsApi();
+  bool _loading = true;
+
   @override
-  int get currentToken => 1;
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    await refreshNotifications();
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _markAll() async {
+    markAllNotificationsRead();
+    notificationUnreadNotifier.value = 0;
+    await _api.markAllRead();
+  }
+
+  Future<void> _openItem(AppNotification item) async {
+    if (item.unread) {
+      markNotificationRead(item.id);
+      notificationUnreadNotifier.value = unreadNotificationCount();
+      _api.markRead(item.id); // fire-and-forget
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NotificationDetailScreen(item: item),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,9 +62,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         return ValueListenableBuilder<List<AppNotification>>(
           valueListenable: notificationsNotifier,
           builder: (context, items, _) {
-            final groups = _group(items);
             final hasUnread = items.any((n) => n.unread);
-
             return Scaffold(
               backgroundColor: ColorTokens.scaffoldBg(context),
               body: Stack(
@@ -39,41 +70,28 @@ class _NotificationsScreenState extends State<NotificationsScreen>
                 children: [
                   const AppGlowBackground(),
                   SafeArea(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          AppReveal(
-                            controller: entryController,
-                            interval: const Interval(
-                              0.0,
-                              0.4,
-                              curve: Curves.easeOutCubic,
-                            ),
-                            child: AppHeaderBack(
-                              title: _S.title(locale),
-                              trailing: hasUnread
-                                  ? _MarkAllButton(
-                                      label: _S.markAll(locale),
-                                      onTap: () {
-                                        markAllNotificationsRead();
-                                        notificationUnreadNotifier.value = 0;
-                                      },
-                                    )
-                                  : null,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: AppHeaderBack(
+                            title: _S.title(locale),
+                            trailing: _MarkAllCircle(
+                              active: hasUnread,
+                              onTap: hasUnread ? _markAll : null,
                             ),
                           ),
-                          const SizedBox(height: 16),
-                          if (items.isEmpty)
-                            _EmptyState(
-                              title: _S.emptyTitle(locale),
-                              message: _S.emptyMessage(locale),
-                            )
-                          else
-                            ..._renderGroups(groups, locale),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 12),
+                        Expanded(
+                          child: RefreshIndicator(
+                            color: AppColors.brandGreen,
+                            onRefresh: refreshNotifications,
+                            child: _buildBody(items, locale),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -85,209 +103,118 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     );
   }
 
-  List<Widget> _renderGroups(
-    List<({String label, List<AppNotification> items})> groups,
-    Locale locale,
-  ) {
-    final out = <Widget>[];
-    for (var gi = 0; gi < groups.length; gi++) {
-      final g = groups[gi];
-      out.add(
-        AppReveal(
-          controller: entryController,
-          interval: Interval(
-            (0.1 + gi * 0.1).clamp(0.0, 0.9),
-            (0.6 + gi * 0.1).clamp(0.0, 1.0),
-            curve: Curves.easeOutCubic,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.only(left: 4, top: 4, bottom: 8),
-            child: Text(
-              _S.groupLabel(locale, g.label),
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w500,
-                fontSize: 13,
-                color: ColorTokens.secondaryText(context),
-              ),
-            ),
+  Widget _buildBody(List<AppNotification> items, Locale locale) {
+    if (_loading && items.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.only(bottom: 80),
+          child: CircularProgressIndicator(
+            strokeWidth: 2.4,
+            color: AppColors.brandGreen,
           ),
         ),
       );
-      out.add(
-        AppReveal(
-          controller: entryController,
-          interval: Interval(
-            (0.15 + gi * 0.1).clamp(0.0, 0.9),
-            (0.7 + gi * 0.1).clamp(0.0, 1.0),
-            curve: Curves.easeOutCubic,
+    }
+    if (items.isEmpty) {
+      // ListView (scroll) — RefreshIndicator bo'sh holatda ham ishlasin.
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.16),
+          _EmptyState(
+            title: _S.emptyTitle(locale),
+            message: _S.emptyMessage(locale),
           ),
-          child: _NotificationGroupCard(items: g.items, locale: locale),
-        ),
+        ],
       );
-      out.add(const SizedBox(height: 16));
     }
-    return out;
-  }
-
-  List<({String label, List<AppNotification> items})> _group(
-    List<AppNotification> items,
-  ) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-
-    final todayItems = <AppNotification>[];
-    final yesterdayItems = <AppNotification>[];
-    final earlierItems = <AppNotification>[];
-
-    for (final n in items) {
-      final d = DateTime(n.at.year, n.at.month, n.at.day);
-      if (d == today) {
-        todayItems.add(n);
-      } else if (d == yesterday) {
-        yesterdayItems.add(n);
-      } else {
-        earlierItems.add(n);
-      }
-    }
-
-    return [
-      if (todayItems.isNotEmpty) (label: 'today', items: todayItems),
-      if (yesterdayItems.isNotEmpty)
-        (label: 'yesterday', items: yesterdayItems),
-      if (earlierItems.isNotEmpty) (label: 'earlier', items: earlierItems),
-    ];
-  }
-}
-
-class _NotificationGroupCard extends StatelessWidget {
-  const _NotificationGroupCard({required this.items, required this.locale});
-
-  final List<AppNotification> items;
-  final Locale locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final children = <Widget>[];
-    for (var i = 0; i < items.length; i++) {
-      children.add(_NotificationTile(item: items[i]));
-      if (i != items.length - 1) {
-        children.add(
-          Padding(
-            padding: const EdgeInsets.only(left: 60),
-            child: Divider(
-              height: 1,
-              thickness: 1,
-              color: ColorTokens.divider(context),
-            ),
-          ),
-        );
-      }
-    }
-    return Container(
-      decoration: BoxDecoration(
-        color: ColorTokens.cardBg(context),
-        borderRadius: BorderRadius.circular(16),
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      itemCount: items.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (context, i) => _NotificationCard(
+        item: items[i],
+        locale: locale,
+        onTap: () => _openItem(items[i]),
       ),
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Column(children: children),
     );
   }
 }
 
-class _NotificationTile extends StatelessWidget {
-  const _NotificationTile({required this.item});
+class _NotificationCard extends StatelessWidget {
+  const _NotificationCard({
+    required this.item,
+    required this.locale,
+    required this.onTap,
+  });
 
   final AppNotification item;
+  final Locale locale;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final (iconData, accent) = iconForType(item.type);
     return Material(
-      color: Colors.transparent,
+      color: ColorTokens.cardBg(context),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        onTap: () {
-          if (item.unread) {
-            markNotificationRead(item.id);
-            notificationUnreadNotifier.value = unreadNotificationCount();
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Row(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(18),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: item.unread
+                  ? AppColors.brandGreen
+                  : ColorTokens.divider(context),
+              width: item.unread ? 1.4 : 1,
+            ),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
+              NotificationDateChip(at: item.at, locale: locale),
+              const SizedBox(height: 12),
+              if (item.imageUrl != null) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: CachedNetworkImage(
+                    imageUrl: item.imageUrl!,
+                    width: double.infinity,
+                    height: 160,
+                    fit: BoxFit.cover,
+                    placeholder: (_, _) => Container(
+                      height: 160,
+                      color: ColorTokens.iconBg(context),
+                    ),
+                    errorWidget: (_, _, _) => const SizedBox.shrink(),
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: Icon(iconData, size: 18, color: accent),
+                const SizedBox(height: 12),
+              ],
+              Text(
+                item.title,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16.5,
+                  height: 1.25,
+                  color: ColorTokens.primaryText(context),
+                ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            item.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'MTSCompact',
-                              fontWeight: item.unread
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              fontSize: 15,
-                              color: ColorTokens.primaryText(context),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _formatTime(item.at),
-                          style: TextStyle(
-                            fontFamily: 'MTSCompact',
-                            fontWeight: FontWeight.w400,
-                            fontSize: 12,
-                            color: ColorTokens.tertiaryText(context),
-                          ),
-                        ),
-                        if (item.unread) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFFF3B30),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.message,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'MTSText',
-                        fontWeight: FontWeight.w400,
-                        fontSize: 13,
-                        height: 1.3,
-                        color: ColorTokens.secondaryText(context),
-                      ),
-                    ),
-                  ],
+              const SizedBox(height: 6),
+              Text(
+                item.message,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'MTSText',
+                  fontWeight: FontWeight.w400,
+                  fontSize: 13.5,
+                  height: 1.35,
+                  color: ColorTokens.secondaryText(context),
                 ),
               ),
             ],
@@ -296,38 +223,29 @@ class _NotificationTile extends StatelessWidget {
       ),
     );
   }
-
-  String _formatTime(DateTime at) {
-    final h = at.hour.toString().padLeft(2, '0');
-    final m = at.minute.toString().padLeft(2, '0');
-    return '$h:$m';
-  }
 }
 
-class _MarkAllButton extends StatelessWidget {
-  const _MarkAllButton({required this.label, required this.onTap});
+class _MarkAllCircle extends StatelessWidget {
+  const _MarkAllCircle({required this.active, required this.onTap});
 
-  final String label;
-  final VoidCallback onTap;
+  final bool active;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: ColorTokens.cardBg(context),
-      borderRadius: BorderRadius.circular(20),
+      color: active ? AppColors.brandGreen : ColorTokens.cardBg(context),
+      shape: const CircleBorder(),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-              color: AppColors.brandGreen,
-            ),
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(
+            Icons.done_all_rounded,
+            size: 20,
+            color: active ? Colors.white : ColorTokens.tertiaryText(context),
           ),
         ),
       ),
@@ -344,7 +262,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
+      padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 24),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -404,11 +322,6 @@ class _S {
     'en' => 'Notifications',
     _ => 'Bildirishnomalar',
   };
-  static String markAll(Locale l) => switch (l.languageCode) {
-    'ru' => 'Прочитать всё',
-    'en' => 'Mark all read',
-    _ => 'Hammasini o‘qish',
-  };
   static String emptyTitle(Locale l) => switch (l.languageCode) {
     'ru' => 'Уведомлений пока нет',
     'en' => 'No notifications yet',
@@ -419,22 +332,5 @@ class _S {
     'en' => 'Updates about scans, valuations and payments will show up here.',
     _ =>
       'Skanlar, baholashlar va to‘lovlar bo‘yicha yangiliklar shu yerda ko‘rinadi.',
-  };
-  static String groupLabel(Locale l, String key) => switch (key) {
-    'today' => switch (l.languageCode) {
-      'ru' => 'Сегодня',
-      'en' => 'Today',
-      _ => 'Bugun',
-    },
-    'yesterday' => switch (l.languageCode) {
-      'ru' => 'Вчера',
-      'en' => 'Yesterday',
-      _ => 'Kecha',
-    },
-    _ => switch (l.languageCode) {
-      'ru' => 'Ранее',
-      'en' => 'Earlier',
-      _ => 'Oldin',
-    },
   };
 }

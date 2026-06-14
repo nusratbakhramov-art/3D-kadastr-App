@@ -6,7 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'core/payment_deep_links.dart';
+import 'core/push_notifications.dart';
 import 'features/auth/auth_storage.dart';
+import 'features/notifications/notifications_api.dart';
 import 'features/home/user_profile.dart';
 import 'features/notifications/notification_model.dart';
 import 'features/onboarding/onboarding_screen.dart';
@@ -159,6 +161,9 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
     _bootstrap();
     // iOS Universal Links — to'lovdan keyin /pay-return/{id} appni ochadi.
     PaymentDeepLinks.init();
+    // FCM push xabarnomalar — Firebase init, ruxsat, token ro'yxati, tap
+    // navigatsiyasi. Firebase sozlanmagan bo'lsa jim o'chadi (app'ga tegmaydi).
+    unawaited(PushNotifications.init());
     // App fonдан qaytganda (Payme'dan) kutilayotgan to'lov holatini tekshiradi —
     // native Payme `c=` universal link'ni ochmaydi, shu fallback qoplaydi.
     WidgetsBinding.instance.addObserver(this);
@@ -177,6 +182,8 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       PaymentDeepLinks.onResumed();
+      // Fonдан qaytganda bildirishnoma badge'ini yangilaymiz (push kelgan bo'lishi mumkin).
+      unawaited(refreshNotifications());
     }
   }
 
@@ -225,6 +232,10 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
         dateOfBirth: profile.dateOfBirth,
         gender: profile.gender,
       );
+    }
+    // Login qilgan bo'lsa — bildirishnoma badge'ini backenddan to'ldiramiz.
+    if (session.token != null) {
+      unawaited(refreshNotifications());
     }
     if (!mounted) return;
     setState(() => _onboardingDone = done);
