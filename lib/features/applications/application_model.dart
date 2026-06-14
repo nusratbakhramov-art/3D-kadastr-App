@@ -37,6 +37,7 @@ class ApplicationItem {
     this.hasDeliverable = false,
     this.isDraft = false,
     this.resumeJobId,
+    this.aiScanJobId,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -67,6 +68,11 @@ class ApplicationItem {
 
   /// DRAFT bo'lsa, davom ettirish uchun AI Baholash job id (resume).
   final int? resumeJobId;
+
+  /// AI Baholash arizasiga teksturali 3D (USDZ) skan biriktirilgan bo'lsa,
+  /// o'sha job id — detail ekranida "3D skan" kartasi ko'rsatiladi va
+  /// `/ai-valuations/{id}/scan` dan yuklab olinadi. Skan yo'q bo'lsa null.
+  final int? aiScanJobId;
 
   /// Ariza yaratilgan vaqt (detail'da ko'rsatiladi).
   final DateTime createdAt;

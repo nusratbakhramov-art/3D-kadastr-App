@@ -99,6 +99,7 @@ class AiJobSummary {
     this.cadastreNumber,
     this.estimatedValue,
     this.currentStep,
+    this.hasScan = false,
   });
 
   final int id;
@@ -108,6 +109,7 @@ class AiJobSummary {
   final String? cadastreNumber;
   final double? estimatedValue;
   final String? currentStep; // DRAFT: qaysi qadamda qolgan (resume)
+  final bool hasScan; // teksturali 3D (USDZ) skan biriktirilganmi
 
   factory AiJobSummary.fromJson(Map<String, dynamic> json) {
     final created = DateTime.tryParse(json['created_at']?.toString() ?? '') ??
@@ -121,6 +123,7 @@ class AiJobSummary {
         cadastreNumber: json['cadastre_number'] as String?,
         estimatedValue: (json['estimated_value'] as num?)?.toDouble(),
         currentStep: json['current_step'] as String?,
+        hasScan: json['has_scan'] == true,
       );
   }
 }

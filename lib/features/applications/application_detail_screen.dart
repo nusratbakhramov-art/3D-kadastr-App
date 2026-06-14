@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/api_config.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_toast.dart';
@@ -25,12 +26,13 @@ Future<String> _ensureResultCached({
   required int jobId,
   required String downloadUrl,
   required String format, // 'usdz' | 'splat'
+  String prefix = 'photo', // cache fayl nomi prefiksi (photo / aival)
   void Function(int received, int total)? onProgress,
 }) async {
   final dir = await getApplicationDocumentsDirectory();
   final scansDir = Directory('${dir.path}/scans');
   if (!scansDir.existsSync()) scansDir.createSync(recursive: true);
-  final filePath = '${scansDir.path}/photo_$jobId.$format';
+  final filePath = '${scansDir.path}/${prefix}_$jobId.$format';
   final file = File(filePath);
   if (await file.exists() && await file.length() > 0) {
     onProgress?.call(await file.length(), await file.length());
@@ -147,6 +149,18 @@ class _DetailStrings {
     'ru' => 'Откроется просмотрщик RoomPlan',
     'en' => 'RoomPlan viewer will open',
     _ => 'RoomPlan viewer ochiladi',
+  };
+
+  static String scan3d(String lang) => switch (lang) {
+    'ru' => '3D скан объекта',
+    'en' => 'Object 3D scan',
+    _ => 'Obyekt 3D skani',
+  };
+
+  static String scan3dHint(String lang) => switch (lang) {
+    'ru' => 'Нажмите, чтобы открыть в AR',
+    'en' => 'Tap to view in AR',
+    _ => 'AR’da ko‘rish uchun bosing',
   };
 
   static String downloading(String lang) => switch (lang) {
@@ -492,6 +506,13 @@ class _AboutTab extends StatelessWidget {
                   ],
                 ),
         ),
+        // AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skan —
+        // har qanday statusda (skan submit paytida yuklanadi). Foydalanuvchi
+        // AR’da ko‘rish uchun bosadi.
+        if (item.aiScanJobId != null) ...[
+          const SizedBox(height: 14),
+          _AiScanCard(jobId: item.aiScanJobId!),
+        ],
         // The downloadable report / 3D model / AR view only exist for a
         // finished deliverable (completed photogrammetry scan). For jobs that
         // are still just submitted, we don't fake a report.
@@ -553,6 +574,139 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skanni ko‘rsatadi:
+/// bosilganda `/ai-valuations/{id}/scan` dan auth bilan yuklab oladi (progress
+/// bilan) va iOS QuickLook (AR) orqali ochadi.
+class _AiScanCard extends StatefulWidget {
+  const _AiScanCard({required this.jobId});
+  final int jobId;
+
+  @override
+  State<_AiScanCard> createState() => _AiScanCardState();
+}
+
+class _AiScanCardState extends State<_AiScanCard> {
+  bool _loading = false;
+  double? _progress; // 0..1 while downloading; null if unknown/idle
+
+  Future<void> _onTap() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final filePath = await _ensureResultCached(
+        jobId: widget.jobId,
+        downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan',
+        format: 'usdz',
+        prefix: 'aival',
+        onProgress: (received, total) {
+          if (!mounted) return;
+          setState(() => _progress = total > 0 ? received / total : null);
+        },
+      );
+      if (!mounted) return;
+      await RoomPlanScanner.preview(filePath);
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _progress = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
+    return InkWell(
+      onTap: _onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ColorTokens.iconBg(context),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: _loading
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        value: _progress,
+                        color: const Color(0xFF03B54F),
+                      ),
+                    )
+                  : SvgPicture.asset(
+                      'assets/icons/chart-scatter-3d.svg',
+                      width: 20,
+                      height: 20,
+                      colorFilter: ColorFilter.mode(
+                        ColorTokens.secondaryText(context),
+                        BlendMode.srcIn,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _DetailStrings.scan3d(lang),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: ColorTokens.primaryText(context),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _loading
+                        ? _DetailStrings.downloading(lang)
+                        : _DetailStrings.scan3dHint(lang),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 13,
+                      color: ColorTokens.secondaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: ColorTokens.secondaryText(context)),
+          ],
+        ),
       ),
     );
   }

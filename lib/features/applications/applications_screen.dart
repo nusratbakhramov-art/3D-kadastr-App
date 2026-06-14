@@ -334,6 +334,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       statusGroup: group,
       isDraft: isDraft,
       resumeJobId: isDraft ? j.id : null,
+      aiScanJobId: j.hasScan ? j.id : null,
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
       addressLabel: hasValue
