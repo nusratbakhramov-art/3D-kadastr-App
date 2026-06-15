@@ -117,13 +117,23 @@ class _AiPaymentSheetState extends State<_AiPaymentSheet> {
 
     return SafeArea(
       top: false,
+      bottom: false,
       child: Container(
         decoration: BoxDecoration(
           color: bg,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
         ),
+        // Clear the home-indicator/gesture bar (viewPadding.bottom) + keyboard
+        // (viewInsets.bottom) with a 16px margin, so the pay button is never cut
+        // off at the bottom on gesture-nav devices.
         padding: EdgeInsets.fromLTRB(
-            20, 12, 20, 16 + MediaQuery.of(context).viewInsets.bottom),
+          20,
+          12,
+          20,
+          16 +
+              MediaQuery.viewPaddingOf(context).bottom +
+              MediaQuery.viewInsetsOf(context).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
