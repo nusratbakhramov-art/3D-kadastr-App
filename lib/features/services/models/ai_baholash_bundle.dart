@@ -18,6 +18,8 @@ class AiBaholashBundle {
     this.client,
     this.location,
     this.purpose = ValuationPurpose.sale,
+    this.purposeBasis,
+    this.addressee,
     this.floor,
     this.totalFloors,
     List<AiRoom>? rooms,
@@ -50,6 +52,13 @@ class AiBaholashBundle {
 
   /// Baholash maqsadi — drives the reconciliation weighting on the backend.
   ValuationPurpose purpose;
+
+  /// Баҳолаш максади — free-text legal basis printed in the Хисобот
+  /// ("…Бош прокуратурасининг … хати асосида … тақдим қилиш учун").
+  String? purposeBasis;
+
+  /// Кимга тақдим этилади — cover-letter addressee ("… га").
+  String? addressee;
 
   /// Which floor the object is on, and total floors in the building. Both are
   /// required by the intake step and adjust the market value (ground/top floor
@@ -91,6 +100,10 @@ class AiBaholashBundle {
         if (client != null) 'client': client!.toJson(),
         if (location != null) 'location': location!.toJson(),
         'purpose': purpose.wire,
+        if (purposeBasis != null && purposeBasis!.trim().isNotEmpty)
+          'purpose_text': purposeBasis!.trim(),
+        if (addressee != null && addressee!.trim().isNotEmpty)
+          'addressee': addressee!.trim(),
         if (floor != null) 'floor': floor,
         if (totalFloors != null) 'total_floors': totalFloors,
         if (rooms.isNotEmpty) 'rooms': rooms.map((r) => r.toJson()).toList(),
@@ -128,6 +141,8 @@ class AiBaholashBundle {
     if (loc is Map) {
       bundle.location = AiLocationInfo.fromJson(loc.cast<String, dynamic>());
     }
+    bundle.purposeBasis = j['purpose_text'] as String?;
+    bundle.addressee = j['addressee'] as String?;
     return bundle;
   }
 }
