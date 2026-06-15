@@ -18,10 +18,10 @@ import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
-import '../../payments/ai_payment_sheet.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
+import 'ai_credentials_screen.dart';
 
 class AiStatusScreen extends StatefulWidget {
   const AiStatusScreen({super.key, required this.bundle});
@@ -85,10 +85,7 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
               bundleJson: widget.bundle.toJson(),
               token: token,
             )
-          : await _api.create(
-              bundleJson: widget.bundle.toJson(),
-              token: token,
-            );
+          : await _api.create(bundleJson: widget.bundle.toJson(), token: token);
       if (!mounted) return;
       setState(() {
         _jobId = id;
@@ -579,7 +576,11 @@ class _ResultView extends StatelessWidget {
           child: ListingCtaButton(
             label: _AiStatusStrings.submitApplication(l),
             enabled: true,
-            onTap: () => showAiPaymentSheet(context, referenceId: snapshot.id),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => AiCredentialsScreen(referenceId: snapshot.id),
+              ),
+            ),
           ),
         ),
       ],
@@ -1568,10 +1569,10 @@ class _AiStatusStrings {
   };
 
   static String submitApplication(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подать заявку',
-        'en' => 'Submit application',
-        _ => 'Ariza yuborish',
-      };
+    'ru' => 'Подать заявку',
+    'en' => 'Submit application',
+    _ => 'Ariza yuborish',
+  };
 
   static String unitBln(Locale l) => switch (l.languageCode) {
     'ru' => 'млрд',
