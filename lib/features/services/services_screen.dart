@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../theme/app_colors.dart';
 import '../auth/widgets/login_required_sheet.dart';
 import 'models/service_item.dart';
-import 'screens/ai_cadastre_screen.dart';
+import 'screens/ai_scan_intro_screen.dart';
 import 'screens/kadastr_3d_screen.dart';
 import 'screens/online_calculator_screen.dart';
 import 'screens/smeta/smeta_editor_screen.dart';
@@ -213,10 +213,11 @@ class _ServicesScreenState extends State<ServicesScreen>
           return;
         }
         if (!context.mounted) return;
+        // Start at the 3D-scan intro (step 1) — same entry as the Home tile.
+        // (Pushing AiCadastreScreen here skipped the scan step.)
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            settings: const RouteSettings(name: 'ai/cadastre'),
-            builder: (_) => const AiCadastreScreen(),
+            builder: (_) => const AiScanIntroScreen(),
           ),
         );
       case ServiceId.calculator:

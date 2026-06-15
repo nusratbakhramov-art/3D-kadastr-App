@@ -102,6 +102,7 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
     // Skan oqimi tugadi — kadastr qadamiga o'tamiz (process ekraniga qaytmaymiz).
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'ai/cadastre'),
         builder: (_) => AiCadastreScreen(scan: r, draftId: draftId),
       ),
     );
