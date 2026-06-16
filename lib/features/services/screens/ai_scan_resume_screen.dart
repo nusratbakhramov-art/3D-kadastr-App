@@ -7,6 +7,7 @@ import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../scans/saved_scan_service.dart';
 import '../api_ai_valuation_job_service.dart';
+import '../data/model_preview.dart';
 import '../widgets/service_app_bar.dart';
 
 /// Skanlangan 3D modelni ko'rish ekrani — wizard qadamidan "3D modelni ko'rish"
@@ -48,7 +49,10 @@ class _AiScanResumeScreenState extends State<AiScanResumeScreen> {
         AppToast.error(context, _S.notFound(_locale));
         return;
       }
-      await _scan.preview(path);
+      // Asosiy model endi GLB (scan_usdz_key → .glb). SceneKit GLB'ni
+      // ko'rsata olmaydi (bo'sh ekran) — shuning uchun kontent bo'yicha
+      // yo'naltiramiz: GLB → model_viewer_plus, eski USDZ → QuickLook.
+      await openScanModel(context, path, scan: _scan);
     } catch (e) {
       if (mounted) AppToast.error(context, '${_S.failed(_locale)}: $e');
     } finally {

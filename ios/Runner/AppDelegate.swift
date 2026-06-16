@@ -75,23 +75,9 @@ import RoomPlan
           }
 
         case "startTexturedScan":
-          guard let controller = controller else {
-            result(FlutterError(
-              code: "NO_CONTROLLER",
-              message: "Flutter view controller mavjud emas",
-              details: nil,
-            ))
-            return
-          }
-          if #available(iOS 17.0, *) {
-            TexturedScanCoordinator.shared.start(from: controller, result: result)
-          } else {
-            result(FlutterError(
-              code: "UNSUPPORTED",
-              message: "Photogrammetry scan iOS 17+ ga muhtoj",
-              details: nil,
-            ))
-          }
+          // Ported RoomScanPlanAI pipeline (RoomPlan capture → atlas texturing
+          // with mesh-depth occlusion). Keeps the same channel contract.
+          RoomScanBridge.shared.handleRoomPlan(call, presenter: controller, result: result)
 
         case "startTexturedRoomPlan":
           guard let controller = controller else {
@@ -172,33 +158,9 @@ import RoomPlan
           }
 
         case "previewModel":
-          guard let args = call.arguments as? [String: Any],
-                let path = args["filePath"] as? String else {
-            result(FlutterError(
-              code: "ARGS",
-              message: "filePath argument kerak",
-              details: nil,
-            ))
-            return
-          }
-          guard let controller = controller else {
-            result(FlutterError(
-              code: "NO_CONTROLLER",
-              message: "Flutter view controller mavjud emas",
-              details: nil,
-            ))
-            return
-          }
-          // SceneKit viewer (SIMULATORda ham ishlaydi). QLPreview/AR Quick Look USDZ 3D'ni
-          // sim'da render qilmaydi — SCNView qiladi. Natija USDZ (single atlas) teksturasi
-          // SceneKit'da to'g'ri yuklanadi (Mac scan009_room2.usdz'da tasdiq). AR shart emas.
-          guard FileManager.default.fileExists(atPath: path) else {
-            result(FlutterError(code: "NO_FILE", message: "USDZ topilmadi: \(path)", details: nil))
-            return
-          }
-          let viewer = SceneKitModelViewerController(url: URL(fileURLWithPath: path))
-          viewer.modalPresentationStyle = .fullScreen
-          controller.present(viewer, animated: true) { result(true) }
+          // Ported RoomScanPlanAI viewer: render atlas.geo + atlas.png directly in
+          // SceneKit (no USDZ round-trip), falling back to the file if needed.
+          RoomScanBridge.shared.handleRoomPlan(call, presenter: controller, result: result)
 
         default:
           result(FlutterMethodNotImplemented)
@@ -212,6 +174,13 @@ import RoomPlan
         binaryMessenger: controller.binaryMessenger
       )
       savedScansChannel.setMethodCallHandler { [weak controller] call, result in
+        // Scan list/get/process/outputPath/delete/viewLidarMesh → ported
+        // RoomScanPlanAI pipeline (Documents/Scans/scanNNN). Debug-log helpers
+        // stay on the legacy path below.
+        if call.method != "readDebugLog" && call.method != "clearDebugLog" {
+          RoomScanBridge.shared.handleSavedScans(call, presenter: controller, result: result)
+          return
+        }
         switch call.method {
         case "list":
           let scans = SavedScanStorage.list()

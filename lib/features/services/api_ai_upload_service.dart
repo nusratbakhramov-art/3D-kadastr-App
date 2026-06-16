@@ -41,6 +41,14 @@ MediaType? _mediaTypeFor(String path) {
     case 'xlsx':
       return MediaType('application',
           'vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    // Teksturali 3D skan modellari (scan_model). Backend kengaytma bo'yicha
+    // tekshiradi, lekin MIME'ni to'g'ri belgilash tozaroq.
+    case 'glb':
+      return MediaType('model', 'gltf-binary');
+    case 'gltf':
+      return MediaType('model', 'gltf+json');
+    case 'usdz':
+      return MediaType('model', 'vnd.usdz+zip');
     default:
       return null;
   }
@@ -55,7 +63,8 @@ enum UploadCategory {
   passport('passport'),
   document('document'),
   scan3d('scan_3d'),
-  scanModel('scan_model'); // teksturali USDZ 3D model
+  scanModel('scan_model'), // teksturali 3D model (GLB asosiy, USDZ orqaga moslik)
+  scanBundle('scan_bundle'); // to'liq skan to'plami (rasmlar, glb, usdz, mesh, geo…)
 
   const UploadCategory(this.wire);
   final String wire;
@@ -88,6 +97,7 @@ class AiUploadService {
     required List<String> filePaths,
     required String token,
     String endpoint = '/ai-valuations/upload',
+    Duration timeout = const Duration(seconds: 120),
   }) async {
     if (filePaths.isEmpty) return const [];
     final uri = Uri.parse('$_baseUrl$endpoint');
@@ -102,7 +112,7 @@ class AiUploadService {
       ));
     }
 
-    final streamed = await _client.send(req).timeout(const Duration(seconds: 120));
+    final streamed = await _client.send(req).timeout(timeout);
     final res = await http.Response.fromStream(streamed);
     if (res.statusCode < 200 || res.statusCode >= 300) {
       var msg = res.body;
@@ -114,6 +124,70 @@ class AiUploadService {
     return files
         .map((f) => (f as Map<String, dynamic>)['key'] as String)
         .toList(growable: false);
+  }
+
+  /// Upload a FULL scan bundle (every artifact) with file-level progress.
+  ///
+  /// [entries] are `{path, type, sizeBytes}` (from the native `listScanFiles`).
+  /// Types map into the backend `scan_files` shape: every non-`frame` type
+  /// becomes a single key (`glb`, `usdz`, `geo`, `png`, `manifest`, …) and all
+  /// `frame` entries collect into a `frames` list. Files go up in small batches
+  /// so [onProgress] fires often — `(filesDone, filesTotal, bytesSent,
+  /// bytesTotal)`. Returns the `scan_files` map for `createDraft(scanFiles:)`.
+  ///
+  /// Best-effort per file: a key that fails to come back is simply omitted, so
+  /// a single bad frame doesn't abort the whole bundle.
+  Future<Map<String, dynamic>> uploadBundle({
+    required List<({String path, String type, int sizeBytes})> entries,
+    required String token,
+    String endpoint = '/ai-valuations/upload',
+    int batchSize = 6,
+    void Function(int filesDone, int filesTotal, int bytesSent, int bytesTotal)?
+        onProgress,
+  }) async {
+    final scanFiles = <String, dynamic>{};
+    final frames = <String>[];
+    final total = entries.length;
+    final totalBytes = entries.fold<int>(0, (s, e) => s + e.sizeBytes);
+    if (total == 0) return scanFiles;
+    var done = 0, bytesSent = 0;
+    onProgress?.call(0, total, 0, totalBytes);
+    for (var i = 0; i < entries.length; i += batchSize) {
+      final end =
+          (i + batchSize < entries.length) ? i + batchSize : entries.length;
+      final batch = entries.sublist(i, end);
+      // Bigger files (GLB/mesh) → longer ceiling so slow uplinks don't time out.
+      final batchBytes = batch.fold<int>(0, (s, e) => s + e.sizeBytes);
+      final secs = 60 + (batchBytes / (1024 * 1024) * 4).ceil(); // ~4s per MB
+      List<String> keys;
+      try {
+        keys = await upload(
+          category: UploadCategory.scanBundle,
+          filePaths: batch.map((e) => e.path).toList(growable: false),
+          token: token,
+          endpoint: endpoint,
+          timeout: Duration(seconds: secs.clamp(60, 600)),
+        );
+      } catch (_) {
+        keys = const []; // bu partiya yiqildi — o'tkazib yuboramiz, davom etamiz
+      }
+      for (var j = 0; j < batch.length; j++) {
+        final e = batch[j];
+        final key = j < keys.length ? keys[j] : null;
+        if (key != null) {
+          if (e.type == 'frame') {
+            frames.add(key);
+          } else {
+            scanFiles[e.type] = key;
+          }
+        }
+        done++;
+        bytesSent += e.sizeBytes;
+      }
+      onProgress?.call(done, total, bytesSent, totalBytes);
+    }
+    if (frames.isNotEmpty) scanFiles['frames'] = frames;
+    return scanFiles;
   }
 
   void dispose() => _client.close();

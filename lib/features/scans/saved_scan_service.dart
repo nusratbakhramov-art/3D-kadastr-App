@@ -113,6 +113,41 @@ class SavedScanProcessResult {
   }
 }
 
+/// Skan to'plamidagi bitta artefakt fayl (native listScanFiles'dan).
+/// [type] backend `scan_files` shakliga mos: `glb`/`usdz`/`geo`/`png`/
+/// `geometry_bin`/`mesh_ply`/`mesh_usdz`/`manifest`/`frames_json`/`frame`.
+class ScanFile {
+  const ScanFile({
+    required this.path,
+    required this.type,
+    required this.sizeBytes,
+    this.rel = '',
+  });
+
+  final String path; // to'liq qurilma yo'li (upload uchun)
+  final String rel; // skan papkasiga nisbatan yo'l (ko'rsatish uchun)
+  final String type;
+  final int sizeBytes;
+
+  bool get isFrame => type == 'frame';
+
+  static ScanFile? fromMap(Map<dynamic, dynamic> j) {
+    final path = j['path'] as String?;
+    final type = j['type'] as String?;
+    if (path == null || type == null) return null;
+    return ScanFile(
+      path: path,
+      type: type,
+      rel: (j['rel'] as String?) ?? '',
+      sizeBytes: ((j['sizeBytes'] as num?) ?? 0).toInt(),
+    );
+  }
+
+  /// Upload-bundle uchun record shaklida (api_ai_upload_service.uploadBundle).
+  ({String path, String type, int sizeBytes}) get entry =>
+      (path: path, type: type, sizeBytes: sizeBytes);
+}
+
 class SavedScanService {
   static const _channel = MethodChannel('kadastr/saved_scans');
   static const _previewChannel = MethodChannel('kadastr/room_plan_scanner');
@@ -158,6 +193,25 @@ class SavedScanService {
       return SavedScanProcessResult.tryFromMap(raw);
     } on PlatformException catch (e) {
       throw Exception('Qayta ishlash xatosi: ${e.message ?? e.code}');
+    }
+  }
+
+  /// Skanning BARCHA artefakt fayllari (rasmlar, glb, usdz, mesh, geo/png,
+  /// manifest, frames.json) — backendga to'liq yuklash uchun. Har biri
+  /// {path, type, sizeBytes}. Native Documents/Scans/scanNNN/ ni sanaydi.
+  Future<List<ScanFile>> listScanFiles(int id) async {
+    try {
+      final raw = await _channel.invokeMethod<List<dynamic>>(
+        'listScanFiles', {'id': id},
+      );
+      if (raw == null) return const [];
+      return raw
+          .whereType<Map<dynamic, dynamic>>()
+          .map(ScanFile.fromMap)
+          .whereType<ScanFile>()
+          .toList();
+    } on PlatformException {
+      return const [];
     }
   }
 

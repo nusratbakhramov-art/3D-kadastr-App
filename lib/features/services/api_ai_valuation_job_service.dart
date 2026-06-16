@@ -65,6 +65,7 @@ class AiJobSnapshot {
     required this.requestPayload,
     this.currentStep,
     this.scanUsdzKey,
+    this.scanFiles,
     this.resultPayload,
     this.errorMessage,
     this.estimatorComment,
@@ -78,6 +79,9 @@ class AiJobSnapshot {
   final Map<String, dynamic> requestPayload;
   final String? currentStep; // DRAFT: qaysi qadamda qolgan
   final String? scanUsdzKey; // teksturali 3D skan backend kaliti (resume ko'rish)
+  // To'liq skan bundle kalitlari (rasmlar, glb, usdz, mesh, geo/png, manifest…).
+  // {"glb": key, "frames": [key…], …}. Detail ekranida hamma artefaktni ko'rsatadi.
+  final Map<String, dynamic>? scanFiles;
   final Map<String, dynamic>? resultPayload;
   final String? errorMessage;
   // Baholash guruhi xulosasi — natija ekranida foydalanuvchiga ko'rsatiladi.
@@ -94,6 +98,7 @@ class AiJobSnapshot {
                 const {},
         currentStep: json['current_step'] as String?,
         scanUsdzKey: json['scan_usdz_key'] as String?,
+        scanFiles: (json['scan_files'] as Map?)?.cast<String, dynamic>(),
         resultPayload:
             (json['result_payload'] as Map?)?.cast<String, dynamic>(),
         errorMessage: json['error_message'] as String?,
@@ -294,6 +299,7 @@ class AiValuationJobService {
     required Map<String, dynamic> payload,
     String? currentStep,
     String? scanUsdzKey,
+    Map<String, dynamic>? scanFiles,
     required String token,
   }) async {
     final uri = Uri.parse('$_baseUrl/ai-valuations/draft');
@@ -309,6 +315,8 @@ class AiValuationJobService {
             'payload': payload,
             if (currentStep != null) 'current_step': currentStep,
             if (scanUsdzKey != null) 'scan_usdz_key': scanUsdzKey,
+            if (scanFiles != null && scanFiles.isNotEmpty)
+              'scan_files': scanFiles,
           }),
         )
         .timeout(const Duration(seconds: 30));
@@ -326,6 +334,8 @@ class AiValuationJobService {
     int id, {
     required Map<String, dynamic> payload,
     String? currentStep,
+    String? scanUsdzKey,
+    Map<String, dynamic>? scanFiles,
     required String token,
   }) async {
     final uri = Uri.parse('$_baseUrl/ai-valuations/$id/draft');
@@ -340,6 +350,9 @@ class AiValuationJobService {
           body: jsonEncode({
             'payload': payload,
             if (currentStep != null) 'current_step': currentStep,
+            if (scanUsdzKey != null) 'scan_usdz_key': scanUsdzKey,
+            if (scanFiles != null && scanFiles.isNotEmpty)
+              'scan_files': scanFiles,
           }),
         )
         .timeout(const Duration(seconds: 30));

@@ -7,36 +7,61 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0E400E1B125B15B1ED77D96B /* PendingFrame.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9DDA9C9A406707764C8C31E0 /* PendingFrame.swift */; };
+		101F30E901687E5BF52600A3 /* VoxelWelder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D8640322B01ABFAC19A4998 /* VoxelWelder.swift */; };
+		14866785363628D954B5E9A0 /* VertexColorTexturer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B498479D1E415BC44D52EE6 /* VertexColorTexturer.swift */; };
 		1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */ = {isa = PBXBuildFile; fileRef = 1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */; };
+		1BB45F1F7DEF65A64B063B4D /* MathHelpers.swift in Sources */ = {isa = PBXBuildFile; fileRef = A566E3010C1D942773A8F743 /* MathHelpers.swift */; };
 		29BB92C3B6AA5576D34D1A84 /* LocalScanIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D0784215623EA4509A1D6BC /* LocalScanIndex.swift */; };
 		29BBB8CC87FE98E8CAB4FACA /* MarchingCubesTables.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBD769A067E08B9418A44EFA /* MarchingCubesTables.swift */; };
 		2CC5983E9C54877404967CFD /* RoomPlanScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC05DC5FFDACEBB486FD23FC /* RoomPlanScanner.swift */; };
+		31A28EEEE0B47300522AEAC9 /* RoomShell.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C8AC7D5FCBB5B0437B7D6EE /* RoomShell.swift */; };
 		32CC4D1AA7E8BE76AA59E02B /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6A3A3F096E7F204635AF1D48 /* Pods_RunnerTests.framework */; };
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
+		486448B55FFDA046E709D04D /* DepthExtractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB898DC45509F88E7E865CD9 /* DepthExtractor.swift */; };
+		4A2E61441D60E2AF76A24653 /* GeometryIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0FEC9A706581F9E42AD9FD2 /* GeometryIO.swift */; };
+		5062523C494CC552D053C345 /* MeshCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = ABB503F0C4A367698C5AF7FF /* MeshCapture.swift */; };
 		5475C134280B9D03370FDB78 /* SavedScanStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */; };
 		558D2A0B08E3FBA514524864 /* MeshCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 645A2ACEB2DB629F7C6E1AD1 /* MeshCleaner.swift */; };
+		5595480A2FE61DBA5F6E3FA2 /* RoomCaptureScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01CA01CD6DE6E709666EE1DE /* RoomCaptureScreen.swift */; };
 		5AE8EFF78A8D420693567581 /* xatlas.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 8F6FF7D10B897F198587E99D /* xatlas.cpp */; };
 		5EE77A4B9E8BCFD2E5B33FDF /* TextureAtlasBaker.metal in Sources */ = {isa = PBXBuildFile; fileRef = F1A0528038DE76FB55AB365C /* TextureAtlasBaker.metal */; };
+		6A32C0211C04B448B8416020 /* DeviceCapability.swift in Sources */ = {isa = PBXBuildFile; fileRef = 053EB4CA9A10A708A6146C90 /* DeviceCapability.swift */; };
 		6B97966732F2F557CEC825D1 /* Pods_Runner.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 074AE24E965FC1115F45B42A /* Pods_Runner.framework */; };
+		6BF2EBDC26275C0015C056F4 /* ScanStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFFF4A79AB85A42C52410E4 /* ScanStore.swift */; };
+		71F47EE1F4E59820E7208504 /* DepthMesher.swift in Sources */ = {isa = PBXBuildFile; fileRef = D5B888B99F56DB13A3B49738 /* DepthMesher.swift */; };
 		7466B7A4F7B1DBEC90872E7B /* ImageQuality.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		78A318202AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage in Frameworks */ = {isa = PBXBuildFile; productRef = 78A3181F2AECB46A00862997 /* FlutterGeneratedPluginSwiftPackage */; };
+		78FB1826A66C563F2716CE56 /* ARMeshViz.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC1AE371C3F4B4480720A053 /* ARMeshViz.swift */; };
+		7AC0E5D5BE51E90B4E1EF83F /* MeshCleanup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52CCF17209C90596E36829D4 /* MeshCleanup.swift */; };
 		887BFDCD711AB83D9C4994C7 /* RealESRGAN.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */; };
+		8E60FEF5E48D226F19B2648B /* AtlasSceneBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FCE0FD14A3A8035A71D6AC /* AtlasSceneBuilder.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
 		97C147011CF9000F007C117D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FF1CF9000F007C117D /* LaunchScreen.storyboard */; };
 		99D322D3CC3E19002C4131A8 /* MeshHoleFiller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 118DE27624D9632CD5CC770E /* MeshHoleFiller.swift */; };
 		AA01AECEF85AAF2094A18FC2 /* TSDFIntegrator.metal in Sources */ = {isa = PBXBuildFile; fileRef = 007386094BD73F6F526C4323 /* TSDFIntegrator.metal */; };
+		ABFF1BDE605F359F41F88293 /* AtlasTexturer.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0328061CEC0B2F340094DE1 /* AtlasTexturer.swift */; };
+		AE5D50249357AE1A311EDFD3 /* ProjectiveSampler.swift in Sources */ = {isa = PBXBuildFile; fileRef = ACF5ABC5ACA6CDFB541B850E /* ProjectiveSampler.swift */; };
+		AEB419511721A009C59D5710 /* ScanRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35A233508FC46A76723A8115 /* ScanRecord.swift */; };
+		AEB8376EEE137637924493BD /* AtlasIO.swift in Sources */ = {isa = PBXBuildFile; fileRef = 454A43C09DA1A1E5B287A1A8 /* AtlasIO.swift */; };
 		B947406B657556A6B1467D3B /* MetalAtlasBaker.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD2F6CF0C9411BA24EFBEE5D /* MetalAtlasBaker.swift */; };
 		BA7B0B60052DEC614178159C /* StreamingTSDF.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1280F1A5DE6E92E674AA399E /* StreamingTSDF.swift */; };
+		BBA3008CDDE6A1712F30BA4E /* ScanModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A2190B51AA0B374A9FE2BD /* ScanModels.swift */; };
 		C17C222DE5363BF12028B012 /* HybridMeshBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D248C50DFE57C389A949AD /* HybridMeshBuilder.swift */; };
 		C48A256C6FDDD6C9B1995FE7 /* AutoProcessRunner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */; };
 		C640DB99A9EC41B5149B2D34 /* PoseRefiner.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6F616916D4C4B0C8E14AE13 /* PoseRefiner.swift */; };
+		C82B0E344E9147B425FF03CD /* RoomScanBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 105207DBB94DF57218337270 /* RoomScanBridge.swift */; };
+		CC566E79F5EF5542F4AB8855 /* CoverageGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A5DB922D0008F4C907794641 /* CoverageGrid.swift */; };
 		D2522B2E52DC5F6FBB5B0568 /* TSDFReconstructor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F86190F99F40BDF908D4F21 /* TSDFReconstructor.swift */; };
 		DF963073C9CE0722E075E6BF /* MLAtlasEnhancer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */; };
 		E24551EFB79403174BAC7930 /* XAtlasBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 6DF1BE198401ABDF945C563E /* XAtlasBridge.mm */; };
+		EC113D1B9FA2B1B7FF6B7AD3 /* MeshExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DD5D460CD7DF3E5CC14D1F /* MeshExporter.swift */; };
 		EE3DEB2DDABF71FA4D3797D3 /* CubeProjectionUV.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */; };
+		F60391B8852500F1739808F9 /* RoomScanRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6579F74F7C9D298CCCDD62CB /* RoomScanRecorder.swift */; };
+		F8B95D46753090A103AD53EC /* TexturingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 671887997091F01E8E4DA14E /* TexturingService.swift */; };
 		F8DC9F7558391CB1A830DAB3 /* DebugLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 163AE41DB103B31779CDA528 /* DebugLog.swift */; };
 /* End PBXBuildFile section */
 
@@ -65,8 +90,11 @@
 
 /* Begin PBXFileReference section */
 		007386094BD73F6F526C4323 /* TSDFIntegrator.metal */ = {isa = PBXFileReference; includeInIndex = 1; path = TSDFIntegrator.metal; sourceTree = "<group>"; };
+		01CA01CD6DE6E709666EE1DE /* RoomCaptureScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoomCaptureScreen.swift; sourceTree = "<group>"; };
+		053EB4CA9A10A708A6146C90 /* DeviceCapability.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DeviceCapability.swift; sourceTree = "<group>"; };
 		06EF290EAFD478F199F29615 /* Pods-Runner.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.debug.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.debug.xcconfig"; sourceTree = "<group>"; };
 		074AE24E965FC1115F45B42A /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		105207DBB94DF57218337270 /* RoomScanBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoomScanBridge.swift; sourceTree = "<group>"; };
 		118DE27624D9632CD5CC770E /* MeshHoleFiller.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshHoleFiller.swift; sourceTree = "<group>"; };
 		1280F1A5DE6E92E674AA399E /* StreamingTSDF.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreamingTSDF.swift; sourceTree = "<group>"; };
 		1411E667E068CC2A68E4D392 /* xatlas.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = xatlas.h; sourceTree = "<group>"; };
@@ -74,21 +102,31 @@
 		1498D2331E8E89220040F4C2 /* GeneratedPluginRegistrant.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GeneratedPluginRegistrant.m; sourceTree = "<group>"; };
 		163AE41DB103B31779CDA528 /* DebugLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		1F86190F99F40BDF908D4F21 /* TSDFReconstructor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TSDFReconstructor.swift; sourceTree = "<group>"; };
+		2C8AC7D5FCBB5B0437B7D6EE /* RoomShell.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoomShell.swift; sourceTree = "<group>"; };
 		2D0784215623EA4509A1D6BC /* LocalScanIndex.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocalScanIndex.swift; sourceTree = "<group>"; };
 		331C807B294A618700263BE5 /* RunnerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunnerTests.swift; sourceTree = "<group>"; };
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		35A233508FC46A76723A8115 /* ScanRecord.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScanRecord.swift; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoProcessRunner.swift; sourceTree = "<group>"; };
+		454A43C09DA1A1E5B287A1A8 /* AtlasIO.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AtlasIO.swift; sourceTree = "<group>"; };
+		4EFFF4A79AB85A42C52410E4 /* ScanStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScanStore.swift; sourceTree = "<group>"; };
+		52CCF17209C90596E36829D4 /* MeshCleanup.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshCleanup.swift; sourceTree = "<group>"; };
 		56D248C50DFE57C389A949AD /* HybridMeshBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HybridMeshBuilder.swift; sourceTree = "<group>"; };
+		63A2190B51AA0B374A9FE2BD /* ScanModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ScanModels.swift; sourceTree = "<group>"; };
 		645A2ACEB2DB629F7C6E1AD1 /* MeshCleaner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshCleaner.swift; sourceTree = "<group>"; };
+		6579F74F7C9D298CCCDD62CB /* RoomScanRecorder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RoomScanRecorder.swift; sourceTree = "<group>"; };
+		671887997091F01E8E4DA14E /* TexturingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TexturingService.swift; sourceTree = "<group>"; };
 		6A3A3F096E7F204635AF1D48 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		6B47C35A5C87BE0CEC5F6400 /* Pods-Runner.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.release.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"; sourceTree = "<group>"; };
+		6D8640322B01ABFAC19A4998 /* VoxelWelder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VoxelWelder.swift; sourceTree = "<group>"; };
 		6DEC7F24591D1B80DE2FB5C2 /* Pods-RunnerTests.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.profile.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.profile.xcconfig"; sourceTree = "<group>"; };
 		6DF1BE198401ABDF945C563E /* XAtlasBridge.mm */ = {isa = PBXFileReference; includeInIndex = 1; path = XAtlasBridge.mm; sourceTree = "<group>"; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		78E0A7A72DC9AD7400C4905E /* FlutterGeneratedPluginSwiftPackage */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = FlutterGeneratedPluginSwiftPackage; path = Flutter/ephemeral/Packages/FlutterGeneratedPluginSwiftPackage; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
+		8B498479D1E415BC44D52EE6 /* VertexColorTexturer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VertexColorTexturer.swift; sourceTree = "<group>"; };
 		8F6FF7D10B897F198587E99D /* xatlas.cpp */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.cpp.cpp; path = xatlas.cpp; sourceTree = "<group>"; };
 		918294D223F6574E3A0BA3F3 /* Pods-Runner.profile.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-Runner.profile.xcconfig"; path = "Target Support Files/Pods-Runner/Pods-Runner.profile.xcconfig"; sourceTree = "<group>"; };
 		955B98DF96F4E500F761F87A /* XAtlasBridge.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = XAtlasBridge.h; sourceTree = "<group>"; };
@@ -99,15 +137,27 @@
 		97C146FD1CF9000F007C117D /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		97C147001CF9000F007C117D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		97C147021CF9000F007C117D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		9DDA9C9A406707764C8C31E0 /* PendingFrame.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PendingFrame.swift; sourceTree = "<group>"; };
+		A566E3010C1D942773A8F743 /* MathHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MathHelpers.swift; sourceTree = "<group>"; };
+		A5DB922D0008F4C907794641 /* CoverageGrid.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoverageGrid.swift; sourceTree = "<group>"; };
+		ABB503F0C4A367698C5AF7FF /* MeshCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshCapture.swift; sourceTree = "<group>"; };
 		AC05DC5FFDACEBB486FD23FC /* RoomPlanScanner.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RoomPlanScanner.swift; sourceTree = "<group>"; };
 		AC51EAB3D734E3A8EA9B3CF7 /* ImageQuality.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageQuality.swift; sourceTree = "<group>"; };
+		ACF5ABC5ACA6CDFB541B850E /* ProjectiveSampler.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProjectiveSampler.swift; sourceTree = "<group>"; };
 		B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CubeProjectionUV.swift; sourceTree = "<group>"; };
+		B1FCE0FD14A3A8035A71D6AC /* AtlasSceneBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AtlasSceneBuilder.swift; sourceTree = "<group>"; };
 		BBD769A067E08B9418A44EFA /* MarchingCubesTables.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarchingCubesTables.swift; sourceTree = "<group>"; };
 		C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLAtlasEnhancer.swift; sourceTree = "<group>"; };
+		CC1AE371C3F4B4480720A053 /* ARMeshViz.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ARMeshViz.swift; sourceTree = "<group>"; };
 		D239B79296615AB1D014B2E1 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
+		D5B888B99F56DB13A3B49738 /* DepthMesher.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DepthMesher.swift; sourceTree = "<group>"; };
 		D6F616916D4C4B0C8E14AE13 /* PoseRefiner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PoseRefiner.swift; sourceTree = "<group>"; };
+		DB898DC45509F88E7E865CD9 /* DepthExtractor.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DepthExtractor.swift; sourceTree = "<group>"; };
 		DD2F6CF0C9411BA24EFBEE5D /* MetalAtlasBaker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MetalAtlasBaker.swift; sourceTree = "<group>"; };
 		DFF4DD005D2C020B35E54AB1 /* SavedScanStorage.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SavedScanStorage.swift; sourceTree = "<group>"; };
+		E0328061CEC0B2F340094DE1 /* AtlasTexturer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AtlasTexturer.swift; sourceTree = "<group>"; };
+		E0FEC9A706581F9E42AD9FD2 /* GeometryIO.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GeometryIO.swift; sourceTree = "<group>"; };
+		E6DD5D460CD7DF3E5CC14D1F /* MeshExporter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshExporter.swift; sourceTree = "<group>"; };
 		F1A0528038DE76FB55AB365C /* TextureAtlasBaker.metal */ = {isa = PBXFileReference; includeInIndex = 1; path = TextureAtlasBaker.metal; sourceTree = "<group>"; };
 		F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = Models/RealESRGAN.mlmodelc; sourceTree = "<group>"; };
 		FC68AA764C6718864843519D /* Pods-RunnerTests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.debug.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.debug.xcconfig"; sourceTree = "<group>"; };
@@ -154,6 +204,39 @@
 			);
 			name = Cpp;
 			path = Cpp;
+			sourceTree = "<group>";
+		};
+		65FE8B6769D3BF3E096E2D5A /* RoomScan */ = {
+			isa = PBXGroup;
+			children = (
+				454A43C09DA1A1E5B287A1A8 /* AtlasIO.swift */,
+				B1FCE0FD14A3A8035A71D6AC /* AtlasSceneBuilder.swift */,
+				E0328061CEC0B2F340094DE1 /* AtlasTexturer.swift */,
+				A5DB922D0008F4C907794641 /* CoverageGrid.swift */,
+				DB898DC45509F88E7E865CD9 /* DepthExtractor.swift */,
+				D5B888B99F56DB13A3B49738 /* DepthMesher.swift */,
+				053EB4CA9A10A708A6146C90 /* DeviceCapability.swift */,
+				E0FEC9A706581F9E42AD9FD2 /* GeometryIO.swift */,
+				A566E3010C1D942773A8F743 /* MathHelpers.swift */,
+				ABB503F0C4A367698C5AF7FF /* MeshCapture.swift */,
+				52CCF17209C90596E36829D4 /* MeshCleanup.swift */,
+				E6DD5D460CD7DF3E5CC14D1F /* MeshExporter.swift */,
+				9DDA9C9A406707764C8C31E0 /* PendingFrame.swift */,
+				ACF5ABC5ACA6CDFB541B850E /* ProjectiveSampler.swift */,
+				01CA01CD6DE6E709666EE1DE /* RoomCaptureScreen.swift */,
+				105207DBB94DF57218337270 /* RoomScanBridge.swift */,
+				6579F74F7C9D298CCCDD62CB /* RoomScanRecorder.swift */,
+				2C8AC7D5FCBB5B0437B7D6EE /* RoomShell.swift */,
+				63A2190B51AA0B374A9FE2BD /* ScanModels.swift */,
+				35A233508FC46A76723A8115 /* ScanRecord.swift */,
+				4EFFF4A79AB85A42C52410E4 /* ScanStore.swift */,
+				671887997091F01E8E4DA14E /* TexturingService.swift */,
+				8B498479D1E415BC44D52EE6 /* VertexColorTexturer.swift */,
+				6D8640322B01ABFAC19A4998 /* VoxelWelder.swift */,
+				CC1AE371C3F4B4480720A053 /* ARMeshViz.swift */,
+			);
+			name = RoomScan;
+			path = RoomScan;
 			sourceTree = "<group>";
 		};
 		960C536F5BB4418970E49E3E /* Pods */ = {
@@ -240,6 +323,7 @@
 				163AE41DB103B31779CDA528 /* DebugLog.swift */,
 				444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */,
 				B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */,
+				65FE8B6769D3BF3E096E2D5A /* RoomScan */,
 			);
 			path = Runner;
 			sourceTree = "<group>";
@@ -467,6 +551,31 @@
 				F8DC9F7558391CB1A830DAB3 /* DebugLog.swift in Sources */,
 				C48A256C6FDDD6C9B1995FE7 /* AutoProcessRunner.swift in Sources */,
 				EE3DEB2DDABF71FA4D3797D3 /* CubeProjectionUV.swift in Sources */,
+				AEB8376EEE137637924493BD /* AtlasIO.swift in Sources */,
+				8E60FEF5E48D226F19B2648B /* AtlasSceneBuilder.swift in Sources */,
+				ABFF1BDE605F359F41F88293 /* AtlasTexturer.swift in Sources */,
+				CC566E79F5EF5542F4AB8855 /* CoverageGrid.swift in Sources */,
+				486448B55FFDA046E709D04D /* DepthExtractor.swift in Sources */,
+				71F47EE1F4E59820E7208504 /* DepthMesher.swift in Sources */,
+				6A32C0211C04B448B8416020 /* DeviceCapability.swift in Sources */,
+				4A2E61441D60E2AF76A24653 /* GeometryIO.swift in Sources */,
+				1BB45F1F7DEF65A64B063B4D /* MathHelpers.swift in Sources */,
+				5062523C494CC552D053C345 /* MeshCapture.swift in Sources */,
+				7AC0E5D5BE51E90B4E1EF83F /* MeshCleanup.swift in Sources */,
+				EC113D1B9FA2B1B7FF6B7AD3 /* MeshExporter.swift in Sources */,
+				0E400E1B125B15B1ED77D96B /* PendingFrame.swift in Sources */,
+				AE5D50249357AE1A311EDFD3 /* ProjectiveSampler.swift in Sources */,
+				5595480A2FE61DBA5F6E3FA2 /* RoomCaptureScreen.swift in Sources */,
+				C82B0E344E9147B425FF03CD /* RoomScanBridge.swift in Sources */,
+				F60391B8852500F1739808F9 /* RoomScanRecorder.swift in Sources */,
+				31A28EEEE0B47300522AEAC9 /* RoomShell.swift in Sources */,
+				BBA3008CDDE6A1712F30BA4E /* ScanModels.swift in Sources */,
+				AEB419511721A009C59D5710 /* ScanRecord.swift in Sources */,
+				6BF2EBDC26275C0015C056F4 /* ScanStore.swift in Sources */,
+				F8B95D46753090A103AD53EC /* TexturingService.swift in Sources */,
+				14866785363628D954B5E9A0 /* VertexColorTexturer.swift in Sources */,
+				101F30E901687E5BF52600A3 /* VoxelWelder.swift in Sources */,
+				78FB1826A66C563F2716CE56 /* ARMeshViz.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -562,6 +671,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = KHGXWF53U9;
 				ENABLE_BITCODE = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
 				INFOPLIST_FILE = Runner/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "3D Kadastr";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -576,6 +686,7 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -753,6 +864,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = KHGXWF53U9;
 				ENABLE_BITCODE = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
 				INFOPLIST_FILE = Runner/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "3D Kadastr";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -767,7 +879,7 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
-				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 				VERSIONING_SYSTEM = "apple-generic";
@@ -784,6 +896,7 @@
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = KHGXWF53U9;
 				ENABLE_BITCODE = NO;
+				GCC_OPTIMIZATION_LEVEL = s;
 				INFOPLIST_FILE = Runner/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "3D Kadastr";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -798,6 +911,7 @@
 				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 1;
 				VERSIONING_SYSTEM = "apple-generic";

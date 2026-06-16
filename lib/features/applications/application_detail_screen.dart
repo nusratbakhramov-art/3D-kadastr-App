@@ -12,10 +12,12 @@ import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_http_client.dart';
+import '../auth/auth_storage.dart';
 import '../settings/settings_state.dart';
 import '../scans/splat_viewer_screen.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
+import '../services/data/model_preview.dart';
 import '../services/data/room_plan_scanner.dart';
 import '../services/widgets/segmented_tabs.dart';
 import '../services/widgets/schema_answers_view.dart';
@@ -177,6 +179,24 @@ class _DetailStrings {
     'ru' => 'Откроется просмотрщик RoomPlan',
     'en' => 'RoomPlan viewer will open',
     _ => 'RoomPlan viewer ochiladi',
+  };
+
+  static String scan3d(String lang) => switch (lang) {
+    'ru' => '3D скан объекта',
+    'en' => 'Object 3D scan',
+    _ => 'Obyekt 3D skani',
+  };
+
+  static String scan3dHint(String lang) => switch (lang) {
+    'ru' => 'Нажмите, чтобы открыть в AR',
+    'en' => 'Tap to view in AR',
+    _ => 'AR’da ko‘rish uchun bosing',
+  };
+
+  static String scanPhotos(String lang) => switch (lang) {
+    'ru' => 'Снимки скана',
+    'en' => 'Scan photos',
+    _ => 'Skan rasmlari',
   };
 
   static String downloading(String lang) => switch (lang) {
@@ -571,9 +591,10 @@ class _AboutTab extends StatelessWidget {
         // pastda "AR orqali ko‘rish" yashil tugmasi.
         if (item.aiScanJobId != null) ...[
           const SizedBox(height: 14),
-          _AiModelCard(jobId: item.aiScanJobId!),
-          const SizedBox(height: 18),
-          _AiArAction(jobId: item.aiScanJobId!),
+          _AiScanCard(jobId: item.aiScanJobId!),
+          // Skan paytida olingan rasmlar (frames) — scan_files'dan. Eski
+          // arizalarda rasm bo'lmasa, kartani o'zi yashiradi.
+          _AiScanFramesGallery(jobId: item.aiScanJobId!),
         ],
         // The downloadable report / 3D model / AR view only exist for a
         // finished deliverable (completed photogrammetry scan). For jobs that
@@ -912,32 +933,20 @@ List<(String, List<(String, String)>)> _buildAiSections(
   return sections;
 }
 
-/// AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skanni "3D Kadastr"
-/// ariza detalidagi "3D model" kartasi bilan bir xil ko‘rinishda ko‘rsatadi:
-/// bosilganda `/ai-valuations/{id}/scan` dan auth bilan yuklab oladi (bayt-aniq
-/// progress bilan) va iOS QuickLook (RoomPlan/AR) orqali ochadi.
-class _AiModelCard extends StatefulWidget {
-  const _AiModelCard({required this.jobId});
+/// AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skanni ko‘rsatadi:
+/// bosilganda `/ai-valuations/{id}/scan` dan auth bilan yuklab oladi (progress
+/// bilan) va iOS QuickLook (AR) orqali ochadi.
+class _AiScanCard extends StatefulWidget {
+  const _AiScanCard({required this.jobId});
   final int jobId;
 
   @override
-  State<_AiModelCard> createState() => _AiModelCardState();
+  State<_AiScanCard> createState() => _AiScanCardState();
 }
 
-class _AiModelCardState extends State<_AiModelCard> {
+class _AiScanCardState extends State<_AiScanCard> {
   bool _loading = false;
-  // 0..1 while downloading; null when not active or size unknown.
-  double? _progress;
-  // Bytes received / total for byte-precise label.
-  int _received = 0;
-  int _total = 0;
-
-  String _fmtBytes(int n) {
-    if (n <= 0) return '0 B';
-    if (n < 1024) return '$n B';
-    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(0)} KB';
-    return '${(n / 1024 / 1024).toStringAsFixed(1)} MB';
-  }
+  double? _progress; // 0..1 while downloading; null if unknown/idle
 
   Future<void> _onTap() async {
     if (_loading) return;
@@ -946,19 +955,18 @@ class _AiModelCardState extends State<_AiModelCard> {
       final filePath = await _ensureResultCached(
         jobId: widget.jobId,
         downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan',
-        format: 'usdz',
+        format: 'glb',
         prefix: 'aival',
         onProgress: (received, total) {
           if (!mounted) return;
-          setState(() {
-            _received = received;
-            _total = total;
-            _progress = total > 0 ? received / total : null;
-          });
+          setState(() => _progress = total > 0 ? received / total : null);
         },
       );
       if (!mounted) return;
-      await RoomPlanScanner.preview(filePath);
+      // Backend GLB (yangi asosiy format) yoki eski USDZ qaytaradi — kontent
+      // bo'yicha to'g'ri viewer tanlaymiz: GLB → model_viewer_plus, USDZ →
+      // QuickLook. (openScanModel — resume ekrani bilan bir xil, markazlashgan.)
+      await openScanModel(context, filePath);
     } on HttpException catch (e) {
       if (!mounted) return;
       AppToast.error(context, e.message);
@@ -974,8 +982,6 @@ class _AiModelCardState extends State<_AiModelCard> {
         setState(() {
           _loading = false;
           _progress = null;
-          _received = 0;
-          _total = 0;
         });
       }
     }
@@ -1005,15 +1011,25 @@ class _AiModelCardState extends State<_AiModelCard> {
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: SvgPicture.asset(
-                'assets/icons/chart-scatter-3d.svg',
-                width: 20,
-                height: 20,
-                colorFilter: ColorFilter.mode(
-                  ColorTokens.secondaryText(context),
-                  BlendMode.srcIn,
-                ),
-              ),
+              child: _loading
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        value: _progress,
+                        color: const Color(0xFF03B54F),
+                      ),
+                    )
+                  : SvgPicture.asset(
+                      'assets/icons/chart-scatter-3d.svg',
+                      width: 20,
+                      height: 20,
+                      colorFilter: ColorFilter.mode(
+                        ColorTokens.secondaryText(context),
+                        BlendMode.srcIn,
+                      ),
+                    ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -1021,54 +1037,31 @@ class _AiModelCardState extends State<_AiModelCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _DetailStrings.model3d(lang),
+                    _DetailStrings.scan3d(lang),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                      height: 1.3,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
                       color: ColorTokens.primaryText(context),
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    !_loading
-                        ? _DetailStrings.roomPlanViewerOpens(lang)
-                        : _total > 0
-                            ? '${_DetailStrings.downloading(lang)} ${(_progress! * 100).toStringAsFixed(0)}% '
-                                '(${_fmtBytes(_received)} / ${_fmtBytes(_total)})'
-                            : '${_DetailStrings.downloading(lang)} ${_fmtBytes(_received)}',
+                    _loading
+                        ? _DetailStrings.downloading(lang)
+                        : _DetailStrings.scan3dHint(lang),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w400,
-                      fontSize: 12,
-                      height: 1.3,
+                      fontSize: 13,
                       color: ColorTokens.secondaryText(context),
                     ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  if (_loading) ...[
-                    const SizedBox(height: 6),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: LinearProgressIndicator(
-                        value: _progress,
-                        minHeight: 4,
-                        backgroundColor: ColorTokens.iconBg(context),
-                      ),
-                    ),
-                  ],
                 ],
               ),
             ),
-            if (!_loading)
-              _MiniPillButton(
-                label: _DetailStrings.view(lang),
-                fg: ColorTokens.primaryText(context),
-                bg: ColorTokens.iconBg(context),
-                iconAsset: 'assets/icons/chevron-right.svg',
-              ),
+            Icon(Icons.chevron_right_rounded,
+                color: ColorTokens.secondaryText(context)),
           ],
         ),
       ),
@@ -1076,92 +1069,240 @@ class _AiModelCardState extends State<_AiModelCard> {
   }
 }
 
-/// AI Baholash 3D skanini AR (QuickLook) rejimida ochadigan asosiy yashil tugma —
-/// "3D Kadastr" ariza detalidagi "AR orqali ko‘rish" tugmasi bilan bir xil.
-class _AiArAction extends StatefulWidget {
-  const _AiArAction({required this.jobId});
+/// Skan rasmlari galereyasi — ariza detalida `scan_files['frames']` kalitlaridan
+/// gorizontal thumbnaillar. Har rasm `GET /ai-valuations/{id}/scan-file?key=…`
+/// dan auth header bilan yuklanadi. Bosilganda to'liq ekran ko'ruvchi (pager).
+/// Rasm yo'q (eski ariza) yoki login yo'q bo'lsa — hech narsa ko'rsatmaydi.
+class _AiScanFramesGallery extends StatefulWidget {
+  const _AiScanFramesGallery({required this.jobId});
   final int jobId;
 
   @override
-  State<_AiArAction> createState() => _AiArActionState();
+  State<_AiScanFramesGallery> createState() => _AiScanFramesGalleryState();
 }
 
-class _AiArActionState extends State<_AiArAction> {
-  bool _loading = false;
+class _AiScanFramesGalleryState extends State<_AiScanFramesGallery> {
+  bool _loading = true;
+  String? _token;
+  List<String> _frames = const [];
 
-  Future<void> _onTap() async {
-    if (_loading) return;
-    setState(() => _loading = true);
-    try {
-      final filePath = await _ensureResultCached(
-        jobId: widget.jobId,
-        downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan',
-        format: 'usdz',
-        prefix: 'aival',
-      );
-      if (!mounted) return;
-      await RoomPlanScanner.preview(filePath);
-    } on HttpException catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, e.message);
-    } catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка: $e',
-        'en' => 'Error: $e',
-        _ => 'Xato: $e',
-      });
-    } finally {
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null || token.isEmpty) {
       if (mounted) setState(() => _loading = false);
+      return;
     }
+    final svc = AiValuationJobService();
+    try {
+      final snap = await svc.get(widget.jobId, token: token);
+      final frames = (snap.scanFiles?['frames'] as List?)
+              ?.whereType<String>()
+              .toList(growable: false) ??
+          const <String>[];
+      if (!mounted) return;
+      setState(() {
+        _token = token;
+        _frames = frames;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    } finally {
+      svc.dispose();
+    }
+  }
+
+  String _url(String key) =>
+      '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan-file'
+      '?key=${Uri.encodeQueryComponent(key)}';
+
+  Map<String, String> get _headers => {'Authorization': 'Bearer $_token'};
+
+  void _openViewer(int index) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => _FramesViewerPage(
+        urls: _frames.map(_url).toList(growable: false),
+        headers: _headers,
+        initialIndex: index,
+      ),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading || _frames.isEmpty) return const SizedBox.shrink();
     final lang = Localizations.localeOf(context).languageCode;
-    return Material(
-      color: const Color(0xFF00E135),
-      borderRadius: BorderRadius.circular(999),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: _onTap,
-        child: SizedBox(
-          height: 52,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: _loading
-                ? const [
-                    SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.4,
-                        color: Colors.black,
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.photo_library_outlined,
+                    size: 18, color: ColorTokens.secondaryText(context)),
+                const SizedBox(width: 8),
+                Text(
+                  '${_DetailStrings.scanPhotos(lang)} (${_frames.length})',
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: ColorTokens.primaryText(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 96,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _frames.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => GestureDetector(
+                  onTap: () => _openViewer(i),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      _url(_frames[i]),
+                      headers: _headers,
+                      width: 96,
+                      height: 96,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      loadingBuilder: (context, child, progress) =>
+                          progress == null
+                              ? child
+                              : Container(
+                                  width: 96,
+                                  height: 96,
+                                  color: ColorTokens.iconBg(context),
+                                  alignment: Alignment.center,
+                                  child: const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  ),
+                                ),
+                      errorBuilder: (context, _, _) => Container(
+                        width: 96,
+                        height: 96,
+                        color: ColorTokens.iconBg(context),
+                        alignment: Alignment.center,
+                        child: Icon(Icons.broken_image_outlined,
+                            color: ColorTokens.secondaryText(context)),
                       ),
                     ),
-                  ]
-                : [
-                    Text(
-                      _DetailStrings.viewViaAr(lang),
-                      style: const TextStyle(
-                        fontFamily: 'MTSCompact',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: Colors.black,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    SvgPicture.asset(
-                      'assets/icons/camera.svg',
-                      width: 30,
-                      height: 30,
-                      colorFilter: const ColorFilter.mode(
-                        Colors.black,
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                  ],
-          ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// To'liq ekran rasm ko'ruvchi — frames galereyasi uchun (swipe + zoom).
+class _FramesViewerPage extends StatefulWidget {
+  const _FramesViewerPage({
+    required this.urls,
+    required this.headers,
+    required this.initialIndex,
+  });
+
+  final List<String> urls;
+  final Map<String, String> headers;
+  final int initialIndex;
+
+  @override
+  State<_FramesViewerPage> createState() => _FramesViewerPageState();
+}
+
+class _FramesViewerPageState extends State<_FramesViewerPage> {
+  late final PageController _controller =
+      PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: widget.urls.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder: (context, i) => InteractiveViewer(
+                minScale: 1,
+                maxScale: 5,
+                child: Center(
+                  child: Image.network(
+                    widget.urls[i],
+                    headers: widget.headers,
+                    fit: BoxFit.contain,
+                    gaplessPlayback: true,
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null
+                            ? child
+                            : const Center(
+                                child: CircularProgressIndicator(
+                                    color: Colors.white)),
+                    errorBuilder: (context, _, _) => const Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.white54,
+                        size: 48),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Text(
+                '${_index + 1} / ${widget.urls.length}',
+                style: const TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
