@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 
 import '../features/auth/auth_storage.dart';
 import '../features/notifications/notifications_api.dart';
+import '../firebase_options.dart';
 import 'api_config.dart';
 import 'app_navigation.dart';
 
@@ -44,7 +45,14 @@ class PushNotifications {
     if (_started) return;
     _started = true;
     try {
-      await Firebase.initializeApp();
+      // iOS: GoogleService-Info.plist bundle'ga qo'shilmagani uchun aniq
+      // options bilan init qilamiz. Android: google-services plugin
+      // auto-config qiladi (options'siz).
+      if (Platform.isIOS) {
+        await Firebase.initializeApp(options: DefaultFirebaseOptions.ios);
+      } else {
+        await Firebase.initializeApp();
+      }
     } catch (e) {
       // GoogleService-Info.plist / google-services.json yo'q yoki noto'g'ri —
       // push'siz davom etamiz.
@@ -75,10 +83,14 @@ class PushNotifications {
 
     final messaging = FirebaseMessaging.instance;
 
-    // Ruxsat (iOS + Android 13+).
+    // Ruxsat (iOS + Android 13+). Natijani log qilamiz.
     try {
-      await messaging.requestPermission(alert: true, badge: true, sound: true);
-    } catch (_) {}
+      final settings =
+          await messaging.requestPermission(alert: true, badge: true, sound: true);
+      debugPrint('PushNotifications: ruxsat = ${settings.authorizationStatus}');
+    } catch (e) {
+      debugPrint('PushNotifications: requestPermission xato: $e');
+    }
 
     // iOS: app ochiq turganda ham banner ko'rsatilsin.
     await messaging.setForegroundNotificationPresentationOptions(
@@ -100,25 +112,50 @@ class PushNotifications {
       );
     }
 
-    // Joriy tokenni backendga yuborish (login qilingan bo'lsa).
+    // iOS: FCM token APNs token tayyor bo'lгач beriladi — bir oz kutib olamiz
+    // (aks holda app ochilishida getToken null qaytarib, token ro'yxatga
+    // tushmay qoladi).
+    if (Platform.isIOS) {
+      for (var i = 0; i < 12; i++) {
+        try {
+          final apns = await messaging.getAPNSToken();
+          if (apns != null) {
+            debugPrint('PushNotifications: APNs token tayyor');
+            break;
+          }
+        } catch (_) {}
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      }
+    }
+
+    // Joriy tokenni backendga yuborish (app ochilganда — login bo'lган bo'lsa).
     await syncToken();
   }
 
-  /// Login bo'lgandan keyin yoki bootstrap'da tokenni backendga yuboradi.
+  /// App ochilganда va login'дан keyin tokenni backendga yuboradi.
   static Future<void> syncToken() async {
     if (!_started) return;
     try {
       final token = await FirebaseMessaging.instance.getToken();
+      debugPrint(
+        'PushNotifications: FCM token = '
+        '${token == null ? "NULL" : "${token.substring(0, 12)}…"}',
+      );
       if (token != null) await _sendTokenToBackend(token);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('PushNotifications: getToken xato: $e');
+    }
   }
 
   static Future<void> _sendTokenToBackend(String token) async {
     final session = await _authStorage.loadSession();
     final auth = session.token;
-    if (auth == null) return; // login qilmagan — login'da qayta yuboriladi
+    if (auth == null) {
+      debugPrint("PushNotifications: login yo'q — token login'да yuboriladi");
+      return; // login qilmagan — login'da qayta yuboriladi
+    }
     try {
-      await http
+      final resp = await http
           .post(
             Uri.parse('${ApiConfig.baseUrl}/devices/register'),
             headers: {
@@ -131,7 +168,10 @@ class PushNotifications {
             }),
           )
           .timeout(const Duration(seconds: 12));
-    } catch (_) {}
+      debugPrint('PushNotifications: /devices/register → ${resp.statusCode}');
+    } catch (e) {
+      debugPrint('PushNotifications: register xato: $e');
+    }
   }
 
   /// Logout — tokenni backenddan o'chiradi (storage tozalanishidan OLDIN
