@@ -138,7 +138,10 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
       final snap = await _api.get(id, token: token);
       if (!mounted) return;
       setState(() => _snapshot = snap);
-      if (snap.status.isTerminal) {
+      // Stop polling once the AI value is ready (under_review) or the job is
+      // terminal (completed/failed). Final completion happens later via the
+      // estimate group — the user re-opens the ariza to see it.
+      if (snap.status.hasResult || snap.status.isTerminal) {
         _pollTimer?.cancel();
         HapticFeedback.mediumImpact();
       }
@@ -156,8 +159,11 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
 
     return PopScope(
       // Block accidental back navigation while a job is in flight — the
-      // user can re-find it via the (future) AI history list.
-      canPop: _snapshot?.status.isTerminal != false,
+      // user can re-find it via the (future) AI history list. Once the result
+      // is ready (under_review) or the job is terminal, allow back.
+      canPop: _snapshot == null ||
+          _snapshot!.status.hasResult ||
+          _snapshot!.status.isTerminal,
       child: Scaffold(
         backgroundColor: bg,
         body: SafeArea(
@@ -215,7 +221,9 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
         ),
       );
     }
-    if (snap.status == AiJobStatus.completed) {
+    // Result is viewable as soon as the AI value lands (under_review) — not
+    // only after the estimate group finalizes the report (completed).
+    if (snap.status.hasResult) {
       return _ResultView(snapshot: snap, isDark: isDark);
     }
     return _scaffoldFrame(

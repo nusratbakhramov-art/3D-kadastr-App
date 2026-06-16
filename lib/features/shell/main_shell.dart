@@ -20,7 +20,9 @@ import '../profile/profile_screen.dart';
 import '../ratings/my_ratings_screen.dart';
 import '../scans/saved_scans_screen.dart';
 import '../services/screens/ai_drafts_screen.dart';
-import '../services/screens/ai_scan_intro_screen.dart';
+// TEMP (simulator testing): AI Baholash 3D-skan introsi o'tkazib yuborilgan.
+// Reliz oldidan qaytarish: import '../services/screens/ai_scan_intro_screen.dart';
+import '../services/screens/ai_cadastre_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
 import '../services/services_screen.dart';
@@ -214,9 +216,12 @@ class _MainShellState extends State<MainShell> {
       return;
     }
     if (!mounted) return;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AiScanIntroScreen()));
+    // TEMP (simulator testing): 3D-skan introsini o'tkazib yuboramiz. Reliz
+    // oldidan qaytarish: builder: (_) => const AiScanIntroScreen().
+    await Navigator.of(context).push(MaterialPageRoute<void>(
+      settings: const RouteSettings(name: 'ai/cadastre'),
+      builder: (_) => const AiCadastreScreen(),
+    ));
   }
 
   void _openCalculator() {

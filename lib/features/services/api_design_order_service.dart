@@ -39,6 +39,7 @@ class DesignOrderSummary {
     required this.updatedAt,
     this.objectType,
     this.address,
+    this.raw = const {},
   });
 
   final int id;
@@ -47,6 +48,10 @@ class DesignOrderSummary {
   final DateTime updatedAt; // oxirgi yangilanish — sort/ko'rsatish
   final String? objectType;
   final String? address;
+
+  /// Backend javobining xom ko'rinishi — ariza detalini dinamik sxema bo'yicha
+  /// to'liq renderlash uchun.
+  final Map<String, dynamic> raw;
 }
 
 class DesignOrderListPage {
@@ -146,6 +151,7 @@ class DesignOrderApiService {
           DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? created,
       objectType: json['object_type'] as String?,
       address: json['address'] as String?,
+      raw: json,
     );
   }
 

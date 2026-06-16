@@ -42,6 +42,7 @@ class OrderSummary {
     this.address,
     this.cadastreNumber,
     this.totalAreaSqm,
+    this.raw = const {},
   });
 
   final int id;
@@ -53,6 +54,10 @@ class OrderSummary {
   final String? address;
   final String? cadastreNumber;
   final double? totalAreaSqm;
+
+  /// Backend javobining xom ko'rinishi (barcha ustunlar + `details`) — ariza
+  /// detalini dinamik sxema bo'yicha to'liq renderlash uchun.
+  final Map<String, dynamic> raw;
 }
 
 class OrderListPage {
@@ -161,6 +166,7 @@ class ArchitectureOrderApiService {
       totalAreaSqm: area is num
           ? area.toDouble()
           : (area is String ? double.tryParse(area) : null),
+      raw: json,
     );
   }
 

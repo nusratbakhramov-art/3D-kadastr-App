@@ -1,9 +1,11 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/api_config.dart';
 import '../../theme/color_tokens.dart';
@@ -12,9 +14,11 @@ import '../../widgets/app_toast.dart';
 import '../auth/auth_http_client.dart';
 import '../settings/settings_state.dart';
 import '../scans/splat_viewer_screen.dart';
+import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import '../services/data/room_plan_scanner.dart';
 import '../services/widgets/segmented_tabs.dart';
+import '../services/widgets/schema_answers_view.dart';
 import 'application_model.dart';
 
 /// Stream the 3D result file (.usdz or .splat) to disk with progress.
@@ -103,6 +107,30 @@ class _DetailStrings {
     _ => 'Hisobot',
   };
 
+  static String reportFile(String lang) => switch (lang) {
+    'ru' => 'Заключение об оценке',
+    'en' => 'Valuation report',
+    _ => 'Baholash xulosasi',
+  };
+
+  static String specialistConclusion(String lang) => switch (lang) {
+    'ru' => 'Заключение специалиста',
+    'en' => 'Specialist conclusion',
+    _ => 'Mutaxassis xulosasi',
+  };
+
+  static String commentLabel(String lang) => switch (lang) {
+    'ru' => 'Комментарий',
+    'en' => 'Comment',
+    _ => 'Izoh',
+  };
+
+  static String causeLabel(String lang) => switch (lang) {
+    'ru' => 'Обоснование оценки',
+    'en' => 'Valuation basis',
+    _ => 'Baholash sababi',
+  };
+
   static String noData(String lang) => switch (lang) {
     'ru' => 'Данные отсутствуют',
     'en' => 'No data available',
@@ -149,18 +177,6 @@ class _DetailStrings {
     'ru' => 'Откроется просмотрщик RoomPlan',
     'en' => 'RoomPlan viewer will open',
     _ => 'RoomPlan viewer ochiladi',
-  };
-
-  static String scan3d(String lang) => switch (lang) {
-    'ru' => '3D скан объекта',
-    'en' => 'Object 3D scan',
-    _ => 'Obyekt 3D skani',
-  };
-
-  static String scan3dHint(String lang) => switch (lang) {
-    'ru' => 'Нажмите, чтобы открыть в AR',
-    'en' => 'Tap to view in AR',
-    _ => 'AR’da ko‘rish uchun bosing',
   };
 
   static String downloading(String lang) => switch (lang) {
@@ -447,6 +463,49 @@ class _TimelineStyle {
   };
 }
 
+/// Eski tekis (label → value) ro'yxat kartasi — dinamik sxema bo'lmagan
+/// arizalar va sxema yuklanmagan holat uchun zaxira.
+Widget _flatRowsCard(
+  BuildContext context,
+  String lang,
+  List<(String, String)> rows,
+) {
+  return Container(
+    padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
+    decoration: BoxDecoration(
+      color: ColorTokens.cardBg(context),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+    ),
+    child: rows.isEmpty
+        ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              _DetailStrings.noData(lang),
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                color: ColorTokens.secondaryText(context),
+              ),
+            ),
+          )
+        : Column(
+            children: [
+              for (var i = 0; i < rows.length; i++) ...[
+                _InfoRow(label: rows[i].$1, value: rows[i].$2),
+                if (i != rows.length - 1)
+                  Divider(
+                    height: 1,
+                    thickness: 1,
+                    color: ColorTokens.divider(context),
+                  ),
+              ],
+            ],
+          ),
+  );
+}
+
 class _AboutTab extends StatelessWidget {
   const _AboutTab({required this.item});
 
@@ -461,7 +520,7 @@ class _AboutTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          item.hasDeliverable
+          (item.hasDeliverable || item.aiReportJobId != null)
               ? _DetailStrings.report(lang)
               : _DetailStrings.applicationDetails(lang),
           style: TextStyle(
@@ -472,46 +531,49 @@ class _AboutTab extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        Container(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-          decoration: BoxDecoration(
-            color: ColorTokens.cardBg(context),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        // AI Baholash — to'liq job snapshot'ini (so'rov + natija) olib, BARCHA
+        // maydonlarni bo'limlarga ajratib ko'rsatamiz. Yuklanmasa yoki xato
+        // bo'lsa yengil ro'yxatga (rows) qaytadi.
+        if (item.aiJobId != null)
+          _AiFullDetail(
+            jobId: item.aiJobId!,
+            fallback: _flatRowsCard(context, lang, rows),
+          )
+        // Dinamik forma (TZ) arizalari — backend sxemasi bo'yicha to'liq
+        // (barcha to'ldirilgan maydonlar, bo'limga ajratilgan). Sxema yuklanmasa
+        // eski tekis ro'yxatga qaytadi.
+        else if (item.formKey != null && (item.formPayload?.isNotEmpty ?? false))
+          SchemaAnswersView(
+            formKey: item.formKey!,
+            payload: item.formPayload!,
+            fallback: _flatRowsCard(context, lang, rows),
+          )
+        else
+          _flatRowsCard(context, lang, rows),
+        // Baholash guruhi xulosasi (izoh + sabab) — yozilgan bo'lsa
+        // foydalanuvchiga ko'rsatiladi (under_review yoki completed).
+        if ((item.estimatorCause?.trim().isNotEmpty ?? false) ||
+            (item.estimatorComment?.trim().isNotEmpty ?? false)) ...[
+          const SizedBox(height: 14),
+          _EstimatorCard(
+            comment: item.estimatorComment,
+            cause: item.estimatorCause,
           ),
-          child: rows.isEmpty
-              ? Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    _DetailStrings.noData(lang),
-                    style: TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                      color: ColorTokens.secondaryText(context),
-                    ),
-                  ),
-                )
-              : Column(
-                  children: [
-                    for (var i = 0; i < rows.length; i++) ...[
-                      _InfoRow(label: rows[i].$1, value: rows[i].$2),
-                      if (i != rows.length - 1)
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: ColorTokens.divider(context),
-                        ),
-                    ],
-                  ],
-                ),
-        ),
+        ],
+        // Yakuniy baholash hisoboti (Xulosa, PDF) — ariza COMPLETED bo'lганда.
+        if (item.aiReportJobId != null) ...[
+          const SizedBox(height: 14),
+          _AiXulosaCard(jobId: item.aiReportJobId!),
+        ],
         // AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skan —
-        // har qanday statusda (skan submit paytida yuklanadi). Foydalanuvchi
-        // AR’da ko‘rish uchun bosadi.
+        // har qanday statusda (skan submit paytida yuklanadi). "3D Kadastr"
+        // ariza detali bilan bir xil ko‘rinish: "3D model → Ochish" karta +
+        // pastda "AR orqali ko‘rish" yashil tugmasi.
         if (item.aiScanJobId != null) ...[
           const SizedBox(height: 14),
-          _AiScanCard(jobId: item.aiScanJobId!),
+          _AiModelCard(jobId: item.aiScanJobId!),
+          const SizedBox(height: 18),
+          _AiArAction(jobId: item.aiScanJobId!),
         ],
         // The downloadable report / 3D model / AR view only exist for a
         // finished deliverable (completed photogrammetry scan). For jobs that
@@ -579,20 +641,303 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-/// AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skanni ko‘rsatadi:
-/// bosilganda `/ai-valuations/{id}/scan` dan auth bilan yuklab oladi (progress
-/// bilan) va iOS QuickLook (AR) orqali ochadi.
-class _AiScanCard extends StatefulWidget {
-  const _AiScanCard({required this.jobId});
+/// AI Baholash arizasining TO'LIQ tafsiloti — yengil ro'yxat o'rniga butun job
+/// snapshot'ini (`/ai-valuations/{id}`: so'rov + natija payload) olib, barcha
+/// maydonlarni bo'limlarga ajratib ko'rsatadi (Obyekt, Buyurtmachi, Joylashuv,
+/// Xonalar, Natija). Yuklanayotганда spinner, xatoда `fallback` ko'rsatiladi.
+class _AiFullDetail extends StatefulWidget {
+  const _AiFullDetail({required this.jobId, required this.fallback});
+
+  final int jobId;
+  final Widget fallback;
+
+  @override
+  State<_AiFullDetail> createState() => _AiFullDetailState();
+}
+
+class _AiFullDetailState extends State<_AiFullDetail> {
+  AiJobSnapshot? _snap;
+  bool _loading = true;
+  bool _error = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final client = AuthHttpClient();
+      final res = await client
+          .get(Uri.parse('${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}'));
+      if (res.statusCode != 200) throw HttpException('HTTP ${res.statusCode}');
+      final json = jsonDecode(res.body) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _snap = AiJobSnapshot.fromJson(json);
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = true;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: const SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    final snap = _snap;
+    if (_error || snap == null) return widget.fallback;
+
+    final lang = Localizations.localeOf(context).languageCode;
+    final sections = _buildAiSections(lang, snap);
+    if (sections.isEmpty) return widget.fallback;
+
+    final summary = (snap.resultPayload?['summary'] as String?)?.trim();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < sections.length; i++) ...[
+          if (i != 0) const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+            child: Text(
+              sections[i].$1,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+          ),
+          _flatRowsCard(context, lang, sections[i].$2),
+        ],
+        if (summary != null && summary.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+            child: Text(
+              _aiLbl(lang, 'AI izoh', 'Комментарий AI', 'AI summary'),
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: ColorTokens.cardBg(context),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+            ),
+            child: Text(
+              summary,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w400,
+                fontSize: 14,
+                height: 1.4,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Localized label picker (uz default).
+String _aiLbl(String lang, String uz, String ru, String en) => switch (lang) {
+      'ru' => ru,
+      'en' => en,
+      _ => uz,
+    };
+
+/// Thousands-grouped UZS amount, e.g. 622794192 → "622 794 192 so'm".
+String _aiMoney(num v) {
+  final s = v.round().abs().toString();
+  final b = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) b.write(' ');
+    b.write(s[i]);
+  }
+  return "${v < 0 ? '-' : ''}${b.toString()} so'm";
+}
+
+/// Build the grouped (sectionTitle, rows) list from a full AI job snapshot.
+/// Only non-empty fields/sections are included.
+List<(String, List<(String, String)>)> _buildAiSections(
+  String lang,
+  AiJobSnapshot snap,
+) {
+  final req = snap.requestPayload;
+  final kad = (req['kadastr'] as Map?)?.cast<String, dynamic>() ?? const {};
+  final client = (req['client'] as Map?)?.cast<String, dynamic>() ?? const {};
+  final loc = (req['location'] as Map?)?.cast<String, dynamic>() ?? const {};
+  final rooms = (req['rooms'] as List?) ?? const [];
+  final res = snap.resultPayload ?? const {};
+
+  String? str(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    if (s.isEmpty || s == 'null') return null;
+    return s;
+  }
+
+  void add(List<(String, String)> rows, String label, String? value) {
+    if (value != null) rows.add((label, value));
+  }
+
+  final sections = <(String, List<(String, String)>)>[];
+
+  // ── Obyekt ──────────────────────────────────────────────────────────
+  final prop = <(String, String)>[];
+  add(prop, _aiLbl(lang, 'Kadastr raqami', 'Кадастровый номер', 'Cadastre no.'),
+      str(kad['cadastre_number']));
+  add(prop, _aiLbl(lang, 'Manzil', 'Адрес', 'Address'),
+      str(kad['address']) ?? str(loc['address']));
+  add(prop, _aiLbl(lang, 'Obyekt turi', 'Тип объекта', 'Object type'),
+      str(kad['object_type_hint']));
+  add(prop, _aiLbl(lang, 'Umumiy maydon', 'Общая площадь', 'Total area'),
+      kad['total_area'] != null ? '${kad['total_area']} m²' : null);
+  add(prop, _aiLbl(lang, 'Yashash maydoni', 'Жилая площадь', 'Living area'),
+      kad['living_area'] != null ? '${kad['living_area']} m²' : null);
+  final floor = str(req['floor']);
+  if (floor != null) {
+    final total = str(req['total_floors']);
+    add(prop, _aiLbl(lang, 'Qavat', 'Этаж', 'Floor'),
+        total != null ? '$floor / $total' : floor);
+  }
+  if (kad['cadastre_value'] is num) {
+    add(prop, _aiLbl(lang, 'Kadastr qiymati', 'Кадастровая стоимость',
+        'Cadastre value'), _aiMoney(kad['cadastre_value'] as num));
+  }
+  if (prop.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Obyekt', 'Объект', 'Property'), prop));
+  }
+
+  // ── Buyurtmachi ─────────────────────────────────────────────────────
+  final cl = <(String, String)>[];
+  add(cl, _aiLbl(lang, 'Ism', 'Имя', 'Name'), str(client['name']));
+  add(cl, _aiLbl(lang, 'Telefon', 'Телефон', 'Phone'), str(client['phone']));
+  add(cl, 'STIR / JSHSHIR', str(client['stir']));
+  add(cl, 'Email', str(client['email']));
+  if (cl.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Buyurtmachi', 'Заказчик', 'Client'), cl));
+  }
+
+  // ── Joylashuv ───────────────────────────────────────────────────────
+  final lc = <(String, String)>[];
+  if (loc['lat'] != null && loc['lng'] != null) {
+    add(lc, _aiLbl(lang, 'Koordinatalar', 'Координаты', 'Coordinates'),
+        '${loc['lat']}, ${loc['lng']}');
+  }
+  add(lc, _aiLbl(lang, 'Maqsad', 'Цель', 'Purpose'), str(req['purpose']));
+  if (lc.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Joylashuv', 'Локация', 'Location'), lc));
+  }
+
+  // ── Xonalar ─────────────────────────────────────────────────────────
+  final rm = <(String, String)>[];
+  for (final r in rooms) {
+    if (r is! Map) continue;
+    final m = r.cast<String, dynamic>();
+    final name = str(m['name']) ?? str(m['kind']) ??
+        _aiLbl(lang, 'Xona', 'Помещение', 'Room');
+    final parts = <String>[];
+    if (m['count'] != null) {
+      parts.add('${m['count']} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
+    }
+    if (m['area'] != null) parts.add('${m['area']} m²');
+    rm.add((name, parts.isEmpty ? '—' : parts.join(' · ')));
+  }
+  if (rm.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Xonalar', 'Помещения', 'Rooms'), rm));
+  }
+
+  // ── Natija ──────────────────────────────────────────────────────────
+  final rs = <(String, String)>[];
+  if (res['estimated_value'] is num) {
+    add(rs, _aiLbl(lang, 'Taxminiy qiymat', 'Оценочная стоимость',
+        'Estimated value'), _aiMoney(res['estimated_value'] as num));
+  }
+  final ppsq = res['price_per_sqm'] ?? res['value_per_sqm'];
+  if (ppsq is num) {
+    add(rs, _aiLbl(lang, '1 m² narxi', 'Цена за 1 м²', 'Price per m²'),
+        _aiMoney(ppsq));
+  }
+  final conf = res['confidence'];
+  if (conf is num) {
+    add(rs, _aiLbl(lang, 'Ishonchlilik', 'Достоверность', 'Confidence'),
+        conf <= 1 ? '${(conf * 100).round()}%' : conf.toString());
+  }
+  if (snap.nearbyListingsCount > 0) {
+    add(rs, _aiLbl(lang, 'Taqqoslangan e\'lonlar', 'Сравнимые объявления',
+        'Comparables'), '${snap.nearbyListingsCount}');
+  }
+  if (snap.nearbyPoisCount > 0) {
+    add(rs, _aiLbl(lang, 'Atrofdagi obyektlar', 'Объекты рядом', 'Nearby POIs'),
+        '${snap.nearbyPoisCount}');
+  }
+  if (rs.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Natija', 'Результат', 'Result'), rs));
+  }
+
+  return sections;
+}
+
+/// AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skanni "3D Kadastr"
+/// ariza detalidagi "3D model" kartasi bilan bir xil ko‘rinishda ko‘rsatadi:
+/// bosilganda `/ai-valuations/{id}/scan` dan auth bilan yuklab oladi (bayt-aniq
+/// progress bilan) va iOS QuickLook (RoomPlan/AR) orqali ochadi.
+class _AiModelCard extends StatefulWidget {
+  const _AiModelCard({required this.jobId});
   final int jobId;
 
   @override
-  State<_AiScanCard> createState() => _AiScanCardState();
+  State<_AiModelCard> createState() => _AiModelCardState();
 }
 
-class _AiScanCardState extends State<_AiScanCard> {
+class _AiModelCardState extends State<_AiModelCard> {
   bool _loading = false;
-  double? _progress; // 0..1 while downloading; null if unknown/idle
+  // 0..1 while downloading; null when not active or size unknown.
+  double? _progress;
+  // Bytes received / total for byte-precise label.
+  int _received = 0;
+  int _total = 0;
+
+  String _fmtBytes(int n) {
+    if (n <= 0) return '0 B';
+    if (n < 1024) return '$n B';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(0)} KB';
+    return '${(n / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
 
   Future<void> _onTap() async {
     if (_loading) return;
@@ -605,7 +950,11 @@ class _AiScanCardState extends State<_AiScanCard> {
         prefix: 'aival',
         onProgress: (received, total) {
           if (!mounted) return;
-          setState(() => _progress = total > 0 ? received / total : null);
+          setState(() {
+            _received = received;
+            _total = total;
+            _progress = total > 0 ? received / total : null;
+          });
         },
       );
       if (!mounted) return;
@@ -625,6 +974,8 @@ class _AiScanCardState extends State<_AiScanCard> {
         setState(() {
           _loading = false;
           _progress = null;
+          _received = 0;
+          _total = 0;
         });
       }
     }
@@ -654,25 +1005,15 @@ class _AiScanCardState extends State<_AiScanCard> {
                 shape: BoxShape.circle,
               ),
               alignment: Alignment.center,
-              child: _loading
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        value: _progress,
-                        color: const Color(0xFF03B54F),
-                      ),
-                    )
-                  : SvgPicture.asset(
-                      'assets/icons/chart-scatter-3d.svg',
-                      width: 20,
-                      height: 20,
-                      colorFilter: ColorFilter.mode(
-                        ColorTokens.secondaryText(context),
-                        BlendMode.srcIn,
-                      ),
-                    ),
+              child: SvgPicture.asset(
+                'assets/icons/chart-scatter-3d.svg',
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(
+                  ColorTokens.secondaryText(context),
+                  BlendMode.srcIn,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -680,32 +1021,147 @@ class _AiScanCardState extends State<_AiScanCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _DetailStrings.scan3d(lang),
+                    _DetailStrings.model3d(lang),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      height: 1.3,
                       color: ColorTokens.primaryText(context),
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    _loading
-                        ? _DetailStrings.downloading(lang)
-                        : _DetailStrings.scan3dHint(lang),
+                    !_loading
+                        ? _DetailStrings.roomPlanViewerOpens(lang)
+                        : _total > 0
+                            ? '${_DetailStrings.downloading(lang)} ${(_progress! * 100).toStringAsFixed(0)}% '
+                                '(${_fmtBytes(_received)} / ${_fmtBytes(_total)})'
+                            : '${_DetailStrings.downloading(lang)} ${_fmtBytes(_received)}',
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w400,
-                      fontSize: 13,
+                      fontSize: 12,
+                      height: 1.3,
                       color: ColorTokens.secondaryText(context),
                     ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
+                  if (_loading) ...[
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: _progress,
+                        minHeight: 4,
+                        backgroundColor: ColorTokens.iconBg(context),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded,
-                color: ColorTokens.secondaryText(context)),
+            if (!_loading)
+              _MiniPillButton(
+                label: _DetailStrings.view(lang),
+                fg: ColorTokens.primaryText(context),
+                bg: ColorTokens.iconBg(context),
+                iconAsset: 'assets/icons/chevron-right.svg',
+              ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// AI Baholash 3D skanini AR (QuickLook) rejimida ochadigan asosiy yashil tugma —
+/// "3D Kadastr" ariza detalidagi "AR orqali ko‘rish" tugmasi bilan bir xil.
+class _AiArAction extends StatefulWidget {
+  const _AiArAction({required this.jobId});
+  final int jobId;
+
+  @override
+  State<_AiArAction> createState() => _AiArActionState();
+}
+
+class _AiArActionState extends State<_AiArAction> {
+  bool _loading = false;
+
+  Future<void> _onTap() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final filePath = await _ensureResultCached(
+        jobId: widget.jobId,
+        downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan',
+        format: 'usdz',
+        prefix: 'aival',
+      );
+      if (!mounted) return;
+      await RoomPlanScanner.preview(filePath);
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
+    return Material(
+      color: const Color(0xFF00E135),
+      borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _onTap,
+        child: SizedBox(
+          height: 52,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: _loading
+                ? const [
+                    SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        color: Colors.black,
+                      ),
+                    ),
+                  ]
+                : [
+                    Text(
+                      _DetailStrings.viewViaAr(lang),
+                      style: const TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Colors.black,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SvgPicture.asset(
+                      'assets/icons/camera.svg',
+                      width: 30,
+                      height: 30,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.black,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                  ],
+          ),
         ),
       ),
     );
@@ -788,6 +1244,247 @@ class _FileCard extends StatelessWidget {
             iconAsset: 'assets/icons/download.svg',
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Baholash guruhi (estimate group) xulosasi — egasi bilan bog'langач yozilgan
+/// baho sababi va izoh. "Shown to the end user" — ariza detalida ko'rsatiladi.
+class _EstimatorCard extends StatelessWidget {
+  const _EstimatorCard({this.comment, this.cause});
+
+  final String? comment;
+  final String? cause;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
+    final c = comment?.trim() ?? '';
+    final cz = cause?.trim() ?? '';
+
+    Widget block(String label, String value) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w400,
+                fontSize: 12,
+                height: 1.3,
+                color: ColorTokens.secondaryText(context),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                height: 1.35,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+          ],
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: ColorTokens.cardBg(context),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            _DetailStrings.specialistConclusion(lang),
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+              height: 1.3,
+              color: ColorTokens.primaryText(context),
+            ),
+          ),
+          if (cz.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            block(_DetailStrings.causeLabel(lang), cz),
+          ],
+          if (c.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            block(_DetailStrings.commentLabel(lang), c),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Yakuniy baholash hisoboti (Xulosa, PDF) yuklab olish kartasi — ariza
+/// COMPLETED bo'lganda. `/ai-valuations/{id}/report` dan auth bilan (bayt-aniq
+/// progress) yuklab oladi va tizim "ulashish/saqlash" oynasi orqali ochadi.
+class _AiXulosaCard extends StatefulWidget {
+  const _AiXulosaCard({required this.jobId});
+  final int jobId;
+
+  @override
+  State<_AiXulosaCard> createState() => _AiXulosaCardState();
+}
+
+class _AiXulosaCardState extends State<_AiXulosaCard> {
+  bool _loading = false;
+  double? _progress;
+  int _total = 0;
+
+  String _fmtBytes(int n) {
+    if (n <= 0) return '';
+    if (n < 1024) return '$n B';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(0)} KB';
+    return '${(n / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _onTap() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final filePath = await _ensureResultCached(
+        jobId: widget.jobId,
+        downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/report',
+        format: 'pdf',
+        prefix: 'xulosa',
+        onProgress: (received, total) {
+          if (!mounted) return;
+          setState(() {
+            _total = total;
+            _progress = total > 0 ? received / total : null;
+          });
+        },
+      );
+      if (!mounted) return;
+      await Share.shareXFiles(
+        [
+          XFile(
+            filePath,
+            mimeType: 'application/pdf',
+            name: 'Baholash_Xulosa_${widget.jobId}.pdf',
+          ),
+        ],
+      );
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _progress = null;
+          _total = 0;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = Localizations.localeOf(context).languageCode;
+    final subtitle = _loading
+        ? (_progress != null
+            ? '${(_progress! * 100).toStringAsFixed(0)}%'
+            : (_total > 0 ? _fmtBytes(_total) : '…'))
+        : 'PDF';
+    return InkWell(
+      onTap: _loading ? null : _onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ColorTokens.iconBg(context),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: SvgPicture.asset(
+                'assets/icons/application-ready.svg',
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(
+                  ColorTokens.secondaryText(context),
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      height: 1.3,
+                      color: ColorTokens.primaryText(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      height: 1.3,
+                      color: ColorTokens.secondaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _loading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      value: _progress,
+                    ),
+                  )
+                : _MiniPillButton(
+                    label: _DetailStrings.download(lang),
+                    fg: const Color(0xFF03B54F),
+                    bg: isDark
+                        ? const Color(0xFF03B54F).withValues(alpha: 0.18)
+                        : const Color(0xFFD7F3E3),
+                    iconAsset: 'assets/icons/download.svg',
+                  ),
+          ],
+        ),
       ),
     );
   }

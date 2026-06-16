@@ -20,6 +20,7 @@ enum AiJobStatus {
   queued,
   gatheringInfo,
   aiPricing,
+  underReview,
   completed,
   failed;
 
@@ -33,6 +34,8 @@ enum AiJobStatus {
         return AiJobStatus.gatheringInfo;
       case 'ai_pricing':
         return AiJobStatus.aiPricing;
+      case 'under_review':
+        return AiJobStatus.underReview;
       case 'completed':
         return AiJobStatus.completed;
       case 'failed':
@@ -46,6 +49,12 @@ enum AiJobStatus {
   bool get isTerminal =>
       this == AiJobStatus.completed || this == AiJobStatus.failed;
 
+  /// The AI value is ready and viewable (the user can see the result), whether
+  /// or not the estimate group has finalized the report. We stop the live poll
+  /// here — final completion happens later, off-screen, via the admin.
+  bool get hasResult =>
+      this == AiJobStatus.underReview || this == AiJobStatus.completed;
+
   bool get isDraft => this == AiJobStatus.draft;
 }
 
@@ -58,6 +67,8 @@ class AiJobSnapshot {
     this.scanUsdzKey,
     this.resultPayload,
     this.errorMessage,
+    this.estimatorComment,
+    this.estimatorCause,
     this.nearbyListingsCount = 0,
     this.nearbyPoisCount = 0,
   });
@@ -69,6 +80,9 @@ class AiJobSnapshot {
   final String? scanUsdzKey; // teksturali 3D skan backend kaliti (resume ko'rish)
   final Map<String, dynamic>? resultPayload;
   final String? errorMessage;
+  // Baholash guruhi xulosasi — natija ekranida foydalanuvchiga ko'rsatiladi.
+  final String? estimatorComment;
+  final String? estimatorCause;
   final int nearbyListingsCount;
   final int nearbyPoisCount;
 
@@ -83,6 +97,8 @@ class AiJobSnapshot {
         resultPayload:
             (json['result_payload'] as Map?)?.cast<String, dynamic>(),
         errorMessage: json['error_message'] as String?,
+        estimatorComment: json['estimator_comment'] as String?,
+        estimatorCause: json['estimator_cause'] as String?,
         nearbyListingsCount: (json['nearby_listings_count'] as int?) ?? 0,
         nearbyPoisCount: (json['nearby_pois_count'] as int?) ?? 0,
       );
@@ -100,6 +116,8 @@ class AiJobSummary {
     this.estimatedValue,
     this.currentStep,
     this.hasScan = false,
+    this.estimatorComment,
+    this.estimatorCause,
   });
 
   final int id;
@@ -110,6 +128,9 @@ class AiJobSummary {
   final double? estimatedValue;
   final String? currentStep; // DRAFT: qaysi qadamda qolgan (resume)
   final bool hasScan; // teksturali 3D (USDZ) skan biriktirilganmi
+  // Baholash guruhi xulosasi — ariza detalida foydalanuvchiga ko'rsatiladi.
+  final String? estimatorComment;
+  final String? estimatorCause;
 
   factory AiJobSummary.fromJson(Map<String, dynamic> json) {
     final created = DateTime.tryParse(json['created_at']?.toString() ?? '') ??
@@ -124,6 +145,8 @@ class AiJobSummary {
         estimatedValue: (json['estimated_value'] as num?)?.toDouble(),
         currentStep: json['current_step'] as String?,
         hasScan: json['has_scan'] == true,
+        estimatorComment: json['estimator_comment'] as String?,
+        estimatorCause: json['estimator_cause'] as String?,
       );
   }
 }

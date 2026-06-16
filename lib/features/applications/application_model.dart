@@ -23,6 +23,8 @@ class ApplicationTimelineStep {
 class ApplicationItem {
   const ApplicationItem({
     required this.id,
+    this.orderNo,
+    this.aiJobId,
     required this.serviceId,
     required this.serviceLabel,
     required this.statusGroup,
@@ -38,11 +40,27 @@ class ApplicationItem {
     this.isDraft = false,
     this.resumeJobId,
     this.aiScanJobId,
+    this.aiReportJobId,
+    this.estimatorComment,
+    this.estimatorCause,
+    this.hasResultPreview = false,
+    this.formKey,
+    this.formPayload,
     required this.createdAt,
     required this.updatedAt,
   });
 
   final String id;
+
+  /// Backend numeric order/ariza id shown on the card as `#NN`. Same as the
+  /// per-service job/order id (e.g. AI job id, calculator order id).
+  final int? orderNo;
+
+  /// AI Baholash job id — set only for AI items. Lets the detail screen fetch
+  /// the FULL job snapshot (request + result payload) to show every field,
+  /// instead of just the lightweight list summary.
+  final int? aiJobId;
+
   final String serviceId;
   final String serviceLabel;
   final ApplicationStatusGroup statusGroup;
@@ -73,6 +91,29 @@ class ApplicationItem {
   /// o'sha job id — detail ekranida "3D skan" kartasi ko'rsatiladi va
   /// `/ai-valuations/{id}/scan` dan yuklab olinadi. Skan yo'q bo'lsa null.
   final int? aiScanJobId;
+
+  /// AI Baholash arizasi COMPLETED (mutaxassis hisobotni generatsiya qilган)
+  /// bo'lsa, o'sha job id — detail ekranida yakuniy "Xulosa (PDF)" yuklab olish
+  /// kartasi ko'rsatiladi (`/ai-valuations/{id}/report`). Aks holda null.
+  final int? aiReportJobId;
+
+  /// Baholash guruhi xulosasi (egasi bilan bog'langач yozilgan) — berilgan
+  /// bo'lsa ariza detalida foydalanuvchiga ko'rsatiladi.
+  final String? estimatorComment;
+  final String? estimatorCause;
+
+  /// AI Baholash natijasi tayyor (taxminiy qiymat mavjud) — ariza hali
+  /// yakunlanmagan bo'lsa ham foydalanuvchi "Natijani ko'rish" orqali ko'radi.
+  final bool hasResultPreview;
+
+  /// Dinamik forma kaliti (masalan "arxitektura_tz"). Berilgan bo'lsa, detail
+  /// ekrani arizani backend sxemasi bo'yicha to'liq (barcha maydonlar, bo'limga
+  /// ajratilgan) ko'rsatadi — `detailRows` o'rniga.
+  final String? formKey;
+
+  /// Yuborilgan ariza payload'i (kalit→qiymat, ichki `details` bilan) — sxema
+  /// bo'yicha renderlash uchun. Backend list/detail javobining xom ko'rinishi.
+  final Map<String, dynamic>? formPayload;
 
   /// Ariza yaratilgan vaqt (detail'da ko'rsatiladi).
   final DateTime createdAt;

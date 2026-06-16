@@ -71,6 +71,9 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       return;
     }
     setState(() => _entryEpoch++);
+    // Tab qayta ochilganda fonда yangilaymiz — boshqa oqimda yaratilgan yangi
+    // ariza (masalan, kalkulyator buyurtmasi) darhol ro'yxatda chiqishi uchun.
+    unawaited(_silentRefresh());
   }
 
   @override
@@ -274,6 +277,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final group = _statusToGroup(o.status);
     return ApplicationItem(
       id: 'arch_${o.id}',
+      orderNo: o.id,
       // Arxitektura/Dizayn TZ — kalkulyator xizmatlari, "Kalkulyator" chipi
       // ostida ko'rsatamiz (serviceLabel kartada turini ko'rsatadi).
       serviceId: 'calc',
@@ -285,6 +289,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       addressValue: (o.address ?? o.cadastreNumber ?? '—'),
       dateLabel: _ApplicationsStrings.applicationDate(lang),
       dateValue: _formatDateTime(o.updatedAt),
+      // Detail ekran arizani backend sxemasi bo'yicha to'liq ko'rsatadi
+      // (barcha to'ldirilgan maydonlar, bo'limga ajratilgan). `raw` — list
+      // javobining xom payload'i (barcha ustunlar + details).
+      formKey: 'arxitektura_tz',
+      formPayload: o.raw,
       detailRows: [
         (_ApplicationsStrings.address(lang), o.address ?? '—'),
         if (o.cadastreNumber != null)
@@ -302,6 +311,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final group = _statusToGroup(o.status);
     return ApplicationItem(
       id: 'design_${o.id}',
+      orderNo: o.id,
       serviceId: 'calc',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'design'),
       statusGroup: group,
@@ -311,6 +321,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       addressValue: o.address ?? '—',
       dateLabel: _ApplicationsStrings.applicationDate(lang),
       dateValue: _formatDateTime(o.updatedAt),
+      formKey: 'dizayn_tz',
+      formPayload: o.raw,
       detailRows: [
         if (o.address != null)
           (_ApplicationsStrings.address(lang), o.address!),
@@ -329,12 +341,20 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final group = _aiJobStatusToGroup(j.status);
     return ApplicationItem(
       id: 'aival_${j.id}',
+      orderNo: j.id,
+      aiJobId: j.id,
       serviceId: 'ai_eval',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'ai_eval'),
       statusGroup: group,
       isDraft: isDraft,
       resumeJobId: isDraft ? j.id : null,
       aiScanJobId: j.hasScan ? j.id : null,
+      // Yakuniy Xulosa (PDF) faqat ariza COMPLETED bo'lganda yuklab olinadi.
+      aiReportJobId: j.status == AiJobStatus.completed ? j.id : null,
+      estimatorComment: j.estimatorComment,
+      estimatorCause: j.estimatorCause,
+      // Natija (taxminiy qiymat) tayyor — under_review yoki completed.
+      hasResultPreview: hasValue && j.status.hasResult,
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
       addressLabel: hasValue
@@ -367,6 +387,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final group = _calcStatusToGroup(o.status);
     return ApplicationItem(
       id: 'calc_${o.id}',
+      orderNo: o.id,
       serviceId: 'calc',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'calc'),
       statusGroup: group,
@@ -395,6 +416,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final objectType = _objectTypeLabel(j.objectType);
     return ApplicationItem(
       id: 'kad3d_${j.id}',
+      orderNo: j.id,
       serviceId: 'kad_3d',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'kad_3d'),
       statusGroup: group,
@@ -508,6 +530,9 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     return switch (s) {
       AiJobStatus.completed => ApplicationStatusGroup.completed,
       AiJobStatus.failed => ApplicationStatusGroup.cancelled,
+      // AI natija tayyor, lekin mutaxassis hisobotni hali yakunlamagan —
+      // foydalanuvchiga "Yuborildi" ko'rinadi (natija ko'rinadi, hisobot kutilmoqda).
+      AiJobStatus.underReview => ApplicationStatusGroup.sent,
       _ => ApplicationStatusGroup.inProgress,
     };
   }
@@ -521,6 +546,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         '${j.photoCount} ${_ApplicationsStrings.pcsUnit(lang)}';
     return ApplicationItem(
       id: 'photo_${j.id}',
+      orderNo: j.id,
       serviceId: 'kad_3d',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, '3d_scan'),
       statusGroup: group,
@@ -619,6 +645,33 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       _nextOffset += next.length;
       _hasMore = _nextOffset < source.length;
       _loadingMore = false;
+    });
+  }
+
+  /// Fonда yangilash — eski ro'yxatni bo'sh ko'rsatmasdan backend'dan qayta
+  /// oladi va ko'rinishni yangilaydi (tab qayta faollashganda). Xato bo'lsa
+  /// eski ro'yxat saqlanadi (jim).
+  Future<void> _silentRefresh() async {
+    if (_loadingInitial || _refreshing) return;
+    final requestId = ++_requestId;
+    try {
+      await _fetchAllFromBackend();
+    } catch (_) {
+      return; // tarmoq/token xatosi — eski ro'yxat qoladi
+    }
+    if (!mounted || requestId != _requestId) return;
+    final source = _sourceItems;
+    // Hozir ko'rsatilayotgan miqdorni saqlaymiz (skroll uzilmasligi uchun),
+    // kamida bitta sahifa.
+    final keep = _items.length < _pageSize ? _pageSize : _items.length;
+    final next = source.take(keep).toList(growable: false);
+    setState(() {
+      _items
+        ..clear()
+        ..addAll(next);
+      _nextOffset = next.length;
+      _hasMore = _nextOffset < source.length;
+      _entryEpoch++;
     });
   }
 
@@ -1488,8 +1541,11 @@ class _ApplicationCard extends StatelessWidget {
     final status = item.isDraft
         ? _StatusStyle.draft(lang)
         : _StatusStyle.fromGroup(item.statusGroup, lang);
+    // Show "Natijani ko'rish" once the ariza is completed, or when an AI result
+    // is already viewable (under_review → "Yuborildi") even before the report.
     final showResultButton =
-        item.statusGroup == ApplicationStatusGroup.completed;
+        item.statusGroup == ApplicationStatusGroup.completed ||
+            item.hasResultPreview;
 
     final dividerColor = ColorTokens.divider(context);
     return Material(
@@ -1512,17 +1568,37 @@ class _ApplicationCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(
-                      item.serviceLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'MTSCompact',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        height: 1.3,
-                        color: ColorTokens.primaryText(context),
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.serviceLabel,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontFamily: 'MTSCompact',
+                            fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            height: 1.3,
+                            color: ColorTokens.primaryText(context),
+                          ),
+                        ),
+                        if (item.orderNo != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            '#${item.orderNo}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontFamily: 'MTSCompact',
+                              fontWeight: FontWeight.w500,
+                              fontSize: 12,
+                              height: 1.2,
+                              color: ColorTokens.secondaryText(context),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
