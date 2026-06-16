@@ -7,8 +7,7 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     // Firebase (FCM push). google-services.json android/app/ ichida bo'lishi shart.
-    // TEMPORARY (test build): disabled because google-services.json is absent. REVERT before release.
-    // id("com.google.gms.google-services")
+    id("com.google.gms.google-services")
 }
 
 // Release signing — loaded from android/key.properties (gitignored). When the

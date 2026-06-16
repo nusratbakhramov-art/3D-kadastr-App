@@ -22,8 +22,7 @@ plugins {
     id("com.android.application") version "8.11.1" apply false
     id("org.jetbrains.kotlin.android") version "2.2.20" apply false
     // Firebase (FCM push) — google-services.json android/app/ ichida bo'lishi shart.
-    // TEMPORARY (test build): disabled because google-services.json is absent. REVERT before release.
-    // id("com.google.gms.google-services") version "4.4.2" apply false
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }
 
 include(":app")
