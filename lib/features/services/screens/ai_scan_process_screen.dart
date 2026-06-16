@@ -104,18 +104,22 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
       _upBytesTotal = 0;
     });
 
-    // Skanning BARCHA artefaktlarini backendga yuklaymiz (rasmlar, glb, usdz,
-    // mesh, geo/png, manifest, frames.json) — fayl-darajali progress bilan.
-    // "glb" kaliti asosiy model sifatida scan_usdz_key ga ham yoziladi (orqaga
-    // moslik). Yuklash best-effort: tarmoq yo'q/xato bo'lsa oqim baribir davom
-    // etadi (kamida asosiy modelni alohida yuklab ko'ramiz).
+    // Backendga FAQAT 2 ta modelni yuklaymiz: GLB (asosiy) + USDZ (zaxira/
+    // QuickLook). Mesh/geo/png/manifest/frames backendga kerak emas — model
+    // faqat 3D ko'rsatish/saqlash uchun ishlatiladi. "glb" kaliti asosiy model
+    // sifatida scan_usdz_key ga ham yoziladi (orqaga moslik). Yuklash
+    // best-effort: tarmoq yo'q/xato bo'lsa oqim baribir davom etadi (asosiy
+    // modelni alohida yuklab ko'ramiz).
     final session = await const AuthStorage().loadSession();
     final token = session.token;
     Map<String, dynamic>? scanFiles;
     String? scanKey;
 
     if (token != null && token.isNotEmpty) {
-      final files = await _service.listScanFiles(_scanId);
+      final all = await _service.listScanFiles(_scanId);
+      final files = all
+          .where((f) => f.type == 'glb' || f.type == 'usdz')
+          .toList(growable: false);
       if (files.isNotEmpty) {
         final svc = AiUploadService();
         try {
