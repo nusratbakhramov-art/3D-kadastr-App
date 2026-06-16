@@ -10,9 +10,12 @@ import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_http_client.dart';
+import '../auth/auth_storage.dart';
 import '../settings/settings_state.dart';
 import '../scans/splat_viewer_screen.dart';
+import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
+import '../services/data/model_preview.dart';
 import '../services/data/room_plan_scanner.dart';
 import '../services/widgets/segmented_tabs.dart';
 import 'application_model.dart';
@@ -161,6 +164,12 @@ class _DetailStrings {
     'ru' => 'Нажмите, чтобы открыть в AR',
     'en' => 'Tap to view in AR',
     _ => 'AR’da ko‘rish uchun bosing',
+  };
+
+  static String scanPhotos(String lang) => switch (lang) {
+    'ru' => 'Снимки скана',
+    'en' => 'Scan photos',
+    _ => 'Skan rasmlari',
   };
 
   static String downloading(String lang) => switch (lang) {
@@ -512,6 +521,9 @@ class _AboutTab extends StatelessWidget {
         if (item.aiScanJobId != null) ...[
           const SizedBox(height: 14),
           _AiScanCard(jobId: item.aiScanJobId!),
+          // Skan paytida olingan rasmlar (frames) — scan_files'dan. Eski
+          // arizalarda rasm bo'lmasa, kartani o'zi yashiradi.
+          _AiScanFramesGallery(jobId: item.aiScanJobId!),
         ],
         // The downloadable report / 3D model / AR view only exist for a
         // finished deliverable (completed photogrammetry scan). For jobs that
@@ -601,7 +613,7 @@ class _AiScanCardState extends State<_AiScanCard> {
       final filePath = await _ensureResultCached(
         jobId: widget.jobId,
         downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan',
-        format: 'usdz',
+        format: 'glb',
         prefix: 'aival',
         onProgress: (received, total) {
           if (!mounted) return;
@@ -609,7 +621,10 @@ class _AiScanCardState extends State<_AiScanCard> {
         },
       );
       if (!mounted) return;
-      await RoomPlanScanner.preview(filePath);
+      // Backend GLB (yangi asosiy format) yoki eski USDZ qaytaradi — kontent
+      // bo'yicha to'g'ri viewer tanlaymiz: GLB → model_viewer_plus, USDZ →
+      // QuickLook. (openScanModel — resume ekrani bilan bir xil, markazlashgan.)
+      await openScanModel(context, filePath);
     } on HttpException catch (e) {
       if (!mounted) return;
       AppToast.error(context, e.message);
@@ -705,6 +720,246 @@ class _AiScanCardState extends State<_AiScanCard> {
             ),
             Icon(Icons.chevron_right_rounded,
                 color: ColorTokens.secondaryText(context)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Skan rasmlari galereyasi — ariza detalida `scan_files['frames']` kalitlaridan
+/// gorizontal thumbnaillar. Har rasm `GET /ai-valuations/{id}/scan-file?key=…`
+/// dan auth header bilan yuklanadi. Bosilganda to'liq ekran ko'ruvchi (pager).
+/// Rasm yo'q (eski ariza) yoki login yo'q bo'lsa — hech narsa ko'rsatmaydi.
+class _AiScanFramesGallery extends StatefulWidget {
+  const _AiScanFramesGallery({required this.jobId});
+  final int jobId;
+
+  @override
+  State<_AiScanFramesGallery> createState() => _AiScanFramesGalleryState();
+}
+
+class _AiScanFramesGalleryState extends State<_AiScanFramesGallery> {
+  bool _loading = true;
+  String? _token;
+  List<String> _frames = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null || token.isEmpty) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
+    final svc = AiValuationJobService();
+    try {
+      final snap = await svc.get(widget.jobId, token: token);
+      final frames = (snap.scanFiles?['frames'] as List?)
+              ?.whereType<String>()
+              .toList(growable: false) ??
+          const <String>[];
+      if (!mounted) return;
+      setState(() {
+        _token = token;
+        _frames = frames;
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    } finally {
+      svc.dispose();
+    }
+  }
+
+  String _url(String key) =>
+      '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan-file'
+      '?key=${Uri.encodeQueryComponent(key)}';
+
+  Map<String, String> get _headers => {'Authorization': 'Bearer $_token'};
+
+  void _openViewer(int index) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => _FramesViewerPage(
+        urls: _frames.map(_url).toList(growable: false),
+        headers: _headers,
+        initialIndex: index,
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading || _frames.isEmpty) return const SizedBox.shrink();
+    final lang = Localizations.localeOf(context).languageCode;
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.photo_library_outlined,
+                    size: 18, color: ColorTokens.secondaryText(context)),
+                const SizedBox(width: 8),
+                Text(
+                  '${_DetailStrings.scanPhotos(lang)} (${_frames.length})',
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    color: ColorTokens.primaryText(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 96,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _frames.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => GestureDetector(
+                  onTap: () => _openViewer(i),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      _url(_frames[i]),
+                      headers: _headers,
+                      width: 96,
+                      height: 96,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      loadingBuilder: (context, child, progress) =>
+                          progress == null
+                              ? child
+                              : Container(
+                                  width: 96,
+                                  height: 96,
+                                  color: ColorTokens.iconBg(context),
+                                  alignment: Alignment.center,
+                                  child: const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  ),
+                                ),
+                      errorBuilder: (context, _, _) => Container(
+                        width: 96,
+                        height: 96,
+                        color: ColorTokens.iconBg(context),
+                        alignment: Alignment.center,
+                        child: Icon(Icons.broken_image_outlined,
+                            color: ColorTokens.secondaryText(context)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// To'liq ekran rasm ko'ruvchi — frames galereyasi uchun (swipe + zoom).
+class _FramesViewerPage extends StatefulWidget {
+  const _FramesViewerPage({
+    required this.urls,
+    required this.headers,
+    required this.initialIndex,
+  });
+
+  final List<String> urls;
+  final Map<String, String> headers;
+  final int initialIndex;
+
+  @override
+  State<_FramesViewerPage> createState() => _FramesViewerPageState();
+}
+
+class _FramesViewerPageState extends State<_FramesViewerPage> {
+  late final PageController _controller =
+      PageController(initialPage: widget.initialIndex);
+  late int _index = widget.initialIndex;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            PageView.builder(
+              controller: _controller,
+              itemCount: widget.urls.length,
+              onPageChanged: (i) => setState(() => _index = i),
+              itemBuilder: (context, i) => InteractiveViewer(
+                minScale: 1,
+                maxScale: 5,
+                child: Center(
+                  child: Image.network(
+                    widget.urls[i],
+                    headers: widget.headers,
+                    fit: BoxFit.contain,
+                    gaplessPlayback: true,
+                    loadingBuilder: (context, child, progress) =>
+                        progress == null
+                            ? child
+                            : const Center(
+                                child: CircularProgressIndicator(
+                                    color: Colors.white)),
+                    errorBuilder: (context, _, _) => const Icon(
+                        Icons.broken_image_outlined,
+                        color: Colors.white54,
+                        size: 48),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              left: 8,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white),
+                onPressed: () => Navigator.of(context).maybePop(),
+              ),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Text(
+                '${_index + 1} / ${widget.urls.length}',
+                style: const TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
           ],
         ),
       ),

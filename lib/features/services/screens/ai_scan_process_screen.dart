@@ -34,6 +34,11 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
   AiScanResult? _result;
   String? _error;
   bool _uploading = false;
+  // Continue bosilganda to'liq skan to'plamini yuklash progressi.
+  int _upDone = 0; // yuborilgan fayllar soni
+  int _upTotal = 0; // jami fayllar
+  int _upBytesSent = 0;
+  int _upBytesTotal = 0;
 
   int get _scanId => widget.scan.savedScanId!;
 
@@ -91,12 +96,59 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
     final r = _result;
     if (r == null || _uploading) return;
     HapticFeedback.lightImpact();
-    setState(() => _uploading = true);
-    // USDZ ni backendga yuklaymiz (best-effort) → kalit draft ustunida saqlanadi.
-    final scanKey = await _uploadUsdz(r.usdzPath);
-    // Skandan keyin DRAFT ariza (skan kaliti + keyingi qadam = kadastr).
-    final draftId =
-        await createAiDraft(currentStep: 'cadastre', scanUsdzKey: scanKey);
+    setState(() {
+      _uploading = true;
+      _upDone = 0;
+      _upTotal = 0;
+      _upBytesSent = 0;
+      _upBytesTotal = 0;
+    });
+
+    // Skanning BARCHA artefaktlarini backendga yuklaymiz (rasmlar, glb, usdz,
+    // mesh, geo/png, manifest, frames.json) — fayl-darajali progress bilan.
+    // "glb" kaliti asosiy model sifatida scan_usdz_key ga ham yoziladi (orqaga
+    // moslik). Yuklash best-effort: tarmoq yo'q/xato bo'lsa oqim baribir davom
+    // etadi (kamida asosiy modelni alohida yuklab ko'ramiz).
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    Map<String, dynamic>? scanFiles;
+    String? scanKey;
+
+    if (token != null && token.isNotEmpty) {
+      final files = await _service.listScanFiles(_scanId);
+      if (files.isNotEmpty) {
+        final svc = AiUploadService();
+        try {
+          scanFiles = await svc.uploadBundle(
+            entries: files.map((f) => f.entry).toList(growable: false),
+            token: token,
+            onProgress: (done, total, sent, totalBytes) {
+              if (!mounted) return;
+              setState(() {
+                _upDone = done;
+                _upTotal = total;
+                _upBytesSent = sent;
+                _upBytesTotal = totalBytes;
+              });
+            },
+          );
+          scanKey = (scanFiles['glb'] ?? scanFiles['usdz']) as String?;
+        } catch (_) {
+          // bundle yuklash yiqildi — quyida asosiy modelni alohida yuboramiz
+        } finally {
+          svc.dispose();
+        }
+      }
+    }
+    // Zaxira: to'plam bo'sh/yiqilgan bo'lsa, hech bo'lmasa asosiy modelni yukla.
+    scanKey ??= await _uploadUsdz(r.usdzPath);
+
+    // Skandan keyin DRAFT ariza (skan kaliti + to'liq to'plam + keyingi qadam).
+    final draftId = await createAiDraft(
+      currentStep: 'cadastre',
+      scanUsdzKey: scanKey,
+      scanFiles: scanFiles,
+    );
     if (!mounted) return;
     setState(() => _uploading = false);
     // Skan oqimi tugadi — kadastr qadamiga o'tamiz (process ekraniga qaytmaymiz).
@@ -191,6 +243,9 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
 
+    // Continue bosilgach — to'plam yuklash progressi (X/N fayl, MB, foiz).
+    if (_uploading) return _buildUploadProgress(l, isDark, textColor, subColor);
+
     final (IconData icon, Color iconColor, String heading, String body)
         content = switch (_stage) {
       _ProcStage.done => (
@@ -279,6 +334,107 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
           const SizedBox(height: 28),
           _ViewModelButton(label: _S.viewModel(l), onTap: _viewModel),
         ],
+      ],
+    );
+  }
+
+  /// "Ma'lumotlar yuklanmoqda" — to'liq skan to'plamini yuklash progressi.
+  /// Foiz baytlar bo'yicha (aniqroq); fayl hisobi (X/N) qo'shimcha ko'rsatkich.
+  Widget _buildUploadProgress(
+      Locale l, bool isDark, Color textColor, Color subColor) {
+    final double? pct = _upBytesTotal > 0
+        ? (_upBytesSent / _upBytesTotal).clamp(0.0, 1.0)
+        : (_upTotal > 0 ? (_upDone / _upTotal).clamp(0.0, 1.0) : null);
+    final pctLabel = pct != null ? '${(pct * 100).round()}%' : '…';
+    final mbSent = (_upBytesSent / (1024 * 1024)).toStringAsFixed(1);
+    final mbTotal = (_upBytesTotal / (1024 * 1024)).toStringAsFixed(1);
+    final track = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 40, 24, 16),
+      children: [
+        Center(
+          child: SizedBox(
+            width: 96,
+            height: 96,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                SizedBox(
+                  width: 96,
+                  height: 96,
+                  child: CircularProgressIndicator(
+                    value: pct,
+                    strokeWidth: 2.6,
+                    backgroundColor: track,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                        AppColors.splashGreen),
+                  ),
+                ),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: AppColors.splashGreen.withValues(alpha: 0.14),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.cloud_upload_rounded,
+                      size: 40, color: AppColors.splashGreen),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        Text(
+          _S.uploadingHeading(l),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            height: 1.25,
+            color: textColor,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          _S.uploadingBody(l),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'MTSText',
+            fontSize: 14,
+            height: 1.4,
+            color: subColor,
+          ),
+        ),
+        const SizedBox(height: 28),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: pct,
+            minHeight: 8,
+            backgroundColor: track,
+            valueColor:
+                const AlwaysStoppedAnimation<Color>(AppColors.splashGreen),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '$_upDone / $_upTotal ${_S.filesWord(l)} · $pctLabel',
+              style: TextStyle(
+                  fontFamily: 'MTSText', fontSize: 13, color: subColor),
+            ),
+            Text(
+              '$mbSent / $mbTotal MB',
+              style: TextStyle(
+                  fontFamily: 'MTSText', fontSize: 13, color: subColor),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -436,6 +592,30 @@ class _S {
         'ru' => 'Продолжить',
         'en' => 'Continue',
         _ => 'Davom etish',
+      };
+
+  static String uploadingHeading(Locale l) => switch (l.languageCode) {
+        'ru' => 'Загрузка данных',
+        'en' => 'Uploading data',
+        _ => 'Ma\'lumotlar yuklanmoqda',
+      };
+
+  static String uploadingBody(Locale l) => switch (l.languageCode) {
+        'ru' =>
+          'Все файлы скана (фото, 3D модель, меш) отправляются на сервер. '
+              'Не закрывайте экран.',
+        'en' =>
+          'All scan files (photos, 3D model, mesh) are being sent to the '
+              'server. Keep the screen open.',
+        _ =>
+          'Skanning barcha fayllari (rasmlar, 3D model, mesh) serverga '
+              'yuborilmoqda. Ekranni yopmang.',
+      };
+
+  static String filesWord(Locale l) => switch (l.languageCode) {
+        'ru' => 'файлов',
+        'en' => 'files',
+        _ => 'fayl',
       };
 
   static String retry(Locale l) => switch (l.languageCode) {

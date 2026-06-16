@@ -3,9 +3,10 @@ class ApiConfig {
 
   /// Backend host (no path). Used for static assets, presigned URLs that
   /// come back relative, etc.
+  // PROD — telefon prod backendga ulanadi.
   static const String serverBaseUrl = 'https://api.3dkadastr.uz';
-  // Dev (telefon LAN): 'http://192.168.1.15:8009'
-  // Dev (simulator): 'http://localhost:8009'
+  // Dev (telefon → Mac LAN IP): 'http://192.168.1.64:8009'
+  // Dev (simulator only): 'http://localhost:8009'
 
   /// API prefix — versioned REST endpoints live here.
   static const String baseUrl = '$serverBaseUrl/api/v1';

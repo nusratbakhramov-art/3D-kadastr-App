@@ -13,6 +13,7 @@ Future<int?> createAiDraft({
   Map<String, dynamic>? payload,
   String currentStep = 'cadastre',
   String? scanUsdzKey,
+  Map<String, dynamic>? scanFiles,
 }) async {
   final session = await const AuthStorage().loadSession();
   final token = session.token;
@@ -23,6 +24,7 @@ Future<int?> createAiDraft({
       payload: payload ?? const <String, dynamic>{},
       currentStep: currentStep,
       scanUsdzKey: scanUsdzKey,
+      scanFiles: scanFiles,
       token: token,
     );
     return snap.id;
