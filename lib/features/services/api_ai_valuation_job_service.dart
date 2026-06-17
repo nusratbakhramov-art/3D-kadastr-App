@@ -282,11 +282,14 @@ class AiValuationJobService {
     );
   }
 
-  /// Arizaga biriktirilgan teksturali 3D skan (USDZ) ni backend'dan yuklab,
-  /// vaqtinchalik faylga yozadi va to'liq yo'lni qaytaradi (QuickLook uchun).
+  /// Arizaga biriktirilgan teksturali 3D skan ni backend'dan yuklab,
+  /// vaqtinchalik faylga yozadi va to'liq yo'lni qaytaradi.
+  /// `prefer=usdz` → USDZ beradi (bo'lsa): iOS native viewer uni single-sided
+  /// "dollhouse" qilib ko'rsatadi (qaralayotgan devor ko'rinmas). USDZ yo'q
+  /// bo'lsa GLB qaytadi → model_viewer (openScanModel kontent bo'yicha tanlaydi).
   /// Skan yo'q yoki yuklab bo'lmasa null.
   Future<String?> downloadScanUsdz(int id, {required String token}) async {
-    final uri = Uri.parse('$_baseUrl/ai-valuations/$id/scan');
+    final uri = Uri.parse('$_baseUrl/ai-valuations/$id/scan?prefer=usdz');
     final res = await _client
         .get(uri, headers: {'Authorization': 'Bearer $token'})
         .timeout(const Duration(seconds: 60));
