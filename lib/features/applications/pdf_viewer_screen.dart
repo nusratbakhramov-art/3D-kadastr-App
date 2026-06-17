@@ -1,12 +1,15 @@
 /// In-app PDF viewer for the report deliverables (Baholash Xulosa, Narxlash
-/// Orderi, 3D Kadastr xulosa). Renders a local file with native PDF rendering
-/// so the user can actually READ the report in-app — not just share/save it
-/// (which dead-ends on Android devices with no PDF app installed). A share
-/// action stays in the app bar.
+/// Orderi, 3D Kadastr xulosa). Renders a local file with PDFium (via pdfx) so
+/// the user can actually READ the report in-app — not just share/save it. A
+/// share action stays in the app bar.
+///
+/// pdfx (PDFium) is used instead of flutter_pdfview because the latter's native
+/// iOS view silently fails to render on iOS 26 (infinite spinner — onRender
+/// never fires).
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:pdfx/pdfx.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../theme/color_tokens.dart';
@@ -30,10 +33,24 @@ class PdfViewerScreen extends StatefulWidget {
 }
 
 class _PdfViewerScreenState extends State<PdfViewerScreen> {
+  late final PdfControllerPinch _controller;
   int _pages = 0;
-  int _current = 0;
+  int _current = 1;
   bool _ready = false;
-  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PdfControllerPinch(
+      document: PdfDocument.openFile(widget.filePath),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   Future<void> _share() async {
     final box = context.findRenderObject() as RenderBox?;
@@ -78,56 +95,34 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          PDFView(
-            filePath: widget.filePath,
-            enableSwipe: true,
-            swipeHorizontal: false,
-            autoSpacing: true,
-            pageFling: true,
-            fitPolicy: FitPolicy.WIDTH,
-            onRender: (pages) {
-              if (!mounted) return;
-              setState(() {
-                _pages = pages ?? 0;
-                _ready = true;
-              });
-            },
-            onError: (e) {
-              if (!mounted) return;
-              setState(() => _error = '$e');
-            },
-            onPageChanged: (page, total) {
-              if (!mounted) return;
-              setState(() => _current = page ?? 0);
-            },
-          ),
-          if (!_ready && _error == null)
-            const Center(child: CircularProgressIndicator()),
-          if (_error != null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  _PdfStrings.error(lang),
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontSize: 14,
-                    color: ColorTokens.secondaryText(context),
-                  ),
-                ),
-              ),
-            ),
-        ],
+      body: PdfViewPinch(
+        controller: _controller,
+        onDocumentLoaded: (doc) {
+          if (!mounted) return;
+          setState(() {
+            _pages = doc.pagesCount;
+            _ready = true;
+          });
+        },
+        onPageChanged: (page) {
+          if (!mounted) return;
+          setState(() => _current = page);
+        },
+        builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
+          options: const DefaultBuilderOptions(),
+          documentLoaderBuilder: (_) =>
+              const Center(child: CircularProgressIndicator()),
+          pageLoaderBuilder: (_) =>
+              const Center(child: CircularProgressIndicator()),
+          errorBuilder: (_, error) => _ErrorView(lang: lang),
+        ),
       ),
       bottomNavigationBar: (_ready && _pages > 0)
           ? SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Text(
-                  '${_current + 1} / $_pages',
+                  '$_current / $_pages',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
@@ -139,6 +134,29 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
               ),
             )
           : null,
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({required this.lang});
+  final String lang;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          _PdfStrings.error(lang),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontSize: 14,
+            color: ColorTokens.secondaryText(context),
+          ),
+        ),
+      ),
     );
   }
 }

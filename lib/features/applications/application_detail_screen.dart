@@ -1861,7 +1861,6 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final lang = Localizations.localeOf(context).languageCode;
     final subtitle = _loading
         ? (_progress != null
@@ -1939,17 +1938,13 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
                       value: _progress,
                     ),
                   )
-                : GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _download,
-                    child: _MiniPillButton(
-                      label: _DetailStrings.download(lang),
-                      fg: const Color(0xFF03B54F),
-                      bg: isDark
-                          ? const Color(0xFF03B54F).withValues(alpha: 0.18)
-                          : const Color(0xFFD7F3E3),
-                      iconAsset: 'assets/icons/download.svg',
-                    ),
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _DownloadIconButton(onTap: _download),
+                      const SizedBox(width: 8),
+                      _ViewChip(onTap: _open),
+                    ],
                   ),
           ],
         ),
@@ -2033,7 +2028,6 @@ class _AiOrderCardState extends State<_AiOrderCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final lang = Localizations.localeOf(context).languageCode;
     return InkWell(
       onTap: _loading ? null : _open,
@@ -2103,17 +2097,13 @@ class _AiOrderCardState extends State<_AiOrderCard> {
                       value: _progress,
                     ),
                   )
-                : GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _download,
-                    child: _MiniPillButton(
-                      label: _DetailStrings.download(lang),
-                      fg: const Color(0xFF03B54F),
-                      bg: isDark
-                          ? const Color(0xFF03B54F).withValues(alpha: 0.18)
-                          : const Color(0xFFD7F3E3),
-                      iconAsset: 'assets/icons/download.svg',
-                    ),
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _DownloadIconButton(onTap: _download),
+                      const SizedBox(width: 8),
+                      _ViewChip(onTap: _open),
+                    ],
                   ),
           ],
         ),
@@ -2212,7 +2202,6 @@ class _K3dReportCardState extends State<_K3dReportCard> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final lang = Localizations.localeOf(context).languageCode;
     final subtitle = _loading
         ? (_progress != null
@@ -2290,17 +2279,13 @@ class _K3dReportCardState extends State<_K3dReportCard> {
                       value: _progress,
                     ),
                   )
-                : GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _download,
-                    child: _MiniPillButton(
-                      label: _DetailStrings.download(lang),
-                      fg: const Color(0xFF03B54F),
-                      bg: isDark
-                          ? const Color(0xFF03B54F).withValues(alpha: 0.18)
-                          : const Color(0xFFD7F3E3),
-                      iconAsset: 'assets/icons/download.svg',
-                    ),
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _DownloadIconButton(onTap: _download),
+                      const SizedBox(width: 8),
+                      _ViewChip(onTap: _open),
+                    ],
                   ),
           ],
         ),
@@ -2671,6 +2656,82 @@ class _ModelCardState extends State<_ModelCard> {
             ),
         ],
       ),
+      ),
+    );
+  }
+}
+
+/// Primary "Ko'rish" (view) chip — opens the in-app PDF viewer.
+class _ViewChip extends StatelessWidget {
+  const _ViewChip({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = Localizations.localeOf(context).languageCode;
+    const fg = Color(0xFF03B54F);
+    final bg = isDark
+        ? const Color(0xFF03B54F).withValues(alpha: 0.18)
+        : const Color(0xFFD7F3E3);
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(10000),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(11, 5, 10, 5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _DetailStrings.view(lang),
+                style: const TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: fg,
+                ),
+              ),
+              const SizedBox(width: 5),
+              const Icon(Icons.visibility_outlined, size: 17, color: fg),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Small circular download icon button (sits next to the view chip).
+class _DownloadIconButton extends StatelessWidget {
+  const _DownloadIconButton({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: ColorTokens.iconBg(context),
+      shape: const CircleBorder(),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          width: 34,
+          height: 34,
+          child: Center(
+            child: SvgPicture.asset(
+              'assets/icons/download.svg',
+              width: 18,
+              height: 18,
+              colorFilter: ColorFilter.mode(
+                ColorTokens.secondaryText(context),
+                BlendMode.srcIn,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
