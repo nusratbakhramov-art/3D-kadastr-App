@@ -74,17 +74,22 @@ class _LoginRequiredSheet extends StatelessWidget {
     final textColor = isDark ? Colors.white : AppColors.textBlack;
     final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
 
-    return SafeArea(
-      top: false,
-      child: Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
+    // The colored Container is the OUTER wrapper so its background fills the
+    // bottom safe-area (home-indicator strip); SafeArea(top:false) only insets
+    // the content. Wrapping the other way round left that strip transparent —
+    // the dark scrim showed through as a "black bar" under the sheet.
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             Container(
               width: 38,
               height: 4,
@@ -126,44 +131,81 @@ class _LoginRequiredSheet extends StatelessWidget {
                 color: muted,
               ),
             ),
-            const SizedBox(height: 22),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.splashGreen,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                ),
-                onPressed: () {
-                  HapticFeedback.lightImpact();
-                  Navigator.of(context).pop(true);
-                },
-                child: Text(
-                  _LoginRequiredStrings.signIn(l),
-                  style: const TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 16,
-                  ),
-                ),
+            const SizedBox(height: 24),
+            // Primary + secondary as a matched pair: same height/radius, the
+            // brand green filled and a quiet tonal "cancel" beneath it.
+            _SheetButton(
+              label: _LoginRequiredStrings.signIn(l),
+              filled: true,
+              isDark: isDark,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                Navigator.of(context).pop(true);
+              },
+            ),
+            const SizedBox(height: 10),
+            _SheetButton(
+              label: _LoginRequiredStrings.cancel(l),
+              filled: false,
+              isDark: isDark,
+              onTap: () => Navigator.of(context).pop(false),
+            ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// One full-width pill button used in the sheet. `filled` = brand-green
+/// primary; otherwise a quiet tonal secondary that pairs with it (same height
+/// and radius, so the two read as an intentional pair rather than a loud pill
+/// over a bare text link).
+class _SheetButton extends StatelessWidget {
+  const _SheetButton({
+    required this.label,
+    required this.filled,
+    required this.isDark,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool filled;
+  final bool isDark;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg = filled
+        ? AppColors.splashGreen
+        : (isDark ? Colors.white.withValues(alpha: 0.07)
+                  : const Color(0xFFF1F2F4));
+    final Color fg = filled
+        ? AppColors.buttonTextBlack
+        : (isDark ? Colors.white.withValues(alpha: 0.85)
+                  : const Color(0xFF6C7278));
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 54,
+          width: double.infinity,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: filled ? FontWeight.w700 : FontWeight.w600,
+                fontSize: 16,
+                color: fg,
               ),
             ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(
-                _LoginRequiredStrings.cancel(l),
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontSize: 15,
-                  color: muted,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

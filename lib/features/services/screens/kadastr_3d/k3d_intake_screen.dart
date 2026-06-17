@@ -6,12 +6,14 @@
 ///   • Kadastr documents (1-20)
 ///   • Floor + rooms breakdown
 ///
-/// Files are uploaded to `/3d-kadastr-jobs/upload` the moment they're picked;
-/// the returned keys are stored on the bundle. "Davom etish" proceeds to the
-/// LiDAR scan step.
+/// Uses the same per-file (ChatGPT-style) upload UI as AI Baholash: each picked
+/// file is its own tile that uploads independently to `/3d-kadastr-jobs/upload`
+/// and can be retried / removed on its own. The returned keys are stored on the
+/// bundle. "Davom etish" proceeds to the LiDAR scan step.
 library;
 
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -20,11 +22,13 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
+import '../../../auth/widgets/auth_toast.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../../settings/settings_state.dart';
 import '../../api_ai_upload_service.dart';
 import '../../models/ai_baholash_bundle.dart' show AiRoom, RoomKind;
 import '../../models/kadastr_3d_bundle.dart';
+import '../../widgets/file_preview_gallery.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
 import '../scan_lidar_screen.dart';
@@ -45,12 +49,15 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
   final AiUploadService _uploads = AiUploadService();
   final ImagePicker _imagePicker = ImagePicker();
 
-  bool _photosBusy = false;
-  bool _kadastrBusy = false;
+  // Per-FILE upload state (ChatGPT-style): each picked file is its own tile that
+  // uploads independently and can be retried / removed on its own. The bundle's
+  // server-key lists are kept in sync with the items that finished uploading.
+  final List<_UploadItem> _photoItems = [];
+  final List<_UploadItem> _kadastrItems = [];
 
-  // On-device paths, index-aligned with the bundle's key lists (for previews).
-  final List<String> _photoPaths = [];
-  final List<String> _kadastrPaths = [];
+  bool get _anyUploading =>
+      _photoItems.any((i) => i.status == _UpStatus.uploading) ||
+      _kadastrItems.any((i) => i.status == _UpStatus.uploading);
 
   final TextEditingController _floorCtrl = TextEditingController();
   final TextEditingController _totalFloorsCtrl = TextEditingController();
@@ -63,6 +70,29 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
     }
     if (widget.bundle.totalFloors != null) {
       _totalFloorsCtrl.text = '${widget.bundle.totalFloors}';
+    }
+    // Restore already-uploaded tiles when the user returns to edit — the bundle
+    // keeps local paths + server keys index-aligned (see _sync below).
+    _rehydrate(_photoItems, widget.bundle.imagePaths, widget.bundle.imageKeys);
+    _rehydrate(
+      _kadastrItems,
+      widget.bundle.kadastrPaths,
+      widget.bundle.kadastrKeys,
+    );
+  }
+
+  void _rehydrate(
+    List<_UploadItem> items,
+    List<String> paths,
+    List<String> keys,
+  ) {
+    final n = paths.length < keys.length ? paths.length : keys.length;
+    for (var i = 0; i < n; i++) {
+      items.add(
+        _UploadItem(paths[i])
+          ..key = keys[i]
+          ..status = _UpStatus.done,
+      );
     }
   }
 
@@ -80,6 +110,7 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
   static const int _maxFloors = 200;
 
   bool get _ready =>
+      !_anyUploading &&
       widget.bundle.imageKeys.isNotEmpty &&
       widget.bundle.kadastrKeys.isNotEmpty &&
       widget.bundle.rooms.isNotEmpty &&
@@ -93,6 +124,7 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
   String? get _missingHint {
     if (_ready) return null;
     final l = localeNotifier.value;
+    if (_anyUploading) return _Strings.uploadingFiles(l);
     final missing = <String>[];
     if (widget.bundle.imageKeys.isEmpty) missing.add(_Strings.missingPhoto(l));
     if (widget.bundle.kadastrKeys.isEmpty) {
@@ -124,57 +156,49 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
     return session.token;
   }
 
-  void _snack(String msg) {
+  // Floating red error toast (top of screen, auto-dismiss) + a firm haptic —
+  // not the default snackbar that covered the button.
+  void _toast(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    HapticFeedback.heavyImpact();
+    AuthToasts.show(context, message: msg, variant: AuthToastVariant.error);
   }
 
+  // ── Property photos (image_picker) ──────────────────────────────────
   Future<void> _addPhotos() async {
-    final remaining = 15 - widget.bundle.imageKeys.length;
+    final remaining = 15 - _photoItems.length;
     if (remaining <= 0) {
-      _snack(_Strings.maxPhotos(localeNotifier.value, 15));
+      _toast(_Strings.maxPhotos(localeNotifier.value, 15));
       return;
     }
     final List<XFile> picked =
         await _imagePicker.pickMultiImage(limit: remaining);
     if (picked.isEmpty) return;
-    await _doUpload(
+    _enqueue(
       category: UploadCategory.propertyPhoto,
+      items: _photoItems,
       paths: picked.map((x) => x.path).toList(),
-      target: widget.bundle.imageKeys,
-      targetPaths: _photoPaths,
-      setBusy: (v) => setState(() => _photosBusy = v),
+      sync: _syncPhotoKeys,
     );
   }
 
-  Future<void> _addKadastr() async {
-    await _pickFilesUpload(
-      category: UploadCategory.kadastr,
-      target: widget.bundle.kadastrKeys,
-      targetPaths: _kadastrPaths,
-      maxTotal: 20,
-      setBusy: (v) => setState(() => _kadastrBusy = v),
-    );
-  }
+  // ── Kadastr docs (file_picker: images + pdf) ────────────────────────
+  Future<void> _addKadastr() => _pickDocs(
+        category: UploadCategory.kadastr,
+        items: _kadastrItems,
+        maxTotal: 20,
+        sync: _syncKadastrKeys,
+      );
 
-  void _removeAt(List<String> target, List<String> targetPaths, int i) {
-    HapticFeedback.lightImpact();
-    setState(() {
-      if (i >= 0 && i < target.length) target.removeAt(i);
-      if (i >= 0 && i < targetPaths.length) targetPaths.removeAt(i);
-    });
-  }
-
-  Future<void> _pickFilesUpload({
+  Future<void> _pickDocs({
     required UploadCategory category,
-    required List<String> target,
-    required List<String> targetPaths,
+    required List<_UploadItem> items,
     required int maxTotal,
-    required void Function(bool) setBusy,
+    required VoidCallback sync,
   }) async {
-    final remaining = maxTotal - target.length;
+    final remaining = maxTotal - items.length;
     if (remaining <= 0) {
-      _snack(_Strings.maxFiles(localeNotifier.value, maxTotal));
+      _toast(_Strings.maxFiles(localeNotifier.value, maxTotal));
       return;
     }
     final result = await FilePicker.platform.pickFiles(
@@ -191,46 +215,160 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
         .map((f) => f.path!)
         .take(remaining)
         .toList();
-    await _doUpload(
-      category: category,
-      paths: paths,
-      target: target,
-      targetPaths: targetPaths,
-      setBusy: setBusy,
-    );
+    _enqueue(category: category, items: items, paths: paths, sync: sync);
   }
 
-  Future<void> _doUpload({
+  // Create one "uploading" tile per newly-picked path (skipping dupes already in
+  // the section), then upload each independently so one failure can't sink the
+  // batch and each can be retried on its own.
+  void _enqueue({
     required UploadCategory category,
+    required List<_UploadItem> items,
     required List<String> paths,
-    required List<String> target,
-    required List<String> targetPaths,
-    required void Function(bool) setBusy,
-  }) async {
-    if (paths.isEmpty) return;
+    required VoidCallback sync,
+  }) {
+    final existing = items.map((i) => i.path).toSet();
+    final fresh = <_UploadItem>[];
+    setState(() {
+      for (final p in paths) {
+        if (existing.contains(p)) continue;
+        final item = _UploadItem(p);
+        items.add(item);
+        fresh.add(item);
+      }
+    });
+    for (final item in fresh) {
+      _uploadOne(item, category, sync);
+    }
+  }
+
+  Future<void> _uploadOne(
+    _UploadItem item,
+    UploadCategory category,
+    VoidCallback sync,
+  ) async {
     final token = await _token();
+    if (!mounted) return;
     if (token == null || token.isEmpty) {
-      _snack(_Strings.authRequired(localeNotifier.value));
+      setState(() {
+        item.status = _UpStatus.failed;
+        item.error = _Strings.authRequired(localeNotifier.value);
+      });
       return;
     }
-    setBusy(true);
+    setState(() {
+      item.status = _UpStatus.uploading;
+      item.error = null;
+    });
     try {
       final keys = await _uploads.upload(
         category: category,
-        filePaths: paths,
+        filePaths: [item.path],
         token: token,
         endpoint: _kUploadEndpoint,
       );
       if (!mounted) return;
       setState(() {
-        target.addAll(keys);
-        targetPaths.addAll(paths.take(keys.length));
+        item.key = keys.isNotEmpty ? keys.first : null;
+        item.status = item.key != null ? _UpStatus.done : _UpStatus.failed;
+        if (item.key == null) {
+          item.error = _Strings.uploadFailed(localeNotifier.value);
+        }
       });
-    } catch (e) {
-      _snack(_Strings.uploadError(localeNotifier.value, '$e'));
+    } on AiUploadException catch (e) {
+      if (!mounted) return;
+      // 400 = backend rejected this file (too big / wrong type / over the cap).
+      setState(() {
+        item.status = _UpStatus.failed;
+        item.error = e.statusCode == 400
+            ? _Strings.uploadRejected(localeNotifier.value)
+            : _Strings.uploadFailed(localeNotifier.value);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        item.status = _UpStatus.failed;
+        item.error = _Strings.uploadFailed(localeNotifier.value);
+      });
     } finally {
-      if (mounted) setBusy(false);
+      sync();
     }
+  }
+
+  void _retry(_UploadItem item, UploadCategory category, VoidCallback sync) {
+    HapticFeedback.selectionClick();
+    _uploadOne(item, category, sync);
+  }
+
+  void _removeItem(
+    List<_UploadItem> items,
+    _UploadItem item,
+    VoidCallback sync,
+  ) {
+    HapticFeedback.lightImpact();
+    setState(() => items.remove(item));
+    sync();
+  }
+
+  // Keep the bundle's server-key lists (what gets submitted) in sync with the
+  // items that finished uploading, preserving order.
+  void _syncPhotoKeys() =>
+      _sync(_photoItems, widget.bundle.imageKeys, widget.bundle.imagePaths);
+  void _syncKadastrKeys() => _sync(
+        _kadastrItems,
+        widget.bundle.kadastrKeys,
+        widget.bundle.kadastrPaths,
+      );
+
+  // Rebuild the bundle's server-key list AND the index-aligned local-path list
+  // from the items that finished uploading — so a re-entered intake can restore
+  // its tiles and the preview gallery works.
+  void _sync(List<_UploadItem> items, List<String> keys, List<String> paths) {
+    final done = items.where((i) => i.key != null).toList();
+    keys
+      ..clear()
+      ..addAll(done.map((i) => i.key!));
+    paths
+      ..clear()
+      ..addAll(done.map((i) => i.path));
+    if (mounted) setState(() {});
+  }
+
+  // Tap a finished image tile → full-screen, swipeable gallery of this section's
+  // images, opened at the tapped one.
+  void _openPreview(List<_UploadItem> items, _UploadItem tapped) {
+    final images = items.where((i) => _UploadItem.isImagePath(i.path)).toList();
+    final start = images.indexOf(tapped);
+    if (start < 0) return;
+    HapticFeedback.selectionClick();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => FilePreviewGallery(
+          paths: images.map((i) => i.path).toList(),
+          initialIndex: start,
+        ),
+      ),
+    );
+  }
+
+  void _showMissing() {
+    final msg = _missingHint;
+    if (msg != null) _toast(msg);
+  }
+
+  Widget _buildSubmit(Locale l) {
+    final button = ListingCtaButton(
+      label: _Strings.ctaContinue(l),
+      enabled: _ready,
+      onTap: _continue,
+    );
+    if (_ready) return button;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: _showMissing,
+      child: button,
+    );
   }
 
   void _continue() {
@@ -269,32 +407,47 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
                   padding: EdgeInsets.symmetric(horizontal: 16),
                   child: StepProgressBar(count: 6, activeIndex: 4),
                 ),
+                const SizedBox(height: 12),
                 Expanded(
                   child: ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     children: [
                       _UploadCard(
                         title: _Strings.objectPhotos(l),
                         hint: _Strings.objectPhotosHint(l),
                         icon: Icons.photo_camera_outlined,
-                        count: b.imageKeys.length,
-                        busy: _photosBusy,
+                        emptyIcon: Icons.add_photo_alternate_outlined,
+                        actionLabel: _Strings.addPhotosCta(l),
+                        items: _photoItems,
+                        maxFiles: 15,
                         onAdd: _addPhotos,
-                        paths: _photoPaths,
-                        onRemove: (i) =>
-                            _removeAt(b.imageKeys, _photoPaths, i),
+                        onRetry: (it) => _retry(
+                          it,
+                          UploadCategory.propertyPhoto,
+                          _syncPhotoKeys,
+                        ),
+                        onRemove: (it) =>
+                            _removeItem(_photoItems, it, _syncPhotoKeys),
+                        onPreview: (it) => _openPreview(_photoItems, it),
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
                         title: _Strings.kadastrDocs(l),
                         hint: _Strings.kadastrDocsHint(l),
                         icon: Icons.description_outlined,
-                        count: b.kadastrKeys.length,
-                        busy: _kadastrBusy,
+                        emptyIcon: Icons.upload_file_outlined,
+                        actionLabel: _Strings.addDocsCta(l),
+                        items: _kadastrItems,
+                        maxFiles: 20,
                         onAdd: _addKadastr,
-                        paths: _kadastrPaths,
-                        onRemove: (i) =>
-                            _removeAt(b.kadastrKeys, _kadastrPaths, i),
+                        onRetry: (it) => _retry(
+                          it,
+                          UploadCategory.kadastr,
+                          _syncKadastrKeys,
+                        ),
+                        onRemove: (it) =>
+                            _removeItem(_kadastrItems, it, _syncKadastrKeys),
+                        onPreview: (it) => _openPreview(_kadastrItems, it),
                       ),
                       const SizedBox(height: 20),
                       _FloorSection(
@@ -313,38 +466,10 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_missingHint != null) ...[
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.info_outline,
-                                  size: 15, color: Color(0xFFE5A23D)),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  _missingHint!,
-                                  style: const TextStyle(
-                                    fontFamily: 'MTSText',
-                                    fontSize: 12,
-                                    color: Color(0xFFE5A23D),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      ListingCtaButton(
-                        label: _Strings.ctaContinue(l),
-                        enabled: _ready,
-                        onTap: _continue,
-                      ),
-                    ],
-                  ),
+                  // No permanent "X required" banner — the button stays disabled
+                  // and tapping it surfaces what's missing as a toast (same UX
+                  // as AI Baholash). Quiet by default, guidance on demand.
+                  child: _buildSubmit(l),
                 ),
               ],
             ),
@@ -355,27 +480,61 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
   }
 }
 
+// ── Per-file upload state ─────────────────────────────────────────────
+enum _UpStatus { uploading, done, failed }
+
+class _UploadItem {
+  _UploadItem(this.path);
+
+  final String path;
+  _UpStatus status = _UpStatus.uploading;
+  String? key; // server object key once uploaded
+  String? error; // failure reason (drives the retry overlay)
+
+  static const Set<String> _imageExts = {
+    'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp',
+  };
+
+  static String extOf(String path) {
+    final name = path.toLowerCase();
+    final dot = name.lastIndexOf('.');
+    return dot >= 0 ? name.substring(dot + 1) : '';
+  }
+
+  static bool isImagePath(String path) => _imageExts.contains(extOf(path));
+  bool get isImage => isImagePath(path);
+}
+
 // ── Upload card ───────────────────────────────────────────────────────
+// Header (icon / title / hint + done-count badge) over a grid of per-file
+// tiles. Each tile uploads + retries on its own; a trailing "+" tile adds more
+// (so only the "+" is a tap target, never the whole card).
 class _UploadCard extends StatelessWidget {
   const _UploadCard({
     required this.title,
     required this.hint,
     required this.icon,
-    required this.count,
-    required this.busy,
+    required this.emptyIcon,
+    required this.actionLabel,
+    required this.items,
+    required this.maxFiles,
     required this.onAdd,
-    required this.paths,
+    required this.onRetry,
     required this.onRemove,
+    required this.onPreview,
   });
 
   final String title;
   final String hint;
   final IconData icon;
-  final int count;
-  final bool busy;
+  final IconData emptyIcon;
+  final String actionLabel;
+  final List<_UploadItem> items;
+  final int maxFiles;
   final VoidCallback onAdd;
-  final List<String> paths;
-  final ValueChanged<int> onRemove;
+  final ValueChanged<_UploadItem> onRetry;
+  final ValueChanged<_UploadItem> onRemove;
+  final ValueChanged<_UploadItem> onPreview;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +543,9 @@ class _UploadCard extends StatelessWidget {
     final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final textColor = isDark ? Colors.white : AppColors.textBlack;
     final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+
+    final doneCount = items.where((i) => i.status == _UpStatus.done).length;
+    final canAdd = items.length < maxFiles;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -396,6 +558,7 @@ class _UploadCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(icon, size: 26, color: AppColors.splashGreen),
               const SizedBox(width: 12),
@@ -416,17 +579,20 @@ class _UploadCard extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (count > 0)
+                        if (doneCount > 0)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 2),
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              color: AppColors.splashGreen
-                                  .withValues(alpha: 0.15),
+                              color: AppColors.splashGreen.withValues(
+                                alpha: 0.15,
+                              ),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              '$count',
+                              '$doneCount',
                               style: const TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
@@ -450,58 +616,62 @@ class _UploadCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              busy
-                  ? const SizedBox(
-                      width: 28, height: 28,
-                      child: CircularProgressIndicator(strokeWidth: 2.5))
-                  : IconButton(
-                      onPressed: onAdd,
-                      icon: const Icon(Icons.add_circle, size: 32),
-                      color: AppColors.splashGreen,
-                      visualDensity: VisualDensity.compact,
-                    ),
             ],
           ),
-          if (paths.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (var i = 0; i < paths.length; i++)
-                  _PreviewTile(
-                    path: paths[i],
-                    onRemove: () => onRemove(i),
-                  ),
-              ],
+          const SizedBox(height: 12),
+          if (items.isEmpty)
+            // First upload: a full-width, inviting drop zone (not a tiny square).
+            _EmptyDropZone(label: actionLabel, icon: emptyIcon, onTap: onAdd)
+          else
+            // Once a file exists: one horizontal swipeable row, "+" pinned first.
+            SizedBox(
+              height: _UploadTile.outerSize,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                padding: EdgeInsets.zero,
+                children: [
+                  if (canAdd) ...[
+                    _AddTile(onTap: onAdd),
+                    const SizedBox(width: 8),
+                  ],
+                  for (int i = 0; i < items.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 8),
+                    _UploadTile(
+                      item: items[i],
+                      onRetry: () => onRetry(items[i]),
+                      onRemove: () => onRemove(items[i]),
+                      onPreview: () => onPreview(items[i]),
+                    ),
+                  ],
+                ],
+              ),
             ),
-          ],
         ],
       ),
     );
   }
 }
 
-// ── Preview tile ──────────────────────────────────────────────────────
-class _PreviewTile extends StatelessWidget {
-  const _PreviewTile({required this.path, required this.onRemove});
+// ── One file tile ─────────────────────────────────────────────────────
+// Thumbnail (image) or file-type chip, with a per-file status overlay: a
+// spinner while uploading, a tap-to-retry overlay on failure, a check when
+// done. The × badge removes it; tapping a finished image opens the gallery.
+class _UploadTile extends StatelessWidget {
+  const _UploadTile({
+    required this.item,
+    required this.onRetry,
+    required this.onRemove,
+    required this.onPreview,
+  });
 
-  final String path;
+  final _UploadItem item;
+  final VoidCallback onRetry;
   final VoidCallback onRemove;
+  final VoidCallback onPreview;
 
-  static const double _size = 60;
-  static const Set<String> _imageExts = {
-    'jpg', 'jpeg', 'png', 'webp', 'heic', 'heif', 'gif', 'bmp',
-  };
-
-  String get _ext {
-    final name = path.toLowerCase();
-    final dot = name.lastIndexOf('.');
-    return dot >= 0 ? name.substring(dot + 1) : '';
-  }
-
-  bool get _isImage => _imageExts.contains(_ext);
+  static const double _size = 76;
+  static const double outerSize = _size + 6;
 
   @override
   Widget build(BuildContext context) {
@@ -511,39 +681,29 @@ class _PreviewTile extends StatelessWidget {
     final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
 
-    Widget body;
-    if (_isImage) {
-      body = ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.file(
-          File(path),
-          width: _size,
-          height: _size,
-          fit: BoxFit.cover,
-          errorBuilder: (_, _, _) => Container(
-            width: _size,
-            height: _size,
-            color: chipBg,
-            child: Icon(Icons.broken_image_outlined, size: 22, color: muted),
-          ),
+    Widget base;
+    if (item.isImage) {
+      base = Image.file(
+        File(item.path),
+        width: _size,
+        height: _size,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => Container(
+          color: chipBg,
+          child: Icon(Icons.broken_image_outlined, size: 22, color: muted),
         ),
       );
     } else {
-      body = Container(
-        width: _size,
-        height: _size,
-        decoration: BoxDecoration(
-          color: chipBg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: border),
-        ),
+      final ext = _UploadItem.extOf(item.path).toUpperCase();
+      base = Container(
+        color: chipBg,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.insert_drive_file_outlined, size: 22, color: muted),
+            Icon(Icons.insert_drive_file_outlined, size: 24, color: muted),
             const SizedBox(height: 4),
             Text(
-              _ext.isEmpty ? _Strings.file(l) : _ext.toUpperCase(),
+              ext.isEmpty ? _Strings.file(l) : ext,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -556,13 +716,75 @@ class _PreviewTile extends StatelessWidget {
       );
     }
 
+    final tappable = item.status == _UpStatus.done && item.isImage;
+
     return SizedBox(
       width: _size + 6,
       height: _size + 6,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          Positioned(left: 0, top: 6, child: body),
+          Positioned(
+            left: 0,
+            top: 6,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: SizedBox(
+                width: _size,
+                height: _size,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: border),
+                      ),
+                      child: GestureDetector(
+                        onTap: tappable ? onPreview : null,
+                        child: base,
+                      ),
+                    ),
+                    if (item.status == _UpStatus.uploading)
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.45),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      )
+                    else if (item.status == _UpStatus.failed)
+                      Tooltip(
+                        message: item.error ?? '',
+                        triggerMode: TooltipTriggerMode.longPress,
+                        child: GestureDetector(
+                          onTap: onRetry,
+                          child: Container(
+                            color: const Color(
+                              0xFFE5484D,
+                            ).withValues(alpha: 0.62),
+                            child: const Center(
+                              child: Icon(
+                                Icons.refresh_rounded,
+                                size: 26,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Remove (×) — always present, so a stuck/failed file can be cleared.
           Positioned(
             right: 0,
             top: 0,
@@ -571,19 +793,211 @@ class _PreviewTile extends StatelessWidget {
               child: Container(
                 width: 20,
                 height: 20,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE5484D),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF14181A) : Colors.white,
                   shape: BoxShape.circle,
+                  border: Border.all(color: border),
                 ),
-                child: const Icon(Icons.close_rounded,
-                    size: 14, color: Colors.white),
+                child: Icon(Icons.close_rounded, size: 13, color: muted),
               ),
             ),
           ),
+          if (item.status == _UpStatus.done)
+            Positioned(
+              left: 3,
+              bottom: 0,
+              child: Container(
+                width: 18,
+                height: 18,
+                decoration: const BoxDecoration(
+                  color: AppColors.splashGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 12,
+                  color: Colors.white,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
+}
+
+// ── "Add file" tile (the +) ───────────────────────────────────────────
+class _AddTile extends StatelessWidget {
+  const _AddTile({required this.onTap});
+  final VoidCallback onTap;
+  static const double _size = 76;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF14181A) : const Color(0xFFF7F8F9);
+
+    // Match _UploadTile geometry exactly (76 square offset 6px from top) so the
+    // "+" lines up with the thumbnails in the swipeable row.
+    return SizedBox(
+      width: _size + 6,
+      height: _size + 6,
+      child: Align(
+        alignment: Alignment.topLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: SizedBox(
+            width: _size,
+            height: _size,
+            child: Material(
+              color: bg,
+              borderRadius: BorderRadius.circular(12),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: onTap,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.splashGreen.withValues(alpha: 0.5),
+                      width: 1.4,
+                    ),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.add_rounded,
+                      size: 28,
+                      color: AppColors.splashGreen,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── First-upload drop zone ────────────────────────────────────────────
+// Full-width, dashed, tappable. Shown only while a category has zero files;
+// the compact _AddTile takes over once the first file lands.
+class _EmptyDropZone extends StatelessWidget {
+  const _EmptyDropZone({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    const accent = AppColors.splashGreen;
+    final fill = accent.withValues(alpha: isDark ? 0.07 : 0.05);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+
+    return SizedBox(
+      width: double.infinity,
+      height: 108,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: CustomPaint(
+          painter: _DashedRRectPainter(
+            color: accent.withValues(alpha: 0.55),
+            radius: 14,
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, size: 24, color: accent),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: textColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Dashed rounded-rectangle border (no extra dependency) ─────────────
+class _DashedRRectPainter extends CustomPainter {
+  _DashedRRectPainter({required this.color, this.radius = 14});
+
+  final Color color;
+  final double radius;
+
+  static const double _dash = 6;
+  static const double _gap = 5;
+  static const double _strokeWidth = 1.5;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = _strokeWidth
+      ..style = PaintingStyle.stroke;
+    const inset = _strokeWidth / 2;
+    final source = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            inset,
+            inset,
+            size.width - _strokeWidth,
+            size.height - _strokeWidth,
+          ),
+          Radius.circular(radius),
+        ),
+      );
+    final dashed = Path();
+    for (final metric in source.computeMetrics()) {
+      var dist = 0.0;
+      while (dist < metric.length) {
+        final next = math.min(dist + _dash, metric.length);
+        dashed.addPath(metric.extractPath(dist, next), Offset.zero);
+        dist += _dash + _gap;
+      }
+    }
+    canvas.drawPath(dashed, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRRectPainter old) =>
+      old.color != color || old.radius != radius;
 }
 
 // ── Floor section ─────────────────────────────────────────────────────
@@ -1193,10 +1607,34 @@ class _Strings {
         _ => 'Avtorizatsiya kerak',
       };
 
-  static String uploadError(Locale l, String e) => switch (l.languageCode) {
-        'ru' => 'Ошибка загрузки: $e',
-        'en' => 'Upload error: $e',
-        _ => 'Yuklashda xatolik: $e',
+  static String uploadingFiles(Locale l) => switch (l.languageCode) {
+        'ru' => 'Файлы загружаются…',
+        'en' => 'Uploading files…',
+        _ => 'Fayllar yuklanmoqda…',
+      };
+
+  static String uploadFailed(Locale l) => switch (l.languageCode) {
+        'ru' => 'Не загрузилось — нажмите, чтобы повторить',
+        'en' => 'Upload failed — tap to retry',
+        _ => 'Yuklanmadi — qayta urinish uchun bosing',
+      };
+
+  static String uploadRejected(Locale l) => switch (l.languageCode) {
+        'ru' => 'Файл отклонён (тип/размер) — нажмите для повтора',
+        'en' => 'File rejected (type/size) — tap to retry',
+        _ => 'Fayl rad etildi (tur/hajm) — qayta bosing',
+      };
+
+  static String addPhotosCta(Locale l) => switch (l.languageCode) {
+        'ru' => 'Добавить фото',
+        'en' => 'Add photos',
+        _ => 'Rasm qo\'shish',
+      };
+
+  static String addDocsCta(Locale l) => switch (l.languageCode) {
+        'ru' => 'Добавить документ',
+        'en' => 'Add document',
+        _ => 'Hujjat qo\'shish',
       };
 
   static String missingPhoto(Locale l) => switch (l.languageCode) {

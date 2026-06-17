@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
+import '../../widgets/app_header_back.dart';
 import '../auth/auth_storage.dart';
 import '../settings/settings_state.dart';
 import '../services/ai_draft_resume.dart';
@@ -20,9 +21,22 @@ import '../market/widgets/category_chips.dart';
 import 'application_model.dart';
 
 class ApplicationsScreen extends StatefulWidget {
-  const ApplicationsScreen({super.key, this.animateToken = 0});
+  const ApplicationsScreen({
+    super.key,
+    this.animateToken = 0,
+    this.lockedServiceId,
+    this.titleOverride,
+  });
 
   final int animateToken;
+
+  /// Agar berilsa, ekran faqat shu xizmat arizalarini ko'rsatadi: chiplar
+  /// yashiriladi va tepada orqaga qaytish sarlavhasi chiqadi (profil menyusidan
+  /// "Mening arizalarim" = `calc`, "Baholashlarim" = `ai_eval` uchun).
+  final String? lockedServiceId;
+
+  /// Locked rejimda ko'rsatiladigan sarlavha (yo'q bo'lsa "Arizalar").
+  final String? titleOverride;
 
   @override
   State<ApplicationsScreen> createState() => _ApplicationsScreenState();
@@ -34,7 +48,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static const double _scrollToTopThreshold = 620;
   static const double _loadMoreThreshold = 360;
 
-  String _selectedServiceId = applicationServiceChips.first.id;
+  late String _selectedServiceId;
   late final ScrollController _scrollController;
   final ValueNotifier<bool> _showScrollTop = ValueNotifier<bool>(false);
   List<ApplicationItem> _allItems = const <ApplicationItem>[];
@@ -56,8 +70,12 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   @override
   void initState() {
     super.initState();
+    _selectedServiceId =
+        widget.lockedServiceId ?? applicationServiceChips.first.id;
     _scrollController = ScrollController()..addListener(_onScroll);
-    if (widget.animateToken > 0) {
+    // Locked rejim push qilingan ekran — animateToken kelmaydi, shuning uchun
+    // darhol yuklaymiz.
+    if (widget.lockedServiceId != null || widget.animateToken > 0) {
       unawaited(_ensureInitialized());
     }
   }
@@ -414,12 +432,19 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final lang = localeNotifier.value.languageCode;
     final group = _kadastr3dStatusToGroup(j.status);
     final objectType = _objectTypeLabel(j.objectType);
+    // Once delivered (COMPLETED) the specialist's PDF / 3D model are downloadable
+    // — wire the detail-screen cards to the per-job download endpoints.
+    final delivered = j.status == Kadastr3dJobStatus.completed;
     return ApplicationItem(
       id: 'kad3d_${j.id}',
       orderNo: j.id,
       serviceId: 'kad_3d',
       serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'kad_3d'),
       statusGroup: group,
+      k3dJobId: j.id,
+      k3dReportJobId: delivered && j.hasReport ? j.id : null,
+      k3dModelJobId: delivered && j.hasModel ? j.id : null,
+      k3dModelExt: j.modelExt,
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
       addressLabel: _ApplicationsStrings.cadastreNumber(lang),
@@ -448,6 +473,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       Kadastr3dJobStatus.completed => ApplicationStatusGroup.completed,
       Kadastr3dJobStatus.failed => ApplicationStatusGroup.cancelled,
       Kadastr3dJobStatus.processing => ApplicationStatusGroup.inProgress,
+      // Admin acknowledged it — user sees a distinct "Qabul qilindi" state.
+      Kadastr3dJobStatus.received => ApplicationStatusGroup.received,
       Kadastr3dJobStatus.submitted => ApplicationStatusGroup.sent,
     };
   }
@@ -467,6 +494,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final lang = localeNotifier.value.languageCode;
     return switch (g) {
       ApplicationStatusGroup.sent => _ApplicationsStrings.submitted(lang),
+      ApplicationStatusGroup.received => _ApplicationsStrings.received(lang),
       ApplicationStatusGroup.inProgress => _ApplicationsStrings.inProgress(lang),
       ApplicationStatusGroup.completed => _ApplicationsStrings.ready(lang),
       ApplicationStatusGroup.cancelled => _ApplicationsStrings.cancelled(lang),
@@ -533,6 +561,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       // AI natija tayyor, lekin mutaxassis hisobotni hali yakunlamagan —
       // foydalanuvchiga "Yuborildi" ko'rinadi (natija ko'rinadi, hisobot kutilmoqda).
       AiJobStatus.underReview => ApplicationStatusGroup.sent,
+      // Mutaxassis arizani qabul qildi — "Qabul qilindi" (Yuborildi → Tayyor oralig'i).
+      AiJobStatus.received => ApplicationStatusGroup.received,
       _ => ApplicationStatusGroup.inProgress,
     };
   }
@@ -750,13 +780,20 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _Title(locale: locale),
-                          const SizedBox(height: 14),
-                          _ServiceChips(
-                            locale: locale,
-                            selectedId: _selectedServiceId,
-                            onChanged: _onServiceChanged,
-                          ),
+                          if (widget.lockedServiceId != null)
+                            AppHeaderBack(
+                              title: widget.titleOverride ??
+                                  _ApplicationsStrings.title(locale),
+                            )
+                          else ...[
+                            _Title(locale: locale),
+                            const SizedBox(height: 14),
+                            _ServiceChips(
+                              locale: locale,
+                              selectedId: _selectedServiceId,
+                              onChanged: _onServiceChanged,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1270,14 +1307,14 @@ class _ApplicationsStrings {
   static String serviceLabel(String lang, String serviceId) =>
       switch (serviceId) {
         'arch' => switch (lang) {
-          'ru' => 'Архитектура ТЗ',
-          'en' => 'Architecture TZ',
-          _ => 'Arxitektura TZ',
+          'ru' => 'Архитектура',
+          'en' => 'Architecture',
+          _ => 'Arxitektura',
         },
         'design' => switch (lang) {
-          'ru' => 'Дизайн ТЗ',
-          'en' => 'Design TZ',
-          _ => 'Dizayn TZ',
+          'ru' => 'Дизайн',
+          'en' => 'Design',
+          _ => 'Dizayn',
         },
         'ai_eval' => switch (lang) {
           'ru' => 'AI оценка',
@@ -1355,6 +1392,12 @@ class _ApplicationsStrings {
     'ru' => 'Отправлено',
     'en' => 'Submitted',
     _ => 'Yuborilgan',
+  };
+
+  static String received(String lang) => switch (lang) {
+    'ru' => 'Принято',
+    'en' => 'Received',
+    _ => 'Qabul qilindi',
   };
 
   static String status(String lang) => switch (lang) {
@@ -1547,7 +1590,6 @@ class _ApplicationCard extends StatelessWidget {
         item.statusGroup == ApplicationStatusGroup.completed ||
             item.hasResultPreview;
 
-    final dividerColor = ColorTokens.divider(context);
     return Material(
       color: ColorTokens.cardBg(context),
       borderRadius: BorderRadius.circular(20),
@@ -1566,7 +1608,25 @@ class _ApplicationCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Service glyph in a rounded chip — gives each card a clear
+                  // at-a-glance identity.
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: ColorTokens.iconBg(context),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(
+                      _serviceIcon(item.serviceId),
+                      size: 22,
+                      color: ColorTokens.brandPrimary(context),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1578,26 +1638,31 @@ class _ApplicationCard extends StatelessWidget {
                           style: TextStyle(
                             fontFamily: 'MTSCompact',
                             fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            height: 1.3,
+                            fontSize: 15,
+                            height: 1.25,
                             color: ColorTokens.primaryText(context),
                           ),
                         ),
-                        if (item.orderNo != null) ...[
-                          const SizedBox(height: 2),
-                          Text(
-                            '#${item.orderNo}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontFamily: 'MTSCompact',
-                              fontWeight: FontWeight.w500,
-                              fontSize: 12,
-                              height: 1.2,
-                              color: ColorTokens.secondaryText(context),
-                            ),
-                          ),
-                        ],
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            if (item.orderNo != null)
+                              Text(
+                                '#${item.orderNo}',
+                                style: TextStyle(
+                                  fontFamily: 'MTSCompact',
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  height: 1.1,
+                                  color: ColorTokens.secondaryText(context),
+                                ),
+                              ),
+                            if (item.orderNo != null && item.typeValue != null)
+                              const SizedBox(width: 8),
+                            if (item.typeValue != null)
+                              Flexible(child: _TypeChip(label: item.typeValue!)),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -1605,17 +1670,26 @@ class _ApplicationCard extends StatelessWidget {
                   _StatusBadge(style: status),
                 ],
               ),
-              const SizedBox(height: 12),
-              Divider(height: 1, thickness: 1, color: dividerColor),
-              const SizedBox(height: 12),
-              _MetaRow(
-                label: '${item.addressLabel}:',
-                value: item.addressValue,
+              const SizedBox(height: 14),
+              // Grouped meta in a subtly inset panel (label left / value right).
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                decoration: BoxDecoration(
+                  color: ColorTokens.scaffoldBg(context),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Column(
+                  children: [
+                    _MetaRow(
+                      label: '${item.addressLabel}:',
+                      value: item.addressValue,
+                    ),
+                    const SizedBox(height: 9),
+                    _MetaRow(label: '${item.dateLabel}:', value: item.dateValue),
+                  ],
+                ),
               ),
-              const SizedBox(height: 12),
-              Divider(height: 1, thickness: 1, color: dividerColor),
-              const SizedBox(height: 12),
-              _MetaRow(label: '${item.dateLabel}:', value: item.dateValue),
               if (item.isDraft) ...[
                 const SizedBox(height: 14),
                 _CardActionButton(
@@ -1631,6 +1705,44 @@ class _ApplicationCard extends StatelessWidget {
               ],
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Service → glyph for the card's leading chip.
+IconData _serviceIcon(String serviceId) => switch (serviceId) {
+      'kad_3d' => Icons.view_in_ar_rounded,
+      'ai_eval' => Icons.insights_rounded,
+      'calc' => Icons.calculate_rounded,
+      _ => Icons.description_rounded,
+    };
+
+/// Small pill for the object type (e.g. "Turar joy") shown next to the #number.
+class _TypeChip extends StatelessWidget {
+  const _TypeChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: ColorTokens.iconBg(context),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontFamily: 'MTSCompact',
+          fontWeight: FontWeight.w600,
+          fontSize: 11,
+          height: 1.1,
+          color: ColorTokens.secondaryText(context),
         ),
       ),
     );
@@ -1712,6 +1824,12 @@ class _StatusStyle {
           label: _ApplicationsStrings.submitted(lang),
           bgColor: const Color(0xFFE2ECFD),
           fgColor: const Color(0xFF2B7FFF),
+          iconAsset: 'assets/icons/application-pending.svg',
+        ),
+        ApplicationStatusGroup.received => _StatusStyle(
+          label: _ApplicationsStrings.received(lang),
+          bgColor: const Color(0xFFFBEFD6),
+          fgColor: const Color(0xFFC98A00),
           iconAsset: 'assets/icons/application-pending.svg',
         ),
         ApplicationStatusGroup.inProgress => _StatusStyle(

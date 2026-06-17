@@ -676,9 +676,9 @@ class _ScanMetadataStrings {
       };
 
   static String tzIncomplete(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Заявка ТЗ не заполнена',
-        'en' => 'TZ form is incomplete',
-        _ => 'TZ so\'rovnomasi to\'liq emas',
+        'ru' => 'Анкета не заполнена',
+        'en' => 'The form is incomplete',
+        _ => 'So\'rovnoma to\'liq emas',
       };
 
   static String loginRequired(Locale locale) => switch (locale.languageCode) {

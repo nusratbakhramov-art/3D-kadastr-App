@@ -1,4 +1,4 @@
-enum ApplicationStatusGroup { sent, inProgress, completed, cancelled }
+enum ApplicationStatusGroup { sent, received, inProgress, completed, cancelled }
 
 enum ApplicationTimelineStatus {
   accepted,
@@ -41,6 +41,10 @@ class ApplicationItem {
     this.resumeJobId,
     this.aiScanJobId,
     this.aiReportJobId,
+    this.k3dJobId,
+    this.k3dReportJobId,
+    this.k3dModelJobId,
+    this.k3dModelExt,
     this.estimatorComment,
     this.estimatorCause,
     this.hasResultPreview = false,
@@ -96,6 +100,20 @@ class ApplicationItem {
   /// bo'lsa, o'sha job id — detail ekranida yakuniy "Xulosa (PDF)" yuklab olish
   /// kartasi ko'rsatiladi (`/ai-valuations/{id}/report`). Aks holda null.
   final int? aiReportJobId;
+
+  /// 3D Kadastr job id — set for every 3D item. Lets the detail screen fetch the
+  /// FULL job snapshot (request_payload) and render all the data the user gave,
+  /// not just the lightweight list summary (mirrors [aiJobId] for AI Baholash).
+  final int? k3dJobId;
+
+  /// 3D Kadastr arizasi COMPLETED bo'lib, mutaxassis yetkazgan deliverable'lar:
+  ///   • k3dReportJobId — xulosa PDF mavjud (`/3d-kadastr-jobs/{id}/report`)
+  ///   • k3dModelJobId  — 3D model mavjud (`/3d-kadastr-jobs/{id}/model`)
+  ///   • k3dModelExt    — model kengaytmasi (glb/usdz) — to'g'ri viewer tanlash uchun
+  /// Yo'q bo'lsa null — detail ekranida tegishli karta ko'rsatilmaydi.
+  final int? k3dReportJobId;
+  final int? k3dModelJobId;
+  final String? k3dModelExt;
 
   /// Baholash guruhi xulosasi (egasi bilan bog'langач yozilgan) — berilgan
   /// bo'lsa ariza detalida foydalanuvchiga ko'rsatiladi.

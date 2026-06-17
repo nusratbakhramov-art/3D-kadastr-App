@@ -1869,9 +1869,9 @@ class _Strings {
       };
 
   static String archTz(Locale l) => switch (l.languageCode) {
-        'ru' => 'Архитектурное ТЗ',
-        'en' => 'Architecture TZ',
-        _ => 'Arxitektura TZ',
+        'ru' => 'Архитектура',
+        'en' => 'Architecture',
+        _ => 'Arxitektura',
       };
 
   static String aiValuation(Locale l) => switch (l.languageCode) {

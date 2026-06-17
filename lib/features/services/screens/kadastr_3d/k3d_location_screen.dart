@@ -15,6 +15,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/i18n.dart';
@@ -60,6 +61,9 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
   bool _resolving = false;
   Timer? _reverseDebounce;
   int _reverseRequestId = 0;
+
+  // Current-location (geolocator) state.
+  bool _locating = false;
 
   @override
   void initState() {
@@ -192,6 +196,42 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
     }
   }
 
+  // ── Current location ─────────────────────────────────────────────────
+
+  Future<void> _goToCurrentLocation() async {
+    HapticFeedback.lightImpact();
+    final l = Localizations.localeOf(context);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) AppToast.error(context, _Strings.locationOff(l));
+        return;
+      }
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+      }
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        if (mounted) AppToast.error(context, _Strings.locationDenied(l));
+        return;
+      }
+      setState(() => _locating = true);
+      final pos = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
+      final here = LatLng(pos.latitude, pos.longitude);
+      setState(() {
+        _center = here;
+        _locating = false;
+      });
+      _mapController.move(here, 17);
+      _scheduleReverse();
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _locating = false);
+      AppToast.error(context, _Strings.locationError(l));
+    }
+  }
+
   // ── Confirm / next ───────────────────────────────────────────────────
 
   void _confirm() {
@@ -268,7 +308,19 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
                   Positioned(
                     right: 28,
                     bottom: 12,
-                    child: MapZoomControls(controller: _mapController),
+                    // Zoom (+/−) + "mening joylashuvim" — ikkalasi ustma-ust.
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        MapZoomControls(controller: _mapController),
+                        const SizedBox(height: 12),
+                        _MyLocationButton(
+                          isDark: isDark,
+                          busy: _locating,
+                          onTap: _goToCurrentLocation,
+                        ),
+                      ],
+                    ),
                   ),
                   if (_suggestions.isNotEmpty)
                     Padding(
@@ -321,19 +373,88 @@ class _OsmTileLayer extends StatelessWidget {
   }
 }
 
+/// Map ustidagi "joriy joylashuv" tugmasi — geolocator orqali GPS oladi.
+class _MyLocationButton extends StatelessWidget {
+  const _MyLocationButton({
+    required this.isDark,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final bool busy;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    return Material(
+      color: bg,
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: busy ? null : onTap,
+        child: SizedBox(
+          width: 48,
+          height: 48,
+          child: busy
+              ? const Padding(
+                  padding: EdgeInsets.all(14),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    color: AppColors.splashGreen,
+                  ),
+                )
+              : const Icon(
+                  Icons.my_location,
+                  color: AppColors.splashGreen,
+                  size: 24,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CenterPin extends StatelessWidget {
   const _CenterPin();
   @override
   Widget build(BuildContext context) {
-    return const IgnorePointer(
+    return IgnorePointer(
       child: Padding(
-        padding: EdgeInsets.only(bottom: 44),
-        child: Icon(
-          Icons.location_on,
-          color: AppColors.splashGreen,
-          size: 44,
-          shadows: [
-            Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2)),
+        // Anchor the pin's tip to the geographic center — the icon's pixel
+        // midpoint sits below the tip, so push it up half its height.
+        padding: const EdgeInsets.only(bottom: 44),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            // A small, soft ground shadow right under the tip — anchors the pin
+            // to the map without the ugly teardrop drop-shadow behind it.
+            Positioned(
+              bottom: 1,
+              child: Container(
+                width: 14,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 3,
+                      spreadRadius: 0.5,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.location_on,
+              color: AppColors.splashGreen,
+              size: 44,
+            ),
           ],
         ),
       ),
@@ -628,5 +749,23 @@ class _Strings {
         'ru' => 'Адрес не найден',
         'en' => 'Address not found',
         _ => 'Manzil topilmadi',
+      };
+
+  static String locationOff(Locale l) => switch (l.languageCode) {
+        'ru' => 'Включите геолокацию на устройстве',
+        'en' => 'Turn on location services',
+        _ => 'Qurilmada joylashuvni yoqing',
+      };
+
+  static String locationDenied(Locale l) => switch (l.languageCode) {
+        'ru' => 'Нет доступа к геолокации',
+        'en' => 'Location permission denied',
+        _ => 'Joylashuvga ruxsat berilmadi',
+      };
+
+  static String locationError(Locale l) => switch (l.languageCode) {
+        'ru' => 'Не удалось определить местоположение',
+        'en' => 'Could not determine location',
+        _ => 'Joylashuvni aniqlab boʻlmadi',
       };
 }

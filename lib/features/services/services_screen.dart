@@ -203,6 +203,12 @@ class _ServicesScreenState extends State<ServicesScreen>
   Future<void> _open(BuildContext context, ServiceItem item) async {
     switch (item.id) {
       case ServiceId.kadastr3d:
+        // 3D Kadastr needs an account (davreest.uz lookup + job submit) — gate
+        // the entry with a login drawer before the wizard opens.
+        if (!await ensureLoggedIn(context)) {
+          return;
+        }
+        if (!context.mounted) return;
         Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()),
         );

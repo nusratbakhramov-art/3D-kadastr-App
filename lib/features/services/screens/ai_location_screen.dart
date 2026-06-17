@@ -509,17 +509,40 @@ class _CenterPin extends StatelessWidget {
   const _CenterPin();
   @override
   Widget build(BuildContext context) {
-    return const IgnorePointer(
+    return IgnorePointer(
       child: Padding(
         // Visually anchor the pin's tip to the geographic center — Icon's
         // pixel midpoint sits below the tip, so push it up half its height.
-        padding: EdgeInsets.only(bottom: 44),
-        child: Icon(
-          Icons.location_on,
-          color: AppColors.splashGreen,
-          size: 44,
-          shadows: [
-            Shadow(color: Colors.black54, blurRadius: 6, offset: Offset(0, 2)),
+        padding: const EdgeInsets.only(bottom: 44),
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            // A small, soft ground shadow right under the tip — anchors the pin
+            // to the map without the ugly teardrop drop-shadow behind it.
+            Positioned(
+              bottom: 1,
+              child: Container(
+                width: 14,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.22),
+                  borderRadius: BorderRadius.circular(3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 3,
+                      spreadRadius: 0.5,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.location_on,
+              color: AppColors.splashGreen,
+              size: 44,
+            ),
           ],
         ),
       ),

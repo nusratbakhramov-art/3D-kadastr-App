@@ -21,6 +21,7 @@ enum AiJobStatus {
   gatheringInfo,
   aiPricing,
   underReview,
+  received,
   completed,
   failed;
 
@@ -36,6 +37,8 @@ enum AiJobStatus {
         return AiJobStatus.aiPricing;
       case 'under_review':
         return AiJobStatus.underReview;
+      case 'received':
+        return AiJobStatus.received;
       case 'completed':
         return AiJobStatus.completed;
       case 'failed':
@@ -53,7 +56,9 @@ enum AiJobStatus {
   /// or not the estimate group has finalized the report. We stop the live poll
   /// here — final completion happens later, off-screen, via the admin.
   bool get hasResult =>
-      this == AiJobStatus.underReview || this == AiJobStatus.completed;
+      this == AiJobStatus.underReview ||
+      this == AiJobStatus.received ||
+      this == AiJobStatus.completed;
 
   bool get isDraft => this == AiJobStatus.draft;
 }

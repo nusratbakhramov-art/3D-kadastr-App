@@ -17,6 +17,7 @@ import '../settings/settings_state.dart';
 import '../scans/splat_viewer_screen.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
+import '../services/models/ai_baholash_bundle.dart' show RoomKind;
 import '../services/data/model_preview.dart';
 import '../services/data/room_plan_scanner.dart';
 import '../services/widgets/segmented_tabs.dart';
@@ -35,9 +36,19 @@ Future<String> _ensureResultCached({
   String prefix = 'photo', // cache fayl nomi prefiksi (photo / aival)
   void Function(int received, int total)? onProgress,
 }) async {
-  final dir = await getApplicationDocumentsDirectory();
-  final scansDir = Directory('${dir.path}/scans');
-  if (!scansDir.existsSync()) scansDir.createSync(recursive: true);
+  // Resolve a writable cache dir. On a fresh iOS container the Documents dir
+  // may not be materialized yet and createSync can throw errno 2 even with
+  // recursive:true — fall back to the temp dir so downloads never crash.
+  Directory scansDir;
+  try {
+    final dir = await getApplicationDocumentsDirectory();
+    scansDir = Directory('${dir.path}/scans');
+    await scansDir.create(recursive: true);
+  } catch (_) {
+    final tmpRoot = await getTemporaryDirectory();
+    scansDir = Directory('${tmpRoot.path}/scans');
+    await scansDir.create(recursive: true);
+  }
   final filePath = '${scansDir.path}/${prefix}_$jobId.$format';
   final file = File(filePath);
   if (await file.exists() && await file.length() > 0) {
@@ -73,6 +84,15 @@ Future<String> _ensureResultCached({
   }
   await tmp.rename(filePath);
   return filePath;
+}
+
+/// Source rect for the iOS share sheet popover. Without it, share_plus throws
+/// "sharePositionOrigin: argument must be set" on iPad / certain iOS layouts.
+/// Anchors the sheet to the tapped card's frame.
+Rect? _shareOrigin(BuildContext context) {
+  final box = context.findRenderObject() as RenderBox?;
+  if (box == null || !box.hasSize) return null;
+  return box.localToGlobal(Offset.zero) & box.size;
 }
 
 /// Localized strings for the application detail screen. Uzbek = default.
@@ -113,6 +133,18 @@ class _DetailStrings {
     'ru' => 'Заключение об оценке',
     'en' => 'Valuation report',
     _ => 'Baholash xulosasi',
+  };
+
+  static String orderFile(String lang) => switch (lang) {
+    'ru' => 'Заказ оценки (Narxlash orderi)',
+    'en' => 'Valuation order',
+    _ => 'Narxlash orderi',
+  };
+
+  static String orderHint(String lang) => switch (lang) {
+    'ru' => 'Дизайнерский PDF-отчёт',
+    'en' => 'Designed PDF report',
+    _ => 'Dizaynli PDF hisobot',
   };
 
   static String specialistConclusion(String lang) => switch (lang) {
@@ -276,7 +308,9 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                widget.item.serviceLabel,
+                widget.item.orderNo != null
+                    ? '${widget.item.serviceLabel} #${widget.item.orderNo}'
+                    : widget.item.serviceLabel,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
@@ -526,6 +560,44 @@ Widget _flatRowsCard(
   );
 }
 
+/// Section title with a green accent bar — groups the detail cards visually.
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
+
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 15,
+            decoration: BoxDecoration(
+              color: ColorTokens.brandPrimary(context),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _AboutTab extends StatelessWidget {
   const _AboutTab({required this.item});
 
@@ -540,7 +612,10 @@ class _AboutTab extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          (item.hasDeliverable || item.aiReportJobId != null)
+          (item.hasDeliverable ||
+                  item.aiReportJobId != null ||
+                  item.k3dReportJobId != null ||
+                  item.k3dModelJobId != null)
               ? _DetailStrings.report(lang)
               : _DetailStrings.applicationDetails(lang),
           style: TextStyle(
@@ -557,6 +632,14 @@ class _AboutTab extends StatelessWidget {
         if (item.aiJobId != null)
           _AiFullDetail(
             jobId: item.aiJobId!,
+            fallback: _flatRowsCard(context, lang, rows),
+          )
+        // 3D Kadastr — to'liq job snapshot'ini (so'rov payload) olib, BARCHA
+        // maydonlarni bo'limlarga ajratib ko'rsatamiz (obyekt, buyurtmachi,
+        // joylashuv, qavat, xonalar). Yuklanmasa yengil ro'yxatga qaytadi.
+        else if (item.k3dJobId != null)
+          _Kadastr3dFullDetail(
+            jobId: item.k3dJobId!,
             fallback: _flatRowsCard(context, lang, rows),
           )
         // Dinamik forma (TZ) arizalari — backend sxemasi bo'yicha to'liq
@@ -584,6 +667,9 @@ class _AboutTab extends StatelessWidget {
         if (item.aiReportJobId != null) ...[
           const SizedBox(height: 14),
           _AiXulosaCard(jobId: item.aiReportJobId!),
+          // Narxlash Orderi — dizaynli AI baholash orderi (alohida PDF).
+          const SizedBox(height: 14),
+          _AiOrderCard(jobId: item.aiReportJobId!),
         ],
         // AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skan —
         // har qanday statusda (skan submit paytida yuklanadi). "3D Kadastr"
@@ -595,6 +681,16 @@ class _AboutTab extends StatelessWidget {
           // Skan paytida olingan rasmlar (frames) — scan_files'dan. Eski
           // arizalarda rasm bo'lmasa, kartani o'zi yashiradi.
           _AiScanFramesGallery(jobId: item.aiScanJobId!),
+        ],
+        // 3D Kadastr — specialist-delivered conclusion PDF + 3D model, shown
+        // once the ariza is COMPLETED (cards appear only for the files present).
+        if (item.k3dReportJobId != null) ...[
+          const SizedBox(height: 14),
+          _K3dReportCard(jobId: item.k3dReportJobId!),
+        ],
+        if (item.k3dModelJobId != null) ...[
+          const SizedBox(height: 14),
+          _K3dModelCard(jobId: item.k3dModelJobId!, ext: item.k3dModelExt),
         ],
         // The downloadable report / 3D model / AR view only exist for a
         // finished deliverable (completed photogrammetry scan). For jobs that
@@ -740,33 +836,13 @@ class _AiFullDetailState extends State<_AiFullDetail> {
       children: [
         for (var i = 0; i < sections.length; i++) ...[
           if (i != 0) const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
-            child: Text(
-              sections[i].$1,
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: ColorTokens.primaryText(context),
-              ),
-            ),
-          ),
+          _SectionHeader(title: sections[i].$1),
           _flatRowsCard(context, lang, sections[i].$2),
         ],
         if (summary != null && summary.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
-            child: Text(
-              _aiLbl(lang, 'AI izoh', 'Комментарий AI', 'AI summary'),
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w700,
-                fontSize: 15,
-                color: ColorTokens.primaryText(context),
-              ),
-            ),
+          _SectionHeader(
+            title: _aiLbl(lang, 'AI izoh', 'Комментарий AI', 'AI summary'),
           ),
           Container(
             width: double.infinity,
@@ -791,6 +867,25 @@ class _AiFullDetailState extends State<_AiFullDetail> {
       ],
     );
   }
+}
+
+/// Localized room label: map the stored `kind` wire to RoomKind.label so it
+/// shows in the user's language (was leaking the raw English wire like
+/// "bedroom"). A custom room ('other') or unknown kind falls back to the
+/// user-entered name.
+String _roomLabel(String lang, Map<String, dynamic> m) {
+  final wire = m['kind']?.toString();
+  final name = m['name']?.toString().trim();
+  RoomKind? rk;
+  for (final k in RoomKind.values) {
+    if (k.wire == wire) {
+      rk = k;
+      break;
+    }
+  }
+  if (rk != null && rk != RoomKind.other) return rk.label(Locale(lang));
+  if (name != null && name.isNotEmpty) return name;
+  return rk?.label(Locale(lang)) ?? _aiLbl(lang, 'Xona', 'Помещение', 'Room');
 }
 
 /// Localized label picker (uz default).
@@ -889,8 +984,7 @@ List<(String, List<(String, String)>)> _buildAiSections(
   for (final r in rooms) {
     if (r is! Map) continue;
     final m = r.cast<String, dynamic>();
-    final name = str(m['name']) ?? str(m['kind']) ??
-        _aiLbl(lang, 'Xona', 'Помещение', 'Room');
+    final name = _roomLabel(lang, m);
     final parts = <String>[];
     if (m['count'] != null) {
       parts.add('${m['count']} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
@@ -928,6 +1022,217 @@ List<(String, List<(String, String)>)> _buildAiSections(
   }
   if (rs.isNotEmpty) {
     sections.add((_aiLbl(lang, 'Natija', 'Результат', 'Result'), rs));
+  }
+
+  return sections;
+}
+
+// ── 3D Kadastr full detail ───────────────────────────────────────────────
+// Fetches the FULL job (`GET /3d-kadastr-jobs/{id}`) and renders every field
+// the user submitted, grouped into sections — same look as the AI Baholash
+// detail. Falls back to the lightweight rows on load failure.
+class _Kadastr3dFullDetail extends StatefulWidget {
+  const _Kadastr3dFullDetail({required this.jobId, required this.fallback});
+
+  final int jobId;
+  final Widget fallback;
+
+  @override
+  State<_Kadastr3dFullDetail> createState() => _Kadastr3dFullDetailState();
+}
+
+class _Kadastr3dFullDetailState extends State<_Kadastr3dFullDetail> {
+  Map<String, dynamic>? _payload;
+  bool _loading = true;
+  bool _error = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final client = AuthHttpClient();
+      final res = await client.get(
+        Uri.parse('${ApiConfig.baseUrl}/3d-kadastr-jobs/${widget.jobId}'),
+      );
+      if (res.statusCode != 200) throw HttpException('HTTP ${res.statusCode}');
+      final json = jsonDecode(res.body) as Map<String, dynamic>;
+      if (!mounted) return;
+      setState(() {
+        _payload =
+            (json['request_payload'] as Map?)?.cast<String, dynamic>() ?? {};
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = true;
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: const SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    final payload = _payload;
+    if (_error || payload == null) return widget.fallback;
+
+    final lang = Localizations.localeOf(context).languageCode;
+    final sections = _buildKadastr3dSections(lang, payload);
+    if (sections.isEmpty) return widget.fallback;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < sections.length; i++) ...[
+          if (i != 0) const SizedBox(height: 8),
+          _SectionHeader(title: sections[i].$1),
+          _flatRowsCard(context, lang, sections[i].$2),
+        ],
+      ],
+    );
+  }
+}
+
+String _k3dObjectType(String lang, String? wire) => switch (wire) {
+      'residential' => _aiLbl(lang, 'Turar joy', 'Жилое', 'Residential'),
+      'non_residential' =>
+        _aiLbl(lang, 'Noturar joy', 'Нежилое', 'Non-residential'),
+      'warehouse' => _aiLbl(lang, 'Ombor', 'Склад', 'Warehouse'),
+      'industrial' =>
+        _aiLbl(lang, 'Sanoat obyektlari', 'Промышленные объекты', 'Industrial'),
+      _ => wire ?? '',
+    };
+
+/// Build the grouped (sectionTitle, rows) list from a 3D Kadastr request
+/// payload. Only non-empty fields/sections are included.
+List<(String, List<(String, String)>)> _buildKadastr3dSections(
+  String lang,
+  Map<String, dynamic> req,
+) {
+  final kad = (req['kadastr'] as Map?)?.cast<String, dynamic>() ?? const {};
+  final client = (req['client'] as Map?)?.cast<String, dynamic>() ?? const {};
+  final loc = (req['location'] as Map?)?.cast<String, dynamic>() ?? const {};
+  final rooms = (req['rooms'] as List?) ?? const [];
+  final imageKeys = (req['image_keys'] as List?) ?? const [];
+  final kadastrKeys = (req['kadastr_keys'] as List?) ?? const [];
+
+  String? str(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    if (s.isEmpty || s == 'null') return null;
+    return s;
+  }
+
+  void add(List<(String, String)> rows, String label, String? value) {
+    if (value != null) rows.add((label, value));
+  }
+
+  final sections = <(String, List<(String, String)>)>[];
+
+  // ── Obyekt ────────────────────────────────────────────────────────────
+  final prop = <(String, String)>[];
+  add(prop, _aiLbl(lang, 'Kadastr raqami', 'Кадастровый номер', 'Cadastre no.'),
+      str(kad['cadastre_number']));
+  add(prop, _aiLbl(lang, 'Manzil', 'Адрес', 'Address'),
+      str(kad['address']) ?? str(loc['address_text']));
+  final ot = str(req['object_type']);
+  if (ot != null) {
+    add(prop, _aiLbl(lang, 'Obyekt turi', 'Тип объекта', 'Object type'),
+        _k3dObjectType(lang, ot));
+  }
+  add(prop, _aiLbl(lang, 'Davreestr turi', 'Тип (davreestr)', 'Type (davreestr)'),
+      str(kad['object_type_hint']));
+  add(prop, _aiLbl(lang, 'Umumiy maydon', 'Общая площадь', 'Total area'),
+      kad['total_area'] != null ? '${kad['total_area']} m²' : null);
+  add(prop, _aiLbl(lang, 'Yashash maydoni', 'Жилая площадь', 'Living area'),
+      kad['living_area'] != null ? '${kad['living_area']} m²' : null);
+  final floor = str(req['floor']);
+  if (floor != null) {
+    final total = str(req['total_floors']);
+    add(prop, _aiLbl(lang, 'Qavat', 'Этаж', 'Floor'),
+        total != null ? '$floor / $total' : floor);
+  }
+  if (kad['cadastre_value'] is num) {
+    add(prop, _aiLbl(lang, 'Kadastr qiymati', 'Кадастровая стоимость',
+        'Cadastre value'), _aiMoney(kad['cadastre_value'] as num));
+  }
+  if (prop.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Obyekt', 'Объект', 'Property'), prop));
+  }
+
+  // ── Buyurtmachi ─────────────────────────────────────────────────────────
+  final cl = <(String, String)>[];
+  add(cl, _aiLbl(lang, 'Ism', 'Имя', 'Name'), str(client['name']));
+  add(cl, _aiLbl(lang, 'Telefon', 'Телефон', 'Phone'), str(client['phone']));
+  add(cl, 'STIR / JSHSHIR', str(client['stir']));
+  add(cl, 'Email', str(client['email']));
+  if (cl.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Buyurtmachi', 'Заказчик', 'Client'), cl));
+  }
+
+  // ── Joylashuv ───────────────────────────────────────────────────────────
+  final lc = <(String, String)>[];
+  if (loc['lat'] != null && loc['lng'] != null) {
+    add(lc, _aiLbl(lang, 'Koordinatalar', 'Координаты', 'Coordinates'),
+        '${loc['lat']}, ${loc['lng']}');
+  }
+  if (lc.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Joylashuv', 'Локация', 'Location'), lc));
+  }
+
+  // ── Xonalar ─────────────────────────────────────────────────────────────
+  final rm = <(String, String)>[];
+  for (final r in rooms) {
+    if (r is! Map) continue;
+    final m = r.cast<String, dynamic>();
+    final name = _roomLabel(lang, m);
+    final parts = <String>[];
+    if (m['count'] != null) {
+      parts.add('${m['count']} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
+    }
+    if (m['area'] != null) parts.add('${m['area']} m²');
+    rm.add((name, parts.isEmpty ? '—' : parts.join(' · ')));
+  }
+  if (rm.isNotEmpty) {
+    sections.add((_aiLbl(lang, 'Xonalar', 'Помещения', 'Rooms'), rm));
+  }
+
+  // ── Yuklangan fayllar ────────────────────────────────────────────────────
+  final files = <(String, String)>[];
+  if (imageKeys.isNotEmpty) {
+    add(files, _aiLbl(lang, 'Obyekt rasmlari', 'Фото объекта', 'Object photos'),
+        '${imageKeys.length} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
+  }
+  if (kadastrKeys.isNotEmpty) {
+    add(
+        files,
+        _aiLbl(lang, 'Kadastr hujjatlari', 'Кадастровые документы',
+            'Cadastre docs'),
+        '${kadastrKeys.length} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
+  }
+  if (files.isNotEmpty) {
+    sections.add(
+        (_aiLbl(lang, 'Yuklangan fayllar', 'Загруженные файлы', 'Files'), files));
   }
 
   return sections;
@@ -1514,6 +1819,7 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
             name: 'Baholash_Xulosa_${widget.jobId}.pdf',
           ),
         ],
+        sharePositionOrigin: _shareOrigin(context),
       );
     } on HttpException catch (e) {
       if (!mounted) return;
@@ -1624,6 +1930,456 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
                         : const Color(0xFFD7F3E3),
                     iconAsset: 'assets/icons/download.svg',
                   ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Narxlash Orderi — the styled AI valuation order (separate designed PDF).
+/// Downloads from `/ai-valuations/{id}/order`. Mirrors `_AiXulosaCard`.
+class _AiOrderCard extends StatefulWidget {
+  const _AiOrderCard({required this.jobId});
+  final int jobId;
+
+  @override
+  State<_AiOrderCard> createState() => _AiOrderCardState();
+}
+
+class _AiOrderCardState extends State<_AiOrderCard> {
+  bool _loading = false;
+  double? _progress;
+
+  Future<void> _onTap() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final filePath = await _ensureResultCached(
+        jobId: widget.jobId,
+        downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/order',
+        format: 'pdf',
+        prefix: 'order',
+        onProgress: (received, total) {
+          if (!mounted) return;
+          setState(() => _progress = total > 0 ? received / total : null);
+        },
+      );
+      if (!mounted) return;
+      await Share.shareXFiles(
+        [
+          XFile(
+            filePath,
+            mimeType: 'application/pdf',
+            name: 'Narxlash_Orderi_${widget.jobId}.pdf',
+          ),
+        ],
+        sharePositionOrigin: _shareOrigin(context),
+      );
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _progress = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = Localizations.localeOf(context).languageCode;
+    return InkWell(
+      onTap: _loading ? null : _onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: ColorTokens.iconBg(context),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                Icons.receipt_long_rounded,
+                size: 20,
+                color: ColorTokens.secondaryText(context),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_DetailStrings.orderFile(lang)} #${widget.jobId}',
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      height: 1.3,
+                      color: ColorTokens.primaryText(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _loading
+                        ? _DetailStrings.downloading(lang)
+                        : _DetailStrings.orderHint(lang),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      height: 1.3,
+                      color: ColorTokens.secondaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _loading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      value: _progress,
+                    ),
+                  )
+                : _MiniPillButton(
+                    label: _DetailStrings.download(lang),
+                    fg: const Color(0xFF03B54F),
+                    bg: isDark
+                        ? const Color(0xFF03B54F).withValues(alpha: 0.18)
+                        : const Color(0xFFD7F3E3),
+                    iconAsset: 'assets/icons/download.svg',
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 3D Kadastr — specialist-delivered conclusion PDF. Mirrors `_AiXulosaCard`
+/// but downloads from `/3d-kadastr-jobs/{id}/report`.
+class _K3dReportCard extends StatefulWidget {
+  const _K3dReportCard({required this.jobId});
+  final int jobId;
+
+  @override
+  State<_K3dReportCard> createState() => _K3dReportCardState();
+}
+
+class _K3dReportCardState extends State<_K3dReportCard> {
+  bool _loading = false;
+  double? _progress;
+  int _total = 0;
+
+  String _fmtBytes(int n) {
+    if (n <= 0) return '';
+    if (n < 1024) return '$n B';
+    if (n < 1024 * 1024) return '${(n / 1024).toStringAsFixed(0)} KB';
+    return '${(n / 1024 / 1024).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _onTap() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final filePath = await _ensureResultCached(
+        jobId: widget.jobId,
+        downloadUrl:
+            '${ApiConfig.baseUrl}/3d-kadastr-jobs/${widget.jobId}/report',
+        format: 'pdf',
+        prefix: 'k3dxulosa',
+        onProgress: (received, total) {
+          if (!mounted) return;
+          setState(() {
+            _total = total;
+            _progress = total > 0 ? received / total : null;
+          });
+        },
+      );
+      if (!mounted) return;
+      await Share.shareXFiles(
+        [
+          XFile(
+            filePath,
+            mimeType: 'application/pdf',
+            name: '3D_Kadastr_Xulosa_${widget.jobId}.pdf',
+          ),
+        ],
+        sharePositionOrigin: _shareOrigin(context),
+      );
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _progress = null;
+          _total = 0;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = Localizations.localeOf(context).languageCode;
+    final subtitle = _loading
+        ? (_progress != null
+            ? '${(_progress! * 100).toStringAsFixed(0)}%'
+            : (_total > 0 ? _fmtBytes(_total) : '…'))
+        : 'PDF';
+    return InkWell(
+      onTap: _loading ? null : _onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ColorTokens.iconBg(context),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: SvgPicture.asset(
+                'assets/icons/application-ready.svg',
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(
+                  ColorTokens.secondaryText(context),
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      height: 1.3,
+                      color: ColorTokens.primaryText(context),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      height: 1.3,
+                      color: ColorTokens.secondaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _loading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      value: _progress,
+                    ),
+                  )
+                : _MiniPillButton(
+                    label: _DetailStrings.download(lang),
+                    fg: const Color(0xFF03B54F),
+                    bg: isDark
+                        ? const Color(0xFF03B54F).withValues(alpha: 0.18)
+                        : const Color(0xFFD7F3E3),
+                    iconAsset: 'assets/icons/download.svg',
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 3D Kadastr — specialist-delivered 3D model (.glb/.usdz). Mirrors
+/// `_AiScanCard` but downloads from `/3d-kadastr-jobs/{id}/model` and uses the
+/// known extension to cache + open with the right viewer.
+class _K3dModelCard extends StatefulWidget {
+  const _K3dModelCard({required this.jobId, this.ext});
+  final int jobId;
+  final String? ext;
+
+  @override
+  State<_K3dModelCard> createState() => _K3dModelCardState();
+}
+
+class _K3dModelCardState extends State<_K3dModelCard> {
+  bool _loading = false;
+  double? _progress;
+
+  Future<void> _onTap() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    try {
+      final ext = (widget.ext == 'usdz') ? 'usdz' : 'glb';
+      final filePath = await _ensureResultCached(
+        jobId: widget.jobId,
+        downloadUrl:
+            '${ApiConfig.baseUrl}/3d-kadastr-jobs/${widget.jobId}/model',
+        format: ext,
+        prefix: 'k3dmodel',
+        onProgress: (received, total) {
+          if (!mounted) return;
+          setState(() => _progress = total > 0 ? received / total : null);
+        },
+      );
+      if (!mounted) return;
+      // Content-aware viewer (GLB → model_viewer_plus, USDZ → QuickLook).
+      await openScanModel(context, filePath);
+    } on HttpException catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, e.message);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(context, switch (localeNotifier.value.languageCode) {
+        'ru' => 'Ошибка: $e',
+        'en' => 'Error: $e',
+        _ => 'Xato: $e',
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _progress = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
+    return InkWell(
+      onTap: _onTap,
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ColorTokens.iconBg(context),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: _loading
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        value: _progress,
+                        color: const Color(0xFF03B54F),
+                      ),
+                    )
+                  : SvgPicture.asset(
+                      'assets/icons/chart-scatter-3d.svg',
+                      width: 20,
+                      height: 20,
+                      colorFilter: ColorFilter.mode(
+                        ColorTokens.secondaryText(context),
+                        BlendMode.srcIn,
+                      ),
+                    ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _DetailStrings.scan3d(lang),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: ColorTokens.primaryText(context),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    _loading
+                        ? _DetailStrings.downloading(lang)
+                        : _DetailStrings.scan3dHint(lang),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 13,
+                      color: ColorTokens.secondaryText(context),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: ColorTokens.secondaryText(context)),
           ],
         ),
       ),

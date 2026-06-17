@@ -1110,7 +1110,7 @@ class _Strings {
       switch (locale.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
 
   // App bar / navigatsiya / tugmalar
-  String get appBarTitle => _s('Дизайн ТЗ', 'Design TZ', 'Dizayn TZ');
+  String get appBarTitle => _s('Дизайн', 'Design', 'Dizayn');
   String get continueLabel => _s('Продолжить', 'Continue', 'Davom etish');
   String get submit => _s('Отправить', 'Submit', 'Yuborish');
   String get saveChanges => _s('Сохранить', 'Save', 'Saqlash');

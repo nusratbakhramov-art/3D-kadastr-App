@@ -17,9 +17,7 @@ import '../onboarding/onboarding_page_data.dart';
 import '../payments/payments_screen.dart';
 import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
-import '../ratings/my_ratings_screen.dart';
 import '../scans/saved_scans_screen.dart';
-import '../services/screens/ai_drafts_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr_3d_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
@@ -171,17 +169,42 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _openRatings() async {
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const MyRatingsScreen()));
+    // "Baholashlarim" — Arizalar ro'yxati AI Baholash xizmatiga qulflangan
+    // (bottom-nav Arizalar tabidagi haqiqiy `/ai-valuations` ma'lumotlari).
+    final l = widget.locale;
+    final title = switch (l.languageCode) {
+      'ru' => 'Мои оценки',
+      'en' => 'My valuations',
+      _ => 'Baholashlarim',
+    };
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ApplicationsScreen(
+          lockedServiceId: 'ai_eval',
+          titleOverride: title,
+        ),
+      ),
+    );
   }
 
   Future<void> _openScans() async {
-    // Real oqim: lokal "Mening skanlarim" o'rniga backend draftlar
-    // ("Mening arizalarim"). Skanlar endi ariza ichida backendda saqlanadi.
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AiDraftsScreen()));
+    // "Mening arizalarim" — Arizalar ro'yxati Kalkulyator xizmatiga qulflangan
+    // (Kalkulyator/Arxitektura/Dizayn buyurtmalari). Avval faqat tugallanmagan
+    // draftlar ko'rsatilardi, shuning uchun ro'yxat doim bo'sh chiqardi.
+    final l = widget.locale;
+    final title = switch (l.languageCode) {
+      'ru' => 'Мои заявки',
+      'en' => 'My applications',
+      _ => 'Mening arizalarim',
+    };
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ApplicationsScreen(
+          lockedServiceId: 'calc',
+          titleOverride: title,
+        ),
+      ),
+    );
   }
 
   Future<void> _openSavedScans() async {
@@ -199,6 +222,15 @@ class _MainShellState extends State<MainShell> {
   }
 
   Future<void> _openKadastr3d() async {
+    // 3D Kadastr needs an account (davreest.uz lookup + job submit) — gate with
+    // a login drawer before the wizard opens.
+    if (!await ensureLoggedIn(
+      context,
+      storage: widget.authStorage,
+    )) {
+      return;
+    }
+    if (!mounted) return;
     await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()));
