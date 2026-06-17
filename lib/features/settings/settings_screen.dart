@@ -591,7 +591,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
         setState(() { _error = L.errorOccurred(localeNotifier.value); _loading = false; });
       }
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() { _error = L.errorOccurred(localeNotifier.value); _loading = false; });
     }
   }
 
@@ -622,7 +622,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
         setState(() { _error = (body['detail'] as String?) ?? L.errorOccurred(localeNotifier.value); _loading = false; });
       }
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() { _error = L.errorOccurred(localeNotifier.value); _loading = false; });
     }
   }
 

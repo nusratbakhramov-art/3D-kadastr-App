@@ -474,7 +474,7 @@ class _S {
   static String email(Locale l) => switch (l.languageCode) {
     'ru' => 'Эл. почта',
     'en' => 'Email',
-    _ => 'Email',
+    _ => 'E-pochta',
   };
 
   static String coords(Locale l) => switch (l.languageCode) {

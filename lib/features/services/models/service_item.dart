@@ -70,12 +70,12 @@ class ServiceStrings {
   static String smetaProTitle(Locale l) => switch (l.languageCode) {
     'ru' => 'ABC смета (для смет)',
     'en' => 'ABC smeta (for estimators)',
-    _ => 'ABC smeta (smetчиklar uchun)',
+    _ => 'ABC smeta (smetachilar uchun)',
   };
 
   static String smetaProSubtitle(Locale l) => switch (l.languageCode) {
     'ru' => 'Профессиональная смета по СНиР через ABC-UZ. Форма N5/N6.',
     'en' => 'Professional СНиР smeta priced by ABC-UZ. Form N5/N6 output.',
-    _ => "СНиР bo'yicha professional smeta — ABC-UZ asosida. Forma N5/N6 ведомость.",
+    _ => "SNiR bo'yicha professional smeta — ABC-UZ asosida. Forma N5/N6 vedomosti.",
   };
 }

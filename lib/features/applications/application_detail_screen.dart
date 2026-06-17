@@ -1704,7 +1704,7 @@ class _ModelCardState extends State<_ModelCard> {
         AppToast.error(context, switch (localeNotifier.value.languageCode) {
           'ru' => 'URL для загрузки не получен',
           'en' => 'Download URL not received',
-          _ => 'Download URL kelmadi',
+          _ => 'Yuklab olish manzili kelmadi',
         });
         return;
       }

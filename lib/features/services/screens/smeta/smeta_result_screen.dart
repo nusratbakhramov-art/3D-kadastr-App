@@ -108,7 +108,10 @@ class _SmetaResultScreenState extends State<SmetaResultScreen> {
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
                 title: _Strings.appBar(locale),
-                subtitle: 'Job ${widget.jobId.substring(0, 8)}…',
+                subtitle: _Strings.jobSubtitle(
+                  locale,
+                  '${widget.jobId.substring(0, 8)}…',
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -143,6 +146,9 @@ class _Strings {
 
   static String appBar(Locale l) =>
       _pick(l, 'Smeta natijasi', 'Результат сметы', 'Estimate result');
+
+  static String jobSubtitle(Locale l, String id) =>
+      _pick(l, 'Vazifa $id', 'Задача $id', 'Job $id');
 
   static String timedOut(Locale l) => _pick(
         l,

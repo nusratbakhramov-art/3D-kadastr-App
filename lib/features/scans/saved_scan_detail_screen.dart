@@ -348,7 +348,7 @@ class _ProcessButton extends StatelessWidget {
               Text(
                 processing
                     ? 'Qayta ishlanmoqda…'
-                    : (isReprocess ? 'Qayta ishlash (v${item.outputs.first.version + 1})' : 'Texturing boshlash'),
+                    : (isReprocess ? 'Qayta ishlash (v${item.outputs.first.version + 1})' : 'Teksturalashni boshlash'),
                 style: const TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,

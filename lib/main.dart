@@ -207,17 +207,10 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
         localeNotifier.value = savedLocale;
       }
     } else {
-      // Foydalanuvchi tanlamagan — QURILMA tilini kuzatamiz (App Store 2.1(a):
-      // qurilma ruscha bo'lsa, ilova ham ruscha ochilsin). Qo'llab-quvvatlanadigan
-      // til (uz/ru/en) bo'lsa o'sha, aks holda default uz.
-      final deviceLang =
-          WidgetsBinding.instance.platformDispatcher.locale.languageCode;
-      const supported = {'uz', 'ru', 'en'};
-      final resolved = supported.contains(deviceLang)
-          ? Locale(deviceLang)
-          : const Locale('uz');
-      if (resolved != localeNotifier.value) {
-        localeNotifier.value = resolved;
+      // Foydalanuvchi hali til tanlamagan — default O'ZBEK (qurilma tilidan
+      // qat'i nazar). Foydalanuvchi keyin Onboarding/Sozlamalardan o'zgartira oladi.
+      if (localeNotifier.value != const Locale('uz')) {
+        localeNotifier.value = const Locale('uz');
       }
     }
 
