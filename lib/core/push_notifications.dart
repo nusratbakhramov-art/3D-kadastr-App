@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/widgets.dart';
+import 'package:app_badge_plus/app_badge_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 
@@ -20,6 +21,18 @@ import 'app_navigation.dart';
 /// emas (hook majburiy, top-level + vm:entry-point bo'lishi shart).
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {}
+
+/// Ilova ikonkasidagi badge'ni o'qilmagan bildirishnomalar soni bilan
+/// sinxronlaydi. `count == 0` bo'lsa badge TOZALANADI. Backend har push'да
+/// `badge=1` yuboradi — foydalanuvchi o'qiganда bu funksiya 0 ga tushirib
+/// badge'ni o'chiradi. Qo'llab-quvvatlanmasa / ruxsat bo'lmasa jim qaytadi.
+Future<void> syncAppBadge(int count) async {
+  try {
+    if (await AppBadgePlus.isSupported()) {
+      await AppBadgePlus.updateBadge(count < 0 ? 0 : count);
+    }
+  } catch (_) {}
+}
 
 /// FCM push xabarnomalar — initsializatsiya, ruxsat, token ro'yxati va bosish
 /// (tap) navigatsiyasi. Firebase sozlanmagan / o'rnatilmagan bo'lsa jim

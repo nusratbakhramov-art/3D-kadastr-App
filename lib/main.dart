@@ -35,6 +35,13 @@ void main() {
   // userProfileNotifier null bo'lib qoladi va Profil ekranida "Kirish" tugmasi
   // ko'rinadi.
   notificationUnreadNotifier.value = unreadNotificationCount();
+  // Ilova ikonkasидаги badge'ni o'qilmaganlar soni bilan doim sinxron tutamiz:
+  // har o'zgarishда (bootstrap/resume/login/o'qish/push) badge yangilanadi,
+  // hammasi o'qilganда (0) tozalanadi. (Backend push'да badge=1 yuboradi.)
+  syncAppBadge(notificationUnreadNotifier.value);
+  notificationUnreadNotifier.addListener(
+    () => syncAppBadge(notificationUnreadNotifier.value),
+  );
   runApp(const KadastrApp());
 }
 
