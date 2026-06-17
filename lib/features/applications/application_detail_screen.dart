@@ -1258,8 +1258,14 @@ class _AiScanCardState extends State<_AiScanCard> {
     try {
       final filePath = await _ensureResultCached(
         jobId: widget.jobId,
-        downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan',
-        format: 'glb',
+        // `prefer=usdz` → backend USDZ beradi (to'plamda bo'lsa). USDZ iOS
+        // native viewer'да "dollhouse" bo'lib ochiladi: qaralayotgan devor
+        // ko'rinmas, xona ichi ko'rinadi (skandan keyingidek). USDZ yo'q bo'lsa
+        // backend GLB qaytaradi → model_viewer. openScanModel kontent bo'yicha
+        // to'g'ri viewer tanlaydi (GLB→model_viewer, USDZ→native dollhouse).
+        downloadUrl:
+            '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan?prefer=usdz',
+        format: 'usdz',
         prefix: 'aival',
         onProgress: (received, total) {
           if (!mounted) return;
@@ -1267,9 +1273,6 @@ class _AiScanCardState extends State<_AiScanCard> {
         },
       );
       if (!mounted) return;
-      // Backend GLB (yangi asosiy format) yoki eski USDZ qaytaradi — kontent
-      // bo'yicha to'g'ri viewer tanlaymiz: GLB → model_viewer_plus, USDZ →
-      // QuickLook. (openScanModel — resume ekrani bilan bir xil, markazlashgan.)
       await openScanModel(context, filePath);
     } on HttpException catch (e) {
       if (!mounted) return;
