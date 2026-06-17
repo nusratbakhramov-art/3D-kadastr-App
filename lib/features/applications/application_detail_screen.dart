@@ -23,6 +23,7 @@ import '../services/data/room_plan_scanner.dart';
 import '../services/widgets/segmented_tabs.dart';
 import '../services/widgets/schema_answers_view.dart';
 import 'application_model.dart';
+import 'pdf_viewer_screen.dart';
 
 /// Stream the 3D result file (.usdz or .splat) to disk with progress.
 ///
@@ -86,9 +87,7 @@ Future<String> _ensureResultCached({
   return filePath;
 }
 
-/// Source rect for the iOS share sheet popover. Without it, share_plus throws
-/// "sharePositionOrigin: argument must be set" on iPad / certain iOS layouts.
-/// Anchors the sheet to the tapped card's frame.
+/// Source rect for the iOS share-sheet popover (required on iPad / some iOS).
 Rect? _shareOrigin(BuildContext context) {
   final box = context.findRenderObject() as RenderBox?;
   if (box == null || !box.hasSize) return null;
@@ -1793,11 +1792,13 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
     return '${(n / 1024 / 1024).toStringAsFixed(1)} MB';
   }
 
-  Future<void> _onTap() async {
+  static const String _shareName = 'Baholash_Xulosa';
+
+  Future<void> _run(Future<void> Function(String path) action) async {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final filePath = await _ensureResultCached(
+      final path = await _ensureResultCached(
         jobId: widget.jobId,
         downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/report',
         format: 'pdf',
@@ -1811,19 +1812,9 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
         },
       );
       if (!mounted) return;
-      await Share.shareXFiles(
-        [
-          XFile(
-            filePath,
-            mimeType: 'application/pdf',
-            name: 'Baholash_Xulosa_${widget.jobId}.pdf',
-          ),
-        ],
-        sharePositionOrigin: _shareOrigin(context),
-      );
+      await action(path);
     } on HttpException catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, e.message);
+      if (mounted) AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, switch (localeNotifier.value.languageCode) {
@@ -1842,6 +1833,32 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
     }
   }
 
+  // Tap the card → view in-app.
+  void _open() => _run((path) async {
+        final lang = localeNotifier.value.languageCode;
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => PdfViewerScreen(
+              filePath: path,
+              title: '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+              shareName: '${_shareName}_${widget.jobId}.pdf',
+            ),
+          ),
+        );
+      });
+
+  // Tap "Yuklash" → download / save / share.
+  void _download() => _run((path) async {
+        await Share.shareXFiles(
+          [
+            XFile(path,
+                mimeType: 'application/pdf',
+                name: '${_shareName}_${widget.jobId}.pdf'),
+          ],
+          sharePositionOrigin: _shareOrigin(context),
+        );
+      });
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -1852,7 +1869,7 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
             : (_total > 0 ? _fmtBytes(_total) : '…'))
         : 'PDF';
     return InkWell(
-      onTap: _loading ? null : _onTap,
+      onTap: _loading ? null : _open,
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -1922,13 +1939,17 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
                       value: _progress,
                     ),
                   )
-                : _MiniPillButton(
-                    label: _DetailStrings.download(lang),
-                    fg: const Color(0xFF03B54F),
-                    bg: isDark
-                        ? const Color(0xFF03B54F).withValues(alpha: 0.18)
-                        : const Color(0xFFD7F3E3),
-                    iconAsset: 'assets/icons/download.svg',
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _download,
+                    child: _MiniPillButton(
+                      label: _DetailStrings.download(lang),
+                      fg: const Color(0xFF03B54F),
+                      bg: isDark
+                          ? const Color(0xFF03B54F).withValues(alpha: 0.18)
+                          : const Color(0xFFD7F3E3),
+                      iconAsset: 'assets/icons/download.svg',
+                    ),
                   ),
           ],
         ),
@@ -1951,11 +1972,11 @@ class _AiOrderCardState extends State<_AiOrderCard> {
   bool _loading = false;
   double? _progress;
 
-  Future<void> _onTap() async {
+  Future<void> _run(Future<void> Function(String path) action) async {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final filePath = await _ensureResultCached(
+      final path = await _ensureResultCached(
         jobId: widget.jobId,
         downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/order',
         format: 'pdf',
@@ -1966,19 +1987,9 @@ class _AiOrderCardState extends State<_AiOrderCard> {
         },
       );
       if (!mounted) return;
-      await Share.shareXFiles(
-        [
-          XFile(
-            filePath,
-            mimeType: 'application/pdf',
-            name: 'Narxlash_Orderi_${widget.jobId}.pdf',
-          ),
-        ],
-        sharePositionOrigin: _shareOrigin(context),
-      );
+      await action(path);
     } on HttpException catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, e.message);
+      if (mounted) AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, switch (localeNotifier.value.languageCode) {
@@ -1996,12 +2007,36 @@ class _AiOrderCardState extends State<_AiOrderCard> {
     }
   }
 
+  void _open() => _run((path) async {
+        final lang = localeNotifier.value.languageCode;
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => PdfViewerScreen(
+              filePath: path,
+              title: '${_DetailStrings.orderFile(lang)} #${widget.jobId}',
+              shareName: 'Narxlash_Orderi_${widget.jobId}.pdf',
+            ),
+          ),
+        );
+      });
+
+  void _download() => _run((path) async {
+        await Share.shareXFiles(
+          [
+            XFile(path,
+                mimeType: 'application/pdf',
+                name: 'Narxlash_Orderi_${widget.jobId}.pdf'),
+          ],
+          sharePositionOrigin: _shareOrigin(context),
+        );
+      });
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final lang = Localizations.localeOf(context).languageCode;
     return InkWell(
-      onTap: _loading ? null : _onTap,
+      onTap: _loading ? null : _open,
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -2068,13 +2103,17 @@ class _AiOrderCardState extends State<_AiOrderCard> {
                       value: _progress,
                     ),
                   )
-                : _MiniPillButton(
-                    label: _DetailStrings.download(lang),
-                    fg: const Color(0xFF03B54F),
-                    bg: isDark
-                        ? const Color(0xFF03B54F).withValues(alpha: 0.18)
-                        : const Color(0xFFD7F3E3),
-                    iconAsset: 'assets/icons/download.svg',
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _download,
+                    child: _MiniPillButton(
+                      label: _DetailStrings.download(lang),
+                      fg: const Color(0xFF03B54F),
+                      bg: isDark
+                          ? const Color(0xFF03B54F).withValues(alpha: 0.18)
+                          : const Color(0xFFD7F3E3),
+                      iconAsset: 'assets/icons/download.svg',
+                    ),
                   ),
           ],
         ),
@@ -2105,11 +2144,13 @@ class _K3dReportCardState extends State<_K3dReportCard> {
     return '${(n / 1024 / 1024).toStringAsFixed(1)} MB';
   }
 
-  Future<void> _onTap() async {
+  static const String _shareName = '3D_Kadastr_Xulosa';
+
+  Future<void> _run(Future<void> Function(String path) action) async {
     if (_loading) return;
     setState(() => _loading = true);
     try {
-      final filePath = await _ensureResultCached(
+      final path = await _ensureResultCached(
         jobId: widget.jobId,
         downloadUrl:
             '${ApiConfig.baseUrl}/3d-kadastr-jobs/${widget.jobId}/report',
@@ -2124,19 +2165,9 @@ class _K3dReportCardState extends State<_K3dReportCard> {
         },
       );
       if (!mounted) return;
-      await Share.shareXFiles(
-        [
-          XFile(
-            filePath,
-            mimeType: 'application/pdf',
-            name: '3D_Kadastr_Xulosa_${widget.jobId}.pdf',
-          ),
-        ],
-        sharePositionOrigin: _shareOrigin(context),
-      );
+      await action(path);
     } on HttpException catch (e) {
-      if (!mounted) return;
-      AppToast.error(context, e.message);
+      if (mounted) AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
       AppToast.error(context, switch (localeNotifier.value.languageCode) {
@@ -2155,6 +2186,30 @@ class _K3dReportCardState extends State<_K3dReportCard> {
     }
   }
 
+  void _open() => _run((path) async {
+        final lang = localeNotifier.value.languageCode;
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => PdfViewerScreen(
+              filePath: path,
+              title: '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+              shareName: '${_shareName}_${widget.jobId}.pdf',
+            ),
+          ),
+        );
+      });
+
+  void _download() => _run((path) async {
+        await Share.shareXFiles(
+          [
+            XFile(path,
+                mimeType: 'application/pdf',
+                name: '${_shareName}_${widget.jobId}.pdf'),
+          ],
+          sharePositionOrigin: _shareOrigin(context),
+        );
+      });
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -2165,7 +2220,7 @@ class _K3dReportCardState extends State<_K3dReportCard> {
             : (_total > 0 ? _fmtBytes(_total) : '…'))
         : 'PDF';
     return InkWell(
-      onTap: _loading ? null : _onTap,
+      onTap: _loading ? null : _open,
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -2235,13 +2290,17 @@ class _K3dReportCardState extends State<_K3dReportCard> {
                       value: _progress,
                     ),
                   )
-                : _MiniPillButton(
-                    label: _DetailStrings.download(lang),
-                    fg: const Color(0xFF03B54F),
-                    bg: isDark
-                        ? const Color(0xFF03B54F).withValues(alpha: 0.18)
-                        : const Color(0xFFD7F3E3),
-                    iconAsset: 'assets/icons/download.svg',
+                : GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _download,
+                    child: _MiniPillButton(
+                      label: _DetailStrings.download(lang),
+                      fg: const Color(0xFF03B54F),
+                      bg: isDark
+                          ? const Color(0xFF03B54F).withValues(alpha: 0.18)
+                          : const Color(0xFFD7F3E3),
+                      iconAsset: 'assets/icons/download.svg',
+                    ),
                   ),
           ],
         ),
