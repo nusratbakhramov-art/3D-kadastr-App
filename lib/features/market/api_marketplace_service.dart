@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
 import 'models/market_listing.dart';
+import 'models/market_region_node.dart';
 
 class MarketplaceApiException implements Exception {
   const MarketplaceApiException(this.message);
@@ -78,6 +79,21 @@ class MarketplaceApiService {
       }
     }
     return out;
+  }
+
+  /// Hudud daraxti (viloyat → tumanlar) — akkordeon filtri uchun.
+  /// `GET /marketplace/regions/tree`.
+  Future<List<MarketRegionNode>> fetchRegionTree() async {
+    final uri = Uri.parse('$_baseUrl/marketplace/regions/tree');
+    final res = await _client.get(uri, headers: _headers()).timeout(_timeout);
+    if (res.statusCode != 200) _throw(res);
+    final body = jsonDecode(res.body);
+    final list = body is Map ? (body['items'] as List? ?? const []) : body as List;
+    return list
+        .whereType<Map>()
+        .map((m) => MarketRegionNode.fromJson(m.cast<String, dynamic>()))
+        .where((n) => n.name.isNotEmpty)
+        .toList(growable: false);
   }
 
   Future<List<MarketCategoryRemote>> fetchCategories() async {

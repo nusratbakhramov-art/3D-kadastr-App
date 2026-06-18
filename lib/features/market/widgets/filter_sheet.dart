@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../theme/app_colors.dart';
 import '../data/market_regions_store.dart';
 import '../models/market_filters.dart';
+import '../models/market_region_node.dart';
 
 Future<MarketFilters?> showMarketFilterSheet(
   BuildContext context, {
@@ -31,6 +32,15 @@ class _FilterSheetState extends State<_FilterSheet> {
   late RangeValues _area;
   late RangeValues _floor;
   late Set<String> _districts;
+  String _regionQuery = '';
+  final Set<String> _expanded = {};
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -53,6 +63,8 @@ class _FilterSheetState extends State<_FilterSheet> {
       _floor =
           const RangeValues(kMarketFloorFloor + 0.0, kMarketFloorCeil + 0.0);
       _districts.clear();
+      _regionQuery = '';
+      _searchCtrl.clear();
     });
   }
 
@@ -190,35 +202,47 @@ class _FilterSheetState extends State<_FilterSheet> {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    _SectionLabel(text: _FilterStrings.districts(l), color: fg),
-                    const SizedBox(height: 8),
-                    // Tumanlar admin paneldan (API) keladi — `marketRegionsNotifier`
-                    // orqali. Yangilanganda ro'yxat avtomatik qayta chiziladi.
-                    ValueListenableBuilder<List<String>>(
-                      valueListenable: marketRegionsNotifier,
-                      builder: (context, regions, _) => Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          for (final d in regions)
-                            _DistrictChip(
-                              label: _FilterStrings.district(l, d),
-                              selected: _districts.contains(d),
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                setState(() {
-                                  if (_districts.contains(d)) {
-                                    _districts.remove(d);
-                                  } else {
-                                    _districts.add(d);
-                                  }
-                                });
-                              },
-                              fg: fg,
-                              bg: chipBg,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _SectionLabel(
+                              text: _FilterStrings.region(l), color: fg),
+                        ),
+                        if (_districts.isNotEmpty)
+                          Text(
+                            _FilterStrings.selectedCount(l, _districts.length),
+                            style: TextStyle(
+                              fontFamily: 'MTSCompact',
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                              color: AppColors.splashGreen,
                             ),
-                        ],
-                      ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    _RegionSearchField(
+                      controller: _searchCtrl,
+                      hint: _FilterStrings.searchRegion(l),
+                      fg: fg,
+                      bg: chipBg,
+                      onChanged: (v) => setState(() => _regionQuery = v),
+                    ),
+                    const SizedBox(height: 12),
+                    // Viloyat→tuman daraxti (akkordeon). Daraxt hali yuklanmagan
+                    // bo'lsa, tekis chiplar (eski ro'yxat) fallback sifatida.
+                    ValueListenableBuilder<List<MarketRegionNode>>(
+                      valueListenable: marketRegionTreeNotifier,
+                      builder: (context, tree, _) {
+                        if (tree.isEmpty) {
+                          return ValueListenableBuilder<List<String>>(
+                            valueListenable: marketRegionsNotifier,
+                            builder: (context, regions, _) =>
+                                _flatChips(regions, l, fg, chipBg),
+                          );
+                        }
+                        return _regionAccordion(tree, l, fg, muted, chipBg);
+                      },
                     ),
                   ],
                 ),
@@ -255,6 +279,153 @@ class _FilterSheetState extends State<_FilterSheet> {
           ),
         );
       },
+    );
+  }
+
+  // ── Hudud filtri ─────────────────────────────────────────────────────────
+  void _toggleDistrict(String d) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (!_districts.add(d)) _districts.remove(d);
+    });
+  }
+
+  void _toggleRegionAll(MarketRegionNode node) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      final all = node.districts.toSet();
+      if (all.isNotEmpty && all.every(_districts.contains)) {
+        _districts.removeAll(all);
+      } else {
+        _districts.addAll(all);
+      }
+    });
+  }
+
+  /// Tekis chiplar — daraxt yuklanmaganidagi zaxira ko'rinish.
+  Widget _flatChips(List<String> regions, Locale l, Color fg, Color bg) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final d in regions)
+          _DistrictChip(
+            label: _FilterStrings.district(l, d),
+            selected: _districts.contains(d),
+            onTap: () => _toggleDistrict(d),
+            fg: fg,
+            bg: bg,
+          ),
+      ],
+    );
+  }
+
+  Widget _regionAccordion(
+    List<MarketRegionNode> tree,
+    Locale l,
+    Color fg,
+    Color muted,
+    Color bg,
+  ) {
+    final q = _regionQuery.trim().toLowerCase();
+    final divider = fg.withValues(alpha: 0.08);
+    final rows = <Widget>[];
+
+    rows.add(_FilterRow(
+      label: _FilterStrings.allRegions(l),
+      fg: fg,
+      weight: FontWeight.w600,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(_districts.clear);
+      },
+      trailing: _RadioDot(selected: _districts.isEmpty),
+    ));
+
+    for (final node in tree) {
+      final regionMatch = q.isEmpty || node.name.toLowerCase().contains(q);
+      final matched = (q.isEmpty || regionMatch)
+          ? node.districts
+          : node.districts
+              .where((d) => d.toLowerCase().contains(q))
+              .toList(growable: false);
+      if (!regionMatch && matched.isEmpty) continue;
+
+      final expanded =
+          _expanded.contains(node.name) || (q.isNotEmpty && matched.isNotEmpty);
+      final selectedCount = node.districts.where(_districts.contains).length;
+
+      rows.add(_FilterRow(
+        label: node.name,
+        fg: fg,
+        weight: FontWeight.w600,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() {
+            if (!_expanded.add(node.name)) _expanded.remove(node.name);
+          });
+        },
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selectedCount > 0) _CountBadge(count: selectedCount),
+            const SizedBox(width: 6),
+            Icon(
+              expanded
+                  ? Icons.keyboard_arrow_up_rounded
+                  : Icons.keyboard_arrow_down_rounded,
+              size: 22,
+              color: muted,
+            ),
+          ],
+        ),
+      ));
+
+      if (expanded && node.districts.isNotEmpty) {
+        final all = node.districts.toSet();
+        final allSelected = all.every(_districts.contains);
+        rows.add(_FilterRow(
+          label: _FilterStrings.selectAll(l),
+          fg: AppColors.splashGreen,
+          weight: FontWeight.w600,
+          leftPad: 32,
+          onTap: () => _toggleRegionAll(node),
+          trailing: _CheckMark(selected: allSelected),
+        ));
+        for (final d in matched) {
+          rows.add(_FilterRow(
+            label: d,
+            fg: fg,
+            leftPad: 32,
+            onTap: () => _toggleDistrict(d),
+            trailing: _CheckMark(selected: _districts.contains(d)),
+          ));
+        }
+      }
+    }
+
+    if (rows.length == 1 && q.isNotEmpty) {
+      rows.add(_FilterRow(
+        label: _FilterStrings.noResults(l),
+        fg: muted,
+        onTap: () {},
+      ));
+    }
+
+    final children = <Widget>[];
+    for (var i = 0; i < rows.length; i++) {
+      if (i > 0) children.add(Divider(height: 1, thickness: 1, color: divider));
+      children.add(rows[i]);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: divider),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(children: children),
     );
   }
 
@@ -297,15 +468,40 @@ class _FilterStrings {
     'en' => 'Area (m²)',
     _ => 'Maydon (m²)',
   };
-  static String districts(Locale l) => switch (l.languageCode) {
-    'ru' => 'Районы',
-    'en' => 'Districts',
-    _ => 'Tumanlar',
-  };
   static String apply(Locale l) => switch (l.languageCode) {
     'ru' => 'Применить',
     'en' => 'Apply',
     _ => 'Qo‘llash',
+  };
+  static String region(Locale l) => switch (l.languageCode) {
+    'ru' => 'Регион',
+    'en' => 'Region',
+    _ => 'Hudud',
+  };
+  static String searchRegion(Locale l) => switch (l.languageCode) {
+    'ru' => 'Поиск региона или района',
+    'en' => 'Search region or district',
+    _ => 'Viloyat yoki tuman qidirish',
+  };
+  static String allRegions(Locale l) => switch (l.languageCode) {
+    'ru' => 'Все регионы',
+    'en' => 'All regions',
+    _ => 'Barcha hududlar',
+  };
+  static String selectAll(Locale l) => switch (l.languageCode) {
+    'ru' => 'Выбрать все',
+    'en' => 'Select all',
+    _ => 'Barchasini tanlash',
+  };
+  static String noResults(Locale l) => switch (l.languageCode) {
+    'ru' => 'Ничего не найдено',
+    'en' => 'Nothing found',
+    _ => 'Hech narsa topilmadi',
+  };
+  static String selectedCount(Locale l, int n) => switch (l.languageCode) {
+    'ru' => '$n выбрано',
+    'en' => '$n selected',
+    _ => '$n ta tanlandi',
   };
 
   /// Localized display label for a canonical district value. The value stored
@@ -389,6 +585,176 @@ class _DistrictChip extends StatelessWidget {
               color: selected ? AppColors.buttonTextBlack : fg,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Akkordeon ichidagi bitta qator (hudud / tuman / "barchasi").
+class _FilterRow extends StatelessWidget {
+  const _FilterRow({
+    required this.label,
+    required this.fg,
+    required this.onTap,
+    this.trailing,
+    this.leftPad = 16,
+    this.weight = FontWeight.w500,
+  });
+
+  final String label;
+  final Color fg;
+  final VoidCallback onTap;
+  final Widget? trailing;
+  final double leftPad;
+  final FontWeight weight;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 52),
+        padding: EdgeInsets.fromLTRB(leftPad, 12, 14, 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: weight,
+                  fontSize: 15,
+                  height: 1.25,
+                  color: fg,
+                ),
+              ),
+            ),
+            ?trailing,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// "Barcha hududlar" uchun radio nuqta.
+class _RadioDot extends StatelessWidget {
+  const _RadioDot({required this.selected});
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: selected ? AppColors.splashGreen : const Color(0xFFB4B9BF),
+          width: 2,
+        ),
+        color: selected ? AppColors.splashGreen : Colors.transparent,
+      ),
+      child: selected
+          ? const Icon(Icons.check, size: 14, color: Colors.white)
+          : null,
+    );
+  }
+}
+
+/// Tuman tanlash belgisi (checkbox o'rnida yengil check).
+class _CheckMark extends StatelessWidget {
+  const _CheckMark({required this.selected});
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: selected ? AppColors.splashGreen : const Color(0xFFB4B9BF),
+          width: 2,
+        ),
+        color: selected ? AppColors.splashGreen : Colors.transparent,
+      ),
+      child: selected
+          ? const Icon(Icons.check, size: 14, color: Colors.white)
+          : null,
+    );
+  }
+}
+
+/// Viloyat qatorida tanlangan tumanlar soni.
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.splashGreen,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$count',
+        style: const TextStyle(
+          fontFamily: 'MTSCompact',
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+          color: AppColors.buttonTextBlack,
+        ),
+      ),
+    );
+  }
+}
+
+class _RegionSearchField extends StatelessWidget {
+  const _RegionSearchField({
+    required this.controller,
+    required this.hint,
+    required this.fg,
+    required this.bg,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String hint;
+  final Color fg;
+  final Color bg;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      onTapOutside: (_) => FocusScope.of(context).unfocus(),
+      style: TextStyle(fontFamily: 'MTSText', fontSize: 14.5, color: fg),
+      decoration: InputDecoration(
+        isDense: true,
+        prefixIcon: Icon(Icons.search_rounded, size: 20, color: fg.withValues(alpha: 0.5)),
+        hintText: hint,
+        hintStyle: TextStyle(
+          fontFamily: 'MTSText',
+          fontSize: 14.5,
+          color: fg.withValues(alpha: 0.45),
+        ),
+        filled: true,
+        fillColor: bg,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: BorderSide(color: fg.withValues(alpha: 0.08)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.splashGreen, width: 1.4),
         ),
       ),
     );
