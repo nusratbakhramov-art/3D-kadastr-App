@@ -17,6 +17,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/input_validators.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../home/user_profile.dart';
@@ -208,18 +209,20 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
   }
 
   // STIR (9) yoki INN (14) — kiritilgan bo'lsa, uzunligi shu ikkitadan biri.
-  bool get _tinValid {
-    final t = _tin.text.trim();
-    return t.isEmpty || t.length == 9 || t.length == 14;
-  }
+  bool get _tinValid => isValidTin(_tin.text);
+
+  // Telefon — kiritilgan bo'lsa formati to'g'ri bo'lsin (xato matni uchun).
+  bool get _phoneError =>
+      _phone.text.trim().isNotEmpty && !isValidUzPhone(_phone.text);
 
   // ── Validatsiya per-step ─────────────────────────────────────────────
   bool get _canAdvance {
     switch (_stepIndex) {
       case 0:
         return _customerName.text.trim().length >= 2 &&
-            _phone.text.trim().length >= 5 &&
-            _tinValid;
+            isValidUzPhone(_phone.text) &&
+            _tinValid &&
+            isValidEmail(_email.text);
       case 1:
         return _draft.objectType != null;
       case _previewIndex:
@@ -502,13 +505,17 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         controller: _phone,
         placeholder: '+998 90 123 45 67',
         keyboardType: TextInputType.phone,
+        phoneFormat: true,
+        maxLength: 17,
         required: true,
+        errorText: _phoneError ? s.phoneError : null,
       ),
       WizardField(
         label: 'E-mail',
         controller: _email,
         placeholder: 'sample@mail.com',
         keyboardType: TextInputType.emailAddress,
+        errorText: isValidEmail(_email.text) ? null : s.emailError,
       ),
     ]);
   }
@@ -1163,6 +1170,12 @@ class _Strings {
       'Must be 9 (STIR) or 14 (INN) digits',
       '9 (STIR) yoki 14 (INN) raqamdan iborat bo\'lsin');
   String get phone => _s('Телефон', 'Phone', 'Telefon');
+  String get phoneError => _s(
+      'Введите корректный номер, напр. +998 90 123 45 67',
+      'Enter a valid number, e.g. +998 90 123 45 67',
+      'To\'g\'ri raqam kiriting, masalan +998 90 123 45 67');
+  String get emailError => _s('Введите корректный e-mail',
+      'Enter a valid e-mail', 'To\'g\'ri e-mail kiriting');
 
   // Step 2: Obyekt va o'lchamlar
   String get objectAndDimensions =>

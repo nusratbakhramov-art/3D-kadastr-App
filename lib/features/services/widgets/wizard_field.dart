@@ -17,6 +17,7 @@ class WizardField extends StatelessWidget {
     this.maxLines = 1,
     this.numericOnly = false,
     this.allowDecimal = false,
+    this.phoneFormat = false,
     this.required = false,
     this.maxLength,
     this.errorText,
@@ -30,6 +31,10 @@ class WizardField extends StatelessWidget {
   final int maxLines;
   final bool numericOnly;
   final bool allowDecimal;
+
+  /// Telefon maydoni — faqat `+`, raqamlar, bo'sh joy va `()-` ruxsat etiladi
+  /// (harf kiritib bo'lmaydi).
+  final bool phoneFormat;
   final bool required;
   final int? maxLength;
   final String? errorText;
@@ -54,6 +59,11 @@ class WizardField extends StatelessWidget {
         FilteringTextInputFormatter.allow(
           allowDecimal ? RegExp(r'[0-9.,]') : RegExp(r'[0-9]'),
         ),
+      );
+    }
+    if (phoneFormat) {
+      formatters.add(
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9+ ()\-]')),
       );
     }
     if (maxLength != null) {

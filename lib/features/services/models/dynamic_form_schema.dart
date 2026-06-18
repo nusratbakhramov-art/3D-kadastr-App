@@ -64,6 +64,7 @@ class FormFieldDef {
     this.unit,
     this.placeholder,
     this.help,
+    this.format,
     this.min,
     this.max,
     this.defaultValue,
@@ -82,6 +83,10 @@ class FormFieldDef {
   final String? unit;
   final Map<String, dynamic>? placeholder;
   final Map<String, dynamic>? help;
+
+  /// Maxsus formati: 'phone' | 'email' | 'tin'. Backend bermasa, [key] dan
+  /// taxmin qilinadi (renderer ichida). Kiritishni cheklash + validatsiya uchun.
+  final String? format;
   final num? min;
   final num? max;
   final dynamic defaultValue;
@@ -97,6 +102,7 @@ class FormFieldDef {
         unit: j['unit'] as String?,
         placeholder: (j['placeholder'] as Map?)?.cast<String, dynamic>(),
         help: (j['help'] as Map?)?.cast<String, dynamic>(),
+        format: j['format'] as String?,
         min: j['min'] as num?,
         max: j['max'] as num?,
         defaultValue: j['default'],

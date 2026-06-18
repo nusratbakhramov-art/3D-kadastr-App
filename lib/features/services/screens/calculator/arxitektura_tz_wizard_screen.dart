@@ -19,6 +19,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/input_validators.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../home/user_profile.dart';
@@ -305,18 +306,21 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   }
 
   // STIR (9) yoki INN (14) — kiritilgan bo'lsa, uzunligi shu ikkitadan biri.
-  bool get _tinValid {
-    final t = _tin.text.trim();
-    return t.isEmpty || t.length == 9 || t.length == 14;
-  }
+  bool get _tinValid => isValidTin(_tin.text);
+
+  // Telefon — kiritilgan bo'lsa formati to'g'ri bo'lsin (xato matnni ko'rsatish
+  // uchun; bo'sh holatda majburiy `*` belgisi yetarli).
+  bool get _phoneError =>
+      _phone.text.trim().isNotEmpty && !isValidUzPhone(_phone.text);
 
   // ── Validatsiya per-step ─────────────────────────────────────────────
   bool get _canAdvance {
     switch (_stepIndex) {
       case 0:
         return _customerName.text.trim().length >= 2 &&
-            _phone.text.trim().length >= 5 &&
-            _tinValid;
+            isValidUzPhone(_phone.text) &&
+            _tinValid &&
+            isValidEmail(_email.text);
       case 2:
         return _draft.objectType != null;
       case _previewIndex:
@@ -635,13 +639,17 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         controller: _phone,
         placeholder: '+998 90 123 45 67',
         keyboardType: TextInputType.phone,
+        phoneFormat: true,
+        maxLength: 17,
         required: true,
+        errorText: _phoneError ? _Strings.phoneError(l) : null,
       ),
       WizardField(
         label: 'E-mail',
         controller: _email,
         placeholder: 'sample@mail.com',
         keyboardType: TextInputType.emailAddress,
+        errorText: isValidEmail(_email.text) ? null : _Strings.emailError(l),
       ),
     ]);
   }
@@ -2000,6 +2008,18 @@ class _Strings {
         'ru' => 'Телефон',
         'en' => 'Phone',
         _ => 'Telefon',
+      };
+
+  static String phoneError(Locale l) => switch (l.languageCode) {
+        'ru' => 'Введите корректный номер, напр. +998 90 123 45 67',
+        'en' => 'Enter a valid number, e.g. +998 90 123 45 67',
+        _ => 'To\'g\'ri raqam kiriting, masalan +998 90 123 45 67',
+      };
+
+  static String emailError(Locale l) => switch (l.languageCode) {
+        'ru' => 'Введите корректный e-mail',
+        'en' => 'Enter a valid e-mail',
+        _ => 'To\'g\'ri e-mail kiriting',
       };
 
   // Step 2 — Object and address
