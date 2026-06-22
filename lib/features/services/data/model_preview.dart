@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -42,7 +44,11 @@ Future<void> openScanModel(
 }) async {
   final glb = await isGlbFile(path);
   if (glb) {
-    final p = await _ensureExt(path, '.glb');
+    var p = await _ensureExt(path, '.glb');
+    // "Dollhouse": GLB materiallarini single-sided qilamiz → model_viewer
+    // kameraga qaragan (yaqin) devorni back-face cull qiladi va xona ichi
+    // ko'rinadi (xuddi skandan keyingi native viewer'дek). GLB sifati saqlanadi.
+    p = await _glbForceSingleSided(p);
     if (!context.mounted) return;
     await Navigator.of(context).push(MaterialPageRoute<void>(
       builder: (_) => GlbViewerPage(filePath: p),
@@ -50,6 +56,61 @@ Future<void> openScanModel(
   } else {
     final p = await _ensureExt(path, '.usdz');
     await (scan ?? SavedScanService()).preview(p);
+  }
+}
+
+/// Rewrites a GLB so every material is single-sided (`doubleSided=false`). With
+/// the room mesh's inward-facing normals, model_viewer then back-face-culls the
+/// wall facing the camera → "dollhouse" (you see into the room), matching the
+/// native post-scan viewer. Only the JSON chunk's material flags change; the
+/// binary buffer (mesh + texture) is copied verbatim → no quality loss. Returns
+/// a sibling `*.dh.glb` path, or the original on any failure.
+Future<String> _glbForceSingleSided(String path) async {
+  try {
+    final bytes = await File(path).readAsBytes();
+    if (bytes.length < 20) return path;
+    final bd = ByteData.sublistView(bytes);
+    if (bd.getUint32(0, Endian.little) != 0x46546C67) return path; // 'glTF'
+    final jsonLen = bd.getUint32(12, Endian.little);
+    if (bd.getUint32(16, Endian.little) != 0x4E4F534A) return path; // 'JSON'
+    final jsonEnd = 20 + jsonLen;
+    if (jsonEnd > bytes.length) return path;
+    final gltf =
+        jsonDecode(utf8.decode(bytes.sublist(20, jsonEnd))) as Map<String, dynamic>;
+    final materials = gltf['materials'];
+    if (materials is! List || materials.isEmpty) return path;
+    var changed = false;
+    for (final m in materials) {
+      if (m is Map<String, dynamic> && m['doubleSided'] != false) {
+        m['doubleSided'] = false;
+        changed = true;
+      }
+    }
+    if (!changed) return path;
+    // Re-encode JSON chunk; pad to a 4-byte boundary with spaces (glTF spec).
+    final newJson = <int>[...utf8.encode(jsonEncode(gltf))];
+    while (newJson.length % 4 != 0) {
+      newJson.add(0x20);
+    }
+    final binChunk = bytes.sublist(jsonEnd); // BIN chunk header + data, verbatim
+    final total = 20 + newJson.length + binChunk.length;
+    final header = ByteData(20);
+    header.setUint32(0, 0x46546C67, Endian.little); // magic 'glTF'
+    header.setUint32(4, 2, Endian.little); // version
+    header.setUint32(8, total, Endian.little); // total byte length
+    header.setUint32(12, newJson.length, Endian.little); // JSON chunk length
+    header.setUint32(16, 0x4E4F534A, Endian.little); // 'JSON'
+    final out = BytesBuilder()
+      ..add(header.buffer.asUint8List())
+      ..add(newJson)
+      ..add(binChunk);
+    final outPath = path.endsWith('.glb')
+        ? '${path.substring(0, path.length - 4)}.dh.glb'
+        : '$path.dh.glb';
+    await File(outPath).writeAsBytes(out.toBytes(), flush: true);
+    return outPath;
+  } catch (_) {
+    return path;
   }
 }
 

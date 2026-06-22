@@ -282,8 +282,9 @@ class AiValuationJobService {
     );
   }
 
-  /// Arizaga biriktirilgan teksturali 3D skan (USDZ) ni backend'dan yuklab,
-  /// vaqtinchalik faylga yozadi va to'liq yo'lni qaytaradi (QuickLook uchun).
+  /// Arizaga biriktirilgan teksturali 3D skan (GLB) ni backend'dan yuklab,
+  /// vaqtinchalik faylga yozadi va to'liq yo'lni qaytaradi. openScanModel uni
+  /// single-sided qilib model_viewer'да "dollhouse" ko'rsatadi.
   /// Skan yo'q yoki yuklab bo'lmasa null.
   Future<String?> downloadScanUsdz(int id, {required String token}) async {
     final uri = Uri.parse('$_baseUrl/ai-valuations/$id/scan');

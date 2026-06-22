@@ -1258,6 +1258,10 @@ class _AiScanCardState extends State<_AiScanCard> {
     try {
       final filePath = await _ensureResultCached(
         jobId: widget.jobId,
+        // GLB (asosiy format, yuqori sifat) yuklaymiz. openScanModel uni
+        // single-sided qilib model_viewer'да "dollhouse" ko'rsatadi: kameraga
+        // qaragan devor ko'rinmas, xona ichi ko'rinadi. Eski USDZ-only ariza
+        // bo'lsa → QuickLook (openScanModel kontent bo'yicha tanlaydi).
         downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/scan',
         format: 'glb',
         prefix: 'aival',
@@ -1267,9 +1271,6 @@ class _AiScanCardState extends State<_AiScanCard> {
         },
       );
       if (!mounted) return;
-      // Backend GLB (yangi asosiy format) yoki eski USDZ qaytaradi — kontent
-      // bo'yicha to'g'ri viewer tanlaymiz: GLB → model_viewer_plus, USDZ →
-      // QuickLook. (openScanModel — resume ekrani bilan bir xil, markazlashgan.)
       await openScanModel(context, filePath);
     } on HttpException catch (e) {
       if (!mounted) return;
