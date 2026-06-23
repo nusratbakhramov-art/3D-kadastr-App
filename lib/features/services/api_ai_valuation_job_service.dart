@@ -161,6 +161,55 @@ class AiJobSummary {
   }
 }
 
+/// One selectable Baholash maqsadi, served by `GET /ai-valuations/purposes`.
+/// The purpose step renders its select from these (backend = source of truth)
+/// instead of a hardcoded list, so wording/order can change without a release.
+class PurposeOption {
+  const PurposeOption({
+    required this.wire,
+    required this.labelByLocale,
+    required this.hintByLocale,
+  });
+
+  /// Backend enum value sent back in the submit payload (`sale`, `mortgage`…).
+  final String wire;
+  final Map<String, String> labelByLocale; // {uz, ru, en}
+  final Map<String, String> hintByLocale;
+
+  String label(String lang) =>
+      labelByLocale[lang] ?? labelByLocale['uz'] ?? wire;
+  String hint(String lang) => hintByLocale[lang] ?? hintByLocale['uz'] ?? '';
+
+  factory PurposeOption.fromJson(Map<String, dynamic> j) => PurposeOption(
+        wire: j['value']?.toString() ?? '',
+        labelByLocale: ((j['label'] as Map?) ?? const {})
+            .map((k, v) => MapEntry('$k', '$v')),
+        hintByLocale: ((j['hint'] as Map?) ?? const {})
+            .map((k, v) => MapEntry('$k', '$v')),
+      );
+}
+
+/// One "Baholash asosi" preset, served by `GET /ai-valuations/valuation-bases`.
+/// The purpose step renders these as a select; `wire == 'other'` reveals the
+/// free-text field instead of storing a fixed label.
+class BasisOption {
+  const BasisOption({required this.wire, required this.labelByLocale});
+
+  final String wire;
+  final Map<String, String> labelByLocale; // {uz, ru, en}
+
+  bool get isOther => wire == 'other';
+
+  String label(String lang) =>
+      labelByLocale[lang] ?? labelByLocale['uz'] ?? wire;
+
+  factory BasisOption.fromJson(Map<String, dynamic> j) => BasisOption(
+        wire: j['value']?.toString() ?? '',
+        labelByLocale: ((j['label'] as Map?) ?? const {})
+            .map((k, v) => MapEntry('$k', '$v')),
+      );
+}
+
 class AiValuationApiException implements Exception {
   AiValuationApiException(this.message, {this.statusCode});
   final String message;
@@ -280,6 +329,45 @@ class AiValuationJobService {
     return AiJobSnapshot.fromJson(
       jsonDecode(res.body) as Map<String, dynamic>,
     );
+  }
+
+  /// Baholash maqsadi options for the purpose step. Public reference data —
+  /// no token. The screen renders its select from this; on failure it falls
+  /// back to a small built-in list so the flow never blocks offline.
+  Future<List<PurposeOption>> fetchPurposeOptions() async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations/purposes');
+    final res = await _client
+        .get(uri, headers: {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 12));
+    if (res.statusCode != 200) {
+      throw AiValuationApiException(
+        _extractDetail(res) ?? 'HTTP ${res.statusCode}',
+        statusCode: res.statusCode,
+      );
+    }
+    final body = jsonDecode(res.body) as List<dynamic>;
+    return body
+        .map((e) => PurposeOption.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
+  }
+
+  /// "Baholash asosi" presets for the purpose step. Public reference data —
+  /// no token. Mirrors [fetchPurposeOptions]; ends with the `other` option.
+  Future<List<BasisOption>> fetchBasisOptions() async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations/valuation-bases');
+    final res = await _client
+        .get(uri, headers: {'Accept': 'application/json'})
+        .timeout(const Duration(seconds: 12));
+    if (res.statusCode != 200) {
+      throw AiValuationApiException(
+        _extractDetail(res) ?? 'HTTP ${res.statusCode}',
+        statusCode: res.statusCode,
+      );
+    }
+    final body = jsonDecode(res.body) as List<dynamic>;
+    return body
+        .map((e) => BasisOption.fromJson(e as Map<String, dynamic>))
+        .toList(growable: false);
   }
 
   /// Arizaga biriktirilgan teksturali 3D skan (GLB) ni backend'dan yuklab,
