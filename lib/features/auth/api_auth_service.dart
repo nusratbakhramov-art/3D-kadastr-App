@@ -125,6 +125,22 @@ class ApiAuthService implements AuthService {
   }
 
   @override
+  Future<void> logout(String token) async {
+    // Backend sessiyasini yopamiz. Best-effort — tarmoq xato bo'lsa ham
+    // chaqiruvchi mahalliy sessiyani baribir tozalaydi.
+    try {
+      await _client
+          .post(
+            Uri.parse('$_baseUrl/auth/logout'),
+            headers: _jsonHeaders(token),
+          )
+          .timeout(_timeout);
+    } catch (_) {
+      // Ignore — local logout proceeds regardless.
+    }
+  }
+
+  @override
   Future<void> completeProfile(String token, UserProfile profile) async {
     if (!profile.isComplete) {
       throw const AuthException("Profil to'liq emas");

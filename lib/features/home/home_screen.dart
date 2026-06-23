@@ -24,7 +24,6 @@ class HomeScreen extends StatefulWidget {
     this.onLoginTap,
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
-    this.onOpenCalculator,
     this.onOpenMarket,
     this.onOpenOrder,
     this.onOpenProfile,
@@ -36,7 +35,6 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onLoginTap;
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
-  final VoidCallback? onOpenCalculator;
   final VoidCallback? onOpenMarket;
   final VoidCallback? onOpenOrder;
   final VoidCallback? onOpenProfile;
@@ -187,7 +185,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     locale: widget.locale,
                     onOpenKadastr3d: widget.onOpenKadastr3d,
                     onOpenAiValuation: widget.onOpenAiValuation,
-                    onOpenCalculator: widget.onOpenCalculator,
                     onOpenMarket: widget.onOpenMarket,
                   ),
                   const SizedBox(height: 12),
@@ -333,14 +330,12 @@ class _CardsGrid extends StatelessWidget {
     required this.locale,
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
-    this.onOpenCalculator,
     this.onOpenMarket,
   });
 
   final Locale locale;
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
-  final VoidCallback? onOpenCalculator;
   final VoidCallback? onOpenMarket;
 
   @override
@@ -380,14 +375,6 @@ class _CardsGrid extends StatelessWidget {
             children: [
               Expanded(
                 child: HomeCard(
-                  title: _CardStrings.calculator(locale),
-                  iconAsset: 'assets/images/home/card-calculator.svg',
-                  onTap: onOpenCalculator,
-                ),
-              ),
-              const SizedBox(width: gap),
-              Expanded(
-                child: HomeCard(
                   title: _CardStrings.market(locale),
                   iconAsset: 'assets/images/home/card-market.svg',
                   onTap: onOpenMarket,
@@ -412,13 +399,10 @@ class _CardStrings {
       };
 
   static String kadastr3d(Locale l) =>
-      _pick(l, '3D kadastr', '3D кадастр', '3D cadastre');
+      _pick(l, 'Kadastr', 'Кадастр', 'Cadastre');
 
   static String aiValuation(Locale l) =>
       _pick(l, 'AI baholash', 'AI оценка', 'AI valuation');
-
-  static String calculator(Locale l) =>
-      _pick(l, 'Kalkulyator', 'Калькулятор', 'Calculator');
 
   static String market(Locale l) => _pick(l, 'Market', 'Маркет', 'Market');
 }

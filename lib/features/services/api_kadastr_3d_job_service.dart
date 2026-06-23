@@ -11,6 +11,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
+import '../auth/auth_http_client.dart';
 
 /// Mirrors `Kadastr3dJobStatus` on the backend. Strings match exactly.
 enum Kadastr3dJobStatus {
@@ -114,7 +115,7 @@ class Kadastr3dApiException implements Exception {
 
 class Kadastr3dJobService {
   Kadastr3dJobService({http.Client? client, String? baseUrl})
-      : _client = client ?? http.Client(),
+      : _client = client ?? AuthHttpClient(),
         _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   final http.Client _client;

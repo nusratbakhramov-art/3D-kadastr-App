@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_navigation.dart';
 import '../../core/push_notifications.dart';
+import '../auth/api_auth_service.dart';
 import '../auth/auth_flow_screen.dart';
 import '../auth/auth_storage.dart';
 import '../auth/widgets/login_required_sheet.dart';
@@ -19,8 +20,7 @@ import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
 import '../scans/saved_scans_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
-import '../services/screens/kadastr_3d_screen.dart';
-import '../services/screens/online_calculator_screen.dart';
+import '../services/screens/kadastr/kadastr_area_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
 import 'app_bottom_nav.dart';
@@ -140,6 +140,9 @@ class _MainShellState extends State<MainShell> {
     final token = session.token;
     if (token != null) {
       await PushNotifications.unregister(token);
+      // Backend sessiyasini ham yopamiz — aks holda access token 24 soat,
+      // refresh token esa 30 kun yaroqli qolib, "chiqish" faqat mahalliy bo'lardi.
+      await ApiAuthService().logout(token);
     }
     await widget.authStorage.clear();
     userProfileNotifier.value = null;
@@ -221,19 +224,14 @@ class _MainShellState extends State<MainShell> {
     ).push(MaterialPageRoute<void>(builder: (_) => const PaymentsScreen()));
   }
 
-  Future<void> _openKadastr3d() async {
-    // 3D Kadastr needs an account (davreest.uz lookup + job submit) — gate with
-    // a login drawer before the wizard opens.
-    if (!await ensureLoggedIn(
-      context,
-      storage: widget.authStorage,
-    )) {
-      return;
-    }
-    if (!mounted) return;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()));
+  void _openKadastr3d() {
+    // "Kadastr" = the combined calculator flow (area → services → estimate →
+    // lead form). No login gate at entry; login is required only at submit.
+    // The old 3D-scan order flow (Kadastr3dScreen) is kept in the codebase for
+    // later but is no longer wired to this tile/banner.
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const KadastrAreaScreen()),
+    );
   }
 
   Future<void> _openAiValuation() async {
@@ -249,12 +247,6 @@ class _MainShellState extends State<MainShell> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const AiScanIntroScreen()));
-  }
-
-  void _openCalculator() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
-    );
   }
 
   void _openMarketTab() => _onTabChanged(2);
@@ -277,7 +269,6 @@ class _MainShellState extends State<MainShell> {
             onLoginTap: _openAuth,
             onOpenKadastr3d: _openKadastr3d,
             onOpenAiValuation: _openAiValuation,
-            onOpenCalculator: _openCalculator,
             onOpenMarket: _openMarketTab,
             onOpenOrder: _openKadastr3d,
             onOpenProfile: () => _onTabChanged(4),

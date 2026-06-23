@@ -32,15 +32,15 @@ class ServiceStrings {
   };
 
   static String kadastrTitle(Locale l) => switch (l.languageCode) {
-    'ru' => '3D кадастр',
-    'en' => '3D cadastre',
-    _ => '3D kadastr',
+    'ru' => 'Кадастр',
+    'en' => 'Cadastre',
+    _ => 'Kadastr',
   };
 
   static String kadastrSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Профессиональный LiDAR скан + QR отчёт. Только жильё.',
-    'en' => 'Professional LiDAR scan + QR report. Residential only.',
-    _ => 'Professional LiDAR skan + QR hisobot. Faqat turar-joy.',
+    'ru' => 'Рассчитайте стоимость услуг и оставьте заявку.',
+    'en' => 'Calculate service prices and submit an application.',
+    _ => 'Xizmatlar narxini hisoblang va ariza qoldiring.',
   };
 
   static String aiTitle(Locale l) => switch (l.languageCode) {

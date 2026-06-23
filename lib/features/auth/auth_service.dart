@@ -35,6 +35,11 @@ abstract class AuthService {
   Future<VerifyResult> verifyOtp(String phone, String code);
   Future<void> completeProfile(String token, UserProfile profile);
   Future<UserProfile> fetchProfile(String token);
+
+  /// Backend sessiyasini yopadi (`POST /auth/logout`) — server tomonidagi
+  /// sessiya `is_active=false` bo'ladi. Best-effort: tarmoq uzilsa ham mahalliy
+  /// chiqish davom etadi.
+  Future<void> logout(String token);
 }
 
 class FakeAuthService implements AuthService {
@@ -88,5 +93,10 @@ class FakeAuthService implements AuthService {
   Future<UserProfile> fetchProfile(String token) async {
     await Future<void>.delayed(delay);
     return UserProfile.empty;
+  }
+
+  @override
+  Future<void> logout(String token) async {
+    await Future<void>.delayed(delay);
   }
 }

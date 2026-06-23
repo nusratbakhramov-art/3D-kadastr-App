@@ -10,6 +10,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:http/http.dart' as http;
+
+import '../auth/auth_http_client.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/api_config.dart';
@@ -220,7 +222,7 @@ class AiValuationApiException implements Exception {
 
 class AiValuationJobService {
   AiValuationJobService({http.Client? client, String? baseUrl})
-      : _client = client ?? http.Client(),
+      : _client = client ?? AuthHttpClient(),
         _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   final http.Client _client;
@@ -280,6 +282,33 @@ class AiValuationJobService {
     }
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     return body['id'] as int;
+  }
+
+  /// AI bahodan keyin foydalanuvchi kiritgan MAQSADLI sotuv narxini (so'm)
+  /// arizaga biriktiradi. Ixtiyoriy — `price` null bo'lsa qiymat tozalanadi.
+  Future<void> setTargetPrice({
+    required int jobId,
+    required double? price,
+    required String token,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/ai-valuations/$jobId/target-price');
+    final res = await _client
+        .patch(
+          uri,
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({'target_sell_price': price}),
+        )
+        .timeout(const Duration(seconds: 20));
+    if (res.statusCode != 200) {
+      throw AiValuationApiException(
+        _extractDetail(res) ?? 'HTTP ${res.statusCode}',
+        statusCode: res.statusCode,
+      );
+    }
   }
 
   /// Current user's AI Baholash jobs, newest-first. Powers the Arizalar list.

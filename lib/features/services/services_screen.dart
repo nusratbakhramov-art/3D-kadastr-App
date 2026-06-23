@@ -4,7 +4,7 @@ import '../../theme/app_colors.dart';
 import '../auth/widgets/login_required_sheet.dart';
 import 'models/service_item.dart';
 import 'screens/ai_scan_intro_screen.dart';
-import 'screens/kadastr_3d_screen.dart';
+import 'screens/kadastr/kadastr_area_screen.dart';
 import 'screens/online_calculator_screen.dart';
 import 'screens/smeta/smeta_editor_screen.dart';
 import 'widgets/service_card.dart';
@@ -80,22 +80,6 @@ class _ServicesScreenState extends State<ServicesScreen>
         accent: const Color(0xFF7C3AED),
         layout: ServiceLayout.square,
       ),
-      ServiceItem(
-        id: ServiceId.calculator,
-        title: ServiceStrings.calculatorTitle(locale),
-        subtitle: ServiceStrings.calculatorSubtitle(locale),
-        asset: 'assets/images/services/calculator.png',
-        accent: const Color(0xFF22D3EE),
-        layout: ServiceLayout.wide,
-      ),
-      ServiceItem(
-        id: ServiceId.smetaPro,
-        title: ServiceStrings.smetaProTitle(locale),
-        subtitle: ServiceStrings.smetaProSubtitle(locale),
-        asset: 'assets/images/services/calculator.png',
-        accent: const Color(0xFFF59E0B),
-        layout: ServiceLayout.wide,
-      ),
     ];
 
     return Scaffold(
@@ -114,7 +98,6 @@ class _ServicesScreenState extends State<ServicesScreen>
             final squareCardWidth = (cardMaxRowWidth - gap) / 2;
             const squareAspect = 0.84;
             final squareHeight = squareCardWidth / squareAspect;
-            final wideHeight = (squareHeight * 0.78).clamp(150.0, 220.0);
 
             return ListView(
               padding: EdgeInsets.fromLTRB(
@@ -175,19 +158,6 @@ class _ServicesScreenState extends State<ServicesScreen>
                             ),
                           ],
                         ),
-                        const SizedBox(height: gap),
-                        _StaggeredEntry(
-                          controller: _controller,
-                          index: 3,
-                          child: SizedBox(
-                            height: wideHeight,
-                            width: double.infinity,
-                            child: ServiceCard(
-                              item: items[2],
-                              onTap: () => _open(context, items[2]),
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -203,14 +173,11 @@ class _ServicesScreenState extends State<ServicesScreen>
   Future<void> _open(BuildContext context, ServiceItem item) async {
     switch (item.id) {
       case ServiceId.kadastr3d:
-        // 3D Kadastr needs an account (davreest.uz lookup + job submit) — gate
-        // the entry with a login drawer before the wizard opens.
-        if (!await ensureLoggedIn(context)) {
-          return;
-        }
-        if (!context.mounted) return;
+        // "Kadastr" = the combined calculator flow. No login gate at entry —
+        // login is required only when submitting the lead form. (The old
+        // 3D-scan order flow, Kadastr3dScreen, is kept for later but unwired.)
         Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()),
+          MaterialPageRoute<void>(builder: (_) => const KadastrAreaScreen()),
         );
       case ServiceId.aiValuation:
         // AI Baholash needs an account (davreest.uz lookup + job submit).

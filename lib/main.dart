@@ -5,8 +5,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
+import 'core/app_navigation.dart';
 import 'core/payment_deep_links.dart';
 import 'core/push_notifications.dart';
+import 'features/auth/auth_http_client.dart';
 import 'features/auth/auth_storage.dart';
 import 'features/notifications/notifications_api.dart';
 import 'features/home/user_profile.dart';
@@ -162,9 +164,16 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
   _Stage _stage = _Stage.splash;
   bool? _onboardingDone;
 
+  // Re-entrancy guard — parallel requests can all trip a failed refresh at once.
+  bool _handlingExpiry = false;
+
   @override
   void initState() {
     super.initState();
+    // Refresh ham muvaffaqiyatsiz bo'lganda (refresh token tugagan/yaroqsiz)
+    // AuthHttpClient sessiyani tozalaydi va shu callback'ni chaqiradi — biz
+    // foydalanuvchini Home'ga qaytarib, "qayta kiring" deb xabar beramiz.
+    AuthHttpClient.onSessionExpired = _handleSessionExpired;
     _bootstrap();
     // iOS Universal Links — to'lovdan keyin /pay-return/{id} appni ochadi.
     PaymentDeepLinks.init();
@@ -181,9 +190,40 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    if (AuthHttpClient.onSessionExpired == _handleSessionExpired) {
+      AuthHttpClient.onSessionExpired = null;
+    }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
+  /// Sessiya tiklab bo'lmaydigan darajada tugaganda: mahalliy auth holatini
+  /// tozalab (storage AuthHttpClient tomonidan allaqachon tozalangan), ochiq
+  /// ekranlarni yopib, asosiy tab'ga qaytaramiz va foydalanuvchini ogohlantiramiz.
+  void _handleSessionExpired() {
+    if (_handlingExpiry) return;
+    _handlingExpiry = true;
+    userProfileNotifier.value = null;
+    notificationUnreadNotifier.value = 0;
+    rootNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+    shellTabRequest.value = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx != null) {
+        final l = Localizations.localeOf(ctx);
+        ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(
+          SnackBar(content: Text(_sessionExpiredMessage(l))),
+        );
+      }
+      _handlingExpiry = false;
+    });
+  }
+
+  static String _sessionExpiredMessage(Locale l) => switch (l.languageCode) {
+        'ru' => 'Сессия истекла. Войдите снова.',
+        'en' => 'Session expired. Please sign in again.',
+        _ => 'Sessiya muddati tugadi. Iltimos, qayta kiring.',
+      };
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {

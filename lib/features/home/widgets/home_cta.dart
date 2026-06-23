@@ -123,9 +123,9 @@ class _CtaStrings {
   const _CtaStrings._();
 
   static String headline(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Заказать услуги 3D Kadastr',
-    'en' => 'Order 3D Kadastr services',
-    _ => '3D Kadastr xizmatlari uchun buyurtma berish',
+    'ru' => 'Рассчитать стоимость услуг Кадастр',
+    'en' => 'Estimate Kadastr service prices',
+    _ => 'Kadastr xizmatlari narxini hisoblang',
   };
 
   static String orderLabel(Locale locale) => switch (locale.languageCode) {

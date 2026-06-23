@@ -21,7 +21,7 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
-import 'ai_credentials_screen.dart';
+import 'ai_target_price_screen.dart';
 
 class AiStatusScreen extends StatefulWidget {
   const AiStatusScreen({super.key, required this.bundle});
@@ -584,9 +584,14 @@ class _ResultView extends StatelessWidget {
           child: ListingCtaButton(
             label: _AiStatusStrings.submitApplication(l),
             enabled: true,
+            // Natijadan keyin: "Qaysi narxda sotmoqchisiz?" (ixtiyoriy) →
+            // appraiser hujjatlari → to'lov.
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => AiCredentialsScreen(referenceId: snapshot.id),
+                builder: (_) => AiTargetPriceScreen(
+                  jobId: snapshot.id,
+                  estimatedValue: estimated,
+                ),
               ),
             ),
           ),
@@ -1568,12 +1573,6 @@ class _AiStatusStrings {
     'ru' => 'Без названия',
     'en' => 'Unnamed',
     _ => 'Nomsiz',
-  };
-
-  static String home(Locale l) => switch (l.languageCode) {
-    'ru' => 'Главная',
-    'en' => 'Home',
-    _ => 'Asosiy sahifa',
   };
 
   static String submitApplication(Locale l) => switch (l.languageCode) {

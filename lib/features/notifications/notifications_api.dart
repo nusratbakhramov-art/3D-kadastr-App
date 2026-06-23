@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
+import '../auth/auth_http_client.dart';
 import '../auth/auth_storage.dart';
 import '../home/user_profile.dart';
 import 'notification_model.dart';
@@ -11,7 +12,7 @@ import 'notification_model.dart';
 class NotificationsApi {
   NotificationsApi({AuthStorage? storage, http.Client? client})
     : _storage = storage ?? const AuthStorage(),
-      _client = client ?? http.Client();
+      _client = client ?? AuthHttpClient();
 
   final AuthStorage _storage;
   final http.Client _client;

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
+import '../auth/auth_http_client.dart';
 import 'models/market_listing.dart';
 import 'models/market_region_node.dart';
 
@@ -44,7 +45,7 @@ class DownloadInfo {
 
 class MarketplaceApiService {
   MarketplaceApiService({http.Client? client, String? baseUrl, String? locale})
-    : _client = client ?? http.Client(),
+    : _client = client ?? AuthHttpClient(),
       _baseUrl = baseUrl ?? ApiConfig.baseUrl,
       _locale = locale;
 

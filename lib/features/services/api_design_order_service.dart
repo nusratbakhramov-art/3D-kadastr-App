@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
+import '../auth/auth_http_client.dart';
 import 'models/design_order_draft.dart';
 
 class DesignOrderApiException implements Exception {
@@ -70,7 +71,7 @@ class DesignOrderListPage {
 
 class DesignOrderApiService {
   DesignOrderApiService({http.Client? client, String? baseUrl})
-      : _client = client ?? http.Client(),
+      : _client = client ?? AuthHttpClient(),
         _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   final http.Client _client;
