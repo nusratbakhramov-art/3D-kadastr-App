@@ -83,15 +83,17 @@ final List<Valuation> mockValuations = [
 ];
 
 String formatSum(int value) {
-  final s = value.toString();
+  final negative = value < 0;
+  final s = value.abs().toString();
   final buf = StringBuffer();
-  var idx = 0;
-  for (var i = s.length - 1; i >= 0; i--) {
-    buf.write(s[s.length - 1 - i]);
-    idx++;
-    if (idx % 3 == 0 && i != 0) buf.write(' ');
+  for (var i = 0; i < s.length; i++) {
+    // Group thousands counted from the RIGHT, so 1000 -> "1 000" and
+    // 50000 -> "50 000" (the previous left-to-right logic broke any amount
+    // whose digit-count wasn't a multiple of 3, e.g. "100 0").
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
+    buf.write(s[i]);
   }
-  return '${buf.toString()} so‘m';
+  return '${negative ? '-' : ''}${buf.toString()} so‘m';
 }
 
 String formatShortDate(DateTime d) =>

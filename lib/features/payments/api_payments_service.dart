@@ -24,29 +24,20 @@ class ApiPaymentsService {
   }
 
   static Payment _fromJson(Map<String, dynamic> j) {
+    final rawType = (j['payment_type'] as String? ?? '').trim();
+    final externalId = (j['external_id'] as String?)?.trim();
     return Payment(
       id: '${j['id']}',
-      title: _titleForType(j['payment_type'] as String? ?? ''),
+      type: PaymentTypeX.fromCode(rawType),
+      rawType: rawType,
       amount: _toInt(j['amount']),
-      method: _parseMethod(j['provider'] as String? ?? ''),
-      at: DateTime.tryParse(j['created_at'] as String? ?? '') ?? DateTime.now(),
+      method: PaymentMethodLabel.fromCode(j['provider'] as String? ?? ''),
+      status: PaymentStatusX.fromCode(j['status'] as String? ?? ''),
+      externalId: (externalId == null || externalId.isEmpty) ? null : externalId,
+      at: DateTime.tryParse(j['created_at'] as String? ?? '')?.toLocal() ??
+          DateTime.now(),
     );
   }
-
-  static String _titleForType(String type) => switch (type.toLowerCase()) {
-        'scan' => '3D skan xizmati',
-        'valuation' => 'AI baholash hisoboti',
-        'virtual_property' => 'Virtual mulk e\'loni',
-        'subscription' => 'Obuna',
-        'marketplace' => 'Marketplace xizmati',
-        _ => type,
-      };
-
-  static PaymentMethod _parseMethod(String p) => switch (p.toLowerCase()) {
-        'payme' => PaymentMethod.payme,
-        'uzum' => PaymentMethod.uzum,
-        _ => PaymentMethod.click,
-      };
 
   static int _toInt(dynamic v) =>
       v == null ? 0 : (double.tryParse(v.toString()) ?? 0).round();
