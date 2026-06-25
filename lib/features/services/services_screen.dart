@@ -5,7 +5,7 @@ import '../auth/widgets/login_required_sheet.dart';
 import 'models/service_item.dart';
 import 'screens/ai_scan_intro_screen.dart';
 import 'screens/kadastr/kadastr_area_screen.dart';
-import 'screens/kadastr_3d_screen.dart';
+import 'screens/online_calculator_screen.dart';
 import 'screens/smeta/smeta_editor_screen.dart';
 import 'widgets/service_card.dart';
 
@@ -203,14 +203,13 @@ class _ServicesScreenState extends State<ServicesScreen>
   Future<void> _open(BuildContext context, ServiceItem item) async {
     switch (item.id) {
       case ServiceId.kadastr3d:
-        // 3D Kadastr needs an account (davreest.uz lookup + job submit) — gate
-        // the entry with a login drawer before the wizard opens.
-        if (!await ensureLoggedIn(context)) {
-          return;
-        }
-        if (!context.mounted) return;
+        // "Kadastr" karta → xizmatlar ro'yxati kalkulyatori (Home'dagi
+        // "3D kadastr" tile bilan bir xil: xizmatni tanla → forma → hisob).
+        // Avval davreest 3D oqimini (Kadastr3dScreen) ochardi — nomuvofiq edi.
         Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()),
+          MaterialPageRoute<void>(
+            builder: (_) => const OnlineCalculatorScreen(),
+          ),
         );
       case ServiceId.aiValuation:
         // AI Baholash needs an account (davreest.uz lookup + job submit).
