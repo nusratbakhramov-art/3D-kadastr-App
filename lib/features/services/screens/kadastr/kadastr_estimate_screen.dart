@@ -1,9 +1,8 @@
 /// Kadastr combined calculator — final step: the estimate.
 ///
-/// Computes each selected service from the area and the per-service type picked
-/// in the type steps (default type when a service didn't need one), shows a
-/// per-service breakdown + combined total, then continues to the lead form on
-/// "Ariza topshirish".
+/// Calculation-only: computes each selected service from the area (default type
+/// per service), shows a per-service breakdown + combined total. No application
+/// is submitted here — the only action is returning to the home screen.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,7 +14,6 @@ import '../../models/calculator_draft.dart';
 import '../../models/calculator_pricing.dart';
 import '../../models/kadastr_estimate.dart';
 import '../../widgets/service_app_bar.dart';
-import 'kadastr_submit_flow_screen.dart';
 
 class KadastrEstimateScreen extends StatelessWidget {
   const KadastrEstimateScreen({
@@ -118,15 +116,9 @@ class KadastrEstimateScreen extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _S.submit(l),
-                        onTap: () => runKadastrSubmit(
-                          context,
-                          areaM2: areaM2,
-                          categories: categories,
-                          estimates: estimates,
-                          totalUzs: total,
-                          choice: choice,
-                        ),
+                        label: _S.backHome(l),
+                        onTap: () =>
+                            Navigator.of(context).popUntil((r) => r.isFirst),
                       ),
                     ),
                   ],
@@ -307,6 +299,6 @@ class _S {
         '* Prices are approximate. Legal services are by agreement. The exact price is set after you apply.',
       );
 
-  static String submit(Locale l) =>
-      _pick(l, 'Ariza topshirish', 'Подать заявку', 'Submit application');
+  static String backHome(Locale l) =>
+      _pick(l, 'Asosiyga qaytish', 'На главную', 'Back to home');
 }

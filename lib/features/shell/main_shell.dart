@@ -240,18 +240,17 @@ class _MainShellState extends State<MainShell> {
     ).push(MaterialPageRoute<void>(builder: (_) => const AiScanIntroScreen()));
   }
 
-  void _openCalculator() {
-    // Yangi birlashgan kalkulyator = area → multi-select services → per-service
-    // type steps → combined estimate. Banner va "3D kadastr" karta shu yerga
-    // (faqat hisob-kitob).
+  void _openCombinedCalc() {
+    // Birlashgan kalkulyator = maydon → ko'p tanlovli xizmatlar → umumiy hisob
+    // → "Ariza topshirish" (to'g'ridan buyurtma). "Kalkulyator" karta + banner.
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const KadastrAreaScreen()),
     );
   }
 
-  void _openKalkulyator() {
-    // Eski "Kalkulyator" oqimi = xizmatlar ro'yxati → tanlangan xizmat formasi
-    // → hisob natijasi → "Ariza topshirish" (buyurtma yuborish).
+  void _openServiceList() {
+    // Xizmatlar ro'yxati = xizmatni tanla → formani to'ldir → hisob natijasi
+    // → "Ariza topshirish". "3D kadastr" karta shu yerga.
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
     );
@@ -275,16 +274,14 @@ class _MainShellState extends State<MainShell> {
           HomeScreen(
             locale: widget.locale,
             onLoginTap: _openAuth,
-            // "3D kadastr" karta → yangi birlashgan kalkulyator (banner bilan
-            // bir xil joyga — faqat hisob-kitob).
-            onOpenKadastr3d: _openCalculator,
+            // "3D kadastr" karta → xizmatlar ro'yxati kalkulyatori.
+            onOpenKadastr3d: _openServiceList,
             onOpenAiValuation: _openAiValuation,
             onOpenMarket: _openMarketTab,
-            // "Kalkulyator" karta → eski xizmatlar-ro'yxati oqimi (hisob →
-            // ariza topshirish).
-            onOpenKalkulyator: _openKalkulyator,
-            // Banner "Online kalkulyator" → yangi birlashgan kalkulyator.
-            onOpenOrder: _openCalculator,
+            // "Kalkulyator" karta → birlashgan (maydon → xizmatlar) kalkulyator.
+            onOpenKalkulyator: _openCombinedCalc,
+            // Banner "Online kalkulyator" → birlashgan kalkulyator.
+            onOpenOrder: _openCombinedCalc,
             onOpenProfile: () => _onTabChanged(4),
             onOpenNotifications: _openNotifications,
           ),

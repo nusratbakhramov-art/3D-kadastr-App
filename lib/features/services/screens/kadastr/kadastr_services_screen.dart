@@ -14,7 +14,6 @@ import '../../models/calculator_pricing.dart';
 import '../../models/kadastr_estimate.dart';
 import '../../widgets/service_app_bar.dart';
 import 'kadastr_estimate_screen.dart';
-import 'kadastr_type_step_screen.dart';
 
 class KadastrServicesScreen extends StatefulWidget {
   const KadastrServicesScreen({super.key, required this.areaM2});
@@ -40,26 +39,15 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
     final ordered = CalculatorCategory.values
         .where(_selected.contains)
         .toList(growable: false);
-    // Services whose price depends on a type get a quick step before the
-    // estimate; if none do (e.g. only Dizayn / Yuridik), go straight there.
-    final steps =
-        ordered.where(categoryNeedsTypeStep).toList(growable: false);
-    final choice = CalculatorServiceChoice();
+    // Calculation-only flow: no per-service type/TZ step — go straight to the
+    // estimate. Services that depend on a type are priced with their default.
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => steps.isEmpty
-            ? KadastrEstimateScreen(
-                areaM2: widget.areaM2,
-                categories: ordered,
-                choice: choice,
-              )
-            : KadastrTypeStepScreen(
-                areaM2: widget.areaM2,
-                categories: ordered,
-                steps: steps,
-                stepIndex: 0,
-                choice: choice,
-              ),
+        builder: (_) => KadastrEstimateScreen(
+          areaM2: widget.areaM2,
+          categories: ordered,
+          choice: CalculatorServiceChoice(),
+        ),
       ),
     );
   }

@@ -226,9 +226,9 @@ class _Strings {
 
   static String placeTzOrder(Locale l) => _pick(
         l,
-        "Texnik topshiriqni to'ldirish",
-        'Заполнить техническое задание',
-        'Fill technical task',
+        'Ariza topshirish',
+        'Подать заявку',
+        'Submit application',
       );
 }
 
