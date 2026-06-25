@@ -37,10 +37,14 @@ import '../../widgets/wizard_review_section.dart';
 import 'arxitektura_tz_success_screen.dart';
 
 class DizaynTzWizardScreen extends StatefulWidget {
-  const DizaynTzWizardScreen({super.key, this.initialDraft});
+  const DizaynTzWizardScreen({super.key, this.initialDraft, this.onSubmit});
 
   /// Kalkulator natijasidan oldindan to'ldirilgan draft.
   final DizaynOrderDraft? initialDraft;
+
+  /// Berilsa, yakuniy step'da backend'ga YUBORILMAYDI — draft callback'ga
+  /// uzatiladi (birlashtirilgan kalkulyator orchestratori o'zi yuboradi).
+  final void Function(DizaynOrderDraft draft)? onSubmit;
 
   @override
   State<DizaynTzWizardScreen> createState() => _DizaynTzWizardScreenState();
@@ -329,6 +333,14 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
     final s = _Strings(_locale);
     if (!_draft.canSubmit) {
       _showError(s.fillRequiredFields);
+      return;
+    }
+
+    // Embedded (birlashtirilgan kalkulyator) rejimi — draft'ni callback'ga
+    // uzatamiz; orchestrator o'zi yuboradi.
+    if (widget.onSubmit != null) {
+      HapticFeedback.lightImpact();
+      widget.onSubmit!(_draft);
       return;
     }
 

@@ -117,7 +117,12 @@ class _S {
   static String _pick(Locale l, String uz, String ru, String en) =>
       switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
 
-  static String appBar(Locale l) => _pick(l, 'Kadastr', 'Кадастр', 'Cadastre');
+  static String appBar(Locale l) => _pick(
+        l,
+        'Onlayn kalkulyator',
+        'Онлайн калькулятор',
+        'Online calculator',
+      );
 
   static String subheading(Locale l) => _pick(
         l,

@@ -123,15 +123,15 @@ class _CtaStrings {
   const _CtaStrings._();
 
   static String headline(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Рассчитать стоимость услуг Кадастр',
-    'en' => 'Estimate Kadastr service prices',
-    _ => 'Kadastr xizmatlari narxini hisoblang',
+    'ru' => 'Расчёт комплексных услуг',
+    'en' => 'Estimate complex services',
+    _ => 'Kompleks xizmatlarini hisoblash',
   };
 
   static String orderLabel(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Заказать',
-    'en' => 'Place order',
-    _ => 'Buyurtma berish',
+    'ru' => 'Онлайн калькулятор',
+    'en' => 'Online calculator',
+    _ => 'Online kalkulyator',
   };
 
   static String loginLabel(Locale locale) => switch (locale.languageCode) {

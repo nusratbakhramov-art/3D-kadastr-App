@@ -1,8 +1,9 @@
-/// Kadastr combined calculator — step 3: the indicative (taxminiy) estimate.
+/// Kadastr combined calculator — final step: the estimate.
 ///
-/// Computes each selected service from the area (using default object types),
-/// shows a clean per-service breakdown + combined total, then continues to the
-/// lead form on "Ariza topshirish".
+/// Computes each selected service from the area and the per-service type picked
+/// in the type steps (default type when a service didn't need one), shows a
+/// per-service breakdown + combined total, then continues to the lead form on
+/// "Ariza topshirish".
 library;
 
 import 'package:flutter/material.dart';
@@ -14,17 +15,22 @@ import '../../models/calculator_draft.dart';
 import '../../models/calculator_pricing.dart';
 import '../../models/kadastr_estimate.dart';
 import '../../widgets/service_app_bar.dart';
-import 'kadastr_lead_form_screen.dart';
+import 'kadastr_submit_flow_screen.dart';
 
 class KadastrEstimateScreen extends StatelessWidget {
   const KadastrEstimateScreen({
     super.key,
     required this.areaM2,
     required this.categories,
+    this.choice,
   });
 
   final double areaM2;
   final List<CalculatorCategory> categories;
+
+  /// Per-service object types picked in the type steps. When null (no service
+  /// needed a type), default types are used.
+  final CalculatorServiceChoice? choice;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +57,7 @@ class KadastrEstimateScreen extends StatelessWidget {
                           areaM2: areaM2,
                           pricing: pricing,
                           locale: l,
+                          choice: choice,
                         ))
                     .toList(growable: false);
                 final total = kadastrCombinedTotalUzs(estimates);
@@ -112,14 +119,13 @@ class KadastrEstimateScreen extends StatelessWidget {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
                         label: _S.submit(l),
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => KadastrLeadFormScreen(
-                              areaM2: areaM2,
-                              estimates: estimates,
-                              totalUzs: total,
-                            ),
-                          ),
+                        onTap: () => runKadastrSubmit(
+                          context,
+                          areaM2: areaM2,
+                          categories: categories,
+                          estimates: estimates,
+                          totalUzs: total,
+                          choice: choice,
                         ),
                       ),
                     ),

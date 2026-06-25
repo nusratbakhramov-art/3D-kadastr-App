@@ -11,8 +11,7 @@ import '../../widgets/service_app_bar.dart';
 import '../../widgets/style_chip.dart';
 import '../online_calculator_result_screen.dart';
 import '_calculator_field.dart';
-import 'arxitektura_tz_success_screen.dart';
-import 'dynamic_form_screen.dart';
+import 'dizayn_tz_wizard_screen.dart';
 
 class DizaynFormScreen extends StatefulWidget {
   const DizaynFormScreen({super.key});
@@ -65,29 +64,12 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
           result: result,
           placeOrderLabel: _Strings.placeTzOrder(locale),
           onPlaceOrder: () {
-            // Dizayn TZ ham backend sxemasi bo'yicha dinamik renderlanadi.
             final draft = _draftFromCalculator(objectType, style, area);
-            final answers = <String, dynamic>{
-              if (draft.objectType != null)
-                'object_type': draft.objectType!.apiValue,
-              if (draft.interior.style != null) 'style': draft.interior.style,
-              if (draft.designAreaSqm != null)
-                'design_area_sqm': draft.designAreaSqm,
-              if (draft.interiorAreaSqm != null)
-                'interior_area_sqm': draft.interiorAreaSqm,
-            };
+            // Kalkulyatorda hisoblangan narxni saqlaymiz — adminka "Итого".
+            draft.estimatedPriceUzs = result.totalUzs;
             Navigator.of(ctx).push(
               MaterialPageRoute<void>(
-                builder: (_) => DynamicFormScreen(
-                  formKey: 'dizayn_tz',
-                  submitPath: '/services/design/orders',
-                  initialAnswers: answers,
-                  extraPayloadPaths: {
-                    'details.estimated_price_uzs': result.totalUzs,
-                  },
-                  onSubmitted: (c, id) =>
-                      ArxitekturaTzSuccessScreen(orderId: id),
-                ),
+                builder: (_) => DizaynTzWizardScreen(initialDraft: draft),
               ),
             );
           },

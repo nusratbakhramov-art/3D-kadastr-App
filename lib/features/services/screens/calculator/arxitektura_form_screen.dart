@@ -10,8 +10,7 @@ import '../../widgets/choice_tile.dart';
 import '../../widgets/service_app_bar.dart';
 import '../online_calculator_result_screen.dart';
 import '_calculator_field.dart';
-import 'arxitektura_tz_success_screen.dart';
-import 'dynamic_form_screen.dart';
+import 'arxitektura_tz_wizard_screen.dart';
 
 class ArxitekturaFormScreen extends StatefulWidget {
   const ArxitekturaFormScreen({super.key});
@@ -61,30 +60,12 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
           result: result,
           placeOrderLabel: _Strings.placeTzOrder(locale),
           onPlaceOrder: () {
-            // TZ formasi endi backend sxemasi bo'yicha dinamik renderlanadi
-            // (admin builder'dan tahrirlanadi — o'zgartirish uchun reliz shart
-            // emas). Kalkulyatordan kelgan obyekt turi / maydon / qurilish turi
-            // va hisoblangan narxni oldindan beramiz.
             final draft = _draftFromCalculator(selected, area);
-            final answers = <String, dynamic>{
-              if (draft.objectType != null)
-                'object_type': draft.objectType!.apiValue,
-              'construction_type': draft.constructionType.apiValue,
-              if (draft.totalAreaSqm != null)
-                'total_area_sqm': draft.totalAreaSqm,
-            };
+            // Kalkulyatorda hisoblangan narxni saqlaymiz — adminka "Итого".
+            draft.estimatedPriceUzs = result.totalUzs;
             Navigator.of(ctx).push(
               MaterialPageRoute<void>(
-                builder: (_) => DynamicFormScreen(
-                  formKey: 'arxitektura_tz',
-                  submitPath: '/services/architecture/orders',
-                  initialAnswers: answers,
-                  extraPayloadPaths: {
-                    'details.estimated_price_uzs': result.totalUzs,
-                  },
-                  onSubmitted: (c, id) =>
-                      ArxitekturaTzSuccessScreen(orderId: id),
-                ),
+                builder: (_) => ArxitekturaTzWizardScreen(initialDraft: draft),
               ),
             );
           },

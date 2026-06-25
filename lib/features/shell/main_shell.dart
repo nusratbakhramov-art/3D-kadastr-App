@@ -21,6 +21,7 @@ import '../profile/profile_screen.dart';
 import '../scans/saved_scans_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr/kadastr_area_screen.dart';
+import '../services/screens/kadastr_3d_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
 import 'app_bottom_nav.dart';
@@ -224,14 +225,19 @@ class _MainShellState extends State<MainShell> {
     ).push(MaterialPageRoute<void>(builder: (_) => const PaymentsScreen()));
   }
 
-  void _openKadastr3d() {
-    // "Kadastr" = the combined calculator flow (area → services → estimate →
-    // lead form). No login gate at entry; login is required only at submit.
-    // The old 3D-scan order flow (Kadastr3dScreen) is kept in the codebase for
-    // later but is no longer wired to this tile/banner.
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const KadastrAreaScreen()),
-    );
+  Future<void> _openKadastr3d() async {
+    // 3D Kadastr needs an account (davreest.uz lookup + job submit) — gate with
+    // a login drawer before the wizard opens.
+    if (!await ensureLoggedIn(
+      context,
+      storage: widget.authStorage,
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()));
   }
 
   Future<void> _openAiValuation() async {
@@ -247,6 +253,14 @@ class _MainShellState extends State<MainShell> {
     await Navigator.of(
       context,
     ).push(MaterialPageRoute<void>(builder: (_) => const AiScanIntroScreen()));
+  }
+
+  void _openCalculator() {
+    // Onlayn kalkulyator = area → multi-select services → per-service type
+    // steps → combined estimate → lead form. Replaces the old category grid.
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const KadastrAreaScreen()),
+    );
   }
 
   void _openMarketTab() => _onTabChanged(2);
@@ -270,7 +284,8 @@ class _MainShellState extends State<MainShell> {
             onOpenKadastr3d: _openKadastr3d,
             onOpenAiValuation: _openAiValuation,
             onOpenMarket: _openMarketTab,
-            onOpenOrder: _openKadastr3d,
+            // Banner "Online kalkulyator" → the combined calculator flow.
+            onOpenOrder: _openCalculator,
             onOpenProfile: () => _onTabChanged(4),
             onOpenNotifications: _openNotifications,
           ),

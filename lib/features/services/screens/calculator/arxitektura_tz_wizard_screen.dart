@@ -29,7 +29,7 @@ import '../../api_cadastre_service.dart';
 import '../../data/calculator_pricing_store.dart';
 import '../../data/last_customer_store.dart';
 import '../../models/calculator_pricing.dart';
-import '../../models/ai_baholash_bundle.dart' show RoomKind;
+import '../../models/ai_baholash_bundle.dart' show RoomKind, AiLocationInfo;
 import '../../models/architecture_order_draft.dart';
 import '../../widgets/cadastre_lookup_field.dart';
 import '../../widgets/color_palette_field.dart';
@@ -239,13 +239,27 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
   // Kadastr lookup natijasidan manzil va maydonni avtomatik to'ldiramiz.
   void _onCadastreResult(CadastreLookupResult r) {
     setState(() {
-      if ((r.address ?? '').trim().isNotEmpty) {
-        _address.text = r.address!.trim();
+      final addr = (r.address ?? '').trim();
+      if (addr.isNotEmpty) {
+        _address.text = addr;
+        // "Manzil" (xaritadan tanlash) maydonida ham ko'rinsin. Lookup faqat
+        // matnli manzil beradi (koordinatasiz) — bor koordinatalarni saqlab,
+        // manzil matnini yangilaymiz (foydalanuvchi xaritadan aniqlashtirishi
+        // mumkin).
+        final loc = _draft.location;
+        _draft.location = AiLocationInfo(
+          lat: loc?.lat ?? 0,
+          lng: loc?.lng ?? 0,
+          addressText: addr,
+        );
       }
       final area = r.totalArea ?? r.livingArea;
       if (area != null && area > 0) {
+        final txt = _trimNum(area);
         _landUnit = 'm2';
-        _totalArea.text = _trimNum(area);
+        // "Yer maydoni" (2-qadamda ko'rinadigan maydon) bo'sh bo'lsa to'ldiramiz.
+        if (_landArea.text.trim().isEmpty) _landArea.text = txt;
+        _totalArea.text = txt;
       }
     });
   }

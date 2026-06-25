@@ -1,24 +1,20 @@
-/// Kadastr combined calculator — step 4: the lead form.
+/// Kadastr combined calculator — contact step for wizard-less selections.
 ///
-/// Collects contact details (ism / telefon / manzil) and submits ONE combined
-/// application carrying all selected services + the taxminiy total. Reuses the
-/// existing `POST /services/calculator/orders` endpoint (contact + per-service
-/// lines are encoded into the order lines) — no backend change.
+/// Shown only when no Arxitektura/Dizayn wizard is selected (those collect
+/// their own customer). Collects contact (ism / telefon / manzil) and pops a
+/// [SharedApplicant]; the coordinator submits the simple services with it.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../theme/app_colors.dart';
-import '../../../auth/auth_storage.dart';
-import '../../../auth/widgets/login_required_sheet.dart';
 import '../../../../widgets/uz_phone_mask_formatter.dart';
 import '../../../market/widgets/listing_cta_button.dart';
-import '../../api_calculator_order_service.dart';
 import '../../models/calculator_draft.dart';
+import '../../models/kadastr_applicant.dart';
 import '../../models/kadastr_estimate.dart';
 import '../../widgets/service_app_bar.dart';
-import '../calculator/arxitektura_tz_success_screen.dart';
 
 class KadastrLeadFormScreen extends StatefulWidget {
   const KadastrLeadFormScreen({
@@ -41,9 +37,6 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
   final _phoneCtrl = TextEditingController();
   final _addressCtrl = TextEditingController();
 
-  final _orders = CalculatorOrderApiService();
-  bool _submitting = false;
-
   @override
   void initState() {
     super.initState();
@@ -58,7 +51,6 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
     _nameCtrl.dispose();
     _phoneCtrl.dispose();
     _addressCtrl.dispose();
-    _orders.dispose();
     super.dispose();
   }
 
@@ -71,64 +63,15 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
   bool get _phoneValid => _phoneDigits == 9;
   bool get _valid => _nameValid && _phoneValid;
 
-  /// Full E.164-ish number for the order: "+998 XX XXX XX XX".
-  String get _fullPhone => '+998 ${_phoneCtrl.text.trim()}';
-
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  CalculatorResult _buildOrder(Locale l) {
-    final name = _nameCtrl.text.trim();
-    final phone = _fullPhone;
-    final address = _addressCtrl.text.trim();
-    final n = widget.estimates.length;
-
-    final lines = <CalculatorLine>[
-      CalculatorLine(_S.name(l), name),
-      CalculatorLine(_S.phone(l), phone),
-      if (address.isNotEmpty) CalculatorLine(_S.address(l), address),
-      CalculatorLine(_S.area(l), '${_fmtArea(widget.areaM2)} m²'),
-      for (final e in widget.estimates)
-        CalculatorLine(
-          e.category.title(l),
-          e.isQuote
-              ? kadastrQuoteLabel(l)
-              : fmtUzsPublic(l, e.totalUzs),
-        ),
-    ];
-
-    return CalculatorResult(
-      categoryTitle: _S.orderTitle(l, n),
-      totalUzs: widget.totalUzs,
-      note: _S.approxNote(l),
-      lines: lines,
+  void _continue() {
+    if (!_valid) return;
+    Navigator.of(context).pop(
+      SharedApplicant(
+        name: _nameCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(), // national digits; fullPhone adds +998
+        address: _addressCtrl.text.trim(),
+      ),
     );
-  }
-
-  Future<void> _submit() async {
-    if (_submitting || !_valid) return;
-    final l = Localizations.localeOf(context);
-    if (!await ensureLoggedIn(context)) return;
-    final session = await const AuthStorage().loadSession();
-    final token = session.token;
-    if (token == null || token.isEmpty) return;
-    if (!mounted) return;
-    setState(() => _submitting = true);
-    try {
-      final id = await _orders.submit(result: _buildOrder(l), token: token);
-      if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => ArxitekturaTzSuccessScreen(orderId: id),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      _snack(_S.sendError(l, '$e'));
-    }
   }
 
   @override
@@ -214,9 +157,9 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
-                    label: _submitting ? _S.sending(l) : _S.send(l),
-                    enabled: _valid && !_submitting,
-                    onTap: _submit,
+                    label: _S.send(l),
+                    enabled: _valid,
+                    onTap: _continue,
                   ),
                 ),
               ],
@@ -389,12 +332,23 @@ class _Field extends StatelessWidget {
             isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            prefixText: prefixText,
-            prefixStyle: TextStyle(
-              fontFamily: 'MTSText',
-              fontSize: 15,
-              color: textColor,
-            ),
+            // prefixIcon (not prefixText) so the +998 stays visible even when
+            // the field is empty and unfocused.
+            prefixIcon: prefixText == null
+                ? null
+                : Padding(
+                    padding: const EdgeInsets.only(left: 14, right: 2),
+                    child: Text(
+                      prefixText!,
+                      style: TextStyle(
+                        fontFamily: 'MTSText',
+                        fontSize: 15,
+                        color: textColor,
+                      ),
+                    ),
+                  ),
+            prefixIconConstraints:
+                const BoxConstraints(minWidth: 0, minHeight: 0),
             hintText: hint,
             hintStyle: TextStyle(
               fontFamily: 'MTSText',
@@ -433,9 +387,6 @@ class _Field extends StatelessWidget {
   }
 }
 
-String _fmtArea(double v) =>
-    v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
-
 class _S {
   const _S._();
 
@@ -467,9 +418,6 @@ class _S {
         'Enter a valid phone number',
       );
 
-  static String address(Locale l) =>
-      _pick(l, 'Manzil', 'Адрес', 'Address');
-
   static String addressOptional(Locale l) => _pick(
         l,
         'Manzil (ixtiyoriy)',
@@ -484,18 +432,6 @@ class _S {
         'City, district, address',
       );
 
-  static String area(Locale l) => _pick(l, 'Maydon', 'Площадь', 'Area');
-
-  static String orderTitle(Locale l, int n) =>
-      _pick(l, 'Kadastr — $n xizmat', 'Кадастр — $n услуг', 'Cadastre — $n services');
-
-  static String approxNote(Locale l) => _pick(
-        l,
-        'QQS bilan · taxminiy narx',
-        'С НДС · примерная цена',
-        'incl. VAT · approximate',
-      );
-
   static String privacyHint(Locale l) => _pick(
         l,
         "Operatorimiz tez orada siz bilan bog'lanadi va aniq narxni aytadi.",
@@ -505,14 +441,4 @@ class _S {
 
   static String send(Locale l) =>
       _pick(l, 'Yuborish', 'Отправить', 'Submit');
-
-  static String sending(Locale l) =>
-      _pick(l, 'Yuborilmoqda...', 'Отправка...', 'Submitting...');
-
-  static String sendError(Locale l, String e) => _pick(
-        l,
-        'Yuborishda xatolik: $e',
-        'Ошибка отправки: $e',
-        'Failed to send: $e',
-      );
 }

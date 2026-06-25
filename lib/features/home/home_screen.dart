@@ -371,16 +371,10 @@ class _CardsGrid extends StatelessWidget {
         const SizedBox(height: gap),
         SizedBox(
           height: height,
-          child: Row(
-            children: [
-              Expanded(
-                child: HomeCard(
-                  title: _CardStrings.market(locale),
-                  iconAsset: 'assets/images/home/card-market.svg',
-                  onTap: onOpenMarket,
-                ),
-              ),
-            ],
+          child: HomeCard(
+            title: _CardStrings.market(locale),
+            iconAsset: 'assets/images/home/card-market.svg',
+            onTap: onOpenMarket,
           ),
         ),
       ],
@@ -399,7 +393,7 @@ class _CardStrings {
       };
 
   static String kadastr3d(Locale l) =>
-      _pick(l, 'Kadastr', 'Кадастр', 'Cadastre');
+      _pick(l, '3D kadastr', '3D кадастр', '3D cadastre');
 
   static String aiValuation(Locale l) =>
       _pick(l, 'AI baholash', 'AI оценка', 'AI valuation');

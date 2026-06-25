@@ -34,19 +34,57 @@ class KadastrServiceEstimate {
   int get totalUzs => isQuote ? 0 : result.totalUzs;
 }
 
-/// Default object type per service so a price can be derived from area alone.
+/// The object type chosen for each price-sensitive service, collected in the
+/// per-service type steps that run after the multi-select. Services not listed
+/// here don't price by type: Dizayn is area-only, Yuridik is quote-only.
+///
+/// Mutable so the type-step wizard can fill it in step by step.
+class CalculatorServiceChoice {
+  CalculatorServiceChoice({
+    this.arxitektura,
+    this.kadastr,
+    this.kadastr3d,
+    this.baholash,
+    this.tamirlash,
+  });
+
+  ArxitekturaObject? arxitektura;
+  KadastrObjectType? kadastr;
+  KadastrObjectType? kadastr3d;
+  BaholashObject? baholash;
+
+  /// Ta'mirlash price depends on the service type (repair vs build); the
+  /// object type and location are display-only, so we don't collect them.
+  TamirlashServiceType? tamirlash;
+}
+
+/// Whether this service needs an object-type step before its price is exact.
+/// Dizayn (area-only) and Yuridik (quote) don't.
+bool categoryNeedsTypeStep(CalculatorCategory category) => switch (category) {
+  CalculatorCategory.arxitektura ||
+  CalculatorCategory.kadastr ||
+  CalculatorCategory.kadastr3d ||
+  CalculatorCategory.baholash ||
+  CalculatorCategory.tamirlash => true,
+  CalculatorCategory.dizayn || CalculatorCategory.yuridik => false,
+};
+
+/// Indicative estimate for a service. When [choice] carries the user's picked
+/// type for this service, the price is exact; otherwise a sensible default type
+/// is used (e.g. the running total before the type steps are filled in).
 KadastrServiceEstimate estimateForCategory({
   required CalculatorCategory category,
   required double areaM2,
   required CalculatorPricing pricing,
   required Locale locale,
+  CalculatorServiceChoice? choice,
 }) {
   switch (category) {
     case CalculatorCategory.arxitektura:
       return KadastrServiceEstimate(
         category: category,
         result: computeArxitektura(
-          objectType: ArxitekturaObject.yakkaSmall,
+          objectType: choice?.arxitektura ?? ArxitekturaObject.yakkaSmall,
           areaM2: areaM2,
           pricing: pricing,
           locale: locale,
@@ -56,7 +94,7 @@ KadastrServiceEstimate estimateForCategory({
       return KadastrServiceEstimate(
         category: category,
         result: computeKadastr(
-          objectType: KadastrObjectType.yakka,
+          objectType: choice?.kadastr ?? KadastrObjectType.yakka,
           areaM2: areaM2,
           is3d: false,
           pricing: pricing,
@@ -67,7 +105,7 @@ KadastrServiceEstimate estimateForCategory({
       return KadastrServiceEstimate(
         category: category,
         result: computeKadastr(
-          objectType: KadastrObjectType.yakka,
+          objectType: choice?.kadastr3d ?? KadastrObjectType.yakka,
           areaM2: areaM2,
           is3d: true,
           pricing: pricing,
@@ -78,7 +116,7 @@ KadastrServiceEstimate estimateForCategory({
       return KadastrServiceEstimate(
         category: category,
         result: computeBaholash(
-          objectType: BaholashObject.uyJoy,
+          objectType: choice?.baholash ?? BaholashObject.uyJoy,
           areaM2: areaM2,
           pricing: pricing,
           locale: locale,
@@ -101,7 +139,7 @@ KadastrServiceEstimate estimateForCategory({
         result: computeTamirlash(
           objectType: TamirlashObjectType.turar,
           location: TamirlashLocation.toshkentShahar,
-          serviceType: TamirlashServiceType.tamir,
+          serviceType: choice?.tamirlash ?? TamirlashServiceType.tamir,
           areaM2: areaM2,
           pricing: pricing,
           locale: locale,
