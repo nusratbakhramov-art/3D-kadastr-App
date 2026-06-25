@@ -7,7 +7,6 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
 import '../data/room_plan_scanner.dart';
 import '../widgets/service_app_bar.dart';
-import 'ai_cadastre_screen.dart'; // TEMP(test): scan-skip bypass — DO NOT COMMIT
 import 'ai_scan_process_screen.dart';
 
 /// AI Baholashning 1-qadami — 3D LiDAR skan.
@@ -39,7 +38,6 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
     setState(() => _supported = ok);
   }
 
-  // ignore: unused_element  // TEMP(test): re-wire to the CTA to restore scan
   Future<void> _startScan() async {
     if (_scanning || _supported != true) return;
     HapticFeedback.lightImpact();
@@ -90,20 +88,6 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
     final unsupported = _supported == false;
-
-    // ────────────────────────────────────────────────────────────────────
-    // TEMP(test) — DO NOT COMMIT. Skips the LiDAR scan so the purpose step
-    // can be tested on a non-Pro device / simulator. Jumps straight to the
-    // cadastre step (scan: null), which then flows on to the purpose step.
-    // Remove this block (and the ai_cadastre_screen import above) to restore
-    // the real scan-first flow.
-    void skipScanForTest() {
-      HapticFeedback.lightImpact();
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const AiCadastreScreen()),
-      );
-    }
-    // ────────────────────────────────────────────────────────────────────
 
     return Scaffold(
       backgroundColor: bg,
@@ -173,14 +157,14 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  // TEMP(test): bypass scan → cadastre. Restore `_startScan`
-                  // / `enabled: _supported == true` to revert. DO NOT COMMIT.
                   child: _scanning
                       ? const _ScanningButton()
                       : ListingCtaButton(
-                          label: 'Skanni o\'tkazib yuborish (TEST)',
-                          enabled: true,
-                          onTap: skipScanForTest,
+                          label: _supported == null
+                              ? _S.checking(l)
+                              : _S.startScan(l),
+                          enabled: _supported == true,
+                          onTap: _startScan,
                         ),
                 ),
               ],
@@ -393,14 +377,12 @@ class _S {
           ],
       };
 
-  // ignore: unused_element  // TEMP(test): unused while scan is bypassed
   static String startScan(Locale l) => switch (l.languageCode) {
         'ru' => 'Начать сканирование',
         'en' => 'Start scanning',
         _ => 'Skanlashni boshlash',
       };
 
-  // ignore: unused_element  // TEMP(test): unused while scan is bypassed
   static String checking(Locale l) => switch (l.languageCode) {
         'ru' => 'Проверка устройства…',
         'en' => 'Checking device…',
