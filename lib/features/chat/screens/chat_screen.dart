@@ -14,7 +14,7 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   final ChatApiService _api = ChatApiService();
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
@@ -22,22 +22,55 @@ class _ChatScreenState extends State<ChatScreen> {
 
   int? _conversationId;
   bool _sending = false;
+  double _lastInset = 0;
 
   String get _lang => widget.locale.languageCode;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _input.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
-  void _scrollToBottom() {
+  /// Klaviatura ochilganda kontentni tepaga suramiz (iMessage uslubi):
+  /// oxirgi xabar har doim klaviatura ustida ko'rinib turadi.
+  @override
+  void didChangeMetrics() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final inset = MediaQuery.of(context).viewInsets.bottom;
+      final opening = inset > _lastInset;
+      _lastInset = inset;
+      if (opening) _scroll.jumpTo(_scroll.position.maxScrollExtent);
+    });
+  }
+
+  /// Top→bottom oqim: yangi kontent kelganda eng pastga ergashamiz, lekin
+  /// foydalanuvchi yuqoriga scroll qilib tarixni o'qiyotgan bo'lsa, majburlamaymiz.
+  void _followBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scroll.hasClients) return;
+      final pos = _scroll.position;
+      final atBottom = pos.maxScrollExtent - pos.pixels < 160;
+      if (atBottom) pos.jumpTo(pos.maxScrollExtent);
+    });
+  }
+
+  /// Xabar yuborilganda har doim pastga o'tamiz (yangi savol + javob).
+  void _jumpToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scroll.hasClients) {
         _scroll.animateTo(
-          _scroll.position.maxScrollExtent + 120,
-          duration: const Duration(milliseconds: 220),
+          _scroll.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 240),
           curve: Curves.easeOut,
         );
       }
@@ -56,7 +89,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _sending = true;
     });
     _input.clear();
-    _scrollToBottom();
+    _jumpToBottom();
 
     try {
       await for (final ev in _api.streamReply(
@@ -70,7 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
             _conversationId = ev.conversationId ?? _conversationId;
           case 'delta':
             setState(() => assistant.content += ev.content ?? '');
-            _scrollToBottom();
+            _followBottom();
           case 'error':
             setState(() {
               final sep = assistant.content.isEmpty ? '' : '\n\n';
@@ -92,7 +125,6 @@ class _ChatScreenState extends State<ChatScreen> {
           assistant.isStreaming = false;
           _sending = false;
         });
-        _scrollToBottom();
       }
     }
   }
