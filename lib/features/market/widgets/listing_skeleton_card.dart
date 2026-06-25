@@ -40,6 +40,9 @@ class _ListingSkeletonCardState extends State<ListingSkeletonCard>
             border: border,
           ),
           child: Column(
+            // Masonry grid bolalarni cheksiz balandlikda o'lchaydi — skeleton
+            // intrinsic balandlikda bo'lishi shart: Expanded/Spacer ishlatmaymiz.
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ClipRRect(
@@ -52,29 +55,28 @@ class _ListingSkeletonCardState extends State<ListingSkeletonCard>
                   child: ColoredBox(color: shade),
                 ),
               ),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _bar(shade, width: 80, height: 12),
-                      const SizedBox(height: 6),
-                      _bar(shade, width: double.infinity, height: 12),
-                      const SizedBox(height: 8),
-                      _bar(shade, width: 110, height: 10),
-                      const SizedBox(height: 4),
-                      _bar(shade, width: 60, height: 10),
-                      const Spacer(),
-                      Container(
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: shade,
-                          borderRadius: BorderRadius.circular(999),
-                        ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _bar(shade, width: 80, height: 12),
+                    const SizedBox(height: 6),
+                    _bar(shade, width: double.infinity, height: 12),
+                    const SizedBox(height: 8),
+                    _bar(shade, width: 110, height: 10),
+                    const SizedBox(height: 4),
+                    _bar(shade, width: 60, height: 10),
+                    const SizedBox(height: 12),
+                    Container(
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: shade,
+                        borderRadius: BorderRadius.circular(999),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],

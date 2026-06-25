@@ -51,6 +51,9 @@ class ListingCard extends StatelessWidget {
             onTap(listing);
           },
           child: Column(
+            // Masonry grid bolalarni cheksiz balandlikda o'lchaydi — Column
+            // kontent bo'yicha o'lchanishi shart (max bo'lsa RenderFlex uziladi).
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ClipRRect(
@@ -99,6 +102,7 @@ class ListingCard extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                 child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _PriceLine(price: listing.priceUzs, color: titleColor),
