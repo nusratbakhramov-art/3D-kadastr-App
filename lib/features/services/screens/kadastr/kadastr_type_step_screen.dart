@@ -93,6 +93,7 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
     final headingColor = isDark ? Colors.white : AppColors.textBlack;
 
     final isTamirlash = _cat == CalculatorCategory.tamirlash;
+    final warning = _areaWarningBanner(l);
 
     return Scaffold(
       backgroundColor: bg,
@@ -133,6 +134,7 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
                     ],
                   ),
                 ),
+                ?warning,
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
@@ -196,6 +198,64 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
       case CalculatorCategory.yuridik:
         return const [];
     }
+  }
+
+  // Kiritilgan maydon tanlangan arxitektura "tier"iga zid bo'lsa — yumshoq
+  // ogohlantirish (bloklamaydi). "Katta" = 500 m² dan katta YOKI 12 m dan
+  // baland bo'lishi mumkin; balandlik bu oqimda so'ralmaydi, shu sababli
+  // maydon < 500 holatida ham qattiq cheklov qo'ymaymiz, faqat eslatamiz.
+  String? _arxAreaWarning(Locale l) {
+    if (_cat != CalculatorCategory.arxitektura) return null;
+    final a = widget.areaM2;
+    if (a <= 0) return null;
+    final sel = widget.choice.arxitektura;
+    if (sel == ArxitekturaObject.yakkaSmall && a >= 500) {
+      return _S.areaOverForSmall(l, a);
+    }
+    if (sel == ArxitekturaObject.yakkaLarge && a < 500) {
+      return _S.areaUnderForLarge(l, a);
+    }
+    return null;
+  }
+
+  Widget? _areaWarningBanner(Locale l) {
+    final msg = _arxAreaWarning(l);
+    if (msg == null) return null;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF3A2E12) : const Color(0xFFFFF4E5);
+    final border = isDark ? const Color(0xFF5C4A1E) : const Color(0xFFFFD9A0);
+    final fg = isDark ? const Color(0xFFE8C98A) : const Color(0xFF7A4E00);
+    final iconColor =
+        isDark ? const Color(0xFFE0B257) : const Color(0xFFB26A00);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.info_outline_rounded, size: 18, color: iconColor),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                msg,
+                style: TextStyle(
+                  fontFamily: 'MTSText',
+                  fontSize: 12.5,
+                  height: 1.3,
+                  color: fg,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -347,4 +407,24 @@ class _S {
 
   static String calculate(Locale l) =>
       _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
+
+  static String _area(double a) {
+    final s =
+        a == a.roundToDouble() ? a.toInt().toString() : a.toStringAsFixed(1);
+    return '$s m²';
+  }
+
+  static String areaOverForSmall(Locale l, double a) => _pick(
+        l,
+        "Siz ${_area(a)} kiritdingiz — bu 500 m² dan katta. Ehtimol «katta» varianti to'g'riroq.",
+        'Вы указали ${_area(a)} — это больше 500 м². Возможно, вариант «большой» подойдёт лучше.',
+        "You entered ${_area(a)} — that's over 500 m². The 'large' option may fit better.",
+      );
+
+  static String areaUnderForLarge(Locale l, double a) => _pick(
+        l,
+        "Siz ${_area(a)} kiritdingiz — 500 m² dan kam. «Katta» faqat 500 m² dan katta yoki 12 m dan baland binolar uchun.",
+        'Вы указали ${_area(a)} — меньше 500 м². «Большой» — только для зданий свыше 500 м² или выше 12 м.',
+        "You entered ${_area(a)} — under 500 m². 'Large' is only for buildings over 500 m² or taller than 12 m.",
+      );
 }
