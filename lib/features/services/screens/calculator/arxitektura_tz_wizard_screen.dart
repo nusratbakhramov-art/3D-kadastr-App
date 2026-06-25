@@ -26,9 +26,11 @@ import '../../../home/user_profile.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_architecture_order_service.dart';
 import '../../api_cadastre_service.dart';
+import '../../api_forms_service.dart';
 import '../../data/calculator_pricing_store.dart';
 import '../../data/last_customer_store.dart';
 import '../../models/calculator_pricing.dart';
+import '../../models/dynamic_form_schema.dart';
 import '../../models/ai_baholash_bundle.dart' show RoomKind, AiLocationInfo;
 import '../../models/architecture_order_draft.dart';
 import '../../widgets/cadastre_lookup_field.dart';
@@ -207,6 +209,16 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     // Oxirgi yuborilgan buyurtmachidan to'ldirish (profilda STIR/INN va e-mail
     // bo'lmaganda ham qaytadan yozmaslik uchun). Bo'sh maydonlarnigina to'ldiramiz.
     _prefillFromLastCustomer();
+    _loadFormSchema();
+  }
+
+  // Backend sxemasini fon rejimida yuklaymiz (kesh bor — tez). Muvaffaqiyatda
+  // variant ro'yxatlari backend'dan, aks holda joriy hardcoded fallback'dan keladi.
+  Future<void> _loadFormSchema() async {
+    try {
+      final schema = await FormsApiService().getForm('arxitektura_tz');
+      if (mounted) setState(() => _formSchema = schema);
+    } catch (_) {/* sxema yetib bormasa — hardcoded fallback ishlatiladi */}
   }
 
   Future<void> _prefillFromLastCustomer() async {
@@ -231,6 +243,11 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
 
   // Buyurtmachi bo'limi oxirgi arizadan to'ldirilganini ko'rsatish uchun.
   bool _prefilledFromLast = false;
+
+  // Backend forma sxemasi (arxitektura_tz) — qattiq-kodlangan variant ro'yxatlari
+  // o'rniga adminkadan tahrirlanadigan variantlarni beradi. Yuklanmaguncha (yoki
+  // xatoda) wizard joriy hardcoded fallback'ni ishlatadi.
+  FormSchema? _formSchema;
 
   void _onCtrlChanged() {
     if (mounted) setState(() {});
@@ -277,6 +294,50 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       if (o.value == v) return o.localized(l);
     }
     return v;
+  }
+
+  // ── Forma sxemasi (form_definitions) variantlari ─────────────────────────
+  // `_catalog`'ga o'xshash, lekin backend forma sxemasidan `maps_to` bo'yicha
+  // o'qiydi. Sxema yo'q / maydon topilmasa bo'sh — chaqiruvchi hardcoded'ga tushadi.
+  List<FormOption> _schemaOptsByPath(String mapsTo) {
+    final schema = _formSchema;
+    if (schema == null) return const [];
+    for (final f in schema.allFields) {
+      if (f.mapsTo == mapsTo) return f.options;
+    }
+    return const [];
+  }
+
+  static String _schemaOptLabel(List<FormOption> opts, String? v, Locale l) {
+    if (v == null) return '';
+    for (final o in opts) {
+      if (o.value == v) return trMap(o.label, l);
+    }
+    return v;
+  }
+
+  /// Variant ro'yxati backend sxemasidan (bor bo'lsa), aks holda [fallbackOptions]
+  /// + [fallbackLabelOf] (joriy qattiq-kodlangan ro'yxat). Tanlangan qiymat kodi
+  /// ikkala manbada bir xil — shu sababli ko'rinish o'zgarmaydi.
+  Widget _schemaChipPicker({
+    required Locale l,
+    required String mapsTo,
+    required String label,
+    required List<String> fallbackOptions,
+    required String Function(String) fallbackLabelOf,
+    required String? value,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final opts = _schemaOptsByPath(mapsTo);
+    final useSchema = opts.isNotEmpty;
+    return WizardChipPicker<String>(
+      label: label,
+      options: useSchema ? [for (final o in opts) o.value] : fallbackOptions,
+      labelOf: (s) =>
+          useSchema ? _schemaOptLabel(opts, s, l) : fallbackLabelOf(s),
+      value: value,
+      onChanged: onChanged,
+    );
   }
 
   @override
@@ -1258,10 +1319,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.constructiveSolutions(l)),
       _OptionalStepHint(text: _Strings.technicalOptionalHint(l)),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.constructive.scheme',
         label: _Strings.constructiveSchemeLabel(l),
-        options: const ['karkas', 'monolit', 'gisht', 'aralash', 'metall'],
-        labelOf: (s) => switch (s) {
+        fallbackOptions: const ['karkas', 'monolit', 'gisht', 'aralash', 'metall'],
+        fallbackLabelOf: (s) => switch (s) {
           'karkas' => _Strings.schemeFrame(l),
           'monolit' => _Strings.schemeMonolith(l),
           'gisht' => _Strings.materialBrick(l),
@@ -1272,10 +1335,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         value: _draft.constructive.scheme,
         onChanged: (v) => setState(() => _draft.constructive.scheme = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.constructive.foundation',
         label: _Strings.foundationLabel(l),
-        options: const ['ustun', 'lenta', 'plita', 'svay'],
-        labelOf: (s) => switch (s) {
+        fallbackOptions: const ['ustun', 'lenta', 'plita', 'svay'],
+        fallbackLabelOf: (s) => switch (s) {
           'ustun' => _Strings.foundationColumn(l),
           'lenta' => _Strings.foundationStrip(l),
           'plita' => _Strings.foundationSlab(l),
@@ -1285,10 +1350,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         value: _draft.constructive.foundation,
         onChanged: (v) => setState(() => _draft.constructive.foundation = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.constructive.walls',
         label: _Strings.wallMaterialLabel(l),
-        options: const ['gisht', 'gazoblok', 'beton', 'sendvich_panel'],
-        labelOf: (s) => switch (s) {
+        fallbackOptions: const ['gisht', 'gazoblok', 'beton', 'sendvich_panel'],
+        fallbackLabelOf: (s) => switch (s) {
           'gisht' => _Strings.materialBrick(l),
           'gazoblok' => _Strings.materialAerocrete(l),
           'beton' => _Strings.materialConcrete(l),
@@ -1298,10 +1365,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         value: _draft.constructive.walls,
         onChanged: (v) => setState(() => _draft.constructive.walls = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.constructive.ceiling',
         label: _Strings.ceilingLabel(l),
-        options: const ['temir_beton', 'yogoch', 'metall'],
-        labelOf: (s) => switch (s) {
+        fallbackOptions: const ['temir_beton', 'yogoch', 'metall'],
+        fallbackLabelOf: (s) => switch (s) {
           'temir_beton' => _Strings.ceilingReinforcedConcrete(l),
           'yogoch' => _Strings.materialWood(l),
           'metall' => _Strings.materialMetal(l),
@@ -1310,10 +1379,12 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         value: _draft.constructive.ceiling,
         onChanged: (v) => setState(() => _draft.constructive.ceiling = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.constructive.roof_type',
         label: _Strings.roofTypeLabel(l),
-        options: const ['yassi', 'qiya'],
-        labelOf: (s) =>
+        fallbackOptions: const ['yassi', 'qiya'],
+        fallbackLabelOf: (s) =>
             s == 'yassi' ? _Strings.roofFlat(l) : _Strings.roofPitched(l),
         value: _draft.constructive.roofType,
         onChanged: (v) => setState(() => _draft.constructive.roofType = v),
@@ -1332,26 +1403,32 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     return _scrollableStep([
       WizardSectionTitle(text: _Strings.engineeringSystems(l)),
       _OptionalStepHint(text: _Strings.technicalOptionalHint(l)),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.engineering.water_source',
         label: _Strings.waterSourceLabel(l),
-        options: const ['markaziy', 'quduq'],
-        labelOf: (s) =>
+        fallbackOptions: const ['markaziy', 'quduq'],
+        fallbackLabelOf: (s) =>
             s == 'markaziy' ? _Strings.central(l) : _Strings.well(l),
         value: _draft.engineering.waterSource,
         onChanged: (v) => setState(() => _draft.engineering.waterSource = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.engineering.sewage',
         label: _Strings.sewageLabel(l),
-        options: const ['markaziy', 'septik'],
-        labelOf: (s) =>
+        fallbackOptions: const ['markaziy', 'septik'],
+        fallbackLabelOf: (s) =>
             s == 'markaziy' ? _Strings.central(l) : _Strings.septic(l),
         value: _draft.engineering.sewage,
         onChanged: (v) => setState(() => _draft.engineering.sewage = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.engineering.heating',
         label: _Strings.heatingLabel(l),
-        options: const ['gaz', 'elektr', 'qozonxona'],
-        labelOf: (s) => switch (s) {
+        fallbackOptions: const ['gaz', 'elektr', 'qozonxona'],
+        fallbackLabelOf: (s) => switch (s) {
           'gaz' => _Strings.heatingGas(l),
           'elektr' => _Strings.heatingElectric(l),
           'qozonxona' => _Strings.heatingBoiler(l),
@@ -1360,19 +1437,23 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         value: _draft.engineering.heating,
         onChanged: (v) => setState(() => _draft.engineering.heating = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.engineering.ventilation',
         label: _Strings.ventilationLabel(l),
-        options: const ['tabiiy', 'mexanik'],
-        labelOf: (s) => s == 'tabiiy'
+        fallbackOptions: const ['tabiiy', 'mexanik'],
+        fallbackLabelOf: (s) => s == 'tabiiy'
             ? _Strings.ventilationNatural(l)
             : _Strings.ventilationMechanical(l),
         value: _draft.engineering.ventilation,
         onChanged: (v) => setState(() => _draft.engineering.ventilation = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        l: l,
+        mapsTo: 'details.engineering.air_conditioning',
         label: _Strings.airConditioningLabel(l),
-        options: const ['split', 'vrf', 'chiller'],
-        labelOf: (s) => switch (s) {
+        fallbackOptions: const ['split', 'vrf', 'chiller'],
+        fallbackLabelOf: (s) => switch (s) {
           'split' => 'Split',
           'vrf' => 'VRF',
           'chiller' => 'Chiller',
