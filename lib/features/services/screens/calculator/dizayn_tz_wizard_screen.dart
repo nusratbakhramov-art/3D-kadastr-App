@@ -24,10 +24,12 @@ import '../../../home/user_profile.dart';
 import '../../../settings/settings_state.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_design_order_service.dart';
+import '../../api_forms_service.dart';
 import '../../data/calculator_pricing_store.dart';
 import '../../data/last_customer_store.dart';
 import '../../models/calculator_pricing.dart';
 import '../../models/design_order_draft.dart';
+import '../../models/dynamic_form_schema.dart';
 import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
 import '../../widgets/color_palette_field.dart';
@@ -94,6 +96,10 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
   bool _submitting = false;
 
+  // Backend forma sxemasi (dizayn_tz) — variant ro'yxatlari/labellarni
+  // adminkadan beradi; yuklanmaguncha hardcoded fallback ishlatiladi.
+  FormSchema? _formSchema;
+
   // Gating controllerlar (validatsiyaga ta'sir qiladi) — bularga listener
   // qo'shamiz, shunda "Davom etish" tugmasi har doim sinxron bo'ladi.
   late final List<TextEditingController> _gating = [_customerName, _tin, _phone];
@@ -155,6 +161,14 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
 
     // Oxirgi yuborilgan buyurtmachidan to'ldirish (faqat bo'sh maydonlar).
     _prefillFromLastCustomer();
+    _loadFormSchema();
+  }
+
+  Future<void> _loadFormSchema() async {
+    try {
+      final schema = await FormsApiService().getForm('dizayn_tz');
+      if (mounted) setState(() => _formSchema = schema);
+    } catch (_) {/* sxema yetib bormasa — hardcoded fallback */}
   }
 
   Future<void> _prefillFromLastCustomer() async {
@@ -327,6 +341,57 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
       if (o.value == v) return o.localized(_locale);
     }
     return v;
+  }
+
+  // ── Forma sxemasi (form_definitions) variantlari ─────────────────────────
+  // `maps_to` bo'yicha backend sxemasidan variant ro'yxati/labellarini beradi;
+  // sxema yo'q / maydon topilmasa, chaqiruvchi hardcoded fallback'ga tushadi.
+  List<FormOption> _schemaOptsByPath(String mapsTo) {
+    final schema = _formSchema;
+    if (schema == null) return const [];
+    for (final f in schema.allFields) {
+      if (f.mapsTo == mapsTo) return f.options;
+    }
+    return const [];
+  }
+
+  String _schemaOptLabel(List<FormOption> opts, String? code) {
+    if (code == null) return '';
+    for (final o in opts) {
+      if (o.value == code) return trMap(o.label, _locale);
+    }
+    return code;
+  }
+
+  /// String-pikerlar uchun: variantlar backend sxemasidan (bor bo'lsa), aks
+  /// holda [fallbackOptions] + [fallbackLabelOf]. Kodlar bir xil — ko'rinish
+  /// o'zgarmaydi.
+  Widget _schemaChipPicker({
+    required String mapsTo,
+    required String label,
+    required List<String> fallbackOptions,
+    required String Function(String) fallbackLabelOf,
+    required String? value,
+    required ValueChanged<String?> onChanged,
+  }) {
+    final opts = _schemaOptsByPath(mapsTo);
+    final useSchema = opts.isNotEmpty;
+    return WizardChipPicker<String>(
+      label: label,
+      options: useSchema ? [for (final o in opts) o.value] : fallbackOptions,
+      labelOf: (v) => useSchema ? _schemaOptLabel(opts, v) : fallbackLabelOf(v),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
+
+  /// Enum-pikerlar uchun: kod (apiValue) bo'yicha sxema labeli, topilmasa
+  /// [fallback]. Variant ro'yxati/saqlanishi o'zgarmaydi — faqat label.
+  String _schemaEnumLabel(String mapsTo, String code, String fallback) {
+    for (final o in _schemaOptsByPath(mapsTo)) {
+      if (o.value == code) return trMap(o.label, _locale);
+    }
+    return fallback;
   }
 
   Future<void> _submit() async {
@@ -556,7 +621,8 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         label: s.objectType,
         required: true,
         options: DizObjectType.values,
-        labelOf: (t) => _objectTypeLabel(t, s),
+        labelOf: (t) =>
+            _schemaEnumLabel('object_type', t.apiValue, _objectTypeLabel(t, s)),
         value: _draft.objectType,
         onChanged: (v) => setState(() => _draft.objectType = v),
       ),
@@ -569,8 +635,8 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
       WizardChipPicker<DizDesignType>(
         label: s.designType,
         options: DizDesignType.values,
-        labelOf: (t) =>
-            t == DizDesignType.yangi ? s.designNew : s.designReconstruction,
+        labelOf: (t) => _schemaEnumLabel('design_type', t.apiValue,
+            t == DizDesignType.yangi ? s.designNew : s.designReconstruction),
         value: _draft.designType,
         onChanged: (v) =>
             setState(() => _draft.designType = v ?? DizDesignType.yangi),
@@ -767,18 +833,20 @@ class _DizaynTzWizardScreenState extends State<DizaynTzWizardScreen> {
         value: _draft.engineering.hasGypsumPlan,
         onChanged: (v) => setState(() => _draft.engineering.hasGypsumPlan = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        mapsTo: 'details.engineering.partition_material',
         label: s.partitionLabel,
-        options: _partitionMaterials,
-        labelOf: (k) => s.materialLabel(k),
+        fallbackOptions: _partitionMaterials,
+        fallbackLabelOf: (k) => s.materialLabel(k),
         value: _draft.engineering.partitionMaterial,
         onChanged: (v) =>
             setState(() => _draft.engineering.partitionMaterial = v),
       ),
-      WizardChipPicker<String>(
+      _schemaChipPicker(
+        mapsTo: 'details.engineering.air_conditioning',
         label: s.airConditioning,
-        options: _acTypes,
-        labelOf: (k) => s.acLabel(k),
+        fallbackOptions: _acTypes,
+        fallbackLabelOf: (k) => s.acLabel(k),
         value: _draft.engineering.airConditioning,
         onChanged: (v) =>
             setState(() => _draft.engineering.airConditioning = v),

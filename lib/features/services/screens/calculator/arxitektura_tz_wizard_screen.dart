@@ -340,6 +340,15 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     );
   }
 
+  /// Enum-pikerlar uchun: kod (apiValue) bo'yicha sxema labeli, topilmasa
+  /// [fallback]. Variant ro'yxati/saqlanishi o'zgarmaydi — faqat label.
+  String _schemaEnumLabel(String mapsTo, String code, Locale l, String fallback) {
+    for (final o in _schemaOptsByPath(mapsTo)) {
+      if (o.value == code) return trMap(o.label, l);
+    }
+    return fallback;
+  }
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -904,8 +913,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     ];
     final current = _landUsePurpose.text.trim();
     String? selectedKey;
-    for (final (k, label) in opts) {
-      if (label == current) selectedKey = k;
+    for (final (k, _) in opts) {
+      if (k == current) selectedKey = k;
     }
     final isOther =
         _landUseCustom || (current.isNotEmpty && selectedKey == null);
@@ -932,7 +941,7 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
               _choiceChip(label, !isOther && selectedKey == k, () {
                 setState(() {
                   _landUseCustom = false;
-                  _landUsePurpose.text = label;
+                  _landUsePurpose.text = k;
                 });
               }),
             _choiceChip(_Strings.landUseOther(l), isOther, () {
@@ -1086,9 +1095,13 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       WizardChipPicker<ConstructionType>(
         label: _Strings.constructionTypeLabel(l),
         options: ConstructionType.values,
-        labelOf: (t) => t == ConstructionType.yangi
-            ? _Strings.constructionNew(l)
-            : _Strings.constructionReconstruction(l),
+        labelOf: (t) => _schemaEnumLabel(
+            'construction_type',
+            t.apiValue,
+            l,
+            t == ConstructionType.yangi
+                ? _Strings.constructionNew(l)
+                : _Strings.constructionReconstruction(l)),
         value: _draft.constructionType,
         onChanged: (v) =>
             setState(() => _draft.constructionType = v ?? ConstructionType.yangi),
@@ -1200,7 +1213,8 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
         label: _Strings.objectTypeLabel(l),
         required: true,
         options: ArchObjectType.values,
-        labelOf: (t) => _objectTypeLabel(t, l),
+        labelOf: (t) =>
+            _schemaEnumLabel('object_type', t.apiValue, l, _objectTypeLabel(t, l)),
         value: _draft.objectType,
         onChanged: (v) => setState(() {
           _draft.objectType = v;
@@ -1601,7 +1615,10 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
       if (d.landAreaSqm != null)
         (_Strings.landAreaLabel(l), '${_trimNum(d.landAreaSqm!)} ${_Strings.unitSqm(l)}'),
       if (d.landUsePurpose.trim().isNotEmpty)
-        (_Strings.landUsePurposeLabel(l), d.landUsePurpose.trim()),
+        (
+          _Strings.landUsePurposeLabel(l),
+          _landUseDisplay(d.landUsePurpose.trim(), l)
+        ),
     ];
 
     // Step 2 — Loyiha
@@ -1841,6 +1858,16 @@ class _ArxitekturaTzWizardScreenState extends State<ArxitekturaTzWizardScreen> {
     if (t.isEmpty) return null;
     return int.tryParse(t);
   }
+
+  // Land use kodi -> ko'rsatiladigan label (kod emas). Eski/erkin matn o'zgarmas.
+  static String _landUseDisplay(String codeOrText, Locale l) =>
+      switch (codeOrText) {
+        'turar_joy' => _Strings.landUseResidential(l),
+        'ishlab_chiqarish' => _Strings.landUseProduction(l),
+        'savdo' => _Strings.landUseCommercial(l),
+        'aralash' => _Strings.landUseMixed(l),
+        _ => codeOrText,
+      };
 
   static String _objectTypeLabel(ArchObjectType t, Locale l) {
     final ru = l.languageCode == 'ru';
