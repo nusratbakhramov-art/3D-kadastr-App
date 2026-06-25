@@ -558,6 +558,9 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     return switch (s) {
       AiJobStatus.completed => ApplicationStatusGroup.completed,
       AiJobStatus.failed => ApplicationStatusGroup.cancelled,
+      // AI dastlabki natija tayyor, lekin to'lov qilinmagan — ariza hali
+      // YUBORILMAGAN. "Jarayonda" ko'rinadi (natija ko'rinadi, to'lov kutilmoqda).
+      AiJobStatus.previewReady => ApplicationStatusGroup.inProgress,
       // AI natija tayyor, lekin mutaxassis hisobotni hali yakunlamagan —
       // foydalanuvchiga "Yuborildi" ko'rinadi (natija ko'rinadi, hisobot kutilmoqda).
       AiJobStatus.underReview => ApplicationStatusGroup.sent,

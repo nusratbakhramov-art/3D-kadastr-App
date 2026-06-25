@@ -22,6 +22,9 @@ enum AiJobStatus {
   queued,
   gatheringInfo,
   aiPricing,
+  // AI dastlabki natija tayyor va to'lovsiz ko'rinadi, lekin ariza hali
+  // baholash guruhiga yuborilmagan ("qoralama"). To'lovdan keyin underReview.
+  previewReady,
   underReview,
   received,
   completed,
@@ -37,6 +40,8 @@ enum AiJobStatus {
         return AiJobStatus.gatheringInfo;
       case 'ai_pricing':
         return AiJobStatus.aiPricing;
+      case 'preview_ready':
+        return AiJobStatus.previewReady;
       case 'under_review':
         return AiJobStatus.underReview;
       case 'received':
@@ -58,6 +63,7 @@ enum AiJobStatus {
   /// or not the estimate group has finalized the report. We stop the live poll
   /// here — final completion happens later, off-screen, via the admin.
   bool get hasResult =>
+      this == AiJobStatus.previewReady ||
       this == AiJobStatus.underReview ||
       this == AiJobStatus.received ||
       this == AiJobStatus.completed;
@@ -284,11 +290,13 @@ class AiValuationJobService {
     return body['id'] as int;
   }
 
-  /// AI bahodan keyin foydalanuvchi kiritgan MAQSADLI sotuv narxini (so'm)
-  /// arizaga biriktiradi. Ixtiyoriy — `price` null bo'lsa qiymat tozalanadi.
+  /// AI bahodan keyin foydalanuvchi kiritgan MAQSADLI sotuv narxini (so'm) va
+  /// bino/uy maydonini (m²) arizaga biriktiradi. Ikkalasi ham ixtiyoriy — null
+  /// qiymat tegishli ustunni tozalaydi.
   Future<void> setTargetPrice({
     required int jobId,
     required double? price,
+    double? areaM2,
     required String token,
   }) async {
     final uri = Uri.parse('$_baseUrl/ai-valuations/$jobId/target-price');
@@ -300,7 +308,7 @@ class AiValuationJobService {
             'Accept': 'application/json',
             'Authorization': 'Bearer $token',
           },
-          body: jsonEncode({'target_sell_price': price}),
+          body: jsonEncode({'target_sell_price': price, 'area_m2': areaM2}),
         )
         .timeout(const Duration(seconds: 20));
     if (res.statusCode != 200) {

@@ -37,12 +37,14 @@ class AiTargetPriceScreen extends StatefulWidget {
 
 class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
   final TextEditingController _ctrl = TextEditingController();
+  final TextEditingController _areaCtrl = TextEditingController();
   final AiValuationJobService _api = AiValuationJobService();
   bool _saving = false;
 
   @override
   void dispose() {
     _ctrl.dispose();
+    _areaCtrl.dispose();
     _api.dispose();
     super.dispose();
   }
@@ -53,12 +55,19 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
     return double.tryParse(digits);
   }
 
+  double? get _enteredArea {
+    final t = _areaCtrl.text.replaceAll(',', '.').replaceAll(RegExp(r'[^0-9.]'), '');
+    if (t.isEmpty) return null;
+    return double.tryParse(t);
+  }
+
   Future<void> _continue() async {
     if (_saving) return;
     setState(() => _saving = true);
     final l = Localizations.localeOf(context);
     final price = _enteredPrice;
-    if (price != null) {
+    final area = _enteredArea;
+    if (price != null || area != null) {
       try {
         final session = await const AuthStorage().loadSession();
         final token = session.token;
@@ -66,6 +75,7 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
           await _api.setTargetPrice(
             jobId: widget.jobId,
             price: price,
+            areaM2: area,
             token: token,
           );
         }
@@ -139,10 +149,13 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _PriceField(
+                      _AmountField(
                         controller: _ctrl,
                         isDark: isDark,
                         locale: l,
+                        suffix: _S.soum(l),
+                        autofocus: true,
+                        inputFormatters: const [_MoneyInputFormatter()],
                         onChanged: (_) => setState(() {}),
                       ),
                       if (widget.estimatedValue != null) ...[
@@ -153,6 +166,37 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
                           locale: l,
                         ),
                       ],
+                      const SizedBox(height: 22),
+                      Text(
+                        _S.areaLabel(l),
+                        style: TextStyle(
+                          fontFamily: 'MTSText',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: headingColor,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _AmountField(
+                        controller: _areaCtrl,
+                        isDark: isDark,
+                        locale: l,
+                        suffix: _S.areaUnit(l),
+                        keyboardType:
+                            const TextInputType.numberWithOptions(decimal: true),
+                        inputFormatters: const [_DecimalInputFormatter()],
+                        onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _S.areaHint(l),
+                        style: TextStyle(
+                          fontFamily: 'MTSText',
+                          fontSize: 12.5,
+                          height: 1.3,
+                          color: subColor,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -187,18 +231,26 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
   }
 }
 
-class _PriceField extends StatelessWidget {
-  const _PriceField({
+class _AmountField extends StatelessWidget {
+  const _AmountField({
     required this.controller,
     required this.isDark,
     required this.locale,
+    required this.suffix,
+    required this.inputFormatters,
     required this.onChanged,
+    this.autofocus = false,
+    this.keyboardType = TextInputType.number,
   });
 
   final TextEditingController controller;
   final bool isDark;
   final Locale locale;
+  final String suffix;
+  final List<TextInputFormatter> inputFormatters;
   final ValueChanged<String> onChanged;
+  final bool autofocus;
+  final TextInputType keyboardType;
 
   @override
   Widget build(BuildContext context) {
@@ -226,11 +278,11 @@ class _PriceField extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              keyboardType: TextInputType.number,
-              autofocus: true,
+              keyboardType: keyboardType,
+              autofocus: autofocus,
               onChanged: onChanged,
               onTapOutside: (_) => FocusScope.of(context).unfocus(),
-              inputFormatters: const [_MoneyInputFormatter()],
+              inputFormatters: inputFormatters,
               cursorColor: AppColors.splashGreen,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -254,7 +306,7 @@ class _PriceField extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            _S.soum(locale),
+            suffix,
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 15,
@@ -338,6 +390,28 @@ class _MoneyInputFormatter extends TextInputFormatter {
   }
 }
 
+/// Maydon (m²) uchun: faqat raqamlar va bitta kasr nuqtasi (`,` → `.`).
+class _DecimalInputFormatter extends TextInputFormatter {
+  const _DecimalInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var t = newValue.text.replaceAll(',', '.').replaceAll(RegExp(r'[^0-9.]'), '');
+    final firstDot = t.indexOf('.');
+    if (firstDot != -1) {
+      t = t.substring(0, firstDot + 1) +
+          t.substring(firstDot + 1).replaceAll('.', '');
+    }
+    return TextEditingValue(
+      text: t,
+      selection: TextSelection.collapsed(offset: t.length),
+    );
+  }
+}
+
 class _S {
   const _S._();
 
@@ -365,6 +439,22 @@ class _S {
       );
 
   static String soum(Locale l) => _pick(l, 'so\'m', 'сум', 'soum');
+
+  static String areaLabel(Locale l) => _pick(
+        l,
+        'Bino / uy maydoni',
+        'Площадь здания / дома',
+        'Building / house area',
+      );
+
+  static String areaUnit(Locale l) => _pick(l, 'm²', 'м²', 'm²');
+
+  static String areaHint(Locale l) => _pick(
+        l,
+        'Ixtiyoriy. Umumiy maydonni m² da kiriting.',
+        'Необязательно. Укажите общую площадь в м².',
+        'Optional. Enter the total area in m².',
+      );
 
   static String aiHint(Locale l) => _pick(
         l,
