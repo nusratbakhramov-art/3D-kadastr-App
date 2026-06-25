@@ -21,7 +21,7 @@ import '../profile/profile_screen.dart';
 import '../scans/saved_scans_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr/kadastr_area_screen.dart';
-import '../services/screens/kadastr_3d_screen.dart';
+import '../services/screens/online_calculator_screen.dart';
 import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
 import 'app_bottom_nav.dart';
@@ -225,21 +225,6 @@ class _MainShellState extends State<MainShell> {
     ).push(MaterialPageRoute<void>(builder: (_) => const PaymentsScreen()));
   }
 
-  Future<void> _openKadastr3d() async {
-    // 3D Kadastr needs an account (davreest.uz lookup + job submit) — gate with
-    // a login drawer before the wizard opens.
-    if (!await ensureLoggedIn(
-      context,
-      storage: widget.authStorage,
-    )) {
-      return;
-    }
-    if (!mounted) return;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const Kadastr3dScreen()));
-  }
-
   Future<void> _openAiValuation() async {
     // AI Baholash needs an account — gate with a login drawer before the
     // wizard opens (kadastr → client → location → purpose → intake → result).
@@ -256,10 +241,19 @@ class _MainShellState extends State<MainShell> {
   }
 
   void _openCalculator() {
-    // Onlayn kalkulyator = area → multi-select services → per-service type
-    // steps → combined estimate → lead form. Replaces the old category grid.
+    // Yangi birlashgan kalkulyator = area → multi-select services → per-service
+    // type steps → combined estimate. Banner va "3D kadastr" karta shu yerga
+    // (faqat hisob-kitob).
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const KadastrAreaScreen()),
+    );
+  }
+
+  void _openKalkulyator() {
+    // Eski "Kalkulyator" oqimi = xizmatlar ro'yxati → tanlangan xizmat formasi
+    // → hisob natijasi → "Ariza topshirish" (buyurtma yuborish).
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
     );
   }
 
@@ -281,10 +275,15 @@ class _MainShellState extends State<MainShell> {
           HomeScreen(
             locale: widget.locale,
             onLoginTap: _openAuth,
-            onOpenKadastr3d: _openKadastr3d,
+            // "3D kadastr" karta → yangi birlashgan kalkulyator (banner bilan
+            // bir xil joyga — faqat hisob-kitob).
+            onOpenKadastr3d: _openCalculator,
             onOpenAiValuation: _openAiValuation,
             onOpenMarket: _openMarketTab,
-            // Banner "Online kalkulyator" → the combined calculator flow.
+            // "Kalkulyator" karta → eski xizmatlar-ro'yxati oqimi (hisob →
+            // ariza topshirish).
+            onOpenKalkulyator: _openKalkulyator,
+            // Banner "Online kalkulyator" → yangi birlashgan kalkulyator.
             onOpenOrder: _openCalculator,
             onOpenProfile: () => _onTabChanged(4),
             onOpenNotifications: _openNotifications,

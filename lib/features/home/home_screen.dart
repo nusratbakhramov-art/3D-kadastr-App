@@ -25,6 +25,7 @@ class HomeScreen extends StatefulWidget {
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
     this.onOpenMarket,
+    this.onOpenKalkulyator,
     this.onOpenOrder,
     this.onOpenProfile,
     this.onOpenNotifications,
@@ -36,6 +37,7 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
   final VoidCallback? onOpenMarket;
+  final VoidCallback? onOpenKalkulyator;
   final VoidCallback? onOpenOrder;
   final VoidCallback? onOpenProfile;
   final VoidCallback? onOpenNotifications;
@@ -186,6 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     onOpenKadastr3d: widget.onOpenKadastr3d,
                     onOpenAiValuation: widget.onOpenAiValuation,
                     onOpenMarket: widget.onOpenMarket,
+                    onOpenKalkulyator: widget.onOpenKalkulyator,
                   ),
                   const SizedBox(height: 12),
                   ValueListenableBuilder<UserProfile?>(
@@ -331,12 +334,14 @@ class _CardsGrid extends StatelessWidget {
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
     this.onOpenMarket,
+    this.onOpenKalkulyator,
   });
 
   final Locale locale;
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
   final VoidCallback? onOpenMarket;
+  final VoidCallback? onOpenKalkulyator;
 
   @override
   Widget build(BuildContext context) {
@@ -371,10 +376,24 @@ class _CardsGrid extends StatelessWidget {
         const SizedBox(height: gap),
         SizedBox(
           height: height,
-          child: HomeCard(
-            title: _CardStrings.market(locale),
-            iconAsset: 'assets/images/home/card-market.svg',
-            onTap: onOpenMarket,
+          child: Row(
+            children: [
+              Expanded(
+                child: HomeCard(
+                  title: _CardStrings.calculator(locale),
+                  iconAsset: 'assets/images/home/card-calculator.svg',
+                  onTap: onOpenKalkulyator,
+                ),
+              ),
+              const SizedBox(width: gap),
+              Expanded(
+                child: HomeCard(
+                  title: _CardStrings.market(locale),
+                  iconAsset: 'assets/images/home/card-market.svg',
+                  onTap: onOpenMarket,
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -399,6 +418,9 @@ class _CardStrings {
       _pick(l, 'AI baholash', 'AI оценка', 'AI valuation');
 
   static String market(Locale l) => _pick(l, 'Market', 'Маркет', 'Market');
+
+  static String calculator(Locale l) =>
+      _pick(l, 'Kalkulyator', 'Калькулятор', 'Calculator');
 }
 
 class _HomeScreenStrings {
