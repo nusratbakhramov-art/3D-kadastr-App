@@ -189,16 +189,21 @@ class MarketplaceApiService {
 
   // ---- Parsing ----
 
+  /// Pydantic serializes `Decimal` (price, area) as a JSON string, so a plain
+  /// `as num` cast throws. Accept num, numeric String, or null.
+  static int _asInt(dynamic value) {
+    if (value == null) return 0;
+    if (value is num) return value.toInt();
+    return double.tryParse(value.toString())?.toInt() ?? 0;
+  }
+
   MarketListing _parseListing(Map<String, dynamic> json) {
     final id = json['id'].toString();
     final name = json['name'] as String? ?? '';
     final region = json['region'] as String? ?? '';
     final isFree = json['is_free'] as bool? ?? false;
-    final price = (json['price'] as num?)?.toInt() ?? 0;
-    final areaRaw = json['area'];
-    final area = areaRaw == null
-        ? 0
-        : (areaRaw is num ? areaRaw.toInt() : double.parse(areaRaw.toString()).toInt());
+    final price = _asInt(json['price']);
+    final area = _asInt(json['area']);
     final preview = json['preview_image_url'] as String?;
     final imageUrl = preview == null ? '' : ApiConfig.resolveUrl(preview);
 
@@ -239,6 +244,7 @@ class MarketplaceApiService {
       categoryLabel: json['category_label'] as String?,
       description: json['description'] as String?,
       isFree: isFree,
+      isOwned: json['is_owned'] as bool? ?? false,
       scenes: scenes,
       files: files,
     );

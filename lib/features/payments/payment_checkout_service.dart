@@ -24,6 +24,9 @@ class PaymentCheckoutService {
   /// Backend `PaymentType.AI_VALUATION` (FastAPI enum query = qiymat).
   static const aiValuationType = 'ai_valuation';
 
+  /// Backend `PaymentType.MARKETPLACE_PURCHASE` — marketplace 3D model sotib olish.
+  static const marketplacePurchaseType = 'marketplace_purchase';
+
   Future<PaymentQuote> getQuote(String paymentType) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/payments/quote')
         .replace(queryParameters: {'payment_type': paymentType});

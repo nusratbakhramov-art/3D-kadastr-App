@@ -40,6 +40,7 @@ class MarketListing {
     this.gallery = const [],
     this.description,
     this.isFree = false,
+    this.isOwned = false,
     this.scenes = const [],
     this.files = const [],
   });
@@ -68,6 +69,11 @@ class MarketListing {
   /// True for the free / open download policy (TZ §6.5). When false, the
   /// "Sotib olish" lead form + payment gate apply.
   final bool isFree;
+
+  /// True when the current (authenticated) user has purchased this paid model
+  /// — i.e. a completed `marketplace_purchase` payment exists. Always false for
+  /// free models and anonymous requests. Gates download / 3D viewer access.
+  final bool isOwned;
 
   /// Scenes (camera angles) saved inside this 3D model. Empty list means
   /// the model has only the default scene.

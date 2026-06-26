@@ -10,16 +10,22 @@ class ListingFormatsCard extends StatelessWidget {
     required this.files,
     required this.onTap,
     this.downloadingFileId,
+    this.locked = false,
   });
 
   /// Files available for this listing (only these formats are shown).
   final List<MarketListingFile> files;
 
-  /// Called when a chip is tapped — receives the file to download.
+  /// Called when a chip is tapped — receives the file. When [locked] the
+  /// parent routes this into the purchase flow instead of downloading.
   final ValueChanged<MarketListingFile> onTap;
 
   /// If non-null, that file's chip shows a spinner.
   final int? downloadingFileId;
+
+  /// Paid model the user hasn't bought yet — chips show a lock cue (formats are
+  /// previewed so the buyer sees what they get, but tapping prompts purchase).
+  final bool locked;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +68,7 @@ class ListingFormatsCard extends StatelessWidget {
                   label: _formatLabel(f.format),
                   size: _sizeLabel(f.fileSize),
                   loading: downloadingFileId == f.id,
+                  locked: locked,
                   onTap: () {
                     if (downloadingFileId != null) return;
                     HapticFeedback.selectionClick();
@@ -98,6 +105,7 @@ class _FormatChip extends StatelessWidget {
     required this.label,
     required this.size,
     required this.loading,
+    required this.locked,
     required this.onTap,
     required this.fg,
   });
@@ -105,6 +113,7 @@ class _FormatChip extends StatelessWidget {
   final String label;
   final String size;
   final bool loading;
+  final bool locked;
   final VoidCallback onTap;
   final Color fg;
 
@@ -174,6 +183,14 @@ class _FormatChip extends StatelessWidget {
                     ),
                 ],
               ),
+              if (locked && !loading) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 14,
+                  color: textColor.withValues(alpha: 0.7),
+                ),
+              ],
             ],
           ),
         ),

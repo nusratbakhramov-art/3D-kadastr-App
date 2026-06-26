@@ -353,33 +353,14 @@ class _SettingsScreenState extends State<SettingsScreen>
   Future<void> _confirmDeleteAccount(BuildContext context, Locale locale) async {
     String t(String ru, String en, String uz) =>
         switch (locale.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showModalBottomSheet<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          t('Удалить аккаунт?', 'Delete account?', "Hisobni o'chirasizmi?"),
-        ),
-        content: Text(
-          t(
-            'Ваш аккаунт и связанные данные будут удалены. Это действие необратимо.',
-            'Your account and associated data will be deleted. This action cannot be undone.',
-            "Hisobingiz va unga bog'liq ma'lumotlar o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.",
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(t('Отмена', 'Cancel', 'Bekor qilish')),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFFE74C4C),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(t('Удалить', 'Delete', "O'chirish")),
-          ),
-        ],
+      backgroundColor: ColorTokens.cardBg(context),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (ctx) => _DeleteAccountSheet(locale: locale),
     );
     if (confirmed != true || !mounted) return;
     try {
@@ -495,6 +476,104 @@ class _LogoutSheet extends StatelessWidget {
                 Expanded(
                   child: _SheetButton(
                     label: _S.logout(locale),
+                    onTap: () => Navigator.pop(context, true),
+                    background: const Color(0xFFE5484D),
+                    foreground: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DeleteAccountSheet extends StatelessWidget {
+  const _DeleteAccountSheet({required this.locale});
+
+  final Locale locale;
+
+  String _t(String ru, String en, String uz) =>
+      switch (locale.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE0E0E0),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Center(
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFFDE8E8),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Color(0xFFE5484D),
+                  size: 26,
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              _t('Удалить аккаунт?', 'Delete account?', "Hisobni o'chirasizmi?"),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 19,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              _t(
+                'Ваш аккаунт и связанные данные будут удалены. Это действие необратимо.',
+                'Your account and associated data will be deleted. This action cannot be undone.',
+                "Hisobingiz va unga bog'liq ma'lumotlar o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.",
+              ),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 14,
+                height: 1.4,
+                color: ColorTokens.secondaryText(context),
+              ),
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: _SheetButton(
+                    label: _t('Отмена', 'Cancel', 'Bekor qilish'),
+                    onTap: () => Navigator.pop(context, false),
+                    background: ColorTokens.iconBg(context),
+                    foreground: ColorTokens.primaryText(context),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SheetButton(
+                    label: _t('Удалить', 'Delete', "O'chirish"),
                     onTap: () => Navigator.pop(context, true),
                     background: const Color(0xFFE5484D),
                     foreground: Colors.white,
