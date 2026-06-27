@@ -47,6 +47,14 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- To'lovdan keyin /pay-return sahifasi `kadastr3d://pay-return/{id}`
+                 custom scheme orqali ilovani qaytaradi (app_links ushlaydi). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="kadastr3d" android:host="pay-return"/>
+            </intent-filter>
         </activity>
         <!-- FCM: app fonда kelgan push qaysi kanalga tushishini belgilaydi
              (PushNotifications._channel bilan bir xil id). -->

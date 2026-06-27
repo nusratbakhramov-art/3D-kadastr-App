@@ -83,11 +83,13 @@ class _ProfileScreenState extends State<ProfileScreen>
         _ProfileStrings.ratings(locale),
         widget.onRatingsTap,
       ),
-      _RowSpec(
-        'assets/icons/menu-payments.svg',
-        _ProfileStrings.payments(locale),
-        widget.onPaymentsTap,
-      ),
+      // Reviewer (demo) akkaunti uchun "To'lovlar" ko'rsatilmaydi.
+      if (!paymentsHidden)
+        _RowSpec(
+          'assets/icons/menu-payments.svg',
+          _ProfileStrings.payments(locale),
+          widget.onPaymentsTap,
+        ),
       _RowSpec(
         'assets/icons/menu-settings.svg',
         _ProfileStrings.settings(locale),

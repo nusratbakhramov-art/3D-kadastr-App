@@ -44,10 +44,17 @@ class PaymentDeepLinks {
 
   static void _handle(Uri uri) {
     final seg = uri.pathSegments;
-    // /pay-return/{id}
+    int? id;
+    // Universal Link: https://api.3dkadastr.uz/pay-return/{id}
+    //   → pathSegments = [pay-return, {id}]
     final i = seg.indexOf('pay-return');
-    if (i < 0 || i + 1 >= seg.length) return;
-    final id = int.tryParse(seg[i + 1]);
+    if (i >= 0 && i + 1 < seg.length) {
+      id = int.tryParse(seg[i + 1]);
+    } else if (uri.host == 'pay-return' && seg.isNotEmpty) {
+      // Custom scheme: kadastr3d://pay-return/{id}
+      //   → host = pay-return, pathSegments = [{id}]
+      id = int.tryParse(seg.first);
+    }
     if (id != null) openResult(id);
   }
 

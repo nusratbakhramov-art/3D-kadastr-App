@@ -58,4 +58,15 @@ class UserProfile {
 final ValueNotifier<UserProfile?> userProfileNotifier =
     ValueNotifier<UserProfile?>(null);
 
+/// App Store reviewer / demo akkaunti telefoni. Bu foydalanuvchi uchun barcha
+/// to'lov oqimlari (Profil "To'lovlar", Sozlamalar "To'lovlarim", AI ariza
+/// to'lovi, Market "Sotib olish") YASHIRILADI. Backend ham shu telefonni
+/// `Settings.DEMO_PHONE` sifatida biladi va `/payments/initiate` ni rad etadi —
+/// ikkalasini sinxron saqlang.
+const String kReviewerPhone = '+998990000011';
+
+/// Joriy (kirgan) foydalanuvchi uchun to'lov oqimlari yashirilishi kerakmi.
+/// Telefon sessiyada barqaror, shuning uchun build paytida o'qish xavfsiz.
+bool get paymentsHidden => userProfileNotifier.value?.phone == kReviewerPhone;
+
 final ValueNotifier<int> notificationUnreadNotifier = ValueNotifier<int>(0);

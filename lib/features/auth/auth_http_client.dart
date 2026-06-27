@@ -23,25 +23,42 @@ import '../../core/api_config.dart';
 import 'auth_storage.dart';
 import 'models/auth_session.dart';
 
+/// Refresh urinishining natijasi. Logout faqat [rejected] da sodir bo'ladi —
+/// vaqtinchalik xatoda (tarmoq, timeout, 5xx) sessiya SAQLANADI.
+enum _RefreshOutcome {
+  /// Yangi token olindi (yoki boshqa so'rov allaqachon yangilagan) — retry qil.
+  refreshed,
+
+  /// Backend refresh tokenni rad etdi (401) — sessiya haqiqatan yaroqsiz,
+  /// foydalanuvchini logout qil.
+  rejected,
+
+  /// Refresh yakunlanmadi (tarmoq/timeout/5xx) — sessiyani saqla, keyin qayta
+  /// urinadi. Foydalanuvchi chiqib ketmaydi.
+  transient,
+}
+
 /// Yagona `lock` — bir vaqtning o'zida faqat bitta refresh chaqiruvi
 /// bo'lishini ta'minlaydi (agar 5 ta API parallel 401 olsa, faqat 1 marta
 /// `/auth/refresh` chaqiramiz).
 class _RefreshLock {
-  Completer<bool>? _inProgress;
+  Completer<_RefreshOutcome>? _inProgress;
 
   /// Refresh allaqachon ishlamoqda bo'lsa, uning natijasini kutadi.
   /// Aks holda yangi refresh boshlaydi.
-  Future<bool> runOrAwait(Future<bool> Function() perform) async {
+  Future<_RefreshOutcome> runOrAwait(
+    Future<_RefreshOutcome> Function() perform,
+  ) async {
     final existing = _inProgress;
     if (existing != null) {
       return existing.future;
     }
-    final completer = Completer<bool>();
+    final completer = Completer<_RefreshOutcome>();
     _inProgress = completer;
     try {
-      final ok = await perform();
-      completer.complete(ok);
-      return ok;
+      final outcome = await perform();
+      completer.complete(outcome);
+      return outcome;
     } catch (e, st) {
       completer.completeError(e, st);
       rethrow;
@@ -94,22 +111,29 @@ class AuthHttpClient extends http.BaseClient {
     }
 
     // Bir vaqtda faqat 1 ta refresh ishlasin (parallel 401 lar uchun).
-    final refreshed = await _refreshLock.runOrAwait(() async {
+    final outcome = await _refreshLock.runOrAwait(() async {
       // Lock ichida — boshqa parallel so'rov allaqachon refresh qilgan
       // bo'lishi mumkin, qayta o'qiymiz.
       final fresh = await _storage.loadSession();
       if (fresh.token != session.token) {
-        // Allaqachon yangilangan — true qaytaramiz va retry qiladi.
-        return true;
+        // Allaqachon yangilangan — retry qiladi.
+        return _RefreshOutcome.refreshed;
       }
       return _doRefresh(fresh.refreshToken!);
     });
 
-    if (!refreshed) {
-      // Refresh fail — sessiyani tozalaymiz.
-      await _storage.clear();
-      onSessionExpired?.call();
-      return res;
+    switch (outcome) {
+      case _RefreshOutcome.rejected:
+        // Refresh token haqiqatan yaroqsiz — sessiyani tozalaymiz.
+        await _storage.clear();
+        onSessionExpired?.call();
+        return res;
+      case _RefreshOutcome.transient:
+        // Tarmoq/timeout/5xx — sessiyani SAQLAYMIZ (foydalanuvchi chiqib
+        // ketmaydi). 401 ni qaytaramiz; keyingi so'rovda qayta urinadi.
+        return res;
+      case _RefreshOutcome.refreshed:
+        break; // pastda retry qilamiz
     }
 
     // 3. Yangi token bilan original so'rovni qayta yuboramiz.
@@ -172,8 +196,11 @@ class AuthHttpClient extends http.BaseClient {
   }
 
   /// Backend'ga `/auth/refresh` chaqirib yangi access + refresh tokenlarni
-  /// olib saqlaydi.
-  Future<bool> _doRefresh(String refreshToken) async {
+  /// olib saqlaydi. Natija:
+  ///   • 200 + token  → [_RefreshOutcome.refreshed]
+  ///   • 401          → [_RefreshOutcome.rejected]  (refresh token yaroqsiz)
+  ///   • timeout/tarmoq/5xx/boshqa → [_RefreshOutcome.transient]  (logout YO'Q)
+  Future<_RefreshOutcome> _doRefresh(String refreshToken) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}/auth/refresh');
       final res = await _inner
@@ -187,15 +214,20 @@ class AuthHttpClient extends http.BaseClient {
           )
           .timeout(const Duration(seconds: 15));
 
+      if (res.statusCode == 401) {
+        // Faqat shu holatda refresh token haqiqatan rad etilgan — logout.
+        return _RefreshOutcome.rejected;
+      }
       if (res.statusCode != 200) {
-        return false;
+        // 5xx yoki kutilmagan status — vaqtinchalik, sessiyani saqlaymiz.
+        return _RefreshOutcome.transient;
       }
 
       final body = jsonDecode(res.body) as Map<String, dynamic>;
       final newAccess = body['access_token'] as String?;
       final newRefresh = body['refresh_token'] as String?;
       if (newAccess == null || newAccess.isEmpty) {
-        return false;
+        return _RefreshOutcome.transient;
       }
 
       // Joriy session ustiga yangi tokenlar
@@ -207,9 +239,10 @@ class AuthHttpClient extends http.BaseClient {
           refreshToken: newRefresh ?? current.refreshToken,
         ),
       );
-      return true;
+      return _RefreshOutcome.refreshed;
     } catch (_) {
-      return false;
+      // Timeout / tarmoq uzilishi / JSON xato — vaqtinchalik, logout qilmaymiz.
+      return _RefreshOutcome.transient;
     }
   }
 

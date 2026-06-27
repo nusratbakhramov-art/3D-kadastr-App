@@ -75,7 +75,9 @@ class _Listing3DViewerScreenState extends State<Listing3DViewerScreen> {
         });
         return;
       }
-      final src = await _api.getDownloadUrl(
+      // 3D ko'rish bepul (egalik shart emas) — preview endpoint. Yuklab olish
+      // (formatlar) hamon egalik bilan himoyalangan (getDownloadUrl).
+      final src = await _api.getPreviewUrl(
         modelId: id,
         fileId: glb.id,
         token: session.token!,
@@ -83,7 +85,7 @@ class _Listing3DViewerScreenState extends State<Listing3DViewerScreen> {
       String? iosUrl;
       if (usdz != null) {
         try {
-          final iosInfo = await _api.getDownloadUrl(
+          final iosInfo = await _api.getPreviewUrl(
             modelId: id,
             fileId: usdz.id,
             token: session.token!,

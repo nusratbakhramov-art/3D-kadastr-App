@@ -18,6 +18,22 @@
 	<string>kadastr</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<!-- Custom URL scheme — to'lovdan keyin Safari'dagi /pay-return sahifasi
+	     `kadastr3d://pay-return/{id}` orqali ilovani ishonchli ochadi (Universal
+	     Link Safari redirect'idan keyin ko'pincha brauzerda qolib ketadi). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>uz.3dkadastr.payreturn</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>kadastr3d</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>

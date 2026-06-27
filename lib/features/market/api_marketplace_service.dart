@@ -178,6 +178,30 @@ class MarketplaceApiService {
     );
   }
 
+  /// Fetch a 3D-preview URL — ownership is NOT required (free view). The
+  /// backend only serves GLB/GLTF/USDZ here; actual downloads stay gated via
+  /// [getDownloadUrl].
+  Future<DownloadInfo> getPreviewUrl({
+    required int modelId,
+    required int fileId,
+    required String token,
+  }) async {
+    final res = await _client
+        .get(
+          Uri.parse('$_baseUrl/marketplace/$modelId/preview/$fileId'),
+          headers: {'Authorization': 'Bearer $token'},
+        )
+        .timeout(_timeout);
+    if (res.statusCode != 200) _throw(res);
+    final body = jsonDecode(res.body) as Map<String, dynamic>;
+    final raw = body['url'] as String;
+    return DownloadInfo(
+      url: ApiConfig.resolveUrl(raw),
+      format: body['format'] as String? ?? 'GLB',
+      expiresIn: (body['expires_in'] as num?)?.toInt() ?? 0,
+    );
+  }
+
   Never _throw(http.Response res) {
     String msg = 'HTTP ${res.statusCode}';
     try {

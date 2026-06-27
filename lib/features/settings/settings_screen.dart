@@ -8,6 +8,9 @@ import 'package:in_app_review/in_app_review.dart';
 import '../../core/api_config.dart';
 import '../../core/i18n.dart';
 import '../auth/auth_http_client.dart';
+import '../auth/widgets/login_required_sheet.dart';
+import '../home/user_profile.dart' show paymentsHidden;
+import '../payments/my_payments_screen.dart';
 
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
@@ -214,6 +217,16 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
+  Future<void> _openPayments(BuildContext context, Locale locale) async {
+    if (!await ensureLoggedIn(context, message: _S.paymentsLoginMsg(locale))) {
+      return;
+    }
+    if (!context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const MyPaymentsScreen()),
+    );
+  }
+
   Future<void> _openRateApp() async {
     final review = InAppReview.instance;
     if (await review.isAvailable()) {
@@ -244,6 +257,13 @@ class _SettingsScreenState extends State<SettingsScreen>
   Widget _otherCard(BuildContext context, Locale locale) {
     return AppMenuCard(
       rows: [
+        // Reviewer (demo) akkaunti uchun "To'lovlarim" ko'rsatilmaydi.
+        if (!paymentsHidden)
+          AppMenuRow(
+            icon: Icons.receipt_long_outlined,
+            label: _S.payments(locale),
+            onTap: () => _openPayments(context, locale),
+          ),
         AppMenuRow(
           icon: Icons.star_outline_rounded,
           label: _S.rateApp(locale),
@@ -1290,6 +1310,16 @@ class _S {
     'ru' => 'Политика конфиденциальности',
     'en' => 'Privacy policy',
     _ => 'Maxfiylik siyosati',
+  };
+  static String payments(Locale l) => switch (l.languageCode) {
+    'ru' => 'Мои платежи',
+    'en' => 'My payments',
+    _ => "To'lovlarim",
+  };
+  static String paymentsLoginMsg(Locale l) => switch (l.languageCode) {
+    'ru' => 'Войдите, чтобы посмотреть историю платежей.',
+    'en' => 'Log in to view your payment history.',
+    _ => "To'lovlar tarixini ko'rish uchun tizimga kiring.",
   };
   static String rateApp(Locale l) => switch (l.languageCode) {
     'ru' => 'Оценить приложение',

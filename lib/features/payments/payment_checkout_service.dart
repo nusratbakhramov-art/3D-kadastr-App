@@ -11,6 +11,41 @@ class PaymentQuote {
   final String currency;
 }
 
+/// To'lovlar tarixidagi bitta yozuv (`GET /payments/`).
+class PaymentRecord {
+  const PaymentRecord({
+    required this.id,
+    required this.paymentType,
+    required this.provider,
+    required this.amount,
+    required this.status,
+    required this.createdAt,
+    this.referenceType,
+    this.referenceId,
+  });
+
+  final int id;
+  final String paymentType; // ai_valuation | marketplace_purchase | ...
+  final String provider; // payme | click | uzum
+  final num amount;
+  final String status; // pending | processing | completed | failed | cancelled | refunded
+  final DateTime createdAt;
+  final String? referenceType;
+  final int? referenceId;
+
+  factory PaymentRecord.fromJson(Map<String, dynamic> j) => PaymentRecord(
+        id: (j['id'] as num).toInt(),
+        paymentType: (j['payment_type'] as String?) ?? '',
+        provider: (j['provider'] as String?) ?? '',
+        amount: num.tryParse('${j['amount']}') ?? 0,
+        status: ((j['status'] as String?) ?? 'pending').toLowerCase(),
+        createdAt: DateTime.tryParse('${j['created_at']}')?.toLocal() ??
+            DateTime.fromMillisecondsSinceEpoch(0),
+        referenceType: j['reference_type'] as String?,
+        referenceId: (j['reference_id'] as num?)?.toInt(),
+      );
+}
+
 /// AI Baholash arizasi to'lovi:
 ///   • [getQuote] — summani backenddan oladi (UI'da ko'rsatish uchun),
 ///   • [initiate] — to'lovni boshlaydi va Payme checkout URL'ini qaytaradi.
@@ -85,5 +120,27 @@ class PaymentCheckoutService {
     if (res.statusCode != 200) return 'unknown';
     final b = jsonDecode(res.body) as Map<String, dynamic>;
     return (b['status'] as String?)?.toLowerCase() ?? 'unknown';
+  }
+
+  /// To'lovlar tarixi. [status] berilsa — server tomonда shu status bo'yicha
+  /// filtrlanadi (`pending`/`processing`/`completed`/`failed`/`cancelled`).
+  Future<({List<PaymentRecord> items, int total})> list({
+    int page = 1,
+    int size = 100,
+    String? status,
+  }) async {
+    final qp = <String, String>{'page': '$page', 'size': '$size'};
+    if (status != null) qp['status'] = status;
+    final uri = Uri.parse('${ApiConfig.baseUrl}/payments/')
+        .replace(queryParameters: qp);
+    final res = await _client.get(uri).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('To\'lovlarni olishda xatolik (${res.statusCode})');
+    }
+    final b = jsonDecode(res.body) as Map<String, dynamic>;
+    final items = ((b['items'] as List<dynamic>?) ?? const [])
+        .map((e) => PaymentRecord.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return (items: items, total: (b['total'] as num?)?.toInt() ?? items.length);
   }
 }

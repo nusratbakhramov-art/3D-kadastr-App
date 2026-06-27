@@ -17,6 +17,7 @@ import '../../../core/i18n.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
+import '../../home/user_profile.dart' show paymentsHidden;
 import '../../market/widgets/listing_cta_button.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
@@ -579,23 +580,26 @@ class _ResultView extends StatelessWidget {
           ),
         ),
         // Fixed bottom CTA — "Ariza yuborish" → to'lov bottom-sheet'i (Payme).
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: ListingCtaButton(
-            label: _AiStatusStrings.submitApplication(l),
-            enabled: true,
-            // Natijadan keyin: "Qaysi narxda sotmoqchisiz?" (ixtiyoriy) →
-            // appraiser hujjatlari → to'lov.
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => AiTargetPriceScreen(
-                  jobId: snapshot.id,
-                  estimatedValue: estimated,
+        // Reviewer (demo) akkaunti uchun yashiriladi — AI dastlabki natijasi
+        // bepul ko'rinadi, lekin pullik rasmiy ariza topshirish ko'rsatilmaydi.
+        if (!paymentsHidden)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: ListingCtaButton(
+              label: _AiStatusStrings.submitApplication(l),
+              enabled: true,
+              // Natijadan keyin: "Qaysi narxda sotmoqchisiz?" (ixtiyoriy) →
+              // appraiser hujjatlari → to'lov.
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => AiTargetPriceScreen(
+                    jobId: snapshot.id,
+                    estimatedValue: estimated,
+                  ),
                 ),
               ),
             ),
           ),
-        ),
       ],
     );
   }

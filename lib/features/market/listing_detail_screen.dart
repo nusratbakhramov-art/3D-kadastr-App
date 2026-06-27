@@ -11,6 +11,7 @@ import '../../theme/app_colors.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_storage.dart';
 import '../auth/widgets/login_required_sheet.dart';
+import '../home/user_profile.dart' show paymentsHidden;
 import '../settings/settings_state.dart';
 import 'api_marketplace_service.dart';
 import 'listing_3d_viewer_screen.dart';
@@ -95,13 +96,9 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
   }
 
   Future<void> _open3DViewer() async {
-    // Pullik va hali sotib olinmagan bo'lsa — ko'rish o'rniga sotib olish oqimi.
-    if (!_unlocked) {
-      await _onBuy();
-      return;
-    }
-    // 3D ko'rish ham faylni yuklab oladi (auth talab qilinadi) — mehmonni
-    // toza login drawer bilan kutib olamiz, buzilgan viewer o'rniga.
+    // 3D ko'rish BEPUL (sotib olish shart emas) — faqat ko'rish, yuklab olish
+    // emas. Mehmonni toza login drawer bilan kutib olamiz (auth talab qilinadi,
+    // chunki preview ham token bilan ishlaydi), buzilgan viewer o'rniga.
     if (!await ensureLoggedIn(
       context,
       storage: widget.authStorage,
@@ -122,6 +119,9 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
   }
 
   Future<void> _onBuy() async {
+    // Reviewer (demo) akkaunti hech qachon sotib ololmaydi — to'lov oqimi
+    // ko'rsatilmaydi (locked format bosilsa ham hech narsa qilmaymiz).
+    if (paymentsHidden) return;
     // Mehmon → login drawer (xom 401 o'rniga). Login'dan keyin egalik allaqachon
     // bo'lishi mumkin (ilgari shu akkaunt sotib olgan) — qayta tekshiramiz.
     if (!await ensureLoggedIn(
@@ -289,16 +289,14 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
                 child: _OwnedBadge(label: _ownedLabel(locale)),
               ),
             ],
-            // Formatlar/3D doim ko'rinadi — xaridor nima olishini ko'radi.
-            // Locked bo'lsa, bosilganda sotib olish oqimi ochiladi.
+            // 3D ko'rish doim ochiq (bepul preview). Formatlar ham doim
+            // ko'rinadi (xaridor nima olishini ko'radi), lekin locked bo'lsa
+            // bosilganda sotib olish oqimi ochiladi.
             if (_has3DViewable) ...[
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _View3DButton(
-                  onTap: _open3DViewer,
-                  locked: !unlocked,
-                ),
+                child: _View3DButton(onTap: _open3DViewer),
               ),
             ],
             if (listing.files.isNotEmpty) ...[
@@ -313,7 +311,9 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
                 ),
               ),
             ],
-            if (!unlocked) ...[
+            // Reviewer (demo) akkaunti uchun "Sotib olish" ko'rsatilmaydi —
+            // bepul modellardan foydalanadi (pulli formatlar locked qoladi).
+            if (!unlocked && !paymentsHidden) ...[
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -400,10 +400,9 @@ class _OwnedBadge extends StatelessWidget {
 }
 
 class _View3DButton extends StatelessWidget {
-  const _View3DButton({required this.onTap, this.locked = false});
+  const _View3DButton({required this.onTap});
 
   final VoidCallback onTap;
-  final bool locked;
 
   @override
   Widget build(BuildContext context) {
@@ -424,11 +423,7 @@ class _View3DButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                locked ? Icons.lock_outline_rounded : Icons.view_in_ar_rounded,
-                size: 22,
-                color: fg,
-              ),
+              Icon(Icons.view_in_ar_rounded, size: 22, color: fg),
               const SizedBox(width: 10),
               Text(
                 '3D modelni ko‘rish',
