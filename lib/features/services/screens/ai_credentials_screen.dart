@@ -299,9 +299,9 @@ class _S {
   };
 
   static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Перейти к оплате',
-    'en' => 'Continue to payment',
-    _ => 'To\'lovga o\'tish',
+    'ru' => 'Воспользоваться платной услугой',
+    'en' => 'Use paid service',
+    _ => 'Pullik xizmatdan foydalanish',
   };
 
   static String empty(Locale l) => switch (l.languageCode) {

@@ -1,15 +1,16 @@
 /// AI Baholash wizard — intake step.
 ///
 /// One scrollable screen with four sections:
-///   • Property photos (inside/outside, 1-15)  → vision condition
+///   • Property photos (inside + exterior)     → vision condition
 ///   • Kadastr documents (1-20)                → AI fact extraction
 ///   • Passport / ID (optional)                → owner for the report
 ///   • Rooms (optional)                        → dynamic breakdown
 ///
 /// Files are uploaded to S3 the moment they're picked; the returned keys are
-/// stored on the bundle. Photos, kadastr documents, and the floor numbers are
-/// required to enable "Hisoblash"; passport and rooms are optional. Tapping the
-/// still-disabled button surfaces what's missing (no permanent banner).
+/// stored on the bundle. Photos (at least 4 per room and no fewer than 12 in
+/// total), kadastr documents, and the floor numbers are required to enable
+/// "Hisoblash"; passport and rooms are optional. Tapping the still-disabled
+/// button surfaces what's missing (no permanent banner).
 library;
 
 import 'dart:io';
@@ -113,12 +114,27 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   // user gets a friendly hint instead of a raw 422 from the server.
   static const int _maxFloors = 200;
 
+  // Photo minimums: at least 4 real photos per room and no fewer than 12 in
+  // total (owner spec). When rooms are provided the required count scales with
+  // them; otherwise the flat 12 applies. Cap high enough to satisfy either.
+  static const int _minPhotos = 12;
+  static const int _minPhotosPerRoom = 4;
+  static const int _maxPhotos = 60;
+
+  // Sum of the optional rooms breakdown (each row carries a count).
+  int get _roomCount =>
+      widget.bundle.rooms.fold(0, (sum, r) => sum + r.count);
+
+  // How many photos we require before "Hisoblash" unlocks.
+  int get _requiredPhotos =>
+      math.max(_minPhotos, _roomCount * _minPhotosPerRoom);
+
   // ── Required-fields gate ──────────────────────────────────────────────
-  // Photos, kadastr docs, rooms, and both floor numbers are mandatory.
-  // Passport stays optional.
+  // Photos (min count), kadastr docs, and both floor numbers are mandatory.
+  // Passport and rooms stay optional.
   bool get _ready =>
       !_anyUploading &&
-      widget.bundle.imageKeys.isNotEmpty &&
+      widget.bundle.imageKeys.length >= _requiredPhotos &&
       widget.bundle.kadastrKeys.isNotEmpty &&
       widget.bundle.floor != null &&
       widget.bundle.totalFloors != null &&
@@ -132,8 +148,11 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     if (_ready) return null;
     final l = localeNotifier.value;
     if (_anyUploading) return _Strings.uploadingFiles(l);
+    final havePhotos = widget.bundle.imageKeys.length;
+    if (havePhotos < _requiredPhotos) {
+      return _Strings.minPhotosNeeded(l, _requiredPhotos, havePhotos);
+    }
     final missing = <String>[];
-    if (widget.bundle.imageKeys.isEmpty) missing.add(_Strings.missingPhoto(l));
     if (widget.bundle.kadastrKeys.isEmpty) {
       missing.add(_Strings.missingKadastr(l));
     }
@@ -172,9 +191,9 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
 
   // ── Property photos (image_picker) ──────────────────────────────────
   Future<void> _addPhotos() async {
-    final remaining = 15 - _photoItems.length;
+    final remaining = _maxPhotos - _photoItems.length;
     if (remaining <= 0) {
-      _toast(_Strings.maxPhotos(localeNotifier.value, 15));
+      _toast(_Strings.maxPhotos(localeNotifier.value, _maxPhotos));
       return;
     }
     final List<XFile> picked = await _imagePicker.pickMultiImage(
@@ -457,7 +476,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                         emptyIcon: Icons.add_photo_alternate_outlined,
                         actionLabel: _Strings.addPhotosCta(l),
                         items: _photoItems,
-                        maxFiles: 15,
+                        maxFiles: _maxPhotos,
                         onAdd: _addPhotos,
                         onRetry: (it) => _retry(
                           it,
@@ -1113,6 +1132,7 @@ class _FloorSection extends StatelessWidget {
             Expanded(
               child: _FloorField(
                 label: _Strings.objectFloor(l),
+                hint: _Strings.objectFloorHint(l),
                 controller: floorCtrl,
                 onChanged: onFloorChanged,
               ),
@@ -1121,6 +1141,7 @@ class _FloorSection extends StatelessWidget {
             Expanded(
               child: _FloorField(
                 label: _Strings.totalFloors(l),
+                hint: _Strings.totalFloorsHint(l),
                 controller: totalFloorsCtrl,
                 onChanged: onTotalChanged,
               ),
@@ -1135,11 +1156,13 @@ class _FloorSection extends StatelessWidget {
 class _FloorField extends StatelessWidget {
   const _FloorField({
     required this.label,
+    required this.hint,
     required this.controller,
     required this.onChanged,
   });
 
   final String label;
+  final String hint;
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
 
@@ -1183,11 +1206,17 @@ class _FloorField extends StatelessWidget {
               fontSize: 17,
               color: textColor,
             ),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               isDense: true,
-              hintText: '—',
+              hintText: hint,
+              hintStyle: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w500,
+                fontSize: 15,
+                color: muted.withValues(alpha: 0.6),
+              ),
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(vertical: 4),
+              contentPadding: const EdgeInsets.symmetric(vertical: 4),
             ),
           ),
         ],
@@ -1615,9 +1644,15 @@ class _Strings {
   };
 
   static String objectPhotosHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Внутри и снаружи (1-15). Для оценки состояния.',
-    'en' => 'Inside and outside (1-15). To assess the condition.',
-    _ => 'Ichki va tashqi (1-15). Holatni baholash uchun.',
+    'ru' =>
+      'Минимум 4 фото на комнату, всего не менее 12. Обязательно добавьте '
+          'внешний вид: входную дверь, вход и наружные стены.',
+    'en' =>
+      'At least 4 photos per room, minimum 12 in total. Be sure to add the '
+          'exterior too: the entrance door, the outside entry and external walls.',
+    _ =>
+      'Har bir xona uchun kamida 4 ta, jami kamida 12 ta rasm. Tashqi '
+          'ko\'rinishni ham qo\'shing: kirish eshigi, tashqi kirish va tashqi devorlar.',
   };
 
   static String kadastrDocs(Locale l) => switch (l.languageCode) {
@@ -1645,27 +1680,39 @@ class _Strings {
   };
 
   static String floor(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этаж',
-    'en' => 'Floor',
-    _ => 'Qavat',
+    'ru' => 'Этажи',
+    'en' => 'Floors',
+    _ => 'Qavatlar',
   };
 
   static String floorDescription(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этаж объекта и всего этажей в здании',
-    'en' => 'Object floor and total floors in the building',
-    _ => 'Obyekt qavati va binodagi jami qavatlar',
+    'ru' => 'На каком этаже ваша квартира и сколько всего этажей в доме?',
+    'en' => 'Which floor is your home on, and how many floors are in the building?',
+    _ => 'Uyingiz nechinchi qavatda va bino necha qavatli?',
   };
 
   static String objectFloor(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этаж объекта',
-    'en' => 'Object floor',
-    _ => 'Obyekt qavati',
+    'ru' => 'Ваш этаж',
+    'en' => 'Your floor',
+    _ => 'Sizning qavatingiz',
+  };
+
+  static String objectFloorHint(Locale l) => switch (l.languageCode) {
+    'ru' => 'напр. 2',
+    'en' => 'e.g. 2',
+    _ => 'masalan, 2',
   };
 
   static String totalFloors(Locale l) => switch (l.languageCode) {
-    'ru' => 'Всего этажей',
-    'en' => 'Total floors',
-    _ => 'Jami qavatlar',
+    'ru' => 'Этажей в доме',
+    'en' => 'Floors in the building',
+    _ => 'Binodagi qavatlar',
+  };
+
+  static String totalFloorsHint(Locale l) => switch (l.languageCode) {
+    'ru' => 'напр. 4',
+    'en' => 'e.g. 4',
+    _ => 'masalan, 4',
   };
 
   static String roomsOptional(Locale l) => switch (l.languageCode) {
@@ -1740,11 +1787,13 @@ class _Strings {
     _ => 'Fayl qo\'shish',
   };
 
-  static String missingPhoto(Locale l) => switch (l.languageCode) {
-    'ru' => 'фото',
-    'en' => 'photo',
-    _ => 'rasm',
-  };
+  // "Need at least N photos (M added)" — shown while below the minimum.
+  static String minPhotosNeeded(Locale l, int need, int have) =>
+      switch (l.languageCode) {
+        'ru' => 'Нужно не менее $need фото (добавлено $have)',
+        'en' => 'At least $need photos required ($have added)',
+        _ => 'Kamida $need ta rasm kerak ($have ta qo\'shildi)',
+      };
 
   static String missingKadastr(Locale l) => switch (l.languageCode) {
     'ru' => 'кадастровый документ',

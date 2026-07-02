@@ -117,6 +117,8 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
                         suffix: _S.soum(l),
                         onChanged: (_) => setState(() {}),
                       ),
+                      const SizedBox(height: 16),
+                      _AssessmentNote(text: _S.assessment(l), isDark: isDark),
                     ],
                   ),
                 ),
@@ -231,6 +233,51 @@ class _AmountField extends StatelessWidget {
   }
 }
 
+/// Yashil "check" bilan — foydalanuvchi baholash xulosasini olishini bildiradi.
+class _AssessmentNote extends StatelessWidget {
+  const _AssessmentNote({required this.text, required this.isDark});
+
+  final String text;
+  final bool isDark;
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = isDark
+        ? AppColors.splashGreen.withValues(alpha: 0.12)
+        : AppColors.splashGreen.withValues(alpha: 0.08);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.splashGreen.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.verified_outlined,
+              size: 20, color: AppColors.splashGreen),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 13.5,
+                height: 1.35,
+                fontWeight: FontWeight.w600,
+                color: textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Digits-only with thousands grouping (`12 500 000`), cursor kept at the end.
 class _MoneyInputFormatter extends TextInputFormatter {
   const _MoneyInputFormatter();
@@ -271,16 +318,23 @@ class _S {
 
   static String heading(Locale l) => _pick(
         l,
-        'Qaysi narxda sotmoqchisiz?',
-        'По какой цене хотите продать?',
-        'What price do you want to sell at?',
+        'Siz tomoningizdan taklif etilayotgan narx summasini yozing',
+        'Укажите сумму цены, предлагаемую с вашей стороны',
+        'Enter the price amount you are proposing',
       );
 
   static String subheading(Locale l) => _pick(
         l,
-        'Ixtiyoriy. Mutaxassis siz so\'ragan narxni inobatga oladi.',
-        'Необязательно. Специалист учтёт запрошенную вами цену.',
-        'Optional. The specialist will take your asking price into account.',
+        'Ixtiyoriy. Mutaxassis siz taklif etgan narxni inobatga oladi.',
+        'Необязательно. Специалист учтёт предложенную вами цену.',
+        'Optional. The specialist will take your proposed price into account.',
+      );
+
+  static String assessment(Locale l) => _pick(
+        l,
+        'Ko\'chmas mulk bozor qiymatini baholash xulosasini olasiz',
+        'Вы получите заключение об оценке рыночной стоимости недвижимости',
+        'You will receive a real-estate market-value assessment report',
       );
 
   static String soum(Locale l) => _pick(l, 'so\'m', 'сум', 'soum');
