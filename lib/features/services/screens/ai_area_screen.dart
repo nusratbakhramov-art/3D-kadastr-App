@@ -1,10 +1,9 @@
-/// AI Baholash — natijadan OLDINGI qadam: foydalanuvchidan MAQSADLI sotuv
-/// narxini so'raydi ("Qaysi narxda sotmoqchisiz?").
+/// AI Baholash — birinchi qadam skandan keyin: obyekt maydonini (m²) so'raydi.
 ///
-/// Ixtiyoriy — bo'sh qoldirib davom etish mumkin. Kiritilgan qiymat bundle'ga
-/// (`targetSellPrice`) yoziladi; keyingi (natija) ekrani arizani yaratgach uni
-/// `PATCH /ai-valuations/{id}/target-price` orqali biriktiradi — shu bois
-/// baholovchi qancha so'ralayotganini boshidanoq ko'radi. Keyin natija ekrani.
+/// Alohida ekran (davreestr lookup'idan oldin), chunki davreestr endi ixtiyoriy
+/// (skip qilinishi mumkin) — shu bois obyekt maydonini foydalanuvchidan shu
+/// yerda aniq olamiz. Kiritilgan qiymat bundle'ga (`areaM2`) yoziladi va submit
+/// payloadida `total_area` sifatida ketadi.
 library;
 
 import 'package:flutter/material.dart';
@@ -12,45 +11,55 @@ import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
-import '../models/ai_baholash_bundle.dart';
+import '../models/ai_scan_result.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
-import 'ai_status_screen.dart';
+import 'ai_cadastre_screen.dart';
 
-class AiTargetPriceScreen extends StatefulWidget {
-  const AiTargetPriceScreen({super.key, required this.bundle});
+class AiAreaScreen extends StatefulWidget {
+  const AiAreaScreen({super.key, this.scan, this.draftId, this.scanJobId});
 
-  /// To'liq wizard bundle — narx shunga yoziladi va natija ekraniga uzatiladi.
-  final AiBaholashBundle bundle;
+  /// 3D skan natijasi (oldingi qadamdan) — keyingi ekranlarga uzatiladi.
+  final AiScanResult? scan;
+
+  /// Skandan keyin yaratilgan DRAFT ariza id.
+  final int? draftId;
+
+  /// Resume oqimi: skanlangan 3D model bor draft id (cadastre ekraniga uzatiladi).
+  final int? scanJobId;
 
   @override
-  State<AiTargetPriceScreen> createState() => _AiTargetPriceScreenState();
+  State<AiAreaScreen> createState() => _AiAreaScreenState();
 }
 
-class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
-  final TextEditingController _ctrl = TextEditingController();
+class _AiAreaScreenState extends State<AiAreaScreen> {
+  final TextEditingController _areaCtrl = TextEditingController();
 
   @override
   void dispose() {
-    _ctrl.dispose();
+    _areaCtrl.dispose();
     super.dispose();
   }
 
-  double? get _enteredPrice {
-    final digits = _ctrl.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.isEmpty) return null;
-    return double.tryParse(digits);
+  double? get _area {
+    final t = _areaCtrl.text.replaceAll(',', '.').replaceAll(RegExp(r'[^0-9.]'), '');
+    if (t.isEmpty) return null;
+    return double.tryParse(t);
   }
 
   void _continue() {
+    final area = _area;
+    if (area == null || area <= 0) return;
     HapticFeedback.lightImpact();
-    // Narxni bundle'ga yozamiz (ixtiyoriy) — natija ekrani ariza yaratgach
-    // PATCH qiladi. Keyin hisoblash/natija ekraniga o'tamiz.
-    widget.bundle.targetSellPrice = _enteredPrice;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/status'),
-        builder: (_) => AiStatusScreen(bundle: widget.bundle),
+        settings: const RouteSettings(name: 'ai/area'),
+        builder: (_) => AiCadastreScreen(
+          scan: widget.scan,
+          draftId: widget.draftId,
+          scanJobId: widget.scanJobId,
+          areaM2: area,
+        ),
       ),
     );
   }
@@ -83,7 +92,7 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
                 const SizedBox(height: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 8, activeIndex: 7),
+                  child: StepProgressBar(count: 8, activeIndex: 0),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
@@ -111,34 +120,31 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      _AmountField(
-                        controller: _ctrl,
+                      _AreaField(
+                        controller: _areaCtrl,
                         isDark: isDark,
-                        suffix: _S.soum(l),
+                        suffix: _S.areaUnit(l),
                         onChanged: (_) => setState(() {}),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _S.areaHint(l),
+                        style: TextStyle(
+                          fontFamily: 'MTSText',
+                          fontSize: 12.5,
+                          height: 1.3,
+                          color: subColor,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
                     label: _S.continueLabel(l),
+                    enabled: (_area ?? 0) > 0,
                     onTap: _continue,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: TextButton(
-                    onPressed: _continue,
-                    child: Text(
-                      _S.skip(l),
-                      style: TextStyle(
-                        fontFamily: 'MTSText',
-                        fontSize: 13.5,
-                        color: subColor,
-                      ),
-                    ),
                   ),
                 ),
               ],
@@ -150,8 +156,8 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
   }
 }
 
-class _AmountField extends StatelessWidget {
-  const _AmountField({
+class _AreaField extends StatelessWidget {
+  const _AreaField({
     required this.controller,
     required this.isDark,
     required this.suffix,
@@ -189,11 +195,11 @@ class _AmountField extends StatelessWidget {
           Expanded(
             child: TextField(
               controller: controller,
-              keyboardType: TextInputType.number,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               autofocus: true,
               onChanged: onChanged,
               onTapOutside: (_) => FocusScope.of(context).unfocus(),
-              inputFormatters: const [_MoneyInputFormatter()],
+              inputFormatters: const [_DecimalInputFormatter()],
               cursorColor: AppColors.splashGreen,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -231,28 +237,24 @@ class _AmountField extends StatelessWidget {
   }
 }
 
-/// Digits-only with thousands grouping (`12 500 000`), cursor kept at the end.
-class _MoneyInputFormatter extends TextInputFormatter {
-  const _MoneyInputFormatter();
-
-  static const int _maxDigits = 15;
+/// Faqat raqamlar va bitta kasr nuqtasi (`,` → `.`).
+class _DecimalInputFormatter extends TextInputFormatter {
+  const _DecimalInputFormatter();
 
   @override
   TextEditingValue formatEditUpdate(
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    var digits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    if (digits.length > _maxDigits) digits = digits.substring(0, _maxDigits);
-    final buf = StringBuffer();
-    for (var i = 0; i < digits.length; i++) {
-      if (i != 0 && (digits.length - i) % 3 == 0) buf.write(' ');
-      buf.write(digits[i]);
+    var t = newValue.text.replaceAll(',', '.').replaceAll(RegExp(r'[^0-9.]'), '');
+    final firstDot = t.indexOf('.');
+    if (firstDot != -1) {
+      t = t.substring(0, firstDot + 1) +
+          t.substring(firstDot + 1).replaceAll('.', '');
     }
-    final text = buf.toString();
     return TextEditingValue(
-      text: text,
-      selection: TextSelection.collapsed(offset: text.length),
+      text: t,
+      selection: TextSelection.collapsed(offset: t.length),
     );
   }
 }
@@ -267,31 +269,31 @@ class _S {
       _pick(l, 'AI Baholash', 'AI оценка', 'AI valuation');
 
   static String appBarSub(Locale l) =>
-      _pick(l, 'Sotuv narxingiz', 'Ваша цена продажи', 'Your selling price');
+      _pick(l, 'Obyekt maydoni', 'Площадь объекта', 'Object area');
 
   static String heading(Locale l) => _pick(
         l,
-        'Qaysi narxda sotmoqchisiz?',
-        'По какой цене хотите продать?',
-        'What price do you want to sell at?',
+        'Obyekt maydoni qancha?',
+        'Какая площадь объекта?',
+        "What is the object's area?",
       );
 
   static String subheading(Locale l) => _pick(
         l,
-        'Ixtiyoriy. Mutaxassis siz so\'ragan narxni inobatga oladi.',
-        'Необязательно. Специалист учтёт запрошенную вами цену.',
-        'Optional. The specialist will take your asking price into account.',
+        'Bino / uy umumiy maydonini m² da kiriting.',
+        'Укажите общую площадь здания / дома в м².',
+        'Enter the total building / house area in m².',
       );
 
-  static String soum(Locale l) => _pick(l, 'so\'m', 'сум', 'soum');
+  static String areaUnit(Locale l) => _pick(l, 'm²', 'м²', 'm²');
+
+  static String areaHint(Locale l) => _pick(
+        l,
+        'Bu maydon baholashda ishlatiladi.',
+        'Эта площадь используется в оценке.',
+        'This area is used in the valuation.',
+      );
 
   static String continueLabel(Locale l) =>
       _pick(l, 'Davom etish', 'Продолжить', 'Continue');
-
-  static String skip(Locale l) => _pick(
-        l,
-        'O\'tkazib yuborish',
-        'Пропустить',
-        'Skip',
-      );
 }

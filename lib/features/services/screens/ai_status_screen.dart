@@ -22,7 +22,7 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
-import 'ai_target_price_screen.dart';
+import 'ai_credentials_screen.dart';
 
 class AiStatusScreen extends StatefulWidget {
   const AiStatusScreen({super.key, required this.bundle});
@@ -87,6 +87,20 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
               token: token,
             )
           : await _api.create(bundleJson: widget.bundle.toJson(), token: token);
+      // Maqsadli narx/maydon natijadan OLDIN kiritilgan bo'lsa — ariza
+      // yaratilgach darhol biriktiramiz (best-effort; uzilsa bloklamaymiz).
+      final price = widget.bundle.targetSellPrice;
+      final area = widget.bundle.areaM2;
+      if (price != null || area != null) {
+        try {
+          await _api.setTargetPrice(
+            jobId: id,
+            price: price,
+            areaM2: area,
+            token: token,
+          );
+        } catch (_) {}
+      }
       if (!mounted) return;
       setState(() {
         _jobId = id;
@@ -588,14 +602,11 @@ class _ResultView extends StatelessWidget {
             child: ListingCtaButton(
               label: _AiStatusStrings.submitApplication(l),
               enabled: true,
-              // Natijadan keyin: "Qaysi narxda sotmoqchisiz?" (ixtiyoriy) →
-              // appraiser hujjatlari → to'lov.
+              // Narx endi natijadan OLDIN so'raladi — bu yerdan to'g'ridan-to'g'ri
+              // appraiser hujjatlari → to'lov oqimiga o'tamiz.
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => AiTargetPriceScreen(
-                    jobId: snapshot.id,
-                    estimatedValue: estimated,
-                  ),
+                  builder: (_) => AiCredentialsScreen(referenceId: snapshot.id),
                 ),
               ),
             ),

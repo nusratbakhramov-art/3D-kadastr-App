@@ -19,13 +19,23 @@ import 'ai_scan_resume_screen.dart';
 enum _LoadStatus { idle, loading, loaded, error }
 
 class AiCadastreScreen extends StatefulWidget {
-  const AiCadastreScreen({super.key, this.scan, this.draftId, this.scanJobId});
+  const AiCadastreScreen({
+    super.key,
+    this.scan,
+    this.draftId,
+    this.scanJobId,
+    this.areaM2,
+  });
 
   /// AI Baholashning 3D skan qadami natijasi (oldingi qadamdan uzatiladi).
   final AiScanResult? scan;
 
   /// Skandan keyin yaratilgan DRAFT ariza id (bundle ichiga ko'chiriladi).
   final int? draftId;
+
+  /// Oldingi (maydon) qadamda kiritilган obyekt maydoni (m²) — bundle'ga
+  /// uzatiladi; davreestr skip qilinsa ham baholash maydonini biladi.
+  final double? areaM2;
 
   /// Resume oqimi: skanlangan 3D model bor draft id. Bo'lsa, "3D modelni
   /// ko'rish" tugmasi chiqadi (model backend'dan yuklanib QuickLook'da ochiladi).
@@ -167,13 +177,13 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     }
   }
 
-  Future<void> _continue() async {
-    if (_status != _LoadStatus.loaded || _info == null) return;
+  Future<void> _goNext(CadastreLookupResult info) async {
     HapticFeedback.lightImpact();
     final bundle = AiBaholashBundle(
-      kadastr: _info!,
+      kadastr: info,
       scan: widget.scan,
       draftId: widget.draftId,
+      areaM2: widget.areaM2,
     );
     await saveAiDraftStep(bundle, 'client'); // DRAFT'ni shu qadam bilan saqlash
     if (!mounted) return;
@@ -183,6 +193,18 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
         builder: (_) => AiClientFormScreen(bundle: bundle),
       ),
     );
+  }
+
+  Future<void> _continue() async {
+    if (_status != _LoadStatus.loaded || _info == null) return;
+    await _goNext(_info!);
+  }
+
+  /// Davreestr lookup ixtiyoriy — foydalanuvchi o'tkazib yuborsa, bo'sh kadastr
+  /// bilan davom etamiz (bundle.toJson placeholder cadastre_number yuboradi;
+  /// obyekt maydoni oldingi qadamdan allaqachon olingan).
+  Future<void> _skip() async {
+    await _goNext(const CadastreLookupResult(cadastreNumber: ''));
   }
 
   @override
@@ -216,7 +238,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 6, activeIndex: 0),
+                      child: const StepProgressBar(count: 8, activeIndex: 1),
                     ),
                     if (widget.scanJobId != null) ...[
                       const SizedBox(height: 12),
@@ -320,11 +342,27 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
                       child: ListingCtaButton(
                         label: _CadastreStrings.continueLabel(l),
                         enabled: _status == _LoadStatus.loaded,
                         onTap: _continue,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                      child: TextButton(
+                        onPressed: _skip,
+                        child: Text(
+                          _CadastreStrings.skip(l),
+                          style: TextStyle(
+                            fontFamily: 'MTSText',
+                            fontSize: 13.5,
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.6)
+                                : const Color(0xFF8A9097),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -937,6 +975,12 @@ class _CadastreStrings {
     'ru' => 'Продолжить',
     'en' => 'Continue',
     _ => 'Davom etish',
+  };
+
+  static String skip(Locale l) => switch (l.languageCode) {
+    'ru' => 'Пропустить (без кадастра)',
+    'en' => 'Skip (without cadastre)',
+    _ => "O'tkazib yuborish (kadastrsiz)",
   };
 
   static String helperSuffix(Locale l) => switch (l.languageCode) {

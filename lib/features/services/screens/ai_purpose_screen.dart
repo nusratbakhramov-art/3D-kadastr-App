@@ -203,7 +203,7 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
                 const SizedBox(height: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 6, activeIndex: 3),
+                  child: StepProgressBar(count: 8, activeIndex: 4),
                 ),
                 const SizedBox(height: 12),
                 Expanded(

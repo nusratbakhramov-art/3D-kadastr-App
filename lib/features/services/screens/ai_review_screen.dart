@@ -19,7 +19,7 @@ import '../widgets/file_preview_gallery.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
 import '../widgets/wizard_review_section.dart';
-import 'ai_status_screen.dart';
+import 'ai_target_price_screen.dart';
 
 class AiReviewScreen extends StatelessWidget {
   const AiReviewScreen({super.key, required this.bundle});
@@ -38,10 +38,12 @@ class AiReviewScreen extends StatelessWidget {
 
   void _submit(BuildContext context) {
     HapticFeedback.lightImpact();
+    // Natijadan OLDIN maqsadli narxni so'raymiz; narx ekrani natija ekraniga
+    // (AiStatusScreen) o'tadi va u yerda ariza yuboriladi.
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/status'),
-        builder: (_) => AiStatusScreen(bundle: bundle),
+        settings: const RouteSettings(name: 'ai/target-price'),
+        builder: (_) => AiTargetPriceScreen(bundle: bundle),
       ),
     );
   }
@@ -72,7 +74,7 @@ class AiReviewScreen extends StatelessWidget {
                 const SizedBox(height: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 6, activeIndex: 5),
+                  child: StepProgressBar(count: 8, activeIndex: 6),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
@@ -103,7 +105,7 @@ class AiReviewScreen extends StatelessWidget {
                         rows: [
                           (_S.cadastreNumber(l), k.cadastreNumber),
                           (_S.address(l), k.address ?? ''),
-                          (_S.area(l), _fmtArea(k.totalArea)),
+                          (_S.area(l), _fmtArea(bundle.areaM2 ?? k.totalArea)),
                           (_S.value(l), _fmtUzs(k.cadastreValue, l)),
                         ],
                       ),

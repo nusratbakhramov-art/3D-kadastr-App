@@ -443,7 +443,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                 const SizedBox(height: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 6, activeIndex: 4),
+                  child: StepProgressBar(count: 8, activeIndex: 5),
                 ),
                 const SizedBox(height: 12),
                 Expanded(

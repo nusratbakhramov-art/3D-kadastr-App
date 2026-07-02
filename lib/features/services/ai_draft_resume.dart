@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../auth/auth_storage.dart';
 import 'api_ai_valuation_job_service.dart';
 import 'models/ai_baholash_bundle.dart';
+import 'screens/ai_area_screen.dart';
 import 'screens/ai_cadastre_screen.dart';
 import 'screens/ai_client_form_screen.dart';
 import 'screens/ai_intake_screen.dart';
@@ -17,6 +18,12 @@ import 'screens/ai_purpose_screen.dart';
 /// resume mantig'i bir joyda.
 Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
   switch (step) {
+    case 'area':
+      return AiAreaScreen(
+        scan: bundle.scan,
+        draftId: bundle.draftId,
+        scanJobId: scanJobId,
+      );
     case 'client':
       return AiClientFormScreen(bundle: bundle);
     case 'location':
@@ -31,6 +38,7 @@ Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
         scan: bundle.scan,
         draftId: bundle.draftId,
         scanJobId: scanJobId,
+        areaM2: bundle.areaM2,
       );
   }
 }

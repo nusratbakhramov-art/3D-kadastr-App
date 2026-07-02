@@ -7,6 +7,7 @@ import '../../../widgets/app_toast.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
+import 'ai_area_screen.dart';
 import 'ai_cadastre_screen.dart';
 import 'ai_client_form_screen.dart';
 import 'ai_intake_screen.dart';
@@ -104,6 +105,12 @@ class _AiDraftsScreenState extends State<AiDraftsScreen> {
   /// "3D modelni ko'rish" tugmasi chiqadi.
   Widget _stepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
     switch (step) {
+      case 'area':
+        return AiAreaScreen(
+          scan: bundle.scan,
+          draftId: bundle.draftId,
+          scanJobId: scanJobId,
+        );
       case 'client':
         return AiClientFormScreen(bundle: bundle);
       case 'location':
@@ -118,6 +125,7 @@ class _AiDraftsScreenState extends State<AiDraftsScreen> {
           scan: bundle.scan,
           draftId: bundle.draftId,
           scanJobId: scanJobId,
+          areaM2: bundle.areaM2,
         );
     }
   }

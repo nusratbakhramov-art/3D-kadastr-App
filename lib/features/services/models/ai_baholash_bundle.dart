@@ -20,6 +20,8 @@ class AiBaholashBundle {
     this.purpose = ValuationPurpose.sale,
     this.purposeBasis,
     this.addressee,
+    this.areaM2,
+    this.targetSellPrice,
     this.floor,
     this.totalFloors,
     List<AiRoom>? rooms,
@@ -60,6 +62,17 @@ class AiBaholashBundle {
   /// Кимга тақдим этилади — cover-letter addressee ("… га").
   String? addressee;
 
+  /// Object area (m²) the user enters up front, right after the scan — its own
+  /// step, before the (now optional) davreestr lookup. Feeds `total_area` in the
+  /// submit payload (so the valuation + admin use it even when davreestr is
+  /// skipped) and is echoed to `area_m2` via the target-price PATCH.
+  double? areaM2;
+
+  /// Desired selling price (so'm) the user enters BEFORE the AI result. Not sent
+  /// in the create payload — the status screen PATCHes it right after the job is
+  /// created (`/target-price`), so the specialist sees it from the start.
+  double? targetSellPrice;
+
   /// Which floor the object is on, and total floors in the building. Both are
   /// required by the intake step and adjust the market value (ground/top floor
   /// discount).
@@ -92,7 +105,8 @@ class AiBaholashBundle {
           if (kadastr.address != null) 'address': kadastr.address,
           if (kadastr.objectTypeHint != null)
             'object_type_hint': kadastr.objectTypeHint,
-          if (kadastr.totalArea != null) 'total_area': kadastr.totalArea,
+          if ((areaM2 ?? kadastr.totalArea) != null)
+            'total_area': areaM2 ?? kadastr.totalArea,
           if (kadastr.livingArea != null) 'living_area': kadastr.livingArea,
           if (kadastr.cadastreValue != null)
             'cadastre_value': kadastr.cadastreValue,
@@ -120,6 +134,7 @@ class AiBaholashBundle {
       kadastr: CadastreLookupResult.fromJson(k),
       draftId: draftId,
       purpose: ValuationPurpose.fromWire(j['purpose'] as String?),
+      areaM2: (k['total_area'] as num?)?.toDouble(),
       floor: (j['floor'] as num?)?.toInt(),
       totalFloors: (j['total_floors'] as num?)?.toInt(),
       rooms: ((j['rooms'] as List?) ?? const [])
