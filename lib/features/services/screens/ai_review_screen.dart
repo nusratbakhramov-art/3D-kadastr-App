@@ -18,13 +18,22 @@ import '../models/ai_baholash_bundle.dart';
 import '../widgets/file_preview_gallery.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import '../widgets/terms_consent.dart';
 import '../widgets/wizard_review_section.dart';
 import 'ai_target_price_screen.dart';
 
-class AiReviewScreen extends StatelessWidget {
+class AiReviewScreen extends StatefulWidget {
   const AiReviewScreen({super.key, required this.bundle});
 
   final AiBaholashBundle bundle;
+
+  @override
+  State<AiReviewScreen> createState() => _AiReviewScreenState();
+}
+
+class _AiReviewScreenState extends State<AiReviewScreen> {
+  // The user must tick the terms box before the request can fire.
+  bool _agreed = false;
 
   // Jump back to a step to edit it. popUntil removes the screens above the
   // target (incl. this review), so re-traversing forward rebuilds them from the
@@ -37,13 +46,14 @@ class AiReviewScreen extends StatelessWidget {
   }
 
   void _submit(BuildContext context) {
+    if (!_agreed) return;
     HapticFeedback.lightImpact();
     // Natijadan OLDIN maqsadli narxni so'raymiz; narx ekrani natija ekraniga
     // (AiStatusScreen) o'tadi va u yerda ariza yuboriladi.
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'ai/target-price'),
-        builder: (_) => AiTargetPriceScreen(bundle: bundle),
+        builder: (_) => AiTargetPriceScreen(bundle: widget.bundle),
       ),
     );
   }
@@ -53,6 +63,7 @@ class AiReviewScreen extends StatelessWidget {
     final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
+    final bundle = widget.bundle;
     final k = bundle.kadastr;
     final loc = bundle.location;
 
@@ -160,9 +171,17 @@ class AiReviewScreen extends StatelessWidget {
                   ),
                 ),
                 Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                  child: TermsConsent(
+                    value: _agreed,
+                    onChanged: (v) => setState(() => _agreed = v),
+                  ),
+                ),
+                Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
                     label: _S.calculate(l),
+                    enabled: _agreed,
                     onTap: () => _submit(context),
                   ),
                 ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:http/http.dart' as http;
 import 'package:in_app_review/in_app_review.dart';
 
@@ -1083,9 +1084,9 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(20, 0, 20, 16 + safeBottom),
-                child: Text(
+                child: HtmlWidget(
                   _content ?? '',
-                  style: TextStyle(
+                  textStyle: TextStyle(
                     fontFamily: 'MTSText',
                     fontSize: 14,
                     height: 1.6,
