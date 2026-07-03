@@ -135,9 +135,9 @@ class _DetailStrings {
   };
 
   static String orderFile(String lang) => switch (lang) {
-    'ru' => 'Заказ оценки (Narxlash orderi)',
-    'en' => 'Valuation order',
-    _ => 'Narxlash orderi',
+    'ru' => 'Narxlash ma\'lumotnomasi',
+    'en' => 'Valuation certificate',
+    _ => 'Narxlash ma\'lumotnomasi',
   };
 
   static String orderHint(String lang) => switch (lang) {
@@ -2023,7 +2023,7 @@ class _AiOrderCardState extends State<_AiOrderCard> {
             builder: (_) => PdfViewerScreen(
               filePath: path,
               title: '${_DetailStrings.orderFile(lang)} #${widget.jobId}',
-              shareName: 'Narxlash_Orderi_${widget.jobId}.pdf',
+              shareName: 'Narxlash_Malumotnomasi_${widget.jobId}.pdf',
             ),
           ),
         );
@@ -2034,7 +2034,7 @@ class _AiOrderCardState extends State<_AiOrderCard> {
           [
             XFile(path,
                 mimeType: 'application/pdf',
-                name: 'Narxlash_Orderi_${widget.jobId}.pdf'),
+                name: 'Narxlash_Malumotnomasi_${widget.jobId}.pdf'),
           ],
           sharePositionOrigin: _shareOrigin(context),
         );
