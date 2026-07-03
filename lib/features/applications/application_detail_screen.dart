@@ -772,6 +772,11 @@ class _AiFullDetail extends StatefulWidget {
 }
 
 class _AiFullDetailState extends State<_AiFullDetail> {
+  /// Sessiya davomida job snapshot'larini keshda saqlaymiz — detal ekrani
+  /// (yoki "Ariza haqida" tab'i) har ochilganda `/ai-valuations/{id}` ni qayta
+  /// so'ramasligi uchun. Ilova qayta ishga tushmaguncha yashaydi.
+  static final Map<int, AiJobSnapshot> _cache = {};
+
   AiJobSnapshot? _snap;
   bool _loading = true;
   bool _error = false;
@@ -779,7 +784,13 @@ class _AiFullDetailState extends State<_AiFullDetail> {
   @override
   void initState() {
     super.initState();
-    _load();
+    final cached = _cache[widget.jobId];
+    if (cached != null) {
+      _snap = cached;
+      _loading = false;
+    } else {
+      _load();
+    }
   }
 
   Future<void> _load() async {
@@ -789,9 +800,11 @@ class _AiFullDetailState extends State<_AiFullDetail> {
           .get(Uri.parse('${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}'));
       if (res.statusCode != 200) throw HttpException('HTTP ${res.statusCode}');
       final json = jsonDecode(res.body) as Map<String, dynamic>;
+      final snap = AiJobSnapshot.fromJson(json);
+      _cache[widget.jobId] = snap;
       if (!mounted) return;
       setState(() {
-        _snap = AiJobSnapshot.fromJson(json);
+        _snap = snap;
         _loading = false;
       });
     } catch (_) {
