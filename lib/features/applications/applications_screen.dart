@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -64,6 +65,19 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   int _requestId = 0;
   int _entryEpoch = 0;
 
+  // ── Qidiruv + filtrlar (mijoz tomonida — barcha arizalar `_allItems` da) ──
+  final TextEditingController _searchCtrl = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchQuery = '';
+  final Set<ApplicationStatusGroup> _statusFilter = <ApplicationStatusGroup>{};
+  DateTime? _dateFrom;
+  DateTime? _dateTo;
+
+  int get _activeFilterCount =>
+      _statusFilter.length + ((_dateFrom != null || _dateTo != null) ? 1 : 0);
+
+  bool get _hasAnyFilter => _activeFilterCount > 0 || _searchQuery.isNotEmpty;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -96,6 +110,8 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchCtrl.dispose();
     _scrollController
       ..removeListener(_onScroll)
       ..dispose();
@@ -144,10 +160,45 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   }
 
   List<ApplicationItem> get _sourceItems {
-    if (_selectedServiceId == 'all') return _allItems;
-    return _allItems
-        .where((item) => item.serviceId == _selectedServiceId)
-        .toList(growable: false);
+    Iterable<ApplicationItem> items = _allItems;
+
+    // Xizmat chipi.
+    if (_selectedServiceId != 'all') {
+      items = items.where((item) => item.serviceId == _selectedServiceId);
+    }
+    // Holat (status) filtri.
+    if (_statusFilter.isNotEmpty) {
+      items = items.where((item) => _statusFilter.contains(item.statusGroup));
+    }
+    // Sana oralig'i (ariza yaratilgan sana bo'yicha).
+    if (_dateFrom != null) {
+      final from = DateTime(_dateFrom!.year, _dateFrom!.month, _dateFrom!.day);
+      items = items.where((item) => !item.createdAt.isBefore(from));
+    }
+    if (_dateTo != null) {
+      final toEnd = DateTime(_dateTo!.year, _dateTo!.month, _dateTo!.day)
+          .add(const Duration(days: 1));
+      items = items.where((item) => item.createdAt.isBefore(toEnd));
+    }
+    // Matnli qidiruv — #id, kadastr/manzil, tur bo'yicha.
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      items = items.where((item) => _matchesQuery(item, q));
+    }
+    return items.toList(growable: false);
+  }
+
+  bool _matchesQuery(ApplicationItem item, String q) {
+    final buf = StringBuffer()
+      ..write(item.addressValue)
+      ..write(' ')
+      ..write(item.typeValue ?? '')
+      ..write(' ')
+      ..write(item.serviceLabel);
+    if (item.orderNo != null) {
+      buf.write(' #${item.orderNo} ${item.orderNo}');
+    }
+    return buf.toString().toLowerCase().contains(q);
   }
 
   Future<void> _ensureInitialized() async {
@@ -760,6 +811,74 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     unawaited(_loadFirstPage());
   }
 
+  void _reapply() {
+    if (_initialized) unawaited(_loadFirstPage());
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 260), () {
+      if (!mounted || value == _searchQuery) return;
+      setState(() => _searchQuery = value);
+      _reapply();
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchCtrl.clear();
+    if (_searchQuery.isEmpty) return;
+    setState(() => _searchQuery = '');
+    _reapply();
+  }
+
+  Future<void> _openFilterSheet() async {
+    final result = await showModalBottomSheet<_FilterResult>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FilterSheet(
+        initialStatuses: _statusFilter,
+        initialFrom: _dateFrom,
+        initialTo: _dateTo,
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _statusFilter
+        ..clear()
+        ..addAll(result.statuses);
+      _dateFrom = result.from;
+      _dateTo = result.to;
+    });
+    _reapply();
+  }
+
+  void _removeStatus(ApplicationStatusGroup group) {
+    setState(() => _statusFilter.remove(group));
+    _reapply();
+  }
+
+  void _clearDateRange() {
+    setState(() {
+      _dateFrom = null;
+      _dateTo = null;
+    });
+    _reapply();
+  }
+
+  void _clearAllFilters() {
+    _searchDebounce?.cancel();
+    _searchCtrl.clear();
+    setState(() {
+      _statusFilter.clear();
+      _dateFrom = null;
+      _dateTo = null;
+      _searchQuery = '';
+    });
+    _reapply();
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -770,13 +889,14 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       body: SafeArea(
         child: Stack(
           children: [
-            RefreshIndicator(
-              color: AppColors.splashGreen,
-              onRefresh: _refresh,
-              child: CustomScrollView(
+            CustomScrollView(
                 controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: BouncingScrollPhysics(),
+                ),
                 slivers: [
+                  // Native iOS "spin + ticks" tortib-yangilash indikatori.
+                  CupertinoSliverRefreshControl(onRefresh: _refresh),
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
@@ -795,6 +915,28 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                               locale: locale,
                               selectedId: _selectedServiceId,
                               onChanged: _onServiceChanged,
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          _SearchFilterBar(
+                            locale: locale,
+                            controller: _searchCtrl,
+                            onChanged: _onSearchChanged,
+                            onClear: _clearSearch,
+                            hasQuery: _searchQuery.isNotEmpty,
+                            activeFilterCount: _activeFilterCount,
+                            onOpenFilters: _openFilterSheet,
+                          ),
+                          if (_activeFilterCount > 0) ...[
+                            const SizedBox(height: 10),
+                            _ActiveFilters(
+                              locale: locale,
+                              statuses: _statusFilter,
+                              from: _dateFrom,
+                              to: _dateTo,
+                              onRemoveStatus: _removeStatus,
+                              onClearDates: _clearDateRange,
+                              onClearAll: _clearAllFilters,
                             ),
                           ],
                         ],
@@ -816,7 +958,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                   else if (_initialized && _items.isEmpty)
                     SliverFillRemaining(
                       hasScrollBody: false,
-                      child: _EmptyState(locale: locale),
+                      child: _EmptyState(
+                        locale: locale,
+                        filtered: _hasAnyFilter,
+                        onReset: _clearAllFilters,
+                      ),
                     )
                   else if (_initialized)
                     SliverPadding(
@@ -857,7 +1003,6 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                     const SliverToBoxAdapter(child: SizedBox.shrink()),
                 ],
               ),
-            ),
             Positioned(
               right: 16,
               bottom: 16,
@@ -1143,20 +1288,63 @@ class _SlidingGradientTransform extends GradientTransform {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.locale});
+  const _EmptyState({required this.locale, this.filtered = false, this.onReset});
 
   final Locale locale;
+  final bool filtered;
+  final VoidCallback? onReset;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        _ApplicationsStrings.empty(locale),
-        style: TextStyle(
-          fontFamily: 'MTSCompact',
-          fontWeight: FontWeight.w500,
-          fontSize: 15,
-          color: ColorTokens.secondaryText(context),
+    final lang = locale.languageCode;
+    if (!filtered) {
+      return Center(
+        child: Text(
+          _ApplicationsStrings.empty(locale),
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w500,
+            fontSize: 15,
+            color: ColorTokens.secondaryText(context),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off_rounded,
+                size: 34, color: ColorTokens.secondaryText(context)),
+            const SizedBox(height: 10),
+            Text(
+              _ApplicationsStrings.noResults(lang),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+                color: ColorTokens.primaryText(context),
+              ),
+            ),
+            if (onReset != null) ...[
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: onReset,
+                child: Text(
+                  _ApplicationsStrings.reset(lang),
+                  style: const TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                    color: AppColors.splashGreen,
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -1253,6 +1441,701 @@ class _ServiceChips extends StatelessWidget {
       selectedId: selectedId,
       onSelected: onChanged,
       padding: EdgeInsets.zero,
+    );
+  }
+}
+
+// ── Qidiruv maydoni + filtr tugmasi ──────────────────────────────────────
+class _SearchFilterBar extends StatelessWidget {
+  const _SearchFilterBar({
+    required this.locale,
+    required this.controller,
+    required this.onChanged,
+    required this.onClear,
+    required this.hasQuery,
+    required this.activeFilterCount,
+    required this.onOpenFilters,
+  });
+
+  final Locale locale;
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+  final bool hasQuery;
+  final int activeFilterCount;
+  final VoidCallback onOpenFilters;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final lang = locale.languageCode;
+    final fill = isDark ? const Color(0xFF1C2123) : const Color(0xFFF1F2F4);
+    final border = isDark ? const Color(0xFF2A2F31) : const Color(0xFFE3E5E8);
+    final textColor = ColorTokens.primaryText(context);
+    final hint = ColorTokens.secondaryText(context);
+
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 46,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: fill,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: border),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.search, size: 20, color: hint),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    onChanged: onChanged,
+                    onTapOutside: (_) => FocusScope.of(context).unfocus(),
+                    textInputAction: TextInputAction.search,
+                    style: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontSize: 15,
+                      color: textColor,
+                    ),
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      border: InputBorder.none,
+                      hintText: _ApplicationsStrings.searchHint(lang),
+                      hintStyle: TextStyle(
+                        fontFamily: 'MTSText',
+                        fontSize: 15,
+                        color: hint,
+                      ),
+                    ),
+                  ),
+                ),
+                if (hasQuery)
+                  GestureDetector(
+                    onTap: onClear,
+                    behavior: HitTestBehavior.opaque,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Icon(Icons.close_rounded, size: 18, color: hint),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: onOpenFilters,
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: activeFilterCount > 0 ? AppColors.splashGreen : fill,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: activeFilterCount > 0 ? AppColors.splashGreen : border,
+              ),
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  Icons.tune_rounded,
+                  size: 22,
+                  color: activeFilterCount > 0 ? Colors.white : hint,
+                ),
+                if (activeFilterCount > 0)
+                  Positioned(
+                    top: 5,
+                    right: 5,
+                    child: Container(
+                      constraints: const BoxConstraints(minWidth: 15),
+                      height: 15,
+                      alignment: Alignment.center,
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$activeFilterCount',
+                        style: const TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 10,
+                          height: 1,
+                          color: AppColors.splashGreen,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Faol filtrlar (o'chirib bo'ladigan chiplar) ──────────────────────────
+class _ActiveFilters extends StatelessWidget {
+  const _ActiveFilters({
+    required this.locale,
+    required this.statuses,
+    required this.from,
+    required this.to,
+    required this.onRemoveStatus,
+    required this.onClearDates,
+    required this.onClearAll,
+  });
+
+  final Locale locale;
+  final Set<ApplicationStatusGroup> statuses;
+  final DateTime? from;
+  final DateTime? to;
+  final ValueChanged<ApplicationStatusGroup> onRemoveStatus;
+  final VoidCallback onClearDates;
+  final VoidCallback onClearAll;
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = locale.languageCode;
+    final chips = <Widget>[];
+    for (final g in ApplicationStatusGroup.values) {
+      if (!statuses.contains(g)) continue;
+      final st = _StatusStyle.fromGroup(g, lang);
+      chips.add(_FilterChipPill(
+        label: st.label,
+        color: st.fgColor,
+        onRemove: () => onRemoveStatus(g),
+      ));
+    }
+    if (from != null || to != null) {
+      chips.add(_FilterChipPill(
+        label: _dateRangeLabel(lang, from, to),
+        color: AppColors.splashGreen,
+        onRemove: onClearDates,
+      ));
+    }
+    if (chips.isEmpty) return const SizedBox.shrink();
+
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: chips.length + 1,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          if (i < chips.length) return chips[i];
+          return GestureDetector(
+            onTap: onClearAll,
+            child: Container(
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Text(
+                _ApplicationsStrings.reset(lang),
+                style: TextStyle(
+                  fontFamily: 'MTSText',
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: ColorTokens.secondaryText(context),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FilterChipPill extends StatelessWidget {
+  const _FilterChipPill({
+    required this.label,
+    required this.color,
+    required this.onRemove,
+  });
+
+  final String label;
+  final Color color;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(11, 0, 7, 0),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 3),
+          GestureDetector(
+            onTap: onRemove,
+            behavior: HitTestBehavior.opaque,
+            child: Padding(
+              padding: const EdgeInsets.all(4),
+              child: Icon(Icons.close_rounded, size: 14, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _shortDate(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${(d.year % 100).toString().padLeft(2, '0')}';
+
+String _fullDate(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}';
+
+String _dateRangeLabel(String lang, DateTime? from, DateTime? to) {
+  if (from != null && to != null) return '${_shortDate(from)} – ${_shortDate(to)}';
+  if (from != null) return '${_ApplicationsStrings.from(lang)} ${_shortDate(from)}';
+  if (to != null) return '${_ApplicationsStrings.to(lang)} ${_shortDate(to)}';
+  return '';
+}
+
+// ── Filtr natijasi (bottom-sheet qaytaradi) ──────────────────────────────
+class _FilterResult {
+  const _FilterResult({required this.statuses, this.from, this.to});
+  final Set<ApplicationStatusGroup> statuses;
+  final DateTime? from;
+  final DateTime? to;
+}
+
+// ── Filtr bottom-sheet (holat + sana oralig'i) ───────────────────────────
+class _FilterSheet extends StatefulWidget {
+  const _FilterSheet({
+    required this.initialStatuses,
+    required this.initialFrom,
+    required this.initialTo,
+  });
+
+  final Set<ApplicationStatusGroup> initialStatuses;
+  final DateTime? initialFrom;
+  final DateTime? initialTo;
+
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  late final Set<ApplicationStatusGroup> _statuses =
+      {...widget.initialStatuses};
+  DateTime? _from;
+  DateTime? _to;
+
+  @override
+  void initState() {
+    super.initState();
+    _from = widget.initialFrom;
+    _to = widget.initialTo;
+  }
+
+  Future<void> _pick({required bool isFrom}) async {
+    final now = DateTime.now();
+    final initial = (isFrom ? _from : _to) ?? now;
+    final picked = await _showDateWheel(
+      initial: initial,
+      first: DateTime(now.year - 3),
+      last: DateTime(now.year + 1, 12, 31),
+    );
+    if (picked == null) return;
+    setState(() {
+      if (isFrom) {
+        _from = picked;
+        if (_to != null && _to!.isBefore(picked)) _to = picked;
+      } else {
+        _to = picked;
+        if (_from != null && _from!.isAfter(picked)) _from = picked;
+      }
+    });
+  }
+
+  /// Native iOS-uslubidagi g'ildirak (wheel) date-picker — aylantirilganda
+  /// haptik javob beradi (CupertinoDatePicker). Tanlangan sanani qaytaradi.
+  Future<DateTime?> _showDateWheel({
+    required DateTime initial,
+    required DateTime first,
+    required DateTime last,
+  }) {
+    final lang = Localizations.localeOf(context).languageCode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1B1F21) : Colors.white;
+    final divider = isDark ? const Color(0xFF2A2F31) : const Color(0xFFE3E5E8);
+    final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+    var temp = initial;
+
+    return showModalBottomSheet<DateTime>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final bottom = MediaQuery.of(ctx).padding.bottom;
+        return Container(
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: EdgeInsets.only(bottom: bottom),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(6, 6, 6, 0),
+                child: Row(
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      child: Text(
+                        _ApplicationsStrings.cancelBtn(lang),
+                        style: TextStyle(
+                          fontFamily: 'MTSText',
+                          fontSize: 15,
+                          color: muted,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Text(
+                        _ApplicationsStrings.selectDate(lang),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: titleColor,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.of(ctx).pop(temp),
+                      child: Text(
+                        _ApplicationsStrings.done(lang),
+                        style: const TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          color: AppColors.splashGreen,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: divider),
+              SizedBox(
+                height: 232,
+                child: CupertinoTheme(
+                  data: CupertinoThemeData(
+                    brightness: isDark ? Brightness.dark : Brightness.light,
+                  ),
+                  child: CupertinoDatePicker(
+                    mode: CupertinoDatePickerMode.date,
+                    initialDateTime: initial,
+                    minimumDate: first,
+                    maximumDate: last,
+                    onDateTimeChanged: (d) => temp = d,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = Localizations.localeOf(context).languageCode;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF14181A) : Colors.white;
+    final textColor = ColorTokens.primaryText(context);
+    final muted = ColorTokens.secondaryText(context);
+    final media = MediaQuery.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: EdgeInsets.fromLTRB(20, 10, 20, 16 + media.padding.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: muted.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            _ApplicationsStrings.filters(lang),
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w900,
+              fontSize: 19,
+              color: textColor,
+            ),
+          ),
+          const SizedBox(height: 18),
+
+          // Holat
+          _SheetLabel(text: _ApplicationsStrings.status(lang)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final g in ApplicationStatusGroup.values)
+                _StatusToggle(
+                  style: _StatusStyle.fromGroup(g, lang),
+                  selected: _statuses.contains(g),
+                  onTap: () => setState(() {
+                    if (!_statuses.add(g)) _statuses.remove(g);
+                  }),
+                ),
+            ],
+          ),
+          const SizedBox(height: 22),
+
+          // Sana oralig'i
+          _SheetLabel(text: _ApplicationsStrings.dateRange(lang)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _DateField(
+                  label: _ApplicationsStrings.from(lang),
+                  value: _from == null ? null : _fullDate(_from!),
+                  placeholder: _ApplicationsStrings.anyDate(lang),
+                  onTap: () => _pick(isFrom: true),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _DateField(
+                  label: _ApplicationsStrings.to(lang),
+                  value: _to == null ? null : _fullDate(_to!),
+                  placeholder: _ApplicationsStrings.anyDate(lang),
+                  onTap: () => _pick(isFrom: false),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => setState(() {
+                    _statuses.clear();
+                    _from = null;
+                    _to = null;
+                  }),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      side: BorderSide(color: muted.withValues(alpha: 0.4)),
+                    ),
+                  ),
+                  child: Text(
+                    _ApplicationsStrings.reset(lang),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: textColor,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.of(context).pop(
+                    _FilterResult(statuses: _statuses, from: _from, to: _to),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.splashGreen,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  child: Text(
+                    _ApplicationsStrings.apply(lang),
+                    style: const TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SheetLabel extends StatelessWidget {
+  const _SheetLabel({required this.text});
+  final String text;
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: TextStyle(
+          fontFamily: 'MTSCompact',
+          fontWeight: FontWeight.w700,
+          fontSize: 13.5,
+          color: ColorTokens.secondaryText(context),
+        ),
+      );
+}
+
+class _StatusToggle extends StatelessWidget {
+  const _StatusToggle({
+    required this.style,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _StatusStyle style;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = style.fgColor;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: EdgeInsets.fromLTRB(selected ? 11 : 14, 9, 14, 9),
+        decoration: BoxDecoration(
+          // Har bir holat o'z rangida — tanlangани to'qroq bo'yaladi.
+          color: c.withValues(alpha: selected ? 0.18 : 0.07),
+          borderRadius: BorderRadius.circular(11),
+          border: Border.all(
+            color: c.withValues(alpha: selected ? 1 : 0.45),
+            width: selected ? 1.6 : 1.2,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              Icon(Icons.check_rounded, size: 15, color: c),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              style.label,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 13.5,
+                color: c,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DateField extends StatelessWidget {
+  const _DateField({
+    required this.label,
+    required this.value,
+    required this.placeholder,
+    required this.onTap,
+  });
+
+  final String label;
+  final String? value;
+  final String placeholder;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fill = isDark ? const Color(0xFF1C2123) : const Color(0xFFF1F2F4);
+    final border = isDark ? const Color(0xFF2A2F31) : const Color(0xFFE3E5E8);
+    final muted = ColorTokens.secondaryText(context);
+    final hasValue = value != null;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: fill,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(fontFamily: 'MTSText', fontSize: 11, color: muted),
+            ),
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                Icon(Icons.calendar_today_rounded, size: 14, color: muted),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    hasValue ? value! : placeholder,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.5,
+                      color: hasValue
+                          ? ColorTokens.primaryText(context)
+                          : muted,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -1407,6 +2290,78 @@ class _ApplicationsStrings {
     'ru' => 'Статус',
     'en' => 'Status',
     _ => 'Holat',
+  };
+
+  static String searchHint(String lang) => switch (lang) {
+    'ru' => 'Поиск (№, адрес)',
+    'en' => 'Search (#, address)',
+    _ => 'Qidirish (№, manzil)',
+  };
+
+  static String filters(String lang) => switch (lang) {
+    'ru' => 'Фильтры',
+    'en' => 'Filters',
+    _ => 'Filtrlar',
+  };
+
+  static String dateRange(String lang) => switch (lang) {
+    'ru' => 'Диапазон дат',
+    'en' => 'Date range',
+    _ => 'Sana oralig\'i',
+  };
+
+  static String from(String lang) => switch (lang) {
+    'ru' => 'С',
+    'en' => 'From',
+    _ => 'Dan',
+  };
+
+  static String to(String lang) => switch (lang) {
+    'ru' => 'По',
+    'en' => 'To',
+    _ => 'Gacha',
+  };
+
+  static String anyDate(String lang) => switch (lang) {
+    'ru' => 'Любая',
+    'en' => 'Any',
+    _ => 'Har qanday',
+  };
+
+  static String apply(String lang) => switch (lang) {
+    'ru' => 'Применить',
+    'en' => 'Apply',
+    _ => 'Qo\'llash',
+  };
+
+  static String selectDate(String lang) => switch (lang) {
+    'ru' => 'Выберите дату',
+    'en' => 'Select date',
+    _ => 'Sanani tanlang',
+  };
+
+  static String done(String lang) => switch (lang) {
+    'ru' => 'Готово',
+    'en' => 'Done',
+    _ => 'Tayyor',
+  };
+
+  static String cancelBtn(String lang) => switch (lang) {
+    'ru' => 'Отмена',
+    'en' => 'Cancel',
+    _ => 'Bekor qilish',
+  };
+
+  static String reset(String lang) => switch (lang) {
+    'ru' => 'Сбросить',
+    'en' => 'Reset',
+    _ => 'Tozalash',
+  };
+
+  static String noResults(String lang) => switch (lang) {
+    'ru' => 'Ничего не найдено',
+    'en' => 'Nothing found',
+    _ => 'Hech narsa topilmadi',
   };
 
   static String price(String lang) => switch (lang) {
