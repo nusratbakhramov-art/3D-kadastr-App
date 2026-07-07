@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 
 class ServicePlaceholderScreen extends StatelessWidget {
@@ -32,7 +33,13 @@ class ServicePlaceholderScreen extends StatelessWidget {
       ),
       body: Center(
         child: Text(
-          'Tez orada',
+          tr(
+            Localizations.localeOf(context),
+            'service.placeholder.coming_soon',
+            uz: 'Bu xizmat tez orada ishga tushadi',
+            ru: 'Скоро',
+            en: 'Coming soon',
+          ),
           style: TextStyle(
             fontFamily: 'MTSText',
             fontSize: 15,

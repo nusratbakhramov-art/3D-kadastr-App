@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../support/support_service.dart';
 import '../market/market_controller.dart';
@@ -145,7 +146,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         backgroundColor: AppColors.splashGreen,
         foregroundColor: AppColors.greenBlack,
-        tooltip: 'Yordamchi',
+        tooltip: switch (widget.locale.languageCode) {
+          'ru' => 'Помощник',
+          'en' => 'Assistant',
+          _ => 'Yordamchi',
+        },
         child: const Icon(Icons.chat_bubble_rounded),
       ),
       body: Stack(
@@ -226,7 +231,11 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: _callSupport,
               backgroundColor: AppColors.splashGreen,
               foregroundColor: AppColors.greenBlack,
-              tooltip: 'Qo\'ng\'iroq',
+              tooltip: switch (widget.locale.languageCode) {
+                'ru' => 'Позвонить',
+                'en' => 'Call',
+                _ => 'Qo\'ng\'iroq',
+              },
               child: const Icon(Icons.call_rounded),
             ),
           ),
@@ -404,31 +413,40 @@ class _CardsGrid extends StatelessWidget {
 class _CardStrings {
   const _CardStrings._();
 
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) {
-        'ru' => ru,
-        'en' => en,
-        _ => uz,
-      };
+  static String _pick(Locale l, String key, String uz, String ru, String en) =>
+      tr(l, key, uz: uz, ru: ru, en: en);
 
-  static String kadastr3d(Locale l) =>
-      _pick(l, '3D kadastr', '3D кадастр', '3D cadastre');
+  static String kadastr3d(Locale l) => _pick(
+    l,
+    'home.card.kadastr3d',
+    '3D kadastr',
+    '3D кадастр',
+    '3D cadastre',
+  );
 
-  static String aiValuation(Locale l) =>
-      _pick(l, 'AI baholash', 'AI оценка', 'AI valuation');
+  static String aiValuation(Locale l) => _pick(
+    l,
+    'home.card.ai_valuation',
+    'AI baholash',
+    'AI оценка',
+    'AI valuation',
+  );
 
-  static String market(Locale l) => _pick(l, 'Market', 'Маркет', 'Market');
+  static String market(Locale l) =>
+      _pick(l, 'home.card.market', 'Market', 'Маркет', 'Market');
 
-  static String calculator(Locale l) =>
-      _pick(l, 'Kalkulyator', 'Калькулятор', 'Calculator');
+  static String calculator(Locale l) => _pick(
+    l,
+    'home.card.calculator',
+    'Kalkulyator',
+    'Калькулятор',
+    'Calculator',
+  );
 }
 
 class _HomeScreenStrings {
   const _HomeScreenStrings._();
 
-  static String seeAll(Locale l) => switch (l.languageCode) {
-    'ru' => 'Все →',
-    'en' => 'See all →',
-    _ => 'Barchasi →',
-  };
+  static String seeAll(Locale l) =>
+      tr(l, 'home.see_all', uz: 'Barchasi →', ru: 'Все →', en: 'See all →');
 }

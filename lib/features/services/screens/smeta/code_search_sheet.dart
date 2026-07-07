@@ -38,7 +38,7 @@ class _CodeSearchSheet extends StatefulWidget {
 class _CodeSearchSheetState extends State<_CodeSearchSheet> {
   final TextEditingController _query = TextEditingController();
   List<CatalogBook> _books = const [];
-  String? _bookFile;            // selected book filter (null = all)
+  String? _bookFile; // selected book filter (null = all)
   List<CatalogCode> _results = const [];
   bool _loading = false;
   String? _error;
@@ -48,7 +48,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
   void initState() {
     super.initState();
     _loadBooks();
-    _loadCodes();           // initial "Latest codes" view
+    _loadCodes(); // initial "Latest codes" view
     _query.addListener(_onQueryChanged);
   }
 
@@ -104,9 +104,9 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
     final qty = await _askQuantity(c);
     if (qty == null) return;
     if (!mounted) return;
-    Navigator.of(context).pop(
-      SmetaItem(code: c.code, name: c.name, unit: c.unit, quantity: qty),
-    );
+    Navigator.of(
+      context,
+    ).pop(SmetaItem(code: c.code, name: c.name, unit: c.unit, quantity: qty));
   }
 
   Future<double?> _askQuantity(CatalogCode c) async {
@@ -126,8 +126,9 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
               TextField(
                 controller: ctrl,
                 autofocus: true,
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 ],
@@ -205,7 +206,11 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Text(
-                "СНиР katalogidan tanlash",
+                switch (locale.languageCode) {
+                  'ru' => 'Выбрать из каталога СНиР',
+                  'en' => 'Choose from the SNiR catalog',
+                  _ => 'SNiR katalogidan tanlash',
+                },
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
@@ -241,7 +246,11 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
                     _BookChip(
-                      label: 'Hammasi',
+                      label: switch (locale.languageCode) {
+                        'ru' => 'Все',
+                        'en' => 'All',
+                        _ => 'Hammasi',
+                      },
                       selected: _bookFile == null,
                       onTap: () {
                         setState(() => _bookFile = null);
@@ -265,23 +274,22 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
               child: _loading
                   ? const Center(child: CircularProgressIndicator())
                   : _error != null
-                      ? _ErrorView(message: _error!, onRetry: _loadCodes)
-                      : _results.isEmpty
-                          ? const _EmptyView()
-                          : ListView.separated(
-                              controller: scroll,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 4,
-                              ),
-                              itemCount: _results.length,
-                              separatorBuilder: (_, _) =>
-                                  const SizedBox(height: 8),
-                              itemBuilder: (_, i) => _CodeRow(
-                                code: _results[i],
-                                onTap: () => _pick(_results[i]),
-                              ),
-                            ),
+                  ? _ErrorView(message: _error!, onRetry: _loadCodes)
+                  : _results.isEmpty
+                  ? const _EmptyView()
+                  : ListView.separated(
+                      controller: scroll,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 4,
+                      ),
+                      itemCount: _results.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (_, i) => _CodeRow(
+                        code: _results[i],
+                        onTap: () => _pick(_results[i]),
+                      ),
+                    ),
             ),
           ],
         ),
@@ -299,11 +307,11 @@ class _CodeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final surface = isDark ? const Color(0xFF1F2426) : const Color(0xFFF7F8F9);
-    final border =
-        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final textColor = isDark ? Colors.white : AppColors.textBlack;
-    final mutedColor =
-        isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+    final mutedColor = isDark
+        ? const Color(0xFF9BA1A6)
+        : const Color(0xFF6C7278);
 
     return Material(
       color: surface,
@@ -374,10 +382,10 @@ class _BookChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final idleBg =
-        isDark ? const Color(0xFF1F2426) : const Color(0xFFF1F2F4);
-    final textColor =
-        selected ? Colors.white : (isDark ? Colors.white70 : AppColors.textBlack);
+    final idleBg = isDark ? const Color(0xFF1F2426) : const Color(0xFFF1F2F4);
+    final textColor = selected
+        ? Colors.white
+        : (isDark ? Colors.white70 : AppColors.textBlack);
 
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -459,10 +467,7 @@ class _ErrorView extends StatelessWidget {
               style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: onRetry,
-              child: Text(L.retry(locale)),
-            ),
+            OutlinedButton(onPressed: onRetry, child: Text(L.retry(locale))),
           ],
         ),
       ),

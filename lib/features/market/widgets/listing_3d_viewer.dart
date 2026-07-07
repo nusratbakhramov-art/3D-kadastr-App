@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/i18n/app_translations.dart';
+import '../../settings/settings_state.dart';
 import '../../../theme/color_tokens.dart';
 
 /// Renders a 3D model with rotate/zoom and an optional AR launch button.
@@ -162,7 +164,7 @@ class _ErrorState extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
-          '3D modelni yuklab bo‘lmadi:\n$error',
+          '${tr(localeNotifier.value, 'market.viewer.load_error', uz: '3D modelni yuklab bo‘lmadi', ru: 'Не удалось загрузить 3D-модель', en: 'Could not load the 3D model')}:\n$error',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'MTSCompact',

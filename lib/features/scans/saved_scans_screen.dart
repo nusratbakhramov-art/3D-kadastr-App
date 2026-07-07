@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
@@ -39,32 +40,40 @@ class _SavedScansScreenState extends State<SavedScansScreen>
   Future<void> _load() async {
     setState(() => _loading = true);
     final items = await _service.list();
-    if (mounted) setState(() { _items = items; _loading = false; });
+    if (mounted) {
+      setState(() {
+        _items = items;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _openDetail(SavedScanItem item) async {
-    await Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => SavedScanDetailScreen(scanId: item.id),
-    ));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SavedScanDetailScreen(scanId: item.id),
+      ),
+    );
     // Detail'dan qaytgach ro'yxatni yangilash (output qo'shilgan bo'lishi mumkin)
     await _load();
   }
 
   Future<void> _deleteScan(SavedScanItem item) async {
+    final locale = localeNotifier.value;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Skanni o\'chirish'),
-        content: Text('"${item.name}" — barcha foto va outputlar bilan o\'chiriladi. Davom etamizmi?'),
+        title: Text(_Strings.deleteTitle(locale)),
+        content: Text(_Strings.deletePrompt(locale, item.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Bekor qilish'),
+            child: Text(_Strings.cancel(locale)),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('O\'chirish'),
+            child: Text(_Strings.delete(locale)),
           ),
         ],
       ),
@@ -73,11 +82,11 @@ class _SavedScansScreenState extends State<SavedScansScreen>
     final ok = await _service.delete(item.id);
     if (ok) {
       if (!mounted) return;
-      AppToast.success(context, 'Skan o\'chirildi');
+      AppToast.success(context, _Strings.deleted(locale));
       await _load();
     } else {
       if (!mounted) return;
-      AppToast.error(context, 'O\'chirishda xatolik');
+      AppToast.error(context, _Strings.deleteError(locale));
     }
   }
 
@@ -104,9 +113,11 @@ class _SavedScansScreenState extends State<SavedScansScreen>
                         AppReveal(
                           controller: entryController,
                           interval: const Interval(
-                            0.0, 0.4, curve: Curves.easeOutCubic,
+                            0.0,
+                            0.4,
+                            curve: Curves.easeOutCubic,
                           ),
-                          child: const AppHeaderBack(title: 'Mening skanlarim'),
+                          child: AppHeaderBack(title: _Strings.title(locale)),
                         ),
                         const SizedBox(height: 16),
                         if (_loading)
@@ -115,7 +126,7 @@ class _SavedScansScreenState extends State<SavedScansScreen>
                             child: Center(child: CircularProgressIndicator()),
                           )
                         else if (_items.isEmpty)
-                          const _EmptyState()
+                          _EmptyState(locale: locale)
                         else
                           for (var i = 0; i < _items.length; i++) ...[
                             AppReveal(
@@ -127,6 +138,7 @@ class _SavedScansScreenState extends State<SavedScansScreen>
                               ),
                               child: _SavedScanCard(
                                 item: _items[i],
+                                locale: locale,
                                 onTap: () => _openDetail(_items[i]),
                                 onDelete: () => _deleteScan(_items[i]),
                               ),
@@ -150,11 +162,13 @@ class _SavedScansScreenState extends State<SavedScansScreen>
 class _SavedScanCard extends StatelessWidget {
   const _SavedScanCard({
     required this.item,
+    required this.locale,
     required this.onTap,
     required this.onDelete,
   });
 
   final SavedScanItem item;
+  final Locale locale;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
@@ -179,7 +193,9 @@ class _SavedScanCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
-                  item.isProcessed ? Icons.view_in_ar : Icons.camera_alt_outlined,
+                  item.isProcessed
+                      ? Icons.view_in_ar
+                      : Icons.camera_alt_outlined,
                   size: 28,
                   color: ColorTokens.brandPrimary(context),
                 ),
@@ -218,14 +234,17 @@ class _SavedScanCard extends StatelessWidget {
                         if (item.areaSqm > 0.01)
                           _Chip('${item.areaSqm.toStringAsFixed(1)} m²'),
                         if (item.photoCount > 0)
-                          _Chip('${item.photoCount} foto'),
+                          _Chip(_Strings.photoCount(locale, item.photoCount)),
                         if (item.outputs.isNotEmpty)
                           _Chip(
-                            '${item.outputs.length} natija',
+                            _Strings.resultCount(locale, item.outputs.length),
                             tint: Colors.green,
                           )
                         else
-                          _Chip('Qayta ishlanmagan', tint: Colors.orange),
+                          _Chip(
+                            _Strings.unprocessed(locale),
+                            tint: Colors.orange,
+                          ),
                       ],
                     ),
                   ],
@@ -248,9 +267,10 @@ class _SavedScanCard extends StatelessWidget {
     final today = DateTime(now.year, now.month, now.day);
     final dayOfScan = DateTime(d.year, d.month, d.day);
     final diff = today.difference(dayOfScan).inDays;
-    final timeStr = '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-    if (diff == 0) return 'Bugun, $timeStr';
-    if (diff == 1) return 'Kecha, $timeStr';
+    final timeStr =
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    if (diff == 0) return _Strings.todayAt(locale, timeStr);
+    if (diff == 1) return _Strings.yesterdayAt(locale, timeStr);
     return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}, $timeStr';
   }
 }
@@ -272,18 +292,16 @@ class _Chip extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          fontFamily: 'MTSText',
-          fontSize: 11,
-          color: fg,
-        ),
+        style: TextStyle(fontFamily: 'MTSText', fontSize: 11, color: fg),
       ),
     );
   }
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  const _EmptyState({required this.locale});
+
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -298,7 +316,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Skanlar yo\'q',
+            _Strings.emptyTitle(locale),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSCompact',
@@ -309,8 +327,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'AI baholash → 3D skan tugmasini bosib, xonangizni skanlang. '
-            'Bu yerda saqlangan ma\'lumotlar ro\'yxati ko\'rinadi.',
+            _Strings.emptyMessage(locale),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSText',
@@ -322,4 +339,95 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Strings {
+  static String title(Locale l) =>
+      _p(l, 'scan.saved.title', 'Mening skanlarim', 'Мои сканы', 'My scans');
+  static String deleteTitle(Locale l) => _p(
+    l,
+    'scan.saved.delete_title',
+    'Skanni o\'chirish',
+    'Удалить скан',
+    'Delete scan',
+  );
+  static String deletePrompt(Locale l, String name) => _p(
+    l,
+    'scan.saved.delete_prompt',
+    '"$name" — barcha foto va outputlar bilan o\'chiriladi. Davom etamizmi?',
+    '"$name" будет удалён вместе со всеми фото и результатами. Продолжить?',
+    '"$name" will be deleted together with all photos and outputs. Continue?',
+  );
+  static String cancel(Locale l) =>
+      _p(l, 'common.cancel', 'Bekor qilish', 'Отмена', 'Cancel');
+  static String delete(Locale l) =>
+      _p(l, 'common.delete', 'O\'chirish', 'Удалить', 'Delete');
+  static String deleted(Locale l) => _p(
+    l,
+    'scan.saved.deleted',
+    'Skan o\'chirildi',
+    'Скан удалён',
+    'Scan deleted',
+  );
+  static String deleteError(Locale l) => _p(
+    l,
+    'scan.saved.delete_error',
+    'O\'chirishda xatolik',
+    'Ошибка удаления',
+    'Delete error',
+  );
+  static String photoCount(Locale l, int count) => _p(
+    l,
+    'scan.common.photo_count',
+    '$count foto',
+    '$count фото',
+    '$count photos',
+  );
+  static String resultCount(Locale l, int count) => _p(
+    l,
+    'scan.saved.result_count',
+    '$count natija',
+    '$count результатов',
+    '$count results',
+  );
+  static String unprocessed(Locale l) => _p(
+    l,
+    'scan.saved.unprocessed',
+    'Qayta ishlanmagan',
+    'Не обработан',
+    'Not processed',
+  );
+  static String todayAt(Locale l, String time) => _p(
+    l,
+    'common.today_at',
+    'Bugun, $time',
+    'Сегодня, $time',
+    'Today, $time',
+  );
+  static String yesterdayAt(Locale l, String time) => _p(
+    l,
+    'common.yesterday_at',
+    'Kecha, $time',
+    'Вчера, $time',
+    'Yesterday, $time',
+  );
+  static String emptyTitle(Locale l) => _p(
+    l,
+    'scan.saved.empty_title',
+    'Skanlar yo\'q',
+    'Сканов нет',
+    'No scans yet',
+  );
+  static String emptyMessage(Locale l) => _p(
+    l,
+    'scan.saved.empty_message',
+    'AI baholash bo\'limida 3D skan tugmasini bosib, xonangizni skan qiling. '
+        'Bu yerda saqlangan ma\'lumotlar ro\'yxati ko\'rinadi.',
+    'Нажмите AI оценка → 3D-скан и отсканируйте комнату. '
+        'Здесь появится список сохранённых данных.',
+    'Tap AI valuation → 3D scan and scan your room. '
+        'Your saved scans will appear here.',
+  );
+  static String _p(Locale l, String key, String uz, String ru, String en) =>
+      tr(l, key, uz: uz, ru: ru, en: en);
 }

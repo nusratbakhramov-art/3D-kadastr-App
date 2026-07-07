@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../core/i18n/app_translations.dart';
 import '../core/i18n.dart';
 import '../theme/app_colors.dart';
 
@@ -61,8 +62,7 @@ class _NoInternetSheetState extends State<NoInternetSheet>
     final iconBg = isDark
         ? AppColors.splashGreen.withValues(alpha: 0.14)
         : AppColors.splashGreen.withValues(alpha: 0.10);
-    final grabberColor =
-        isDark ? Colors.white24 : const Color(0xFFE3E5E8);
+    final grabberColor = isDark ? Colors.white24 : const Color(0xFFE3E5E8);
 
     return SafeArea(
       top: false,
@@ -120,7 +120,13 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                 ),
                 const SizedBox(height: 18),
                 Text(
-                  'Internet aloqasi yo\'q',
+                  tr(
+                    Localizations.localeOf(context),
+                    'common.no_internet_title',
+                    uz: 'Internetga ulanish yo\'q',
+                    ru: 'Нет подключения к интернету',
+                    en: 'No internet connection',
+                  ),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -130,7 +136,13 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Ulanishingizni tekshirib, qayta urinib ko\'ring',
+                  tr(
+                    Localizations.localeOf(context),
+                    'common.no_internet_message',
+                    uz: 'Internet ulanishini tekshirib, qayta urinib ko\'ring',
+                    ru: 'Проверьте подключение и попробуйте снова',
+                    en: 'Check your connection and try again',
+                  ),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontFamily: 'MTSText',
@@ -171,7 +183,13 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                     minimumSize: const Size.fromHeight(44),
                   ),
                   child: Text(
-                    'Yopish',
+                    tr(
+                      Localizations.localeOf(context),
+                      'common.close',
+                      uz: 'Yopish',
+                      ru: 'Закрыть',
+                      en: 'Close',
+                    ),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w600,

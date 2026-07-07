@@ -10,9 +10,9 @@ class ScanCameraCard extends StatelessWidget {
     required this.state,
     required this.onTap,
     this.onLongPress,
-    this.idleLabel = 'LiDAR kamerani ishga tushiring',
-    this.scanningLabel = 'Skanerlanmoqda...',
-    this.doneLabel = 'Skan tayyor',
+    required this.idleLabel,
+    required this.scanningLabel,
+    required this.doneLabel,
   });
 
   final ScanCardState state;

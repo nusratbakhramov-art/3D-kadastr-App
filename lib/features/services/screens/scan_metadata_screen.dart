@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
@@ -59,6 +60,45 @@ const _tumanlarByViloyat = <String, List<String>>{
   ],
 };
 
+const _geoLabels = <String, ({String ru, String en})>{
+  'Toshkent shahri': (ru: 'Ташкент', en: 'Tashkent city'),
+  'Toshkent viloyati': (ru: 'Ташкентская область', en: 'Tashkent region'),
+  'Andijon': (ru: 'Андижан', en: 'Andijan'),
+  'Buxoro': (ru: 'Бухара', en: 'Bukhara'),
+  'Farg\'ona': (ru: 'Фергана', en: 'Fergana'),
+  'Jizzax': (ru: 'Джизак', en: 'Jizzakh'),
+  'Namangan': (ru: 'Наманган', en: 'Namangan'),
+  'Navoiy': (ru: 'Навои', en: 'Navoi'),
+  'Qashqadaryo': (ru: 'Кашкадарья', en: 'Kashkadarya'),
+  'Qoraqalpog\'iston': (ru: 'Каракалпакстан', en: 'Karakalpakstan'),
+  'Samarqand': (ru: 'Самарканд', en: 'Samarkand'),
+  'Sirdaryo': (ru: 'Сырдарья', en: 'Syrdarya'),
+  'Surxondaryo': (ru: 'Сурхандарья', en: 'Surkhandarya'),
+  'Xorazm': (ru: 'Хорезм', en: 'Khorezm'),
+  'Bektemir': (ru: 'Бектемир', en: 'Bektemir'),
+  'Chilonzor': (ru: 'Чиланзар', en: 'Chilanzar'),
+  'Mirobod': (ru: 'Мирабад', en: 'Mirabad'),
+  'Mirzo Ulug\'bek': (ru: 'Мирзо-Улугбек', en: 'Mirzo Ulugbek'),
+  'Olmazor': (ru: 'Алмазар', en: 'Almazar'),
+  'Sirg\'ali': (ru: 'Сергелийский', en: 'Sergeli'),
+  'Shayxontohur': (ru: 'Шайхантахур', en: 'Shaykhantakhur'),
+  'Uchtepa': (ru: 'Учтепа', en: 'Uchtepa'),
+  'Yakkasaroy': (ru: 'Яккасарай', en: 'Yakkasaray'),
+  'Yashnobod': (ru: 'Яшнабад', en: 'Yashnabad'),
+  'Yunusobod': (ru: 'Юнусабад', en: 'Yunusabad'),
+  'Bekobod': (ru: 'Бекабад', en: 'Bekabad'),
+  'Bo\'ka': (ru: 'Бука', en: 'Buka'),
+  'Chinoz': (ru: 'Чиназ', en: 'Chinaz'),
+  'Ohangaron': (ru: 'Ахангаран', en: 'Ohangaron'),
+  'Olmaliq': (ru: 'Алмалык', en: 'Almalyk'),
+  'Parkent': (ru: 'Паркент', en: 'Parkent'),
+  'Piskent': (ru: 'Пскент', en: 'Pskent'),
+  'Quyichirchiq': (ru: 'Куйичирчик', en: 'Quyichirchiq'),
+  'O\'rtachirchiq': (ru: 'Уртачирчик', en: 'Ortachirchiq'),
+  'Yangiyo\'l': (ru: 'Янгиюль', en: 'Yangiyul'),
+  'Zangiota': (ru: 'Зангиата', en: 'Zangiota'),
+};
+
 class ScanMetadataScreen extends StatefulWidget {
   const ScanMetadataScreen({super.key, required this.draft});
 
@@ -81,9 +121,20 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
 
   bool get _ready => _viloyat != null && _tuman != null;
 
+  String _localizedGeoName(String value, Locale locale) {
+    final label = _geoLabels[value];
+    if (label == null) return value;
+    return switch (locale.languageCode) {
+      'ru' => label.ru,
+      'en' => label.en,
+      _ => value,
+    };
+  }
+
   Future<void> _pickViloyat() async {
     final locale = localeNotifier.value;
     final v = await _showPicker(
+      locale: locale,
       title: _ScanMetadataStrings.pickViloyatTitle(locale),
       options: _viloyatlar,
       current: _viloyat,
@@ -108,6 +159,7 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
       return;
     }
     final t = await _showPicker(
+      locale: locale,
       title: _ScanMetadataStrings.pickTumanTitle(locale),
       options: options,
       current: _tuman,
@@ -117,6 +169,7 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
   }
 
   Future<String?> _showPicker({
+    required Locale locale,
     required String title,
     required List<String> options,
     required String? current,
@@ -180,7 +233,7 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  value,
+                                  _localizedGeoName(value, locale),
                                   style: TextStyle(
                                     fontFamily: 'MTSText',
                                     fontWeight: selected
@@ -240,10 +293,7 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
       // (backend `address` matni sifatida).
       final enrichedTz = tz;
       if (_viloyat != null || _tuman != null) {
-        final extra = [
-          ?_tuman,
-          ?_viloyat,
-        ].join(', ');
+        final extra = [?_tuman, ?_viloyat].join(', ');
         if (enrichedTz.address.trim().isEmpty) {
           enrichedTz.address = extra;
         } else {
@@ -329,16 +379,24 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
                           ),
                           const SizedBox(height: 10),
                           _PickerField(
-                            placeholder:
-                                _ScanMetadataStrings.pickViloyatTitle(locale),
+                            placeholder: _ScanMetadataStrings.pickViloyatTitle(
+                              locale,
+                            ),
                             value: _viloyat,
+                            displayValue: _viloyat == null
+                                ? null
+                                : _localizedGeoName(_viloyat!, locale),
                             onTap: _pickViloyat,
                           ),
                           const SizedBox(height: 10),
                           _PickerField(
-                            placeholder:
-                                _ScanMetadataStrings.pickTumanTitle(locale),
+                            placeholder: _ScanMetadataStrings.pickTumanTitle(
+                              locale,
+                            ),
                             value: _tuman,
+                            displayValue: _tuman == null
+                                ? null
+                                : _localizedGeoName(_tuman!, locale),
                             onTap: _viloyat == null ? null : _pickTuman,
                           ),
                           const SizedBox(height: 22),
@@ -360,8 +418,9 @@ class _ScanMetadataScreenState extends State<ScanMetadataScreen> {
                           ListingCtaButton(
                             label: _submitting
                                 ? _ScanMetadataStrings.sending(locale)
-                                : _ScanMetadataStrings
-                                    .submitToSpecialist(locale),
+                                : _ScanMetadataStrings.submitToSpecialist(
+                                    locale,
+                                  ),
                             enabled: _ready && !_submitting,
                             onTap: _submitToSpecialist,
                           ),
@@ -427,11 +486,13 @@ class _PickerField extends StatelessWidget {
   const _PickerField({
     required this.placeholder,
     required this.value,
+    required this.displayValue,
     required this.onTap,
   });
 
   final String placeholder;
   final String? value;
+  final String? displayValue;
   final VoidCallback? onTap;
 
   @override
@@ -461,7 +522,7 @@ class _PickerField extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  value ?? placeholder,
+                  displayValue ?? placeholder,
                   style: TextStyle(
                     fontFamily: 'MTSText',
                     fontWeight: value == null
@@ -494,38 +555,38 @@ class _PickerField extends StatelessWidget {
 String _objectTypeLabel(ArchObjectType t, Locale locale) =>
     switch (locale.languageCode) {
       'ru' => switch (t) {
-          ArchObjectType.yakkaSmall => 'Частный дом <500 м²',
-          ArchObjectType.yakkaLarge => 'Частный дом >500 м²',
-          ArchObjectType.kopQavatli => 'Многоквартирный дом',
-          ArchObjectType.ofis => 'Офис',
-          ArchObjectType.savdoMarkazi => 'Торговый центр',
-          ArchObjectType.mehmonxona => 'Гостиница',
-          ArchObjectType.sanoat => 'Промышленный',
-          ArchObjectType.omborxona => 'Склад',
-          ArchObjectType.boshqa => 'Другое',
-        },
+        ArchObjectType.yakkaSmall => 'Частный дом <500 м²',
+        ArchObjectType.yakkaLarge => 'Частный дом >500 м²',
+        ArchObjectType.kopQavatli => 'Многоквартирный дом',
+        ArchObjectType.ofis => 'Офис',
+        ArchObjectType.savdoMarkazi => 'Торговый центр',
+        ArchObjectType.mehmonxona => 'Гостиница',
+        ArchObjectType.sanoat => 'Промышленный',
+        ArchObjectType.omborxona => 'Склад',
+        ArchObjectType.boshqa => 'Другое',
+      },
       'en' => switch (t) {
-          ArchObjectType.yakkaSmall => 'Single house <500 m²',
-          ArchObjectType.yakkaLarge => 'Single house >500 m²',
-          ArchObjectType.kopQavatli => 'Multi-family residence',
-          ArchObjectType.ofis => 'Office',
-          ArchObjectType.savdoMarkazi => 'Shopping mall',
-          ArchObjectType.mehmonxona => 'Hotel',
-          ArchObjectType.sanoat => 'Industrial',
-          ArchObjectType.omborxona => 'Warehouse',
-          ArchObjectType.boshqa => 'Other',
-        },
+        ArchObjectType.yakkaSmall => 'Single house <500 m²',
+        ArchObjectType.yakkaLarge => 'Single house >500 m²',
+        ArchObjectType.kopQavatli => 'Multi-family residence',
+        ArchObjectType.ofis => 'Office',
+        ArchObjectType.savdoMarkazi => 'Shopping mall',
+        ArchObjectType.mehmonxona => 'Hotel',
+        ArchObjectType.sanoat => 'Industrial',
+        ArchObjectType.omborxona => 'Warehouse',
+        ArchObjectType.boshqa => 'Other',
+      },
       _ => switch (t) {
-          ArchObjectType.yakkaSmall => 'Yakka uy <500 m²',
-          ArchObjectType.yakkaLarge => 'Yakka uy >500 m²',
-          ArchObjectType.kopQavatli => 'Ko\'p qavatli turar-joy',
-          ArchObjectType.ofis => 'Ofis',
-          ArchObjectType.savdoMarkazi => 'Savdo markazi',
-          ArchObjectType.mehmonxona => 'Mehmonxona',
-          ArchObjectType.sanoat => 'Sanoat',
-          ArchObjectType.omborxona => 'Omborxona',
-          ArchObjectType.boshqa => 'Boshqa',
-        },
+        ArchObjectType.yakkaSmall => 'Yakka uy <500 m²',
+        ArchObjectType.yakkaLarge => 'Yakka uy >500 m²',
+        ArchObjectType.kopQavatli => 'Ko\'p qavatli turar-joy',
+        ArchObjectType.ofis => 'Ofis',
+        ArchObjectType.savdoMarkazi => 'Savdo markazi',
+        ArchObjectType.mehmonxona => 'Mehmonxona',
+        ArchObjectType.sanoat => 'Sanoat',
+        ArchObjectType.omborxona => 'Omborxona',
+        ArchObjectType.boshqa => 'Boshqa',
+      },
     };
 
 class _SummaryCard extends StatelessWidget {
@@ -546,43 +607,71 @@ class _SummaryCard extends StatelessWidget {
 
     final tz = draft.tzDraft;
     final rows = <(String, String)>[
-      ('Kadastr raqami', draft.cadastreNumber),
-      ('Obyekt turi', draft.objectType?.label ?? '—'),
-      ('Skan', draft.scanCompleted ? 'Tayyor' : 'Kutilmoqda'),
+      (_ScanMetadataStrings.rowCadastreNumber(locale), draft.cadastreNumber),
+      (
+        _ScanMetadataStrings.rowObjectType(locale),
+        draft.objectType?.localizedLabel(locale) ?? '—',
+      ),
+      (
+        _ScanMetadataStrings.rowScan(locale),
+        draft.scanCompleted
+            ? _ScanMetadataStrings.scanReady(locale)
+            : _ScanMetadataStrings.scanPending(locale),
+      ),
       if (draft.hasLocation)
         (
-          'Xarita',
+          _ScanMetadataStrings.rowMap(locale),
           'lat: ${draft.latitude!.toStringAsFixed(6)}, '
               'lon: ${draft.longitude!.toStringAsFixed(6)}',
         ),
       if (tz != null) ...[
-        ('Buyurtmachi', tz.customerName),
-        if (tz.tin.trim().isNotEmpty) ('STIR', tz.tin),
-        ('Telefon', tz.phone),
-        if (tz.email.trim().isNotEmpty) ('E-mail', tz.email),
-        if (tz.objectName.trim().isNotEmpty) ('Obyekt nomi', tz.objectName),
+        (_ScanMetadataStrings.rowCustomer(locale), tz.customerName),
+        if (tz.tin.trim().isNotEmpty)
+          (_ScanMetadataStrings.rowTin(locale), tz.tin),
+        (_ScanMetadataStrings.rowPhone(locale), tz.phone),
+        if (tz.email.trim().isNotEmpty)
+          (_ScanMetadataStrings.rowEmail(locale), tz.email),
+        if (tz.objectName.trim().isNotEmpty)
+          (_ScanMetadataStrings.rowObjectName(locale), tz.objectName),
         if (tz.objectType != null)
-          ('Loyiha turi', _objectTypeLabel(tz.objectType!, locale)),
+          (
+            _ScanMetadataStrings.rowProjectType(locale),
+            _objectTypeLabel(tz.objectType!, locale),
+          ),
         (
-          'Qurilish turi',
+          _ScanMetadataStrings.rowConstructionType(locale),
           tz.constructionType.apiValue == 'rekonstruksiya'
-              ? 'Rekonstruksiya'
-              : 'Yangi qurilish',
+              ? _ScanMetadataStrings.constructionReconstruction(locale)
+              : _ScanMetadataStrings.constructionNew(locale),
         ),
-        if (tz.floors != null) ('Qavatlar', '${tz.floors}'),
+        if (tz.floors != null)
+          (_ScanMetadataStrings.rowFloors(locale), '${tz.floors}'),
         if (tz.totalAreaSqm != null)
-          ('Umumiy maydon', '${tz.totalAreaSqm} m²'),
+          (_ScanMetadataStrings.rowTotalArea(locale), '${tz.totalAreaSqm} m²'),
         if (tz.buildingAreaSqm != null)
-          ('Qurilish maydoni', '${tz.buildingAreaSqm} m²'),
-        if (tz.maxHeightM != null) ('Balandlik', '${tz.maxHeightM} m'),
+          (
+            _ScanMetadataStrings.rowBuildingArea(locale),
+            '${tz.buildingAreaSqm} m²',
+          ),
+        if (tz.maxHeightM != null)
+          (_ScanMetadataStrings.rowHeight(locale), '${tz.maxHeightM} m'),
         if (tz.rooms.isNotEmpty)
-          ('Xonalar', '${tz.rooms.length} ta'),
+          (
+            _ScanMetadataStrings.rowRooms(locale),
+            _ScanMetadataStrings.roomsValue(locale, tz.rooms.length),
+          ),
         if (tz.architecture.style != null)
-          ('Uslub', tz.architecture.style!),
+          (_ScanMetadataStrings.rowStyle(locale), tz.architecture.style!),
         if (tz.timeline.sketchDays != null)
-          ('Eskiz loyiha', '${tz.timeline.sketchDays} kun'),
+          (
+            _ScanMetadataStrings.rowSketchProject(locale),
+            _ScanMetadataStrings.daysValue(locale, tz.timeline.sketchDays!),
+          ),
         if (tz.timeline.workingDays != null)
-          ('Ishchi loyiha', '${tz.timeline.workingDays} kun'),
+          (
+            _ScanMetadataStrings.rowWorkingProject(locale),
+            _ScanMetadataStrings.daysValue(locale, tz.timeline.workingDays!),
+          ),
       ],
     ];
 
@@ -632,91 +721,230 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _ScanMetadataStrings {
-  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Регион и сводка',
-        'en' => 'Region & summary',
-        _ => 'Hudud va xulosa',
-      };
+  static String _t(
+    Locale locale,
+    String key,
+    String uz,
+    String ru,
+    String en,
+  ) => tr(locale, key, uz: uz, ru: ru, en: en);
 
-  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Укажите регион и проверьте данные',
-        'en' => 'Select the region and review the data',
-        _ => 'Hududni tanlang va ma\'lumotlarni tekshiring',
-      };
-
-  static String sectionRegion(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Регион',
-        'en' => 'Region',
-        _ => 'Hudud',
-      };
-
-  static String sectionSummary(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сводка',
-        'en' => 'Summary',
-        _ => 'Xulosa',
-      };
-
-  static String pickViloyatTitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Выберите регион',
-        'en' => 'Select region',
-        _ => 'Viloyatni tanlang',
-      };
-
-  static String pickTumanTitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Выберите район',
-        'en' => 'Select district',
-        _ => 'Tumanni tanlang',
-      };
-
-  static String tumanListSoon(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Список районов появится позже',
-        'en' => 'District list will be available soon',
-        _ => 'Tumanlar ro\'yxati keyinroq qo\'shiladi',
-      };
-
-  static String tzIncomplete(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Анкета не заполнена',
-        'en' => 'The form is incomplete',
-        _ => 'So\'rovnoma to\'liq emas',
-      };
-
-  static String loginRequired(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сначала войдите в аккаунт',
-        'en' => 'Please log in first',
-        _ => 'Avval tizimga kiring',
-      };
-
-  static String networkError(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Ошибка сети',
-        'en' => 'Network error',
-        _ => 'Tarmoq xatosi',
-      };
-
-  static String aiValuationStarted(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'AI-оценка скоро будет подключена',
-        'en' => 'AI valuation will be connected soon',
-        _ => 'AI baholash yaqinda ulanadi',
-      };
-
-  static String submitToSpecialist(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Отправить специалисту',
-        'en' => 'Submit to specialist',
-        _ => 'Mutaxassisga yuborish',
-      };
-
-  static String aiValuationButton(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'AI оценка',
-        'en' => 'AI valuation',
-        _ => 'AI baholash',
-      };
-
-  static String sending(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Отправка...',
-        'en' => 'Sending...',
-        _ => 'Yuborilmoqda...',
-      };
+  static String appBarTitle(Locale locale) => _t(
+    locale,
+    'scan.metadata.app_bar_title',
+    'Hudud va xulosa',
+    'Регион и сводка',
+    'Region & summary',
+  );
+  static String appBarSubtitle(Locale locale) => _t(
+    locale,
+    'scan.metadata.app_bar_subtitle',
+    'Hududni tanlang va ma\'lumotlarni tekshiring',
+    'Укажите регион и проверьте данные',
+    'Select the region and review the data',
+  );
+  static String sectionRegion(Locale locale) =>
+      _t(locale, 'scan.metadata.section_region', 'Hudud', 'Регион', 'Region');
+  static String sectionSummary(Locale locale) => _t(
+    locale,
+    'scan.metadata.section_summary',
+    'Xulosa',
+    'Сводка',
+    'Summary',
+  );
+  static String pickViloyatTitle(Locale locale) => _t(
+    locale,
+    'scan.metadata.pick_viloyat_title',
+    'Viloyatni tanlang',
+    'Выберите регион',
+    'Select region',
+  );
+  static String pickTumanTitle(Locale locale) => _t(
+    locale,
+    'scan.metadata.pick_tuman_title',
+    'Tumanni tanlang',
+    'Выберите район',
+    'Select district',
+  );
+  static String tumanListSoon(Locale locale) => _t(
+    locale,
+    'scan.metadata.tuman_list_soon',
+    'Tumanlar ro\'yxati keyinroq qo\'shiladi',
+    'Список районов появится позже',
+    'District list will be available soon',
+  );
+  static String tzIncomplete(Locale locale) => _t(
+    locale,
+    'scan.metadata.tz_incomplete',
+    'So\'rovnoma to\'liq emas',
+    'Анкета не заполнена',
+    'The form is incomplete',
+  );
+  static String loginRequired(Locale locale) => _t(
+    locale,
+    'scan.metadata.login_required',
+    'Avval tizimga kiring',
+    'Сначала войдите в аккаунт',
+    'Please log in first',
+  );
+  static String networkError(Locale locale) => _t(
+    locale,
+    'scan.metadata.network_error',
+    'Tarmoq xatosi',
+    'Ошибка сети',
+    'Network error',
+  );
+  static String aiValuationStarted(Locale locale) => _t(
+    locale,
+    'scan.metadata.ai_valuation_started',
+    'AI baholash yaqinda ulanadi',
+    'AI-оценка скоро будет подключена',
+    'AI valuation will be connected soon',
+  );
+  static String submitToSpecialist(Locale locale) => _t(
+    locale,
+    'scan.metadata.submit_to_specialist',
+    'Mutaxassisga yuborish',
+    'Отправить специалисту',
+    'Submit to specialist',
+  );
+  static String aiValuationButton(Locale locale) => _t(
+    locale,
+    'scan.metadata.ai_valuation_button',
+    'AI baholash',
+    'AI оценка',
+    'AI valuation',
+  );
+  static String sending(Locale locale) => _t(
+    locale,
+    'scan.metadata.sending',
+    'Yuborilmoqda...',
+    'Отправка...',
+    'Sending...',
+  );
+  static String rowCadastreNumber(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_cadastre_number',
+    'Kadastr raqami',
+    'Кадастровый номер',
+    'Cadastre number',
+  );
+  static String rowObjectType(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_object_type',
+    'Obyekt turi',
+    'Тип объекта',
+    'Object type',
+  );
+  static String rowScan(Locale locale) =>
+      _t(locale, 'scan.metadata.row_scan', 'Skan', 'Скан', 'Scan');
+  static String scanReady(Locale locale) =>
+      _t(locale, 'scan.metadata.scan_ready', 'Tayyor', 'Готов', 'Ready');
+  static String scanPending(Locale locale) => _t(
+    locale,
+    'scan.metadata.scan_pending',
+    'Kutilmoqda',
+    'Ожидается',
+    'Pending',
+  );
+  static String rowMap(Locale locale) =>
+      _t(locale, 'scan.metadata.row_map', 'Xarita', 'Карта', 'Map');
+  static String rowCustomer(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_customer',
+    'Buyurtmachi',
+    'Заказчик',
+    'Customer',
+  );
+  static String rowTin(Locale locale) =>
+      _t(locale, 'scan.metadata.row_tin', 'STIR', 'ИНН', 'TIN');
+  static String rowPhone(Locale locale) =>
+      _t(locale, 'scan.metadata.row_phone', 'Telefon', 'Телефон', 'Phone');
+  static String rowEmail(Locale locale) =>
+      _t(locale, 'scan.metadata.row_email', 'E-mail', 'E-mail', 'E-mail');
+  static String rowObjectName(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_object_name',
+    'Obyekt nomi',
+    'Название объекта',
+    'Object name',
+  );
+  static String rowProjectType(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_project_type',
+    'Loyiha turi',
+    'Тип проекта',
+    'Project type',
+  );
+  static String rowConstructionType(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_construction_type',
+    'Qurilish turi',
+    'Тип строительства',
+    'Construction type',
+  );
+  static String constructionReconstruction(Locale locale) => _t(
+    locale,
+    'scan.metadata.construction_reconstruction',
+    'Rekonstruksiya',
+    'Реконструкция',
+    'Reconstruction',
+  );
+  static String constructionNew(Locale locale) => _t(
+    locale,
+    'scan.metadata.construction_new',
+    'Yangi qurilish',
+    'Новое строительство',
+    'New construction',
+  );
+  static String rowFloors(Locale locale) =>
+      _t(locale, 'scan.metadata.row_floors', 'Qavatlar', 'Этажность', 'Floors');
+  static String rowTotalArea(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_total_area',
+    'Umumiy maydon',
+    'Общая площадь',
+    'Total area',
+  );
+  static String rowBuildingArea(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_building_area',
+    'Qurilish maydoni',
+    'Площадь застройки',
+    'Building area',
+  );
+  static String rowHeight(Locale locale) =>
+      _t(locale, 'scan.metadata.row_height', 'Balandlik', 'Высота', 'Height');
+  static String rowRooms(Locale locale) =>
+      _t(locale, 'scan.metadata.row_rooms', 'Xonalar', 'Помещения', 'Rooms');
+  static String roomsValue(Locale locale, int count) => _t(
+    locale,
+    'scan.metadata.rooms_value',
+    '$count ta',
+    '$count шт.',
+    '$count rooms',
+  );
+  static String rowStyle(Locale locale) =>
+      _t(locale, 'scan.metadata.row_style', 'Uslub', 'Стиль', 'Style');
+  static String rowSketchProject(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_sketch_project',
+    'Eskiz loyiha',
+    'Эскизный проект',
+    'Concept design',
+  );
+  static String rowWorkingProject(Locale locale) => _t(
+    locale,
+    'scan.metadata.row_working_project',
+    'Ishchi loyiha',
+    'Рабочий проект',
+    'Working design',
+  );
+  static String daysValue(Locale locale, int days) => _t(
+    locale,
+    'scan.metadata.days_value',
+    '$days kun',
+    '$days дн.',
+    '$days days',
+  );
 }

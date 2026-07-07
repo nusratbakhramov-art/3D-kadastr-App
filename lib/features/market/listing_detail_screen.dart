@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/app_toast.dart';
 import '../auth/auth_storage.dart';
@@ -331,36 +332,41 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
   }
 }
 
-String _buyLabel(Locale l) => switch (l.languageCode) {
-  'ru' => 'Купить',
-  'en' => 'Buy',
-  _ => 'Sotib olish',
-};
+String _buyLabel(Locale l) =>
+    tr(l, 'market.listing.buy', uz: 'Sotib olish', ru: 'Купить', en: 'Buy');
 
-String _ownedLabel(Locale l) => switch (l.languageCode) {
-  'ru' => 'Куплено',
-  'en' => 'Purchased',
-  _ => 'Sotib olingan',
-};
+String _ownedLabel(Locale l) => tr(
+  l,
+  'market.listing.owned',
+  uz: 'Sotib olingan',
+  ru: 'Куплено',
+  en: 'Purchased',
+);
 
 // Guest-gate xabarlari — login drawer (`ensureLoggedIn`) ichida ko'rsatiladi.
-String _loginMsgBuy(Locale l) => switch (l.languageCode) {
-  'ru' => 'Войдите, чтобы купить эту модель.',
-  'en' => 'Sign in to purchase this model.',
-  _ => 'Bu modelni sotib olish uchun tizimga kiring.',
-};
+String _loginMsgBuy(Locale l) => tr(
+  l,
+  'market.listing.login_buy',
+  uz: 'Bu modelni sotib olish uchun tizimga kiring.',
+  ru: 'Войдите, чтобы купить эту модель.',
+  en: 'Sign in to purchase this model.',
+);
 
-String _loginMsgDownload(Locale l) => switch (l.languageCode) {
-  'ru' => 'Войдите, чтобы скачать файл.',
-  'en' => 'Sign in to download.',
-  _ => 'Yuklab olish uchun tizimga kiring.',
-};
+String _loginMsgDownload(Locale l) => tr(
+  l,
+  'market.listing.login_download',
+  uz: 'Yuklab olish uchun tizimga kiring.',
+  ru: 'Войдите, чтобы скачать файл.',
+  en: 'Sign in to download.',
+);
 
-String _loginMsgView(Locale l) => switch (l.languageCode) {
-  'ru' => 'Войдите, чтобы открыть 3D-модель.',
-  'en' => 'Sign in to open the 3D model.',
-  _ => '3D modelni ochish uchun tizimga kiring.',
-};
+String _loginMsgView(Locale l) => tr(
+  l,
+  'market.listing.login_view',
+  uz: '3D modelni ochish uchun tizimga kiring.',
+  ru: 'Войдите, чтобы открыть 3D-модель.',
+  en: 'Sign in to open the 3D model.',
+);
 
 class _OwnedBadge extends StatelessWidget {
   const _OwnedBadge({required this.label});
@@ -406,6 +412,7 @@ class _View3DButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final bg = AppColors.splashGreen;
     final fg = AppColors.buttonTextBlack;
 
@@ -426,7 +433,13 @@ class _View3DButton extends StatelessWidget {
               Icon(Icons.view_in_ar_rounded, size: 22, color: fg),
               const SizedBox(width: 10),
               Text(
-                '3D modelni ko‘rish',
+                tr(
+                  locale,
+                  'market.listing.view_3d_model',
+                  uz: '3D modelni ko‘rish',
+                  ru: 'Посмотреть 3D-модель',
+                  en: 'View 3D model',
+                ),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,

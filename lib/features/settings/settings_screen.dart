@@ -8,6 +8,7 @@ import 'package:in_app_review/in_app_review.dart';
 
 import '../../core/api_config.dart';
 import '../../core/i18n.dart';
+import '../../core/i18n/app_translations.dart';
 import '../auth/auth_http_client.dart';
 import '../auth/widgets/login_required_sheet.dart';
 import '../home/user_profile.dart' show paymentsHidden;
@@ -223,9 +224,9 @@ class _SettingsScreenState extends State<SettingsScreen>
       return;
     }
     if (!context.mounted) return;
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const MyPaymentsScreen()),
-    );
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const MyPaymentsScreen()));
   }
 
   Future<void> _openRateApp() async {
@@ -246,7 +247,11 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
   }
 
-  Future<void> _openLegalSheet(BuildContext context, Locale locale, String type) async {
+  Future<void> _openLegalSheet(
+    BuildContext context,
+    Locale locale,
+    String type,
+  ) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -371,9 +376,15 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   // Hisobni o'chirish (App Store 5.1.1(v)). Backend hisobni deaktivatsiya qilib
   // barcha sessiyalarni bekor qiladi; muvaffaqiyatda login ekraniga qaytamiz.
-  Future<void> _confirmDeleteAccount(BuildContext context, Locale locale) async {
-    String t(String ru, String en, String uz) =>
-        switch (locale.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    Locale locale,
+  ) async {
+    String t(String ru, String en, String uz) => switch (locale.languageCode) {
+      'ru' => ru,
+      'en' => en,
+      _ => uz,
+    };
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: ColorTokens.cardBg(context),
@@ -516,8 +527,11 @@ class _DeleteAccountSheet extends StatelessWidget {
 
   final Locale locale;
 
-  String _t(String ru, String en, String uz) =>
-      switch (locale.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+  String _t(String ru, String en, String uz) => switch (locale.languageCode) {
+    'ru' => ru,
+    'en' => en,
+    _ => uz,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -556,7 +570,11 @@ class _DeleteAccountSheet extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              _t('Удалить аккаунт?', 'Delete account?', "Hisobni o'chirasizmi?"),
+              _t(
+                'Удалить аккаунт?',
+                'Delete account?',
+                "Hisobni o'chirasizmi?",
+              ),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -678,20 +696,34 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
   Future<void> _sendOtp() async {
     final phone = _phoneCtrl.text.trim();
     if (phone.isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final res = await http.post(
-        Uri.parse('${ApiConfig.baseUrl}/auth/send-otp'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'phone': phone}),
-      ).timeout(const Duration(seconds: 15));
+      final res = await http
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/auth/send-otp'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'phone': phone}),
+          )
+          .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
-        setState(() { _otpSent = true; _loading = false; });
+        setState(() {
+          _otpSent = true;
+          _loading = false;
+        });
       } else {
-        setState(() { _error = L.errorOccurred(localeNotifier.value); _loading = false; });
+        setState(() {
+          _error = L.errorOccurred(localeNotifier.value);
+          _loading = false;
+        });
       }
     } catch (e) {
-      setState(() { _error = L.errorOccurred(localeNotifier.value); _loading = false; });
+      setState(() {
+        _error = L.errorOccurred(localeNotifier.value);
+        _loading = false;
+      });
     }
   }
 
@@ -699,14 +731,19 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
     final phone = _phoneCtrl.text.trim();
     final otp = _otpCtrl.text.trim();
     if (phone.isEmpty || otp.isEmpty) return;
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final client = AuthHttpClient();
-      final res = await client.post(
-        Uri.parse('${ApiConfig.baseUrl}/profile/change-phone'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'new_phone': phone, 'otp_code': otp}),
-      ).timeout(const Duration(seconds: 15));
+      final res = await client
+          .post(
+            Uri.parse('${ApiConfig.baseUrl}/profile/change-phone'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'new_phone': phone, 'otp_code': otp}),
+          )
+          .timeout(const Duration(seconds: 15));
       if (res.statusCode == 200) {
         if (mounted) {
           Navigator.pop(context);
@@ -719,10 +756,18 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
         }
       } else {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
-        setState(() { _error = (body['detail'] as String?) ?? L.errorOccurred(localeNotifier.value); _loading = false; });
+        setState(() {
+          _error =
+              (body['detail'] as String?) ??
+              L.errorOccurred(localeNotifier.value);
+          _loading = false;
+        });
       }
     } catch (e) {
-      setState(() { _error = L.errorOccurred(localeNotifier.value); _loading = false; });
+      setState(() {
+        _error = L.errorOccurred(localeNotifier.value);
+        _loading = false;
+      });
     }
   }
 
@@ -736,16 +781,24 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
           color: ColorTokens.cardBg(context),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         ),
-        padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + MediaQuery.paddingOf(context).bottom),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          16 + MediaQuery.paddingOf(context).bottom,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Center(
               child: Container(
-                width: 40, height: 4,
+                width: 40,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: ColorTokens.secondaryText(context).withValues(alpha: 0.3),
+                  color: ColorTokens.secondaryText(
+                    context,
+                  ).withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -803,7 +856,10 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
             ],
             if (_error != null) ...[
               const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 13)),
+              Text(
+                _error!,
+                style: const TextStyle(color: Colors.red, fontSize: 13),
+              ),
             ],
             const SizedBox(height: 16),
             ElevatedButton(
@@ -812,13 +868,27 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
                 backgroundColor: AppColors.splashGreen,
                 foregroundColor: const Color(0xFF011606),
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
               child: _loading
-                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : Text(
-                      _otpSent ? 'Tasdiqlash' : 'OTP yuborish',
-                      style: const TextStyle(fontFamily: 'MTSCompact', fontWeight: FontWeight.w700, fontSize: 15),
+                      switch (localeNotifier.value.languageCode) {
+                        'ru' => _otpSent ? 'Подтвердить' : 'Отправить OTP',
+                        'en' => _otpSent ? 'Confirm' : 'Send OTP',
+                        _ => _otpSent ? 'Tasdiqlash' : 'OTP yuborish',
+                      },
+                      style: const TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
                     ),
             ),
           ],
@@ -1001,14 +1071,25 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
   }
 
   Future<void> _load() async {
-    final cached = widget.type == 'terms' ? _LegalCache.terms : _LegalCache.privacy;
+    final cached = widget.type == 'terms'
+        ? _LegalCache.terms
+        : _LegalCache.privacy;
     if (cached != null) {
-      if (mounted) setState(() { _title = cached.title; _content = cached.content; _loading = false; });
+      if (mounted)
+        setState(() {
+          _title = cached.title;
+          _content = cached.content;
+          _loading = false;
+        });
       return;
     }
     try {
       final res = await http
-          .get(Uri.parse('${ApiConfig.baseUrl}/legal/${widget.type}?lang=${widget.locale.languageCode}'))
+          .get(
+            Uri.parse(
+              '${ApiConfig.baseUrl}/legal/${widget.type}?lang=${widget.locale.languageCode}',
+            ),
+          )
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
@@ -1019,15 +1100,28 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
         } else {
           _LegalCache.privacy = (title: title, content: content);
         }
-        if (mounted) setState(() { _title = title; _content = content; _loading = false; });
+        if (mounted)
+          setState(() {
+            _title = title;
+            _content = content;
+            _loading = false;
+          });
         return;
       }
     } catch (_) {
       // fall through to static fallback
     }
     // API unavailable — show static fallback content
-    final fallback = _LegalFallback.get(widget.type, widget.locale.languageCode);
-    if (mounted) setState(() { _title = fallback.title; _content = fallback.content; _loading = false; });
+    final fallback = _LegalFallback.get(
+      widget.type,
+      widget.locale.languageCode,
+    );
+    if (mounted)
+      setState(() {
+        _title = fallback.title;
+        _content = fallback.content;
+        _loading = false;
+      });
   }
 
   @override
@@ -1048,7 +1142,9 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
               width: 36,
               height: 4,
               decoration: BoxDecoration(
-                color: ColorTokens.secondaryText(context).withValues(alpha: 0.3),
+                color: ColorTokens.secondaryText(
+                  context,
+                ).withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1061,9 +1157,22 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.wifi_off_rounded, size: 32, color: ColorTokens.secondaryText(context)),
+                    Icon(
+                      Icons.wifi_off_rounded,
+                      size: 32,
+                      color: ColorTokens.secondaryText(context),
+                    ),
                     const SizedBox(height: 12),
-                    TextButton(onPressed: () { setState(() { _loading = true; _error = null; }); unawaited(_load()); }, child: Text(L.retry(Localizations.localeOf(context)))),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _loading = true;
+                          _error = null;
+                        });
+                        unawaited(_load());
+                      },
+                      child: Text(L.retry(Localizations.localeOf(context))),
+                    ),
                   ],
                 ),
               ),
@@ -1257,107 +1366,93 @@ class _OptionSheet<T> extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Настройки',
-    'en' => 'Settings',
-    _ => 'Sozlamalar',
-  };
-  static String account(Locale l) => switch (l.languageCode) {
-    'ru' => 'Аккаунт',
-    'en' => 'Account',
-    _ => 'Hisob',
-  };
-  static String privacy(Locale l) => switch (l.languageCode) {
-    'ru' => 'Конфиденциальность',
-    'en' => 'Privacy',
-    _ => 'Maxfiylik',
-  };
-  static String other(Locale l) => switch (l.languageCode) {
-    'ru' => 'Прочее',
-    'en' => 'Other',
-    _ => 'Boshqa',
-  };
-  static String language(Locale l) => switch (l.languageCode) {
-    'ru' => 'Язык',
-    'en' => 'Language',
-    _ => 'Til',
-  };
-  static String theme(Locale l) => switch (l.languageCode) {
-    'ru' => 'Тема',
-    'en' => 'Theme',
-    _ => 'Mavzu',
-  };
-  static String notifications(Locale l) => switch (l.languageCode) {
-    'ru' => 'Уведомления',
-    'en' => 'Notifications',
-    _ => 'Bildirishnomalar',
-  };
+  static String _t(Locale l, String key, String uz, String ru, String en) =>
+      tr(l, key, uz: uz, ru: ru, en: en);
+
+  static String title(Locale l) =>
+      _t(l, 'settings.title', 'Sozlamalar', 'Настройки', 'Settings');
+  static String account(Locale l) =>
+      _t(l, 'settings.account', 'Hisob', 'Аккаунт', 'Account');
+  static String privacy(Locale l) =>
+      _t(l, 'settings.privacy', 'Maxfiylik', 'Конфиденциальность', 'Privacy');
+  static String other(Locale l) =>
+      _t(l, 'settings.other', 'Boshqa', 'Прочее', 'Other');
+  static String language(Locale l) =>
+      _t(l, 'settings.language', 'Til', 'Язык', 'Language');
+  static String theme(Locale l) =>
+      _t(l, 'settings.theme', 'Mavzu', 'Тема', 'Theme');
+  static String notifications(Locale l) => _t(
+    l,
+    'settings.notifications',
+    'Bildirishnomalar',
+    'Уведомления',
+    'Notifications',
+  );
   // static String biometric(Locale l) => switch (l.languageCode) {
   //   'ru' => 'Биометрический вход',
   //   'en' => 'Biometric login',
   //   _ => 'Biometrik kirish',
   // };
-  static String changePhone(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сменить номер',
-    'en' => 'Change phone',
-    _ => 'Telefon raqamni o‘zgartirish',
-  };
-  static String terms(Locale l) => switch (l.languageCode) {
-    'ru' => 'Условия использования',
-    'en' => 'Terms of use',
-    _ => 'Foydalanish shartlari',
-  };
-  static String privacyPolicy(Locale l) => switch (l.languageCode) {
-    'ru' => 'Политика конфиденциальности',
-    'en' => 'Privacy policy',
-    _ => 'Maxfiylik siyosati',
-  };
-  static String payments(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мои платежи',
-    'en' => 'My payments',
-    _ => "To'lovlarim",
-  };
-  static String paymentsLoginMsg(Locale l) => switch (l.languageCode) {
-    'ru' => 'Войдите, чтобы посмотреть историю платежей.',
-    'en' => 'Log in to view your payment history.',
-    _ => "To'lovlar tarixini ko'rish uchun tizimga kiring.",
-  };
-  static String rateApp(Locale l) => switch (l.languageCode) {
-    'ru' => 'Оценить приложение',
-    'en' => 'Rate the app',
-    _ => 'Ilovani baholash',
-  };
-  static String version(Locale l) => switch (l.languageCode) {
-    'ru' => 'Версия',
-    'en' => 'Version',
-    _ => 'Versiya',
-  };
-  static String logout(Locale l) => switch (l.languageCode) {
-    'ru' => 'Выйти',
-    'en' => 'Log out',
-    _ => 'Chiqish',
-  };
-  static String logoutTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Выйти из аккаунта?',
-    'en' => 'Log out?',
-    _ => 'Chiqishni xohlaysizmi?',
-  };
-  static String logoutMessage(Locale l) => switch (l.languageCode) {
-    'ru' => 'Вы можете снова войти в любое время.',
-    'en' => 'You can sign in again anytime.',
-    _ => 'Istalgan vaqtda qayta kirishingiz mumkin.',
-  };
-  static String cancel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Отмена',
-    'en' => 'Cancel',
-    _ => 'Bekor qilish',
-  };
+  static String changePhone(Locale l) => _t(
+    l,
+    'settings.change_phone',
+    'Telefon raqamni o‘zgartirish',
+    'Сменить номер',
+    'Change phone',
+  );
+  static String terms(Locale l) => _t(
+    l,
+    'settings.terms',
+    'Foydalanish shartlari',
+    'Условия использования',
+    'Terms of use',
+  );
+  static String privacyPolicy(Locale l) => _t(
+    l,
+    'settings.privacy_policy',
+    'Maxfiylik siyosati',
+    'Политика конфиденциальности',
+    'Privacy policy',
+  );
+  static String payments(Locale l) =>
+      _t(l, 'settings.payments', "To'lovlarim", 'Мои платежи', 'My payments');
+  static String paymentsLoginMsg(Locale l) => _t(
+    l,
+    'settings.payments_login_msg',
+    "To'lovlar tarixini ko'rish uchun tizimga kiring.",
+    'Войдите, чтобы посмотреть историю платежей.',
+    'Log in to view your payment history.',
+  );
+  static String rateApp(Locale l) => _t(
+    l,
+    'settings.rate_app',
+    'Ilovani baholash',
+    'Оценить приложение',
+    'Rate the app',
+  );
+  static String version(Locale l) =>
+      _t(l, 'settings.version', 'Versiya', 'Версия', 'Version');
+  static String logout(Locale l) =>
+      _t(l, 'settings.logout', 'Chiqish', 'Выйти', 'Log out');
+  static String logoutTitle(Locale l) => _t(
+    l,
+    'settings.logout_title',
+    'Chiqishni xohlaysizmi?',
+    'Выйти из аккаунта?',
+    'Log out?',
+  );
+  static String logoutMessage(Locale l) => _t(
+    l,
+    'settings.logout_message',
+    'Istalgan vaqtda qayta kirishingiz mumkin.',
+    'Вы можете снова войти в любое время.',
+    'You can sign in again anytime.',
+  );
+  static String cancel(Locale l) =>
+      _t(l, 'common.cancel', 'Bekor qilish', 'Отмена', 'Cancel');
 
-  static String languageName(Locale l) => switch (l.languageCode) {
-    'ru' => 'Русский',
-    'en' => 'English',
-    _ => 'O‘zbekcha',
-  };
+  static String languageName(Locale l) =>
+      _t(l, 'settings.language_name', 'O‘zbekcha', 'Русский', 'English');
   static String themeName(Locale l, ThemeMode mode) => switch (mode) {
     ThemeMode.system => switch (l.languageCode) {
       'ru' => 'Системная',
@@ -1375,9 +1470,6 @@ class _S {
       _ => 'Tungi',
     },
   };
-  static String savedToast(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сохранено',
-    'en' => 'Saved',
-    _ => 'Saqlandi',
-  };
+  static String savedToast(Locale l) =>
+      _t(l, 'common.saved', 'Saqlandi', 'Сохранено', 'Saved');
 }

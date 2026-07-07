@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/api_config.dart';
+import '../../../core/i18n.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
@@ -59,7 +61,10 @@ class _AiScanScreenState extends State<AiScanScreen> {
       if (result.isSavedRaw) {
         AppToast.success(
           context,
-          'Skan saqlandi (#${result.savedScanId}) — Profil → Mening skanlarim',
+          _AiScanStrings.savedScanSuccess(
+            localeNotifier.value,
+            result.savedScanId!,
+          ),
         );
       } else {
         // Legacy: filePath bilan kelgan (offline_processed yoki eski flow).
@@ -69,7 +74,10 @@ class _AiScanScreenState extends State<AiScanScreen> {
           if (!mounted) return;
           AppToast.success(
             context,
-            '3D model tayyor — iPhone\'da saqlandi (${(result.fileSize / 1048576).toStringAsFixed(1)} MB)',
+            _AiScanStrings.savedModelSuccess(
+              localeNotifier.value,
+              (result.fileSize / 1048576).toStringAsFixed(1),
+            ),
           );
         }
       }
@@ -80,7 +88,10 @@ class _AiScanScreenState extends State<AiScanScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _state = ScanCardState.idle);
-      AppToast.error(context, 'Skan xatosi: $e');
+      AppToast.error(
+        context,
+        '${_AiScanStrings.scanError(localeNotifier.value)}: $e',
+      );
     }
     return;
   }
@@ -101,7 +112,10 @@ class _AiScanScreenState extends State<AiScanScreen> {
     final token = session.token;
     if (token == null || token.isEmpty) {
       if (!mounted) return;
-      AppToast.error(context, 'Skan uchun avval tizimga kiring');
+      AppToast.error(
+        context,
+        _AiScanStrings.loginRequiredForScan(localeNotifier.value),
+      );
       return;
     }
     setState(() => _state = ScanCardState.scanning);
@@ -126,8 +140,11 @@ class _AiScanScreenState extends State<AiScanScreen> {
       final etaLabel = _providerEta(selectedProvider);
       AppToast.success(
         context,
-        'Foto\'lar $providerLabel\'ga yuborildi. 3D model $etaLabel\'da tayyor — '
-        'Arizalar bo\'limidan kuzating.',
+        _AiScanStrings.providerUploadSuccess(
+          localeNotifier.value,
+          providerLabel,
+          etaLabel,
+        ),
       );
     } on RoomPlanScannerException catch (e) {
       if (!mounted) return;
@@ -166,26 +183,28 @@ class _AiScanScreenState extends State<AiScanScreen> {
   }
 
   String _providerLabel(String provider) {
+    final locale = localeNotifier.value;
     switch (provider) {
       case 'aws_gpu':
-        return 'AWS GPU';
+        return _AiScanStrings.providerAwsGpu(locale);
       case 'kiri_engine':
-        return 'Kiri';
+        return _AiScanStrings.providerKiri(locale);
       case 'polycam':
       default:
-        return 'Polycam';
+        return _AiScanStrings.providerPolycam(locale);
     }
   }
 
   String _providerEta(String provider) {
+    final locale = localeNotifier.value;
     switch (provider) {
       case 'aws_gpu':
-        return '15-30 daqiqa';
+        return _AiScanStrings.providerEtaAws(locale);
       case 'kiri_engine':
-        return '5-20 daqiqa';
+        return _AiScanStrings.providerEtaKiri(locale);
       case 'polycam':
       default:
-        return '30-60 daqiqa';
+        return _AiScanStrings.providerEtaPolycam(locale);
     }
   }
 
@@ -237,10 +256,8 @@ class _AiScanScreenState extends State<AiScanScreen> {
     // Wizard'dan kelgan to'liq draft + skan natijasi → backend AI baholash.
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        builder: (_) => AiResultScreen(
-          draft: draft,
-          scanCompleted: scanCompleted,
-        ),
+        builder: (_) =>
+            AiResultScreen(draft: draft, scanCompleted: scanCompleted),
       ),
     );
   }
@@ -331,8 +348,9 @@ class _AiScanScreenState extends State<AiScanScreen> {
                             state: _state,
                             onTap: _startScan,
                             idleLabel: _AiScanStrings.cameraIdle(locale),
-                            scanningLabel:
-                                _AiScanStrings.cameraScanning(locale),
+                            scanningLabel: _AiScanStrings.cameraScanning(
+                              locale,
+                            ),
                             doneLabel: _AiScanStrings.cameraDone(locale),
                           ),
                           if (_state == ScanCardState.done &&
@@ -422,8 +440,11 @@ class _PreviewButton extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Icon(Icons.view_in_ar_rounded,
-                  color: AppColors.splashGreen, size: 22),
+              Icon(
+                Icons.view_in_ar_rounded,
+                color: AppColors.splashGreen,
+                size: 22,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
@@ -436,8 +457,11 @@ class _PreviewButton extends StatelessWidget {
                   ),
                 ),
               ),
-              Icon(Icons.chevron_right_rounded,
-                  color: textColor.withValues(alpha: 0.4), size: 22),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: textColor.withValues(alpha: 0.4),
+                size: 22,
+              ),
             ],
           ),
         ),
@@ -450,90 +474,109 @@ class _PreviewButton extends StatelessWidget {
 /// Keeps the inline `switch (locale.languageCode)` pattern used elsewhere
 /// in the app (see `home_cta.dart`).
 class _AiScanStrings {
-  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'AI Оценка',
-        'en' => 'AI Valuation',
-        _ => 'AI Baholash',
-      };
+  static String _t(
+    Locale locale,
+    String key,
+    String uz,
+    String ru,
+    String en,
+  ) => tr(locale, key, uz: uz, ru: ru, en: en);
 
-  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Определение стоимости недвижимости',
-        'en' => 'Determine property value',
-        _ => 'Ko\'chmas mulk qiymatini aniqlash',
-      };
-
-  static String heading(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сканируйте объект',
-        'en' => 'Scan the object',
-        _ => 'Obyektni skan qiling',
-      };
-
-  static String subheading(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сканируйте через RoomPlan LiDAR',
-        'en' => 'Scan via RoomPlan LiDAR',
-        _ => 'RoomPlan LiDAR orqali skan qiling',
-      };
-
-  static String cameraIdle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Запустите LiDAR-камеру',
-        'en' => 'Start LiDAR camera',
-        _ => 'LiDAR kamerani ishga tushiring',
-      };
-
-  static String cameraScanning(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сканирование...',
-        'en' => 'Scanning...',
-        _ => 'Skanerlanmoqda...',
-      };
-
-  static String cameraDone(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Скан готов',
-        'en' => 'Scan ready',
-        _ => 'Skan tayyor',
-      };
-
-  static List<String> tips(Locale locale) => switch (locale.languageCode) {
-        'ru' => const [
-            'Двигайте устройство медленно',
-            'Охватите всю комнату',
-            'Освещение должно быть достаточным',
-          ],
-        'en' => const [
-            'Move the device slowly',
-            'Cover the entire room',
-            'Sufficient lighting is required',
-          ],
-        _ => const [
-            'Qurilmani sekin harakatlantiring',
-            'Xonani to\'liq qamrab oling',
-            'Yorug\'lik yetarli bo\'lishi kerak',
-          ],
-      };
-
-  static String ctaStart(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Начать сканирование',
-        'en' => 'Start scan',
-        _ => 'Scan boshlash',
-      };
-
-  static String ctaContinue(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
-
-  static String ctaSkip(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Пропустить и продолжить',
-        'en' => 'Skip and continue',
-        _ => 'O\'tkazib yuborish',
-      };
-
-  static String preview3dModel(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Просмотр 3D-модели',
-        'en' => 'View 3D model',
-        _ => '3D modelni ko\'rish',
-      };
+  static String appBarTitle(Locale locale) => _t(
+    locale,
+    'scan.ai.app_bar_title',
+    'AI Baholash',
+    'AI Оценка',
+    'AI Valuation',
+  );
+  static String appBarSubtitle(Locale locale) => _t(
+    locale,
+    'scan.ai.app_bar_subtitle',
+    'Ko\'chmas mulk qiymatini aniqlash',
+    'Определение стоимости недвижимости',
+    'Determine property value',
+  );
+  static String heading(Locale locale) => _t(
+    locale,
+    'scan.ai.heading',
+    'Obyektni skan qiling',
+    'Сканируйте объект',
+    'Scan the object',
+  );
+  static String subheading(Locale locale) => _t(
+    locale,
+    'scan.ai.subheading',
+    'RoomPlan LiDAR orqali skan qiling',
+    'Сканируйте через RoomPlan LiDAR',
+    'Scan via RoomPlan LiDAR',
+  );
+  static String cameraIdle(Locale locale) => _t(
+    locale,
+    'scan.ai.camera_idle',
+    'LiDAR kamerani ishga tushiring',
+    'Запустите LiDAR-камеру',
+    'Start LiDAR camera',
+  );
+  static String cameraScanning(Locale locale) => _t(
+    locale,
+    'scan.ai.camera_scanning',
+    'Skanerlanmoqda...',
+    'Сканирование...',
+    'Scanning...',
+  );
+  static String cameraDone(Locale locale) => _t(
+    locale,
+    'scan.ai.camera_done',
+    'Skan tayyor',
+    'Скан готов',
+    'Scan ready',
+  );
+  static List<String> tips(Locale locale) => [
+    _t(
+      locale,
+      'scan.ai.tip_move_slowly',
+      'Qurilmani sekin harakatlantiring',
+      'Двигайте устройство медленно',
+      'Move the device slowly',
+    ),
+    _t(
+      locale,
+      'scan.ai.tip_cover_room',
+      'Xonani to\'liq qamrab oling',
+      'Охватите всю комнату',
+      'Cover the entire room',
+    ),
+    _t(
+      locale,
+      'scan.ai.tip_light',
+      'Yorug\'lik yetarli bo\'lishi kerak',
+      'Освещение должно быть достаточным',
+      'Sufficient lighting is required',
+    ),
+  ];
+  static String ctaStart(Locale locale) => _t(
+    locale,
+    'scan.ai.cta_start',
+    'Scan boshlash',
+    'Начать сканирование',
+    'Start scan',
+  );
+  static String ctaContinue(Locale locale) =>
+      _t(locale, 'common.continue', 'Davom etish', 'Продолжить', 'Continue');
+  static String ctaSkip(Locale locale) => _t(
+    locale,
+    'scan.ai.cta_skip',
+    'O\'tkazib yuborish',
+    'Пропустить и продолжить',
+    'Skip and continue',
+  );
+  static String preview3dModel(Locale locale) => _t(
+    locale,
+    'scan.ai.preview_3d_model',
+    '3D modelni ko\'rish',
+    'Просмотр 3D-модели',
+    'View 3D model',
+  );
 
   static String unsupportedDevice(Locale locale) =>
       switch (locale.languageCode) {
@@ -543,22 +586,242 @@ class _AiScanStrings {
         'en' =>
           'This device does not support RoomPlan. iPhone Pro or iPad Pro is '
               'required (iOS 16+ with a LiDAR sensor).',
-        _ => 'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
-            '(iOS 16+ va LiDAR sensori).',
+        _ =>
+          'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
+              '(iOS 16+ va LiDAR sensori).',
       };
 
-  static String scanError(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Ошибка сканирования',
-        'en' => 'Scan error',
-        _ => 'Skan xatosi',
+  static String scanError(Locale locale) => _t(
+    locale,
+    'scan.ai.scan_error',
+    'Skan xatosi',
+    'Ошибка сканирования',
+    'Scan error',
+  );
+
+  static String previewError(Locale locale) => _t(
+    locale,
+    'scan.ai.preview_error',
+    'Ko\'rsatish xatosi',
+    'Ошибка просмотра',
+    'Preview error',
+  );
+
+  static String savedScanSuccess(Locale locale, int id) =>
+      switch (locale.languageCode) {
+        'ru' => 'Скан сохранён (#$id) — Профиль → Мои сканы',
+        'en' => 'Scan saved (#$id) — Profile → My scans',
+        _ => 'Skan saqlandi (#$id) — Profil → Mening skanlarim',
       };
 
-  static String previewError(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Ошибка просмотра',
-        'en' => 'Preview error',
-        _ => 'Ko\'rsatish xatosi',
+  static String savedModelSuccess(Locale locale, String sizeMb) =>
+      switch (locale.languageCode) {
+        'ru' => '3D-модель готова — сохранена на iPhone ($sizeMb MB)',
+        'en' => '3D model is ready — saved on iPhone ($sizeMb MB)',
+        _ => '3D model tayyor — iPhone\'da saqlandi ($sizeMb MB)',
       };
 
+  static String loginRequiredForScan(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Сначала войдите в аккаунт для сканирования',
+        'en' => 'Please sign in first to scan',
+        _ => 'Skan uchun avval tizimga kiring',
+      };
+
+  static String providerUploadSuccess(
+    Locale locale,
+    String providerLabel,
+    String etaLabel,
+  ) => switch (locale.languageCode) {
+    'ru' =>
+      'Фото отправлены в $providerLabel. 3D-модель будет готова через '
+          '$etaLabel — отслеживайте статус в разделе "Заявки".',
+    'en' =>
+      'Photos were sent to $providerLabel. The 3D model will be ready in '
+          '$etaLabel — track it in Applications.',
+    _ =>
+      'Foto\'lar $providerLabel\'ga yuborildi. 3D model $etaLabel\'da tayyor — '
+          'Arizalar bo\'limidan kuzating.',
+  };
+
+  static String providerSheetTitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Выберите способ создания 3D-модели',
+        'en' => 'Choose how to create the 3D model',
+        _ => '3D model yaratish usulini tanlang',
+      };
+
+  static String providerSheetSubtitle(
+    Locale locale,
+  ) => switch (locale.languageCode) {
+    'ru' =>
+      'Каким способом обработать фото и данные сканирования для 3D-модели?',
+    'en' => 'How should the photos and scan data be processed into a 3D model?',
+    _ => 'Foto va skan ma\'lumotlari qaysi usulda 3D modelga aylantirilsin?',
+  };
+
+  static String providerCaptureSubtitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Модель создаётся прямо на iPhone. Интернет не требуется.',
+        'en' =>
+          'The model is created directly on the iPhone. No internet required.',
+        _ => 'Model iPhone\'ning o\'zida tayyorlanadi. Internet kerak emas.',
+      };
+
+  static String providerPolycamSubtitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Обработка через онлайн-сервис, результат высокого качества.',
+        'en' =>
+          'Processed through an online service with high-quality results.',
+        _ => 'Onlayn xizmat orqali tayyorlanadi, natija sifati yuqori.',
+      };
+
+  static String providerAwsSubtitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Обработка на нашем сервере: быстрее и экономичнее.',
+        'en' => 'Processed on our server: faster and more cost-efficient.',
+        _ => 'Bizning serverda tezroq va tejamkorroq qayta ishlanadi.',
+      };
+
+  static String providerKiriSubtitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Подходит даже для фотографий среднего качества.',
+        'en' => 'Works well even with lower-quality photos.',
+        _ => 'Sifat pastroq bo\'lgan suratlarda ham yaxshi natija beradi.',
+      };
+
+  static String providerCapture(Locale locale) => 'iPhone Object Capture';
+  static String providerPolycam(Locale locale) => 'Polycam';
+  static String providerAwsGpu(Locale locale) => 'AWS GPU';
+  static String providerKiri(Locale locale) => 'Kiri Engine 3DGS';
+
+  static String providerEtaCapture(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => '3-5 минут',
+        'en' => '3-5 minutes',
+        _ => '3-5 daqiqa',
+      };
+
+  static String providerEtaPolycam(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => '30-60 минут',
+        'en' => '30-60 minutes',
+        _ => '30-60 daqiqa',
+      };
+
+  static String providerEtaAws(Locale locale) => switch (locale.languageCode) {
+    'ru' => '15-30 минут',
+    'en' => '15-30 minutes',
+    _ => '15-30 daqiqa',
+  };
+
+  static String providerEtaKiri(Locale locale) => switch (locale.languageCode) {
+    'ru' => '5-20 минут',
+    'en' => '5-20 minutes',
+    _ => '5-20 daqiqa',
+  };
+
+  static String qualitySheetTitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Выберите качество обработки',
+        'en' => 'Choose processing quality',
+        _ => 'Model sifati darajasini tanlang',
+      };
+
+  static String qualitySheetSubtitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Баланс между скоростью и качеством результата',
+        'en' => 'Balance between speed and output quality',
+        _ => 'Tezlik va natija sifati o\'rtasidagi muvozanat',
+      };
+
+  static String qualityDraftTitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Быстро',
+        'en' => 'Fast',
+        _ => 'Tez',
+      };
+
+  static String qualityDraftSubtitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Быстрый результат, базовое качество',
+        'en' => 'Fast result with basic quality',
+        _ => 'Tez natija, o\'rtacha sifat',
+      };
+
+  static String qualityDraftEta(Locale locale) => switch (locale.languageCode) {
+    'ru' => '~10 минут',
+    'en' => '~10 minutes',
+    _ => '~10 daqiqa',
+  };
+
+  static String qualityDraftValue(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => '60% качества',
+        'en' => '60% quality',
+        _ => '60% sifat',
+      };
+
+  static String qualityBalancedTitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Стандарт',
+        'en' => 'Standard',
+        _ => 'Standart',
+      };
+
+  static String qualityBalancedSubtitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Рекомендуемый баланс скорости и качества',
+        'en' => 'Recommended balance of speed and quality',
+        _ => 'Tezlik va sifatning tavsiya etilgan muvozanati',
+      };
+
+  static String qualityBalancedEta(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => '~25-40 минут',
+        'en' => '~25-40 minutes',
+        _ => '~25-40 daqiqa',
+      };
+
+  static String qualityBalancedValue(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => '80% качества',
+        'en' => '80% quality',
+        _ => '80% sifat',
+      };
+
+  static String qualityMaxTitle(Locale locale) => switch (locale.languageCode) {
+    'ru' => 'Максимум',
+    'en' => 'Maximum',
+    _ => 'Maksimal',
+  };
+
+  static String qualityMaxSubtitle(Locale locale) =>
+      switch (locale.languageCode) {
+        'ru' => 'Высокая детализация с использованием глубины LiDAR',
+        'en' => 'High-detail result using LiDAR depth',
+        _ => 'Yuqori aniqlikdagi natija, LiDAR chuqurlik ma\'lumotlari bilan',
+      };
+
+  static String qualityMaxEta(Locale locale) => switch (locale.languageCode) {
+    'ru' => '~90-150 минут',
+    'en' => '~90-150 minutes',
+    _ => '~90-150 daqiqa',
+  };
+
+  static String qualityMaxValue(Locale locale) => switch (locale.languageCode) {
+    'ru' => '95-100% качества',
+    'en' => '95-100% quality',
+    _ => '95-100% sifat',
+  };
+
+  static String recommended(Locale locale) => _t(
+    locale,
+    'common.recommended',
+    'Tavsiya',
+    'Рекомендация',
+    'Recommended',
+  );
 }
 
 /// 3D pipeline tanlash uchun bottom sheet — Polycam / AWS GPU / Kiri.
@@ -566,6 +829,7 @@ class _AiScanStrings {
 class _ProviderPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     return SafeArea(
       child: Container(
         margin: const EdgeInsets.all(12),
@@ -590,28 +854,27 @@ class _ProviderPickerSheet extends StatelessWidget {
               ),
             ),
             Text(
-              '3D pipeline tanlang',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              _AiScanStrings.providerSheetTitle(locale),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             Text(
-              'Foto\'lar qaysi tizimda 3D model qilinsin?',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white60,
-                  ),
+              _AiScanStrings.providerSheetSubtitle(locale),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.white60),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 18),
             _providerCard(
               context,
               id: 'object_capture',
-              title: 'iPhone Object Capture',
-              subtitle:
-                  'On-device LiDAR + ARKit. Internet kerak emas, iPhone\'da saqlanadi.',
-              eta: '3-5 daqiqa',
+              title: _AiScanStrings.providerCapture(locale),
+              subtitle: _AiScanStrings.providerCaptureSubtitle(locale),
+              eta: _AiScanStrings.providerEtaCapture(locale),
               icon: Icons.phone_iphone,
               color: const Color(0xFF34C759),
               recommended: true,
@@ -620,9 +883,9 @@ class _ProviderPickerSheet extends StatelessWidget {
             _providerCard(
               context,
               id: 'polycam',
-              title: 'Polycam',
-              subtitle: 'Web UI orqali, sifat baland (mesh-based USDZ)',
-              eta: '30-60 daqiqa',
+              title: _AiScanStrings.providerPolycam(locale),
+              subtitle: _AiScanStrings.providerPolycamSubtitle(locale),
+              eta: _AiScanStrings.providerEtaPolycam(locale),
               icon: Icons.cloud,
               color: const Color(0xFFE85A4F),
             ),
@@ -630,9 +893,9 @@ class _ProviderPickerSheet extends StatelessWidget {
             _providerCard(
               context,
               id: 'aws_gpu',
-              title: 'AWS GPU (kadastr)',
-              subtitle: 'O\'z server, ARKit pose\'lar bilan tezroq + arzon',
-              eta: '15-30 daqiqa',
+              title: _AiScanStrings.providerAwsGpu(locale),
+              subtitle: _AiScanStrings.providerAwsSubtitle(locale),
+              eta: _AiScanStrings.providerEtaAws(locale),
               icon: Icons.memory,
               color: const Color(0xFFFF9900),
             ),
@@ -640,16 +903,16 @@ class _ProviderPickerSheet extends StatelessWidget {
             _providerCard(
               context,
               id: 'kiri_engine',
-              title: 'Kiri Engine 3DGS',
-              subtitle: 'Gaussian Splatting — past sifatli foto\'larga ham yaxshi',
-              eta: '5-20 daqiqa',
+              title: _AiScanStrings.providerKiri(locale),
+              subtitle: _AiScanStrings.providerKiriSubtitle(locale),
+              eta: _AiScanStrings.providerEtaKiri(locale),
               icon: Icons.auto_awesome,
               color: const Color(0xFF3DB99F),
             ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Bekor qilish'),
+              child: Text(L.cancel(locale)),
             ),
           ],
         ),
@@ -667,6 +930,7 @@ class _ProviderPickerSheet extends StatelessWidget {
     required Color color,
     bool recommended = false,
   }) {
+    final locale = Localizations.localeOf(context);
     return InkWell(
       onTap: () => Navigator.of(context).pop(id),
       borderRadius: BorderRadius.circular(14),
@@ -709,13 +973,15 @@ class _ProviderPickerSheet extends StatelessWidget {
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: color.withOpacity(0.22),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            'TAVSIYA',
+                            _AiScanStrings.recommended(locale).toUpperCase(),
                             style: TextStyle(
                               color: color,
                               fontSize: 10,
@@ -730,16 +996,16 @@ class _ProviderPickerSheet extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white60,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
                   ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      const Icon(Icons.schedule,
-                          size: 12, color: Colors.white54),
+                      const Icon(
+                        Icons.schedule,
+                        size: 12,
+                        color: Colors.white54,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         eta,
@@ -762,12 +1028,12 @@ class _ProviderPickerSheet extends StatelessWidget {
   }
 }
 
-
 /// Splatfacto quality preset tanlash uchun bottom sheet (aws_gpu uchun).
 /// 'draft' (tez, ~10 daq), 'balanced' (~30 daq, default), 'max' (~90 daq).
 class _QualityPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     return SafeArea(
       child: Container(
         margin: const EdgeInsets.all(12),
@@ -792,28 +1058,28 @@ class _QualityPickerSheet extends StatelessWidget {
               ),
             ),
             Text(
-              'Sifat darajasini tanlang',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+              _AiScanStrings.qualitySheetTitle(locale),
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 4),
             Text(
-              'Tezlik va sifat orasidagi balans',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white60,
-                  ),
+              _AiScanStrings.qualitySheetSubtitle(locale),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: Colors.white60),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 18),
             _qualityCard(
               context,
               id: 'draft',
-              title: 'Tez',
-              subtitle: 'Tezkor preview, oddiy sifat',
-              eta: '~10 daqiqa',
-              quality: '60% sifat',
+              title: _AiScanStrings.qualityDraftTitle(locale),
+              subtitle: _AiScanStrings.qualityDraftSubtitle(locale),
+              eta: _AiScanStrings.qualityDraftEta(locale),
+              quality: _AiScanStrings.qualityDraftValue(locale),
               icon: Icons.bolt,
               color: const Color(0xFF60A5FA),
             ),
@@ -821,10 +1087,10 @@ class _QualityPickerSheet extends StatelessWidget {
             _qualityCard(
               context,
               id: 'balanced',
-              title: 'Standart',
-              subtitle: 'Tezlik va sifat balansi (tavsiya)',
-              eta: '~25-40 daqiqa',
-              quality: '80% sifat',
+              title: _AiScanStrings.qualityBalancedTitle(locale),
+              subtitle: _AiScanStrings.qualityBalancedSubtitle(locale),
+              eta: _AiScanStrings.qualityBalancedEta(locale),
+              quality: _AiScanStrings.qualityBalancedValue(locale),
               icon: Icons.tune,
               color: const Color(0xFFFF9900),
               recommended: true,
@@ -833,17 +1099,17 @@ class _QualityPickerSheet extends StatelessWidget {
             _qualityCard(
               context,
               id: 'max',
-              title: 'Maksimal',
-              subtitle: 'Foto-realistic, LiDAR depth bilan',
-              eta: '~90-150 daqiqa',
-              quality: '95-100% sifat',
+              title: _AiScanStrings.qualityMaxTitle(locale),
+              subtitle: _AiScanStrings.qualityMaxSubtitle(locale),
+              eta: _AiScanStrings.qualityMaxEta(locale),
+              quality: _AiScanStrings.qualityMaxValue(locale),
               icon: Icons.diamond,
               color: const Color(0xFFE85A4F),
             ),
             const SizedBox(height: 8),
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Bekor qilish'),
+              child: Text(L.cancel(locale)),
             ),
           ],
         ),
@@ -862,6 +1128,7 @@ class _QualityPickerSheet extends StatelessWidget {
     required Color color,
     bool recommended = false,
   }) {
+    final locale = Localizations.localeOf(context);
     return InkWell(
       onTap: () => Navigator.of(context).pop(id),
       borderRadius: BorderRadius.circular(14),
@@ -912,9 +1179,9 @@ class _QualityPickerSheet extends StatelessWidget {
                             color: color,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'Tavsiya',
-                            style: TextStyle(
+                          child: Text(
+                            _AiScanStrings.recommended(locale),
+                            style: const TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -927,10 +1194,7 @@ class _QualityPickerSheet extends StatelessWidget {
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Colors.white60,
-                    ),
+                    style: const TextStyle(fontSize: 12, color: Colors.white60),
                   ),
                   const SizedBox(height: 4),
                   Row(

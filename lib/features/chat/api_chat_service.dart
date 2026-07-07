@@ -9,9 +9,11 @@ library;
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/widgets.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
+import '../../core/i18n/app_translations.dart';
 import '../auth/auth_http_client.dart';
 
 /// SSE hodisasi: meta (conversation_id) | delta (matn bo'lagi) | error | done.
@@ -33,8 +35,8 @@ class ChatStreamEvent {
 
 class ChatApiService {
   ChatApiService({http.Client? client, String? baseUrl})
-      : _client = client ?? AuthHttpClient(),
-        _baseUrl = baseUrl ?? ApiConfig.baseUrl;
+    : _client = client ?? AuthHttpClient(),
+      _baseUrl = baseUrl ?? ApiConfig.baseUrl;
 
   final http.Client _client;
   final String _baseUrl;
@@ -45,6 +47,7 @@ class ChatApiService {
     int? conversationId,
     String lang = 'uz',
   }) async* {
+    final locale = Locale(lang);
     final uri = Uri.parse('$_baseUrl/chat/stream');
     final req = http.Request('POST', uri)
       ..headers['Content-Type'] = 'application/json'
@@ -60,7 +63,8 @@ class ChatApiService {
 
     if (res.statusCode != 200) {
       final body = await res.stream.bytesToString();
-      String detail = 'Server xatosi (${res.statusCode})';
+      String detail =
+          '${tr(locale, 'chat.server_error', uz: 'Server xatosi', ru: 'Ошибка сервера', en: 'Server error')} (${res.statusCode})';
       try {
         final j = jsonDecode(body);
         if (j is Map && j['detail'] != null) detail = j['detail'].toString();
@@ -71,8 +75,9 @@ class ChatApiService {
       return;
     }
 
-    final lines =
-        res.stream.transform(utf8.decoder).transform(const LineSplitter());
+    final lines = res.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
     await for (final line in lines) {
       if (!line.startsWith('data:')) continue;
       final payload = line.substring(5).trim();
@@ -91,7 +96,16 @@ class ChatApiService {
         case 'delta':
           yield ChatStreamEvent.delta(d['content'] as String? ?? '');
         case 'error':
-          yield ChatStreamEvent.error(d['message'] as String? ?? 'Xatolik');
+          yield ChatStreamEvent.error(
+            d['message'] as String? ??
+                tr(
+                  locale,
+                  'common.error',
+                  uz: 'Xatolik',
+                  ru: 'Ошибка',
+                  en: 'Error',
+                ),
+          );
         case 'done':
           yield ChatStreamEvent.done();
           return;

@@ -3,14 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../theme/app_colors.dart';
 
 class ScanTipsCard extends StatelessWidget {
-  const ScanTipsCard({
-    super.key,
-    this.tips = const [
-      'Qurilmani sekin harakatlantiring',
-      'Xonani to\'liq qamrab oling',
-      'Yorug\'lik yetarli bo\'lishi kerak',
-    ],
-  });
+  const ScanTipsCard({super.key, required this.tips});
 
   final List<String> tips;
 

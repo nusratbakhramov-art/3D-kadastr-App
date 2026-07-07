@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../user_profile.dart';
 
@@ -261,24 +262,27 @@ class _BellButton extends StatelessWidget {
 class _HomeStrings {
   const _HomeStrings._();
 
-  static String userGreeting(Locale locale, String name) =>
-      switch (locale.languageCode) {
-        'ru' => 'Привет, $name👋',
-        'en' => 'Hi, $name👋',
-        _ => 'Salom, $name👋',
-      };
+  static String userGreeting(Locale locale, String name) {
+    final prefix = tr(
+      locale,
+      'home.header.greeting_prefix',
+      uz: 'Salom',
+      ru: 'Привет',
+      en: 'Hi',
+    );
+    return '$prefix, $name👋';
+  }
 
-  static String guestGreeting(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Привет, гость👋',
-    'en' => 'Hi, guest👋',
-    _ => 'Salom, mehmon👋',
-  };
+  static String guestGreeting(Locale locale) => tr(
+    locale,
+    'home.header.guest_greeting',
+    uz: 'Salom, mehmon👋',
+    ru: 'Привет, гость👋',
+    en: 'Hi, guest👋',
+  );
 
-  static String loginLabel(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Войти',
-    'en' => 'Log in',
-    _ => 'Kirish',
-  };
+  static String loginLabel(Locale locale) =>
+      tr(locale, 'home.header.login', uz: 'Kirish', ru: 'Войти', en: 'Log in');
 
   static String formatDate(Locale locale, DateTime date) {
     final month = _monthName(locale, date.month);

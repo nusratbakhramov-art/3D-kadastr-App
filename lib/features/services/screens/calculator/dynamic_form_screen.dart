@@ -14,6 +14,8 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../../core/api_config.dart';
+import '../../../../core/i18n.dart';
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../core/input_validators.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/app_toast.dart';
@@ -137,9 +139,9 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
   }
 
   TextEditingController _ctrl(FormFieldDef f) => _controllers.putIfAbsent(
-        f.key,
-        () => TextEditingController(text: (_answers[f.key] ?? '').toString()),
-      );
+    f.key,
+    () => TextEditingController(text: (_answers[f.key] ?? '').toString()),
+  );
 
   /// Maydonning effektiv formati — backend bersa o'sha, aks holda kalitdan
   /// taxmin qilamiz (telefon/email/STIR har doim shu kalitlar bilan keladi).
@@ -157,7 +159,8 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
   String? _validateSection(FormSectionDef s, Locale l) {
     for (final f in s.fields) {
       final v = _answers[f.key];
-      final empty = v == null ||
+      final empty =
+          v == null ||
           (v is String && v.trim().isEmpty) ||
           (v is List && v.isEmpty);
       if (f.required && empty && f.type != FormFieldType.toggle) {
@@ -251,12 +254,14 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
       final orderId = (body['id'] as num?)?.toInt() ?? 0;
       // Keyingi ariza uchun buyurtmachi rekvizitlarini eslab qolamiz.
       if (widget.prefillCustomer && (_answers['customer_name'] != null)) {
-        await const LastCustomerStore().save(LastCustomer(
-          name: (_answers['customer_name'] ?? '').toString(),
-          tin: (_answers['tin'] ?? '').toString(),
-          phone: (_answers['phone'] ?? '').toString(),
-          email: (_answers['email'] ?? '').toString(),
-        ));
+        await const LastCustomerStore().save(
+          LastCustomer(
+            name: (_answers['customer_name'] ?? '').toString(),
+            tin: (_answers['tin'] ?? '').toString(),
+            phone: (_answers['phone'] ?? '').toString(),
+            email: (_answers['email'] ?? '').toString(),
+          ),
+        );
       }
       if (!mounted) return;
       if (widget.onSubmitted != null) {
@@ -302,8 +307,8 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
       body: SafeArea(
         child: schema == null
             ? _loadError != null
-                ? _ErrorView(message: _loadError!, onRetry: _load)
-                : const Center(child: CircularProgressIndicator())
+                  ? _ErrorView(message: _loadError!, onRetry: _load)
+                  : const Center(child: CircularProgressIndicator())
             : _buildWizard(schema, l),
       ),
     );
@@ -379,8 +384,8 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
                 label: _submitting
                     ? '…'
                     : isLast
-                        ? _submitLabel(l)
-                        : _continueLabel(l),
+                    ? _submitLabel(l)
+                    : _continueLabel(l),
                 enabled: !_submitting,
                 onTap: _next,
               ),
@@ -421,15 +426,20 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
         return _textField(f, l, multiline: f.type == FormFieldType.textarea);
       case FormFieldType.number:
       case FormFieldType.integer:
-        return _textField(f, l, numeric: true,
-            integer: f.type == FormFieldType.integer);
+        return _textField(
+          f,
+          l,
+          numeric: true,
+          integer: f.type == FormFieldType.integer,
+        );
       case FormFieldType.date:
         return _dateField(f, l);
       case FormFieldType.rooms:
         return _RoomsField(
           label: trMap(f.label, l),
           locale: l,
-          value: (_answers[f.key] as List?)?.cast<Map<String, dynamic>>() ??
+          value:
+              (_answers[f.key] as List?)?.cast<Map<String, dynamic>>() ??
               const [],
           onChanged: (rooms) => setState(() => _answers[f.key] = rooms),
         );
@@ -439,17 +449,17 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
   }
 
   Widget _label(FormFieldDef f, Locale l) => Padding(
-        padding: const EdgeInsets.only(left: 4, bottom: 6),
-        child: Text(
-          f.required ? '${trMap(f.label, l)} *' : trMap(f.label, l),
-          style: TextStyle(
-            fontFamily: 'MTSCompact',
-            fontWeight: FontWeight.w600,
-            fontSize: 13,
-            color: _muted(context),
-          ),
-        ),
-      );
+    padding: const EdgeInsets.only(left: 4, bottom: 6),
+    child: Text(
+      f.required ? '${trMap(f.label, l)} *' : trMap(f.label, l),
+      style: TextStyle(
+        fontFamily: 'MTSCompact',
+        fontWeight: FontWeight.w600,
+        fontSize: 13,
+        color: _muted(context),
+      ),
+    ),
+  );
 
   Widget _choiceGroup(FormFieldDef f, Locale l, {required bool multi}) {
     final selected = multi
@@ -512,8 +522,13 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
     );
   }
 
-  Widget _textField(FormFieldDef f, Locale l,
-      {bool multiline = false, bool numeric = false, bool integer = false}) {
+  Widget _textField(
+    FormFieldDef f,
+    Locale l, {
+    bool multiline = false,
+    bool numeric = false,
+    bool integer = false,
+  }) {
     final fmt = _formatOf(f);
     // Kiritishni cheklash: STIR faqat raqam (telefon alohida _phoneField'da).
     final formatters = <TextInputFormatter>[];
@@ -522,15 +537,19 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
         ..add(FilteringTextInputFormatter.digitsOnly)
         ..add(LengthLimitingTextInputFormatter(14));
     } else if (numeric) {
-      formatters.add(FilteringTextInputFormatter.allow(
-          RegExp(integer ? r'[0-9]' : r'[0-9.,]')));
+      formatters.add(
+        FilteringTextInputFormatter.allow(
+          RegExp(integer ? r'[0-9]' : r'[0-9.,]'),
+        ),
+      );
     }
     final keyboard = switch (fmt) {
       'email' => TextInputType.emailAddress,
       'tin' => TextInputType.number,
-      _ => numeric
-          ? TextInputType.numberWithOptions(decimal: !integer)
-          : (multiline ? TextInputType.multiline : TextInputType.text),
+      _ =>
+        numeric
+            ? TextInputType.numberWithOptions(decimal: !integer)
+            : (multiline ? TextInputType.multiline : TextInputType.text),
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -552,8 +571,7 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
             // STIR `text` turida — raqam string sifatida saqlanadi.
             if (numeric && fmt != 'tin') {
               final t = raw.trim().replaceAll(',', '.');
-              _answers[f.key] =
-                  integer ? int.tryParse(t) : double.tryParse(t);
+              _answers[f.key] = integer ? int.tryParse(t) : double.tryParse(t);
             } else {
               _answers[f.key] = raw;
             }
@@ -580,8 +598,10 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
               lastDate: DateTime(2100),
             );
             if (picked != null) {
-              setState(() => _answers[f.key] =
-                  picked.toIso8601String().split('T').first);
+              setState(
+                () =>
+                    _answers[f.key] = picked.toIso8601String().split('T').first,
+              );
             }
           },
           child: InputDecorator(
@@ -642,8 +662,7 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
       ),
       filled: true,
       fillColor: fieldBg,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
         borderSide: BorderSide(color: border),
@@ -655,58 +674,62 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
     );
   }
 
-  Color _txt(BuildContext c) =>
-      Theme.of(c).brightness == Brightness.dark ? Colors.white : AppColors.textBlack;
+  Color _txt(BuildContext c) => Theme.of(c).brightness == Brightness.dark
+      ? Colors.white
+      : AppColors.textBlack;
   Color _muted(BuildContext c) => Theme.of(c).brightness == Brightness.dark
       ? const Color(0xFF9BA1A6)
       : const Color(0xFF6C7278);
 
   // ── i18n ──────────────────────────────────────────────────────────────
   String _continueLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
+    'ru' => 'Продолжить',
+    'en' => 'Continue',
+    _ => 'Davom etish',
+  };
   String _submitLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отправить',
-        'en' => 'Submit',
-        _ => 'Yuborish',
-      };
+    'ru' => 'Отправить',
+    'en' => 'Submit',
+    _ => 'Yuborish',
+  };
   String _req(Locale l) => switch (l.languageCode) {
-        'ru' => 'обязательно',
-        'en' => 'required',
-        _ => 'majburiy',
-      };
+    'ru' => 'обязательно',
+    'en' => 'required',
+    _ => 'majburiy',
+  };
   String _phoneErr(Locale l) => switch (l.languageCode) {
-        'ru' => 'Телефон — введите корректный номер, напр. +998 90 123 45 67',
-        'en' => 'Phone — enter a valid number, e.g. +998 90 123 45 67',
-        _ => 'Telefon — to\'g\'ri raqam kiriting, masalan +998 90 123 45 67',
-      };
+    'ru' => 'Телефон — введите корректный номер, напр. +998 90 123 45 67',
+    'en' => 'Phone — enter a valid number, e.g. +998 90 123 45 67',
+    _ => 'Telefon — to\'g\'ri raqam kiriting, masalan +998 90 123 45 67',
+  };
   String _emailErr(Locale l) => switch (l.languageCode) {
-        'ru' => 'Email — введите корректный адрес',
-        'en' => 'Email — enter a valid address',
-        _ => 'Email — to\'g\'ri manzil kiriting',
-      };
+    'ru' => 'Email — введите корректный адрес',
+    'en' => 'Email — enter a valid address',
+    _ => 'Email — to\'g\'ri manzil kiriting',
+  };
   String _tinErr(Locale l) => switch (l.languageCode) {
-        'ru' => 'СТИР/ИНН — 9 или 14 цифр',
-        'en' => 'TIN — 9 or 14 digits',
-        _ => 'STIR/INN — 9 yoki 14 raqam',
-      };
+    'ru' => 'СТИР/ИНН — 9 или 14 цифр',
+    'en' => 'TIN — 9 or 14 digits',
+    _ => 'STIR/INN — 9 yoki 14 raqam',
+  };
   String _sent(Locale l) => switch (l.languageCode) {
-        'ru' => 'Заявка отправлена',
-        'en' => 'Order submitted',
-        _ => 'Ariza yuborildi',
-      };
+    'ru' => 'Заявка отправлена',
+    'en' => 'Order submitted',
+    _ => 'Ariza yuborildi',
+  };
   String _loginFirst(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сначала войдите в систему',
-        'en' => 'Please sign in first',
-        _ => 'Avval tizimga kiring',
-      };
+    'ru' => 'Сначала войдите в систему',
+    'en' => 'Please sign in first',
+    _ => 'Avval tizimga kiring',
+  };
 }
 
 class _ToggleRow extends StatelessWidget {
-  const _ToggleRow(
-      {required this.label, required this.value, required this.onChanged});
+  const _ToggleRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
@@ -758,6 +781,7 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -768,7 +792,7 @@ class _ErrorView extends StatelessWidget {
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            TextButton(onPressed: onRetry, child: const Text('Qayta urinish')),
+            TextButton(onPressed: onRetry, child: Text(L.retry(locale))),
           ],
         ),
       ),
@@ -798,12 +822,15 @@ class _RoomsField extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.only(left: 4, bottom: 6),
-          child: Text(label,
-              style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                  color: muted)),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+              color: muted,
+            ),
+          ),
         ),
         for (var i = 0; i < value.length; i++)
           Padding(
@@ -815,7 +842,9 @@ class _RoomsField extends StatelessWidget {
                   child: TextFormField(
                     initialValue: value[i]['name']?.toString() ?? '',
                     style: const TextStyle(
-                        fontFamily: 'MTSCompact', fontSize: 14),
+                      fontFamily: 'MTSCompact',
+                      fontSize: 14,
+                    ),
                     decoration: _miniDec(context, _nameHint(locale)),
                     onChanged: (v) => _update(i, 'name', v),
                   ),
@@ -826,7 +855,9 @@ class _RoomsField extends StatelessWidget {
                     initialValue: value[i]['count']?.toString() ?? '',
                     keyboardType: TextInputType.number,
                     style: const TextStyle(
-                        fontFamily: 'MTSCompact', fontSize: 14),
+                      fontFamily: 'MTSCompact',
+                      fontSize: 14,
+                    ),
                     decoration: _miniDec(context, '×'),
                     onChanged: (v) => _update(i, 'count', int.tryParse(v)),
                   ),
@@ -834,8 +865,8 @@ class _RoomsField extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.close_rounded, size: 20),
                   onPressed: () {
-                    final list =
-                        List<Map<String, dynamic>>.from(value)..removeAt(i);
+                    final list = List<Map<String, dynamic>>.from(value)
+                      ..removeAt(i);
                     onChanged(list);
                   },
                 ),
@@ -869,8 +900,7 @@ class _RoomsField extends StatelessWidget {
     return InputDecoration(
       hintText: hint,
       isDense: true,
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide(color: border),
@@ -882,16 +912,15 @@ class _RoomsField extends StatelessWidget {
     );
   }
 
-  String _nameHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Помещение',
-        'en' => 'Room',
-        _ => 'Xona',
-      };
-  String _addRoom(Locale l) => switch (l.languageCode) {
-        'ru' => 'Добавить помещение',
-        'en' => 'Add room',
-        _ => 'Xona qo\'shish',
-      };
+  String _nameHint(Locale l) =>
+      tr(l, 'common.room_name_short', uz: 'Xona', ru: 'Помещение', en: 'Room');
+  String _addRoom(Locale l) => tr(
+    l,
+    'dynamic_form.add_room',
+    uz: 'Xona qo\'shish',
+    ru: 'Добавить помещение',
+    en: 'Add room',
+  );
 }
 
 /// Login'dagi telefon formatini (faqat O'zbekiston: `+998` prefiks +
@@ -989,16 +1018,19 @@ class _UzPhoneMask extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final rawCursor =
-        newValue.selection.baseOffset.clamp(0, newValue.text.length);
+    final rawCursor = newValue.selection.baseOffset.clamp(
+      0,
+      newValue.text.length,
+    );
     final digitsBeforeCursor = newValue.text
         .substring(0, rawCursor)
         .replaceAll(RegExp(r'\D'), '')
         .length;
 
     final allDigits = newValue.text.replaceAll(RegExp(r'\D'), '');
-    final clipped =
-        allDigits.length > _max ? allDigits.substring(0, _max) : allDigits;
+    final clipped = allDigits.length > _max
+        ? allDigits.substring(0, _max)
+        : allDigits;
 
     final buf = StringBuffer();
     for (var i = 0; i < clipped.length; i++) {

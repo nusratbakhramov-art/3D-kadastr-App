@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/i18n.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
@@ -58,8 +59,9 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
 
     setState(() => _state = ScanCardState.scanning);
     try {
-      final result =
-          await RoomPlanScanner.startScan(locale: localeNotifier.value);
+      final result = await RoomPlanScanner.startScan(
+        locale: localeNotifier.value,
+      );
       if (!mounted) return;
       if (result == null) {
         // Foydalanuvchi bekor qildi.
@@ -94,7 +96,9 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
     final session = await const AuthStorage().loadSession();
     final token = session.token;
     if (token == null || token.isEmpty) {
-      if (mounted) AppToast.error(context, L.authRequired(localeNotifier.value));
+      if (mounted) {
+        AppToast.error(context, L.authRequired(localeNotifier.value));
+      }
       return;
     }
     setState(() => _uploading = true);
@@ -206,8 +210,9 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
                             state: _state,
                             onTap: _startScan,
                             idleLabel: _ScanLidarStrings.cameraIdle(locale),
-                            scanningLabel:
-                                _ScanLidarStrings.cameraScanning(locale),
+                            scanningLabel: _ScanLidarStrings.cameraScanning(
+                              locale,
+                            ),
                             doneLabel: _ScanLidarStrings.cameraDone(locale),
                             onLongPress: () {
                               HapticFeedback.mediumImpact();
@@ -235,11 +240,12 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
                         label: _uploading
-                            ? 'Skan yuklanmoqda…'
+                            ? _ScanLidarStrings.uploading(locale)
                             : (_state == ScanCardState.done
-                                ? _ScanLidarStrings.ctaContinue(locale)
-                                : _ScanLidarStrings.ctaStart(locale)),
-                        enabled: _state != ScanCardState.scanning && !_uploading,
+                                  ? _ScanLidarStrings.ctaContinue(locale)
+                                  : _ScanLidarStrings.ctaStart(locale)),
+                        enabled:
+                            _state != ScanCardState.scanning && !_uploading,
                         onTap: _state == ScanCardState.done
                             ? _continue
                             : _startScan,
@@ -339,78 +345,95 @@ class _ScanResultCard extends StatelessWidget {
 }
 
 class _ScanLidarStrings {
-  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => '3D Кадастр',
-        'en' => '3D Cadastre',
-        _ => '3D kadastr',
-      };
+  static String _t(
+    Locale locale,
+    String key,
+    String uz,
+    String ru,
+    String en,
+  ) => tr(locale, key, uz: uz, ru: ru, en: en);
 
-  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сканируйте через RoomPlan LiDAR',
-        'en' => 'Scan via RoomPlan LiDAR',
-        _ => 'RoomPlan LiDAR orqali skan qiling',
-      };
-
-  static String heading(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сканируйте объект',
-        'en' => 'Scan the object',
-        _ => 'Obyektni skan qiling',
-      };
-
-  static String subheading(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сканируйте через RoomPlan LiDAR',
-        'en' => 'Scan via RoomPlan LiDAR',
-        _ => 'RoomPlan LiDAR orqali skan qiling',
-      };
-
-  static String cameraIdle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Запустите LiDAR-камеру',
-        'en' => 'Start LiDAR camera',
-        _ => 'LiDAR kamerani ishga tushiring',
-      };
-
-  static String cameraScanning(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Сканирование...',
-        'en' => 'Scanning...',
-        _ => 'Skanerlanmoqda...',
-      };
-
-  static String cameraDone(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Скан готов',
-        'en' => 'Scan ready',
-        _ => 'Skan tayyor',
-      };
-
-  static List<String> tips(Locale locale) => switch (locale.languageCode) {
-        'ru' => const [
-            'Двигайте устройство медленно',
-            'Охватите всю комнату',
-            'Освещение должно быть достаточным',
-          ],
-        'en' => const [
-            'Move the device slowly',
-            'Cover the entire room',
-            'Sufficient lighting is required',
-          ],
-        _ => const [
-            'Qurilmani sekin harakatlantiring',
-            'Xonani to\'liq qamrab oling',
-            'Yorug\'lik yetarli bo\'lishi kerak',
-          ],
-      };
-
-  static String ctaStart(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Начать сканирование',
-        'en' => 'Start scan',
-        _ => 'Scan boshlash',
-      };
-
-  static String ctaContinue(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
+  static String appBarTitle(Locale locale) => _t(
+    locale,
+    'scan.lidar.app_bar_title',
+    '3D kadastr',
+    '3D Кадастр',
+    '3D Cadastre',
+  );
+  static String appBarSubtitle(Locale locale) => _t(
+    locale,
+    'scan.lidar.app_bar_subtitle',
+    'RoomPlan LiDAR orqali skan qiling',
+    'Сканируйте через RoomPlan LiDAR',
+    'Scan via RoomPlan LiDAR',
+  );
+  static String heading(Locale locale) => _t(
+    locale,
+    'scan.lidar.heading',
+    'Obyektni skan qiling',
+    'Сканируйте объект',
+    'Scan the object',
+  );
+  static String subheading(Locale locale) => _t(
+    locale,
+    'scan.lidar.subheading',
+    'RoomPlan LiDAR orqali skan qiling',
+    'Сканируйте через RoomPlan LiDAR',
+    'Scan via RoomPlan LiDAR',
+  );
+  static String cameraIdle(Locale locale) => _t(
+    locale,
+    'scan.lidar.camera_idle',
+    'LiDAR kamerani ishga tushiring',
+    'Запустите LiDAR-камеру',
+    'Start LiDAR camera',
+  );
+  static String cameraScanning(Locale locale) => _t(
+    locale,
+    'scan.lidar.camera_scanning',
+    'Skanerlanmoqda...',
+    'Сканирование...',
+    'Scanning...',
+  );
+  static String cameraDone(Locale locale) => _t(
+    locale,
+    'scan.lidar.camera_done',
+    'Skan tayyor',
+    'Скан готов',
+    'Scan ready',
+  );
+  static List<String> tips(Locale locale) => [
+    _t(
+      locale,
+      'scan.lidar.tip_move_slowly',
+      'Qurilmani sekin harakatlantiring',
+      'Двигайте устройство медленно',
+      'Move the device slowly',
+    ),
+    _t(
+      locale,
+      'scan.lidar.tip_cover_room',
+      'Xonani to\'liq qamrab oling',
+      'Охватите всю комнату',
+      'Cover the entire room',
+    ),
+    _t(
+      locale,
+      'scan.lidar.tip_light',
+      'Yorug\'lik yetarli bo\'lishi kerak',
+      'Освещение должно быть достаточным',
+      'Sufficient lighting is required',
+    ),
+  ];
+  static String ctaStart(Locale locale) => _t(
+    locale,
+    'scan.lidar.cta_start',
+    'Scan boshlash',
+    'Начать сканирование',
+    'Start scan',
+  );
+  static String ctaContinue(Locale locale) =>
+      _t(locale, 'common.continue', 'Davom etish', 'Продолжить', 'Continue');
 
   static String unsupportedDevice(Locale locale) =>
       switch (locale.languageCode) {
@@ -420,55 +443,57 @@ class _ScanLidarStrings {
         'en' =>
           'This device does not support RoomPlan. iPhone Pro or iPad Pro is '
               'required (iOS 16+ with a LiDAR sensor).',
-        _ => 'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
-            '(iOS 16+ va LiDAR sensori).',
+        _ =>
+          'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
+              '(iOS 16+ va LiDAR sensori).',
       };
 
-  static String scanError(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Ошибка сканирования',
-        'en' => 'Scan error',
-        _ => 'Skan xatosi',
-      };
-
-  static String rowWalls(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Стены',
-        'en' => 'Walls',
-        _ => 'Devorlar',
-      };
-
-  static String rowDoors(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Двери',
-        'en' => 'Doors',
-        _ => 'Eshiklar',
-      };
-
-  static String rowWindows(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Окна',
-        'en' => 'Windows',
-        _ => 'Oynalar',
-      };
-
-  static String rowOpenings(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Другие проёмы',
-        'en' => 'Other openings',
-        _ => 'Boshqa ochiqliklar',
-      };
-
-  static String rowObjects(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Мебель/объекты',
-        'en' => 'Furniture/objects',
-        _ => 'Mebel/obyektlar',
-      };
-
-  static String rowFloorArea(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Площадь (примерно)',
-        'en' => 'Area (approx.)',
-        _ => 'Maydon (taxminiy)',
-      };
-
-  static String rowFileSize(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Размер файла',
-        'en' => 'File size',
-        _ => 'Fayl hajmi',
-      };
+  static String scanError(Locale locale) => _t(
+    locale,
+    'scan.lidar.scan_error',
+    'Skan xatosi',
+    'Ошибка сканирования',
+    'Scan error',
+  );
+  static String rowWalls(Locale locale) =>
+      _t(locale, 'scan.lidar.row_walls', 'Devorlar', 'Стены', 'Walls');
+  static String rowDoors(Locale locale) =>
+      _t(locale, 'scan.lidar.row_doors', 'Eshiklar', 'Двери', 'Doors');
+  static String rowWindows(Locale locale) =>
+      _t(locale, 'scan.lidar.row_windows', 'Oynalar', 'Окна', 'Windows');
+  static String rowOpenings(Locale locale) => _t(
+    locale,
+    'scan.lidar.row_openings',
+    'Boshqa ochiqliklar',
+    'Другие проёмы',
+    'Other openings',
+  );
+  static String rowObjects(Locale locale) => _t(
+    locale,
+    'scan.lidar.row_objects',
+    'Mebel/obyektlar',
+    'Мебель/объекты',
+    'Furniture/objects',
+  );
+  static String rowFloorArea(Locale locale) => _t(
+    locale,
+    'scan.lidar.row_floor_area',
+    'Maydon (taxminiy)',
+    'Площадь (примерно)',
+    'Area (approx.)',
+  );
+  static String rowFileSize(Locale locale) => _t(
+    locale,
+    'scan.lidar.row_file_size',
+    'Fayl hajmi',
+    'Размер файла',
+    'File size',
+  );
+  static String uploading(Locale locale) => _t(
+    locale,
+    'scan.lidar.uploading',
+    'Skan serverga yuklanmoqda…',
+    'Скан загружается на сервер…',
+    'Uploading scan to the server…',
+  );
 }

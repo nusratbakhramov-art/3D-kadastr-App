@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
@@ -37,37 +38,44 @@ class _MyScansScreenState extends State<MyScansScreen>
   Future<void> _load() async {
     setState(() => _loading = true);
     final items = await _service.list();
-    if (mounted) setState(() { _items = items; _loading = false; });
+    if (mounted) {
+      setState(() {
+        _items = items;
+        _loading = false;
+      });
+    }
   }
 
   Future<void> _openScan(LocalScanItem item) async {
+    final locale = localeNotifier.value;
     final path = await _service.getPath(item.id);
     if (path == null) {
-      _showSnackBar('Fayl topilmadi');
+      _showSnackBar(_S.fileNotFound(locale));
       return;
     }
     try {
       await _previewChannel.invokeMethod('previewModel', {'filePath': path});
     } on PlatformException catch (e) {
-      _showSnackBar('Ochishda xatolik: ${e.message}');
+      _showSnackBar(_S.openError(locale, e.message ?? ''));
     }
   }
 
   Future<void> _deleteScan(LocalScanItem item) async {
+    final locale = localeNotifier.value;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Skanni o\'chirish'),
-        content: Text('"${item.name}" ni o\'chirishni tasdiqlaysizmi?'),
+        title: Text(_S.deleteTitle(locale)),
+        content: Text(_S.deletePrompt(locale, item.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Bekor qilish'),
+            child: Text(_S.cancel(locale)),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('O\'chirish'),
+            child: Text(_S.delete(locale)),
           ),
         ],
       ),
@@ -75,10 +83,10 @@ class _MyScansScreenState extends State<MyScansScreen>
     if (confirmed != true) return;
     final ok = await _service.delete(item.id);
     if (ok) {
-      _showSnackBar('Skan o\'chirildi');
+      _showSnackBar(_S.deleted(locale));
       await _load();
     } else {
-      _showSnackBar('Xatolik');
+      _showSnackBar(_S.error(locale));
     }
   }
 
@@ -112,7 +120,9 @@ class _MyScansScreenState extends State<MyScansScreen>
                         AppReveal(
                           controller: entryController,
                           interval: const Interval(
-                            0.0, 0.4, curve: Curves.easeOutCubic,
+                            0.0,
+                            0.4,
+                            curve: Curves.easeOutCubic,
                           ),
                           child: AppHeaderBack(title: _S.title(locale)),
                         ),
@@ -135,6 +145,7 @@ class _MyScansScreenState extends State<MyScansScreen>
                               ),
                               child: _LocalScanCard(
                                 item: _items[i],
+                                locale: locale,
                                 onTap: () => _openScan(_items[i]),
                                 onDelete: () => _deleteScan(_items[i]),
                               ),
@@ -158,11 +169,13 @@ class _MyScansScreenState extends State<MyScansScreen>
 class _LocalScanCard extends StatelessWidget {
   const _LocalScanCard({
     required this.item,
+    required this.locale,
     required this.onTap,
     required this.onDelete,
   });
 
   final LocalScanItem item;
+  final Locale locale;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
@@ -226,7 +239,7 @@ class _LocalScanCard extends StatelessWidget {
                         if (item.areaSqm > 0.01)
                           _Chip('${item.areaSqm.toStringAsFixed(1)} m²'),
                         if (item.photoCount > 0)
-                          _Chip('${item.photoCount} foto'),
+                          _Chip(_S.photoCount(locale, item.photoCount)),
                         _Chip(item.sizeFormatted),
                       ],
                     ),
@@ -237,7 +250,7 @@ class _LocalScanCard extends StatelessWidget {
                 icon: const Icon(Icons.delete_outline, size: 20),
                 color: Colors.red.withValues(alpha: 0.7),
                 onPressed: onDelete,
-                tooltip: 'O\'chirish',
+                tooltip: _S.delete(locale),
               ),
             ],
           ),
@@ -251,9 +264,10 @@ class _LocalScanCard extends StatelessWidget {
     final today = DateTime(now.year, now.month, now.day);
     final dayOfScan = DateTime(d.year, d.month, d.day);
     final diff = today.difference(dayOfScan).inDays;
-    final timeStr = '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
-    if (diff == 0) return 'Bugun, $timeStr';
-    if (diff == 1) return 'Kecha, $timeStr';
+    final timeStr =
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+    if (diff == 0) return _S.todayAt(locale, timeStr);
+    if (diff == 1) return _S.yesterdayAt(locale, timeStr);
     return '${d.day.toString().padLeft(2, '0')}.${d.month.toString().padLeft(2, '0')}.${d.year}, $timeStr';
   }
 }
@@ -325,25 +339,80 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _S {
-  static String title(Locale l) {
-    switch (l.languageCode) {
-      case 'ru': return 'Мои сканы';
-      case 'en': return 'My scans';
-      default:   return 'Skanlarim';
-    }
-  }
-  static String emptyTitle(Locale l) {
-    switch (l.languageCode) {
-      case 'ru': return 'Сканов пока нет';
-      case 'en': return 'No scans yet';
-      default:   return 'Hozircha skan yo\'q';
-    }
-  }
-  static String emptyMessage(Locale l) {
-    switch (l.languageCode) {
-      case 'ru': return 'Создайте свой первый 3D скан комнаты';
-      case 'en': return 'Create your first 3D room scan';
-      default:   return 'Birinchi 3D xona skanini yarating';
-    }
-  }
+  static String fileNotFound(Locale l) => _p(
+    l,
+    'common.file_not_found',
+    'Fayl topilmadi',
+    'Файл не найден',
+    'File not found',
+  );
+  static String openError(Locale l, String message) =>
+      '${_p(l, 'common.open_error', 'Ochishda xatolik', 'Ошибка открытия', 'Open error')}: $message';
+  static String deleteTitle(Locale l) => _p(
+    l,
+    'scan.my.delete_title',
+    'Skanni o\'chirish',
+    'Удалить скан',
+    'Delete scan',
+  );
+  static String deletePrompt(Locale l, String name) => _p(
+    l,
+    'scan.my.delete_prompt',
+    '"$name" ni o\'chirishni tasdiqlaysizmi?',
+    'Подтвердить удаление "$name"?',
+    'Confirm deleting "$name"?',
+  );
+  static String cancel(Locale l) =>
+      _p(l, 'common.cancel', 'Bekor qilish', 'Отмена', 'Cancel');
+  static String delete(Locale l) =>
+      _p(l, 'common.delete', 'O\'chirish', 'Удалить', 'Delete');
+  static String deleted(Locale l) => _p(
+    l,
+    'scan.my.deleted',
+    'Skan o\'chirildi',
+    'Скан удалён',
+    'Scan deleted',
+  );
+  static String error(Locale l) =>
+      _p(l, 'common.error', 'Xatolik', 'Ошибка', 'Error');
+  static String title(Locale l) =>
+      _p(l, 'scan.my.title', 'Skanlarim', 'Мои сканы', 'My scans');
+  static String emptyTitle(Locale l) => _p(
+    l,
+    'scan.my.empty_title',
+    'Hozircha skan yo\'q',
+    'Сканов пока нет',
+    'No scans yet',
+  );
+  static String emptyMessage(Locale l) => _p(
+    l,
+    'scan.my.empty_message',
+    'Birinchi 3D xona skanini yarating',
+    'Создайте свой первый 3D скан комнаты',
+    'Create your first 3D room scan',
+  );
+
+  static String photoCount(Locale l, int count) => _p(
+    l,
+    'scan.common.photo_count',
+    '$count foto',
+    '$count фото',
+    '$count photos',
+  );
+  static String todayAt(Locale l, String time) => _p(
+    l,
+    'common.today_at',
+    'Bugun, $time',
+    'Сегодня, $time',
+    'Today, $time',
+  );
+  static String yesterdayAt(Locale l, String time) => _p(
+    l,
+    'common.yesterday_at',
+    'Kecha, $time',
+    'Вчера, $time',
+    'Yesterday, $time',
+  );
+  static String _p(Locale l, String key, String uz, String ru, String en) =>
+      tr(l, key, uz: uz, ru: ru, en: en);
 }

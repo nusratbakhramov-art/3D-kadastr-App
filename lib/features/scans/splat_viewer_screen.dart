@@ -26,12 +26,11 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../core/i18n/app_translations.dart';
+import '../settings/settings_state.dart';
+
 class SplatViewerScreen extends StatefulWidget {
-  const SplatViewerScreen({
-    super.key,
-    required this.splatFilePath,
-    this.title,
-  });
+  const SplatViewerScreen({super.key, required this.splatFilePath, this.title});
 
   /// Local diskdagi `.splat` fayl yo'li (chaqiruvchi auth bilan yuklab kelgan).
   final String splatFilePath;
@@ -70,8 +69,9 @@ class _SplatViewerScreenState extends State<SplatViewerScreen> {
   /// Loopback HTTP server bilan har ikkala fayl bir xil http origin'da
   /// serve qilinadi — CORS muammosi yo'q.
   Future<String> _startLocalServer() async {
-    final viewerHtml =
-        await rootBundle.loadString('assets/3d/splat_viewer.html');
+    final viewerHtml = await rootBundle.loadString(
+      'assets/3d/splat_viewer.html',
+    );
     final splatFile = File(widget.splatFilePath);
     final splatName = splatFile.uri.pathSegments.last;
     final splatLength = await splatFile.length();
@@ -81,14 +81,10 @@ class _SplatViewerScreenState extends State<SplatViewerScreen> {
     final libFiles = <String, Uint8List>{
       '/lib/three.module.js': (await rootBundle.load(
         'assets/3d/lib/three.module.js',
-      ))
-          .buffer
-          .asUint8List(),
+      )).buffer.asUint8List(),
       '/lib/gaussian-splats-3d.module.js': (await rootBundle.load(
         'assets/3d/lib/gaussian-splats-3d.module.js',
-      ))
-          .buffer
-          .asUint8List(),
+      )).buffer.asUint8List(),
     };
 
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -98,15 +94,19 @@ class _SplatViewerScreenState extends State<SplatViewerScreen> {
       try {
         final path = req.uri.path;
         if (path == '/' || path == '/viewer.html') {
-          req.response.headers
-              .set(HttpHeaders.contentTypeHeader, 'text/html; charset=utf-8');
+          req.response.headers.set(
+            HttpHeaders.contentTypeHeader,
+            'text/html; charset=utf-8',
+          );
           req.response.headers.set('cache-control', 'no-store');
           req.response.write(viewerHtml);
           await req.response.close();
         } else if (libFiles.containsKey(path)) {
           final bytes = libFiles[path]!;
           req.response.headers.set(
-              HttpHeaders.contentTypeHeader, 'application/javascript; charset=utf-8');
+            HttpHeaders.contentTypeHeader,
+            'application/javascript; charset=utf-8',
+          );
           req.response.headers.set('cache-control', 'no-store');
           req.response.headers.contentLength = bytes.length;
           req.response.add(bytes);
@@ -115,8 +115,10 @@ class _SplatViewerScreenState extends State<SplatViewerScreen> {
           // Range support (mkkellogg progressive load uchun foydali)
           final rangeHeader = req.headers.value(HttpHeaders.rangeHeader);
           req.response.headers.set('accept-ranges', 'bytes');
-          req.response.headers
-              .set(HttpHeaders.contentTypeHeader, 'application/octet-stream');
+          req.response.headers.set(
+            HttpHeaders.contentTypeHeader,
+            'application/octet-stream',
+          );
           if (rangeHeader != null && rangeHeader.startsWith('bytes=')) {
             final spec = rangeHeader.substring(6).split('-');
             final start = int.tryParse(spec[0]) ?? 0;
@@ -126,8 +128,10 @@ class _SplatViewerScreenState extends State<SplatViewerScreen> {
             final length = end - start + 1;
             req.response.statusCode = HttpStatus.partialContent;
             req.response.headers.contentLength = length;
-            req.response.headers
-                .set('content-range', 'bytes $start-$end/$splatLength');
+            req.response.headers.set(
+              'content-range',
+              'bytes $start-$end/$splatLength',
+            );
             await splatFile.openRead(start, end + 1).pipe(req.response);
           } else {
             req.response.headers.contentLength = splatLength;
@@ -149,48 +153,51 @@ class _SplatViewerScreenState extends State<SplatViewerScreen> {
   }
 
   Future<void> _shareSplat() async {
-    await Share.shareXFiles(
-      [XFile(widget.splatFilePath)],
-      text: widget.title ?? '3D skan',
-    );
+    final locale = localeNotifier.value;
+    await Share.shareXFiles([
+      XFile(widget.splatFilePath),
+    ], text: widget.title ?? _Strings.shareTitle(locale));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF1a1a1a),
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.black.withValues(alpha: 0.4),
-        elevation: 0,
-        foregroundColor: Colors.white,
-        title: Text(
-          widget.title ?? '3D ko\'rinish',
-          style: const TextStyle(color: Colors.white, fontSize: 17),
-        ),
-        actions: [
-          IconButton(
-            tooltip: 'Ulashish',
-            icon: const Icon(Icons.ios_share_rounded),
-            onPressed: _shareSplat,
+    return ValueListenableBuilder<Locale>(
+      valueListenable: localeNotifier,
+      builder: (context, locale, _) => Scaffold(
+        backgroundColor: const Color(0xFF1a1a1a),
+        extendBodyBehindAppBar: true,
+        appBar: AppBar(
+          backgroundColor: Colors.black.withValues(alpha: 0.4),
+          elevation: 0,
+          foregroundColor: Colors.white,
+          title: Text(
+            widget.title ?? _Strings.viewerTitle(locale),
+            style: const TextStyle(color: Colors.white, fontSize: 17),
           ),
-        ],
-      ),
-      body: FutureBuilder<String>(
-        future: _viewerUrl,
-        builder: (context, snap) {
-          if (snap.hasError) {
-            return _ErrorView(error: snap.error!);
-          }
-          if (!snap.hasData) {
-            return const _LoadingView();
-          }
-          _webView ??= WebViewController()
-            ..setJavaScriptMode(JavaScriptMode.unrestricted)
-            ..setBackgroundColor(const Color(0xFF1a1a1a))
-            ..loadRequest(Uri.parse(snap.data!));
-          return WebViewWidget(controller: _webView!);
-        },
+          actions: [
+            IconButton(
+              tooltip: _Strings.share(locale),
+              icon: const Icon(Icons.ios_share_rounded),
+              onPressed: _shareSplat,
+            ),
+          ],
+        ),
+        body: FutureBuilder<String>(
+          future: _viewerUrl,
+          builder: (context, snap) {
+            if (snap.hasError) {
+              return _ErrorView(error: snap.error!, locale: locale);
+            }
+            if (!snap.hasData) {
+              return const _LoadingView();
+            }
+            _webView ??= WebViewController()
+              ..setJavaScriptMode(JavaScriptMode.unrestricted)
+              ..setBackgroundColor(const Color(0xFF1a1a1a))
+              ..loadRequest(Uri.parse(snap.data!));
+            return WebViewWidget(controller: _webView!);
+          },
+        ),
       ),
     );
   }
@@ -203,7 +210,8 @@ class _LoadingView extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: SizedBox(
-        width: 48, height: 48,
+        width: 48,
+        height: 48,
         child: CircularProgressIndicator(
           strokeWidth: 2.8,
           valueColor: AlwaysStoppedAnimation(Colors.white),
@@ -214,9 +222,10 @@ class _LoadingView extends StatelessWidget {
 }
 
 class _ErrorView extends StatelessWidget {
-  const _ErrorView({required this.error});
+  const _ErrorView({required this.error, required this.locale});
 
   final Object error;
+  final Locale locale;
 
   @override
   Widget build(BuildContext context) {
@@ -226,11 +235,14 @@ class _ErrorView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline_rounded,
-                color: Colors.white54, size: 56),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.white54,
+              size: 56,
+            ),
             const SizedBox(height: 16),
-            const Text(
-              '3D modelni ochib bo\'lmadi',
+            Text(
+              _Strings.openError(locale),
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 17,
@@ -248,4 +260,27 @@ class _ErrorView extends StatelessWidget {
       ),
     );
   }
+}
+
+class _Strings {
+  static String shareTitle(Locale l) =>
+      _p(l, 'scan.splat.share_title', '3D skan', '3D-скан', '3D scan');
+  static String viewerTitle(Locale l) => _p(
+    l,
+    'scan.splat.viewer_title',
+    '3D ko\'rinish',
+    '3D-просмотр',
+    '3D view',
+  );
+  static String share(Locale l) =>
+      _p(l, 'common.share', 'Ulashish', 'Поделиться', 'Share');
+  static String openError(Locale l) => _p(
+    l,
+    'scan.splat.open_error',
+    '3D modelni ochib bo\'lmadi',
+    'Не удалось открыть 3D-модель',
+    'Could not open the 3D model',
+  );
+  static String _p(Locale l, String key, String uz, String ru, String en) =>
+      tr(l, key, uz: uz, ru: ru, en: en);
 }

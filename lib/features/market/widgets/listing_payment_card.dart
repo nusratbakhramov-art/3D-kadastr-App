@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/payment_method.dart';
 
@@ -33,7 +34,13 @@ class ListingPaymentCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'To\'lov',
+            tr(
+              Localizations.localeOf(context),
+              'market.payment.title',
+              uz: 'To\'lov usuli',
+              ru: 'Оплата',
+              en: 'Payment',
+            ),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,

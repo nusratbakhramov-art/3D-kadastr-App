@@ -1,4 +1,7 @@
 import 'architecture_order_draft.dart';
+import 'package:flutter/widgets.dart';
+
+import '../../../core/i18n/app_translations.dart';
 
 enum ScanObjectType {
   turarJoy('Turar joy', 'residential'),
@@ -11,6 +14,37 @@ enum ScanObjectType {
 
   /// Backend `ObjectType` enum value (matches app/models/scan.py).
   final String wire;
+
+  String localizedLabel(Locale locale) => switch (this) {
+    ScanObjectType.turarJoy => tr(
+      locale,
+      'scan.object_type.residential',
+      uz: 'Turar joy',
+      ru: 'Жилое',
+      en: 'Residential',
+    ),
+    ScanObjectType.noturarJoy => tr(
+      locale,
+      'scan.object_type.non_residential',
+      uz: 'Noturar joy',
+      ru: 'Нежилое',
+      en: 'Non-residential',
+    ),
+    ScanObjectType.ombor => tr(
+      locale,
+      'scan.object_type.warehouse',
+      uz: 'Ombor',
+      ru: 'Склад',
+      en: 'Warehouse',
+    ),
+    ScanObjectType.sanoat => tr(
+      locale,
+      'scan.object_type.industrial',
+      uz: 'Sanoat obyektlari',
+      ru: 'Промышленные объекты',
+      en: 'Industrial',
+    ),
+  };
 }
 
 class ScanDraft {

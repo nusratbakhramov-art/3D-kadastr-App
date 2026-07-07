@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/market_listing.dart';
 
@@ -49,7 +50,13 @@ class ListingFormatsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Formatlar',
+            tr(
+              Localizations.localeOf(context),
+              'market.formats.title',
+              uz: 'Yuklab olish formatlari',
+              ru: 'Форматы',
+              en: 'Formats',
+            ),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,

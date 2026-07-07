@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'core/app_navigation.dart';
+import 'core/i18n/app_translations.dart';
+import 'core/i18n/app_translations_store.dart';
 import 'core/payment_deep_links.dart';
 import 'core/push_notifications.dart';
 import 'features/auth/auth_http_client.dart';
@@ -59,36 +61,41 @@ class KadastrApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeModeNotifier,
-      builder: (context, themeMode, _) {
-        return ValueListenableBuilder<Locale>(
-          valueListenable: localeNotifier,
-          builder: (context, locale, _) {
-            return MaterialApp(
-              title: 'Kadastr',
-              navigatorKey: rootNavigatorKey,
-              debugShowCheckedModeBanner: false,
-              locale: locale,
-              supportedLocales: const [
-                Locale('uz'),
-                Locale('ru'),
-                Locale('en'),
-              ],
-              localizationsDelegates: const [
-                GlobalMaterialLocalizations.delegate,
-                GlobalWidgetsLocalizations.delegate,
-                GlobalCupertinoLocalizations.delegate,
-              ],
-              theme: AppTheme.light(),
-              darkTheme: AppTheme.dark(),
-              themeMode: themeMode,
-              builder: _systemUiBuilder,
-              home: _AppRoot(
-                onboardingStorage: onboardingStorage,
-                authStorage: authStorage,
-                locale: locale,
-              ),
+    return ValueListenableBuilder<AppTranslations>(
+      valueListenable: appTranslationsNotifier,
+      builder: (context, _, _) {
+        return ValueListenableBuilder<ThemeMode>(
+          valueListenable: themeModeNotifier,
+          builder: (context, themeMode, _) {
+            return ValueListenableBuilder<Locale>(
+              valueListenable: localeNotifier,
+              builder: (context, locale, _) {
+                return MaterialApp(
+                  title: 'Kadastr',
+                  navigatorKey: rootNavigatorKey,
+                  debugShowCheckedModeBanner: false,
+                  locale: locale,
+                  supportedLocales: const [
+                    Locale('uz'),
+                    Locale('ru'),
+                    Locale('en'),
+                  ],
+                  localizationsDelegates: const [
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  theme: AppTheme.light(),
+                  darkTheme: AppTheme.dark(),
+                  themeMode: themeMode,
+                  builder: _systemUiBuilder,
+                  home: _AppRoot(
+                    onboardingStorage: onboardingStorage,
+                    authStorage: authStorage,
+                    locale: locale,
+                  ),
+                );
+              },
             );
           },
         );
@@ -211,19 +218,19 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
       final ctx = rootNavigatorKey.currentContext;
       if (ctx != null) {
         final l = Localizations.localeOf(ctx);
-        ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(
-          SnackBar(content: Text(_sessionExpiredMessage(l))),
-        );
+        ScaffoldMessenger.maybeOf(
+          ctx,
+        )?.showSnackBar(SnackBar(content: Text(_sessionExpiredMessage(l))));
       }
       _handlingExpiry = false;
     });
   }
 
   static String _sessionExpiredMessage(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сессия истекла. Войдите снова.',
-        'en' => 'Session expired. Please sign in again.',
-        _ => 'Sessiya muddati tugadi. Iltimos, qayta kiring.',
-      };
+    'ru' => 'Сессия истекла. Войдите снова.',
+    'en' => 'Session expired. Please sign in again.',
+    _ => 'Sessiya muddati tugadi. Iltimos, qayta kiring.',
+  };
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -243,6 +250,10 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
     // Market filtridagi tumanlar ro'yxati ham admin paneldan keladi — keshdan
     // o'qib, fonda yangilaymiz (offline xavfsiz, default = kMarketDistricts).
     unawaited(MarketRegionsStore.instance.loadCachedThenRefresh());
+
+    // UI tarjimalarini keshdan darhol olib, har startda fonda versiyasini
+    // tekshiramiz. Faqat server versiyasi kattaroq bo'lsa yangi bundle yuklanadi.
+    unawaited(AppTranslationsStore.instance.loadCachedThenRefresh());
 
     // Avval saqlangan locale ni yuklab, app bo'ylab qo'llaymiz. Bu
     // localeNotifier'ni o'zgartiradi va MaterialApp rebuild bo'lib, butun
