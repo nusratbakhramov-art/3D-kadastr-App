@@ -26,12 +26,25 @@ class AiCadastreScreen extends StatefulWidget {
     this.scanJobId,
     this.areaM2,
     this.initial,
+    this.onResolved,
+    this.resumeBundle,
   });
+
+  /// Resume oqimi: draft'dan to'liq tiklangan bundle. Berilsa, bu ekran uni
+  /// eslab qoladi — Orqaga qaytib Davom etish bosilganda keyingi qadamlar
+  /// (mijoz, joylashuv, ...) ma'lumotlari saqlanadi, yangi bo'sh bundle
+  /// yaratilmaydi.
+  final AiBaholashBundle? resumeBundle;
 
   /// Resume oqimi: draft'dan tiklangan davreestr natijasi. Berilsa, ekran shu
   /// yuklangan holat bilan ochiladi (qayta lookup qilinmaydi) — foydalanuvchi
   /// Orqaga qaytib bu qadamni ko'ra oladi.
   final CadastreLookupResult? initial;
+
+  /// Har safar davreestr natijasi o'zgarganda chaqiriladi (topildi → natija,
+  /// tozalandi → null). Oldingi (maydon) qadam buni eslab qoladi, shunda
+  /// foydalanuvchi Orqaga qaytib qayta oldinga bosганда kadastr yo'qolmaydi.
+  final ValueChanged<CadastreLookupResult?>? onResolved;
 
   /// AI Baholashning 3D skan qadami natijasi (oldingi qadamdan uzatiladi).
   final AiScanResult? scan;
@@ -66,9 +79,18 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   int _lookupRequestId = 0;
   List<String> _recent = const [];
 
+  /// The bundle this screen created, kept so that returning here (Back from a
+  /// later step) and pressing Davom etish again REUSES it instead of building a
+  /// fresh one — which would wipe every downstream edit (client, joylashuv,
+  /// maqsad, intake). Rebuilt only when the cadastre number itself changes.
+  AiBaholashBundle? _bundle;
+
   @override
   void initState() {
     super.initState();
+    // Resume: keep the fully-restored bundle so Back → Davom etish preserves
+    // the later steps instead of rebuilding an empty bundle.
+    _bundle = widget.resumeBundle;
     // Resume: show the saved davreestr result as already loaded, without a
     // re-lookup. Set the loaded state BEFORE wiring the text listener so filling
     // the field doesn't kick off a fresh lookup.
@@ -127,6 +149,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
           _info = null;
           _errorMsg = null;
         });
+        widget.onResolved?.call(null);
       }
     }
   }
@@ -176,6 +199,8 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
         _status = _LoadStatus.loaded;
         _errorMsg = null;
       });
+      // Remember it upstream so back→forward re-prefills instead of clearing.
+      widget.onResolved?.call(result);
     } on CadastreLookupException catch (e) {
       if (!mounted || reqId != _lookupRequestId) return;
       setState(() {
@@ -197,12 +222,23 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
 
   Future<void> _goNext(CadastreLookupResult info) async {
     HapticFeedback.lightImpact();
-    final bundle = AiBaholashBundle(
-      kadastr: info,
-      scan: widget.scan,
-      draftId: widget.draftId,
-      areaM2: widget.areaM2,
-    );
+    // Reuse the bundle we already built (so downstream edits survive Back →
+    // Davom etish). Rebuild only when the cadastre number actually changed —
+    // a different property should legitimately reset the later steps.
+    final existing = _bundle;
+    final AiBaholashBundle bundle;
+    if (existing != null &&
+        existing.kadastr.cadastreNumber == info.cadastreNumber) {
+      bundle = existing;
+    } else {
+      bundle = AiBaholashBundle(
+        kadastr: info,
+        scan: widget.scan,
+        draftId: widget.draftId,
+        areaM2: widget.areaM2,
+      );
+      _bundle = bundle;
+    }
     await saveAiDraftStep(bundle, 'client'); // DRAFT'ni shu qadam bilan saqlash
     if (!mounted) return;
     Navigator.of(context).push(

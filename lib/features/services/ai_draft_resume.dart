@@ -24,6 +24,10 @@ Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
         draftId: bundle.draftId,
         scanJobId: scanJobId,
         initialArea: bundle.areaM2,
+        // Carry the saved davreestr result so Back→forward re-prefills cadastre.
+        initialCadastre: bundle.kadastr.cadastreNumber.trim().isEmpty
+            ? null
+            : bundle.kadastr,
       );
     case 'client':
       return AiClientFormScreen(bundle: bundle);
@@ -42,6 +46,9 @@ Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
         areaM2: bundle.areaM2,
         // Resume: show the saved davreestr result without re-looking-up.
         initial: bundle.kadastr,
+        // Keep the full restored bundle so Back → Davom etish preserves the
+        // later steps instead of rebuilding an empty one.
+        resumeBundle: bundle,
       );
   }
 }

@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../ai_draft_saver.dart';
+import '../api_cadastre_service.dart';
 import '../models/ai_scan_result.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -24,6 +25,7 @@ class AiAreaScreen extends StatefulWidget {
     this.draftId,
     this.scanJobId,
     this.initialArea,
+    this.initialCadastre,
   });
 
   /// 3D skan natijasi (oldingi qadamdan) — keyingi ekranlarga uzatiladi.
@@ -39,6 +41,10 @@ class AiAreaScreen extends StatefulWidget {
   /// to'ldiriladi.
   final double? initialArea;
 
+  /// Oldin aniqlangan davreestr natijasi (resume yoki Orqaga qaytish). Keyingi
+  /// kadastr qadamiga uzatiladi, shunda Orqaga→Oldinga bosганда yo'qolmaydi.
+  final CadastreLookupResult? initialCadastre;
+
   @override
   State<AiAreaScreen> createState() => _AiAreaScreenState();
 }
@@ -46,9 +52,14 @@ class AiAreaScreen extends StatefulWidget {
 class _AiAreaScreenState extends State<AiAreaScreen> {
   final TextEditingController _areaCtrl = TextEditingController();
 
+  /// The cadastre resolved on the next step. Held here so re-entering the
+  /// cadastre screen (Back → Davom etish) restores it instead of starting blank.
+  CadastreLookupResult? _cadastre;
+
   @override
   void initState() {
     super.initState();
+    _cadastre = widget.initialCadastre;
     final a = widget.initialArea;
     if (a != null && a > 0) {
       _areaCtrl.text =
@@ -90,6 +101,8 @@ class _AiAreaScreenState extends State<AiAreaScreen> {
           draftId: draftId,
           scanJobId: widget.scanJobId,
           areaM2: area,
+          initial: _cadastre,
+          onResolved: (r) => _cadastre = r,
         ),
       ),
     );

@@ -92,10 +92,14 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     List<String> paths,
     List<String> keys,
   ) {
-    final n = paths.length < keys.length ? paths.length : keys.length;
-    for (var i = 0; i < n; i++) {
+    // Keys are the source of truth — they survive draft serialization. Local
+    // paths are transient and are ABSENT on resume, so drive off keys and fall
+    // back to an empty path (the tile then shows an "uploaded" placeholder
+    // instead of the file being dropped entirely).
+    for (var i = 0; i < keys.length; i++) {
+      final path = i < paths.length ? paths[i] : '';
       items.add(
-        _UploadItem(paths[i])
+        _UploadItem(path)
           ..key = keys[i]
           ..status = _UpStatus.done,
       );
@@ -114,20 +118,13 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   // user gets a friendly hint instead of a raw 422 from the server.
   static const int _maxFloors = 200;
 
-  // Photo minimums: at least 4 real photos per room and no fewer than 12 in
-  // total (owner spec). When rooms are provided the required count scales with
-  // them; otherwise the flat 12 applies. Cap high enough to satisfy either.
+  // Photo minimum: a flat 12 photos total (owner spec — this is the required
+  // minimum and does NOT scale per room; never more than 12 required).
   static const int _minPhotos = 12;
-  static const int _minPhotosPerRoom = 4;
   static const int _maxPhotos = 60;
 
-  // Sum of the optional rooms breakdown (each row carries a count).
-  int get _roomCount =>
-      widget.bundle.rooms.fold(0, (sum, r) => sum + r.count);
-
   // How many photos we require before "Hisoblash" unlocks.
-  int get _requiredPhotos =>
-      math.max(_minPhotos, _roomCount * _minPhotosPerRoom);
+  int get _requiredPhotos => _minPhotos;
 
   // ── Required-fields gate ──────────────────────────────────────────────
   // Photos (min count), kadastr docs, and both floor numbers are mandatory.
@@ -582,7 +579,13 @@ class _UploadItem {
   }
 
   static bool isImagePath(String path) => _imageExts.contains(extOf(path));
-  bool get isImage => isImagePath(path);
+  // On resume the local path is gone — fall back to the server key, which keeps
+  // the original file extension, so a restored photo still reads as an image.
+  bool get isImage => isImagePath(path.isNotEmpty ? path : (key ?? ''));
+
+  /// True once the local file is available on disk (fresh pick). False for a
+  /// draft-restored item whose upload lives only on the server (key, no path).
+  bool get hasLocalFile => path.isNotEmpty;
 }
 
 // ── Upload card ───────────────────────────────────────────────────────
@@ -762,7 +765,7 @@ class _UploadTile extends StatelessWidget {
     final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
 
     Widget base;
-    if (item.isImage) {
+    if (item.isImage && item.hasLocalFile) {
       base = Image.file(
         File(item.path),
         width: _size,
@@ -773,8 +776,32 @@ class _UploadTile extends StatelessWidget {
           child: Icon(Icons.broken_image_outlined, size: 22, color: muted),
         ),
       );
+    } else if (item.isImage) {
+      // Draft-restored photo — the file lives on the server (key), not on disk,
+      // so we can't show the thumbnail. Signal it's already attached.
+      base = Container(
+        color: chipBg,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_done_outlined, size: 24, color: muted),
+            const SizedBox(height: 4),
+            Text(
+              _Strings.uploaded(l),
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 9.5,
+                color: muted,
+              ),
+            ),
+          ],
+        ),
+      );
     } else {
-      final ext = _UploadItem.extOf(item.path).toUpperCase();
+      final ext = _UploadItem.extOf(
+        item.hasLocalFile ? item.path : (item.key ?? ''),
+      ).toUpperCase();
       base = Container(
         color: chipBg,
         child: Column(
@@ -796,7 +823,8 @@ class _UploadTile extends StatelessWidget {
       );
     }
 
-    final tappable = item.status == _UpStatus.done && item.isImage;
+    final tappable =
+        item.status == _UpStatus.done && item.isImage && item.hasLocalFile;
 
     return SizedBox(
       width: _size + 6,
@@ -1731,6 +1759,12 @@ class _Strings {
     'ru' => 'файл',
     'en' => 'file',
     _ => 'fayl',
+  };
+
+  static String uploaded(Locale l) => switch (l.languageCode) {
+    'ru' => 'Загружено',
+    'en' => 'Uploaded',
+    _ => 'Yuklangan',
   };
 
   static String maxPhotos(Locale l, int n) => switch (l.languageCode) {

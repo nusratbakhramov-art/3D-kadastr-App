@@ -157,15 +157,20 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: _scanning
-                      ? const _ScanningButton()
-                      : ListingCtaButton(
-                          label: _supported == null
-                              ? _S.checking(l)
-                              : _S.startScan(l),
-                          enabled: _supported == true,
-                          onTap: _startScan,
-                        ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _scanning
+                          ? const _ScanningButton()
+                          : ListingCtaButton(
+                              label: _supported == null
+                                  ? _S.checking(l)
+                                  : _S.startScan(l),
+                              enabled: _supported == true,
+                              onTap: _startScan,
+                            ),
+                    ],
+                  ),
                 ),
               ],
             ),
