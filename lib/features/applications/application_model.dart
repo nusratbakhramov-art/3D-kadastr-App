@@ -1,6 +1,7 @@
 enum ApplicationStatusGroup { sent, received, inProgress, completed, cancelled }
 
 enum ApplicationTimelineStatus {
+  draft,
   accepted,
   sentToSystem,
   assignedSpecialist,

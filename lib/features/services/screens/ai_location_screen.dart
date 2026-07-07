@@ -73,11 +73,30 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     _mapController = MapController();
     _geocoder = GeocoderClient();
     _searchCtrl.addListener(_onSearchChanged);
-    // Auto-place the pin at the property's real location (geocoded from the
-    // davreestr cadastre address) once the map is laid out. Otherwise the user
-    // is left on the Tashkent default and can submit the wrong spot — which
-    // pulls comps from the wrong area and badly skews the valuation. Deferred
-    // to post-frame so the MapController is attached before we move it.
+    // If a location was already chosen (resume from draft, or the user went
+    // back and returned to this step), restore that exact pin — don't re-geocode
+    // from the cadastre address, which would silently overwrite their choice.
+    final saved = widget.bundle.location;
+    if (saved != null && (saved.lat != 0 || saved.lng != 0)) {
+      _center = LatLng(saved.lat, saved.lng);
+      _addressText = saved.addressText;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        try {
+          _mapController.move(_center, 16);
+        } catch (_) {
+          // Map not attached yet — the next build picks up _center.
+        }
+        // No confirmed address text saved — reverse-geocode the restored pin.
+        if (_addressText == null) _scheduleReverse();
+      });
+      return;
+    }
+    // First visit: auto-place the pin at the property's real location (geocoded
+    // from the davreestr cadastre address) once the map is laid out. Otherwise
+    // the user is left on the Tashkent default and can submit the wrong spot —
+    // which pulls comps from the wrong area and badly skews the valuation.
+    // Deferred to post-frame so the MapController is attached before we move it.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _initFromCadastreAddress();
     });

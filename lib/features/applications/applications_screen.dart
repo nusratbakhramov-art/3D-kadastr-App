@@ -447,7 +447,17 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         (_ApplicationsStrings.applicationDate(lang), _formatDateTime(j.createdAt)),
         (_ApplicationsStrings.updatedAt(lang), _formatDateTime(j.updatedAt)),
       ],
-      timeline: _basicTimeline(group, j.createdAt),
+      // A draft was NOT submitted — show a single "Qoralama" step, not the
+      // accepted → sent-to-system timeline of a real application.
+      timeline: isDraft
+          ? [
+              ApplicationTimelineStep(
+                status: ApplicationTimelineStatus.draft,
+                at: j.updatedAt,
+                completed: true,
+              ),
+            ]
+          : _basicTimeline(group, j.createdAt),
     );
   }
 

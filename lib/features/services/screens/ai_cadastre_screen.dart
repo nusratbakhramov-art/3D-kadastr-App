@@ -25,7 +25,13 @@ class AiCadastreScreen extends StatefulWidget {
     this.draftId,
     this.scanJobId,
     this.areaM2,
+    this.initial,
   });
+
+  /// Resume oqimi: draft'dan tiklangan davreestr natijasi. Berilsa, ekran shu
+  /// yuklangan holat bilan ochiladi (qayta lookup qilinmaydi) — foydalanuvchi
+  /// Orqaga qaytib bu qadamni ko'ra oladi.
+  final CadastreLookupResult? initial;
 
   /// AI Baholashning 3D skan qadami natijasi (oldingi qadamdan uzatiladi).
   final AiScanResult? scan;
@@ -63,6 +69,18 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   @override
   void initState() {
     super.initState();
+    // Resume: show the saved davreestr result as already loaded, without a
+    // re-lookup. Set the loaded state BEFORE wiring the text listener so filling
+    // the field doesn't kick off a fresh lookup.
+    if (widget.initial != null) {
+      _status = _LoadStatus.loaded;
+      _info = widget.initial;
+      final n = widget.initial!.cadastreNumber;
+      _cadastreController.value = TextEditingValue(
+        text: n,
+        selection: TextSelection.collapsed(offset: n.length),
+      );
+    }
     _cadastreController.addListener(_onCadastreChanged);
     _loadRecent();
   }

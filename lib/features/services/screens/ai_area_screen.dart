@@ -18,7 +18,13 @@ import '../widgets/step_progress_bar.dart';
 import 'ai_cadastre_screen.dart';
 
 class AiAreaScreen extends StatefulWidget {
-  const AiAreaScreen({super.key, this.scan, this.draftId, this.scanJobId});
+  const AiAreaScreen({
+    super.key,
+    this.scan,
+    this.draftId,
+    this.scanJobId,
+    this.initialArea,
+  });
 
   /// 3D skan natijasi (oldingi qadamdan) — keyingi ekranlarga uzatiladi.
   final AiScanResult? scan;
@@ -29,12 +35,26 @@ class AiAreaScreen extends StatefulWidget {
   /// Resume oqimi: skanlangan 3D model bor draft id (cadastre ekraniga uzatiladi).
   final int? scanJobId;
 
+  /// Resume oqimi: draft'dan tiklangan obyekt maydoni (m²) — maydon oldindan
+  /// to'ldiriladi.
+  final double? initialArea;
+
   @override
   State<AiAreaScreen> createState() => _AiAreaScreenState();
 }
 
 class _AiAreaScreenState extends State<AiAreaScreen> {
   final TextEditingController _areaCtrl = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final a = widget.initialArea;
+    if (a != null && a > 0) {
+      _areaCtrl.text =
+          a == a.roundToDouble() ? a.toInt().toString() : a.toString();
+    }
+  }
 
   @override
   void dispose() {

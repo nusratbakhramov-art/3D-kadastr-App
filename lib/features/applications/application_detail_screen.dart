@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/api_config.dart';
+import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_toast.dart';
@@ -15,6 +16,7 @@ import '../auth/auth_http_client.dart';
 import '../auth/auth_storage.dart';
 import '../settings/settings_state.dart';
 import '../scans/splat_viewer_screen.dart';
+import '../services/ai_draft_resume.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import '../services/models/ai_baholash_bundle.dart' show RoomKind;
@@ -243,6 +245,18 @@ class _DetailStrings {
   };
 
   // Timeline step labels.
+  static String draft(String lang) => switch (lang) {
+    'ru' => 'Черновик (не отправлено)',
+    'en' => 'Draft (not submitted)',
+    _ => 'Qoralama (yuborilmagan)',
+  };
+
+  static String continueDraft(String lang) => switch (lang) {
+    'ru' => 'Продолжить заполнение',
+    'en' => 'Continue editing',
+    _ => 'Davom etish',
+  };
+
   static String accepted(String lang) => switch (lang) {
     'ru' => 'Заявка принята',
     'en' => 'Application accepted',
@@ -331,7 +345,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
               ),
               const SizedBox(height: 14),
               if (_tab == _DetailTab.status)
-                _StatusTab(steps: steps)
+                _StatusTab(steps: steps, item: widget.item)
               else
                 _AboutTab(item: widget.item),
             ],
@@ -345,19 +359,27 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
 enum _DetailTab { status, about }
 
 class _StatusTab extends StatelessWidget {
-  const _StatusTab({required this.steps});
+  const _StatusTab({required this.steps, required this.item});
 
   final List<ApplicationTimelineStep> steps;
+  final ApplicationItem item;
 
   @override
   Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
+    final canResume = item.isDraft && item.resumeJobId != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _TimelineCard(steps: steps),
         const SizedBox(height: 14),
-        _PrimaryBlackAction(label: _DetailStrings.contactSpecialist(lang)),
+        if (canResume)
+          _ResumeDraftAction(
+            label: _DetailStrings.continueDraft(lang),
+            jobId: item.resumeJobId!,
+          )
+        else
+          _PrimaryBlackAction(label: _DetailStrings.contactSpecialist(lang)),
       ],
     );
   }
@@ -488,6 +510,11 @@ class _TimelineStyle {
     ApplicationTimelineStatus status,
     String lang,
   ) => switch (status) {
+    ApplicationTimelineStatus.draft => _TimelineStyle(
+      label: _DetailStrings.draft(lang),
+      icon: Icons.edit_note_rounded,
+      bg: const Color(0xFFE0A12A), // amber — matches the "Qoralama" badge
+    ),
     ApplicationTimelineStatus.accepted => _TimelineStyle(
       label: _DetailStrings.accepted(lang),
       icon: Icons.description_outlined,
@@ -644,7 +671,8 @@ class _AboutTab extends StatelessWidget {
         // Dinamik forma (TZ) arizalari — backend sxemasi bo'yicha to'liq
         // (barcha to'ldirilgan maydonlar, bo'limga ajratilgan). Sxema yuklanmasa
         // eski tekis ro'yxatga qaytadi.
-        else if (item.formKey != null && (item.formPayload?.isNotEmpty ?? false))
+        else if (item.formKey != null &&
+            (item.formPayload?.isNotEmpty ?? false))
           SchemaAnswersView(
             formKey: item.formKey!,
             payload: item.formPayload!,
@@ -796,8 +824,9 @@ class _AiFullDetailState extends State<_AiFullDetail> {
   Future<void> _load() async {
     try {
       final client = AuthHttpClient();
-      final res = await client
-          .get(Uri.parse('${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}'));
+      final res = await client.get(
+        Uri.parse('${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}'),
+      );
       if (res.statusCode != 200) throw HttpException('HTTP ${res.statusCode}');
       final json = jsonDecode(res.body) as Map<String, dynamic>;
       final snap = AiJobSnapshot.fromJson(json);
@@ -862,7 +891,10 @@ class _AiFullDetailState extends State<_AiFullDetail> {
             decoration: BoxDecoration(
               color: ColorTokens.cardBg(context),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+              border: Border.all(
+                color: ColorTokens.outline(context),
+                width: 0.6,
+              ),
             ),
             child: Text(
               summary,
@@ -902,10 +934,10 @@ String _roomLabel(String lang, Map<String, dynamic> m) {
 
 /// Localized label picker (uz default).
 String _aiLbl(String lang, String uz, String ru, String en) => switch (lang) {
-      'ru' => ru,
-      'en' => en,
-      _ => uz,
-    };
+  'ru' => ru,
+  'en' => en,
+  _ => uz,
+};
 
 /// Thousands-grouped UZS amount, e.g. 622794192 → "622 794 192 so'm".
 String _aiMoney(num v) {
@@ -946,25 +978,51 @@ List<(String, List<(String, String)>)> _buildAiSections(
 
   // ── Obyekt ──────────────────────────────────────────────────────────
   final prop = <(String, String)>[];
-  add(prop, _aiLbl(lang, 'Kadastr raqami', 'Кадастровый номер', 'Cadastre no.'),
-      str(kad['cadastre_number']));
-  add(prop, _aiLbl(lang, 'Manzil', 'Адрес', 'Address'),
-      str(kad['address']) ?? str(loc['address']));
-  add(prop, _aiLbl(lang, 'Obyekt turi', 'Тип объекта', 'Object type'),
-      str(kad['object_type_hint']));
-  add(prop, _aiLbl(lang, 'Umumiy maydon', 'Общая площадь', 'Total area'),
-      kad['total_area'] != null ? '${kad['total_area']} m²' : null);
-  add(prop, _aiLbl(lang, 'Yashash maydoni', 'Жилая площадь', 'Living area'),
-      kad['living_area'] != null ? '${kad['living_area']} m²' : null);
+  add(
+    prop,
+    _aiLbl(lang, 'Kadastr raqami', 'Кадастровый номер', 'Cadastre no.'),
+    str(kad['cadastre_number']),
+  );
+  add(
+    prop,
+    _aiLbl(lang, 'Manzil', 'Адрес', 'Address'),
+    str(kad['address']) ?? str(loc['address']),
+  );
+  add(
+    prop,
+    _aiLbl(lang, 'Obyekt turi', 'Тип объекта', 'Object type'),
+    str(kad['object_type_hint']),
+  );
+  add(
+    prop,
+    _aiLbl(lang, 'Umumiy maydon', 'Общая площадь', 'Total area'),
+    kad['total_area'] != null ? '${kad['total_area']} m²' : null,
+  );
+  add(
+    prop,
+    _aiLbl(lang, 'Yashash maydoni', 'Жилая площадь', 'Living area'),
+    kad['living_area'] != null ? '${kad['living_area']} m²' : null,
+  );
   final floor = str(req['floor']);
   if (floor != null) {
     final total = str(req['total_floors']);
-    add(prop, _aiLbl(lang, 'Qavat', 'Этаж', 'Floor'),
-        total != null ? '$floor / $total' : floor);
+    add(
+      prop,
+      _aiLbl(lang, 'Qavat', 'Этаж', 'Floor'),
+      total != null ? '$floor / $total' : floor,
+    );
   }
   if (kad['cadastre_value'] is num) {
-    add(prop, _aiLbl(lang, 'Kadastr qiymati', 'Кадастровая стоимость',
-        'Cadastre value'), _aiMoney(kad['cadastre_value'] as num));
+    add(
+      prop,
+      _aiLbl(
+        lang,
+        'Kadastr qiymati',
+        'Кадастровая стоимость',
+        'Cadastre value',
+      ),
+      _aiMoney(kad['cadastre_value'] as num),
+    );
   }
   if (prop.isNotEmpty) {
     sections.add((_aiLbl(lang, 'Obyekt', 'Объект', 'Property'), prop));
@@ -983,8 +1041,11 @@ List<(String, List<(String, String)>)> _buildAiSections(
   // ── Joylashuv ───────────────────────────────────────────────────────
   final lc = <(String, String)>[];
   if (loc['lat'] != null && loc['lng'] != null) {
-    add(lc, _aiLbl(lang, 'Koordinatalar', 'Координаты', 'Coordinates'),
-        '${loc['lat']}, ${loc['lng']}');
+    add(
+      lc,
+      _aiLbl(lang, 'Koordinatalar', 'Координаты', 'Coordinates'),
+      '${loc['lat']}, ${loc['lng']}',
+    );
   }
   add(lc, _aiLbl(lang, 'Maqsad', 'Цель', 'Purpose'), str(req['purpose']));
   if (lc.isNotEmpty) {
@@ -1011,26 +1072,46 @@ List<(String, List<(String, String)>)> _buildAiSections(
   // ── Natija ──────────────────────────────────────────────────────────
   final rs = <(String, String)>[];
   if (res['estimated_value'] is num) {
-    add(rs, _aiLbl(lang, 'Taxminiy qiymat', 'Оценочная стоимость',
-        'Estimated value'), _aiMoney(res['estimated_value'] as num));
+    add(
+      rs,
+      _aiLbl(lang, 'Taxminiy qiymat', 'Оценочная стоимость', 'Estimated value'),
+      _aiMoney(res['estimated_value'] as num),
+    );
   }
   final ppsq = res['price_per_sqm'] ?? res['value_per_sqm'];
   if (ppsq is num) {
-    add(rs, _aiLbl(lang, '1 m² narxi', 'Цена за 1 м²', 'Price per m²'),
-        _aiMoney(ppsq));
+    add(
+      rs,
+      _aiLbl(lang, '1 m² narxi', 'Цена за 1 м²', 'Price per m²'),
+      _aiMoney(ppsq),
+    );
   }
   final conf = res['confidence'];
   if (conf is num) {
-    add(rs, _aiLbl(lang, 'Ishonchlilik', 'Достоверность', 'Confidence'),
-        conf <= 1 ? '${(conf * 100).round()}%' : conf.toString());
+    add(
+      rs,
+      _aiLbl(lang, 'Ishonchlilik', 'Достоверность', 'Confidence'),
+      conf <= 1 ? '${(conf * 100).round()}%' : conf.toString(),
+    );
   }
   if (snap.nearbyListingsCount > 0) {
-    add(rs, _aiLbl(lang, 'Taqqoslangan e\'lonlar', 'Сравнимые объявления',
-        'Comparables'), '${snap.nearbyListingsCount}');
+    add(
+      rs,
+      _aiLbl(
+        lang,
+        'Taqqoslangan e\'lonlar',
+        'Сравнимые объявления',
+        'Comparables',
+      ),
+      '${snap.nearbyListingsCount}',
+    );
   }
   if (snap.nearbyPoisCount > 0) {
-    add(rs, _aiLbl(lang, 'Atrofdagi obyektlar', 'Объекты рядом', 'Nearby POIs'),
-        '${snap.nearbyPoisCount}');
+    add(
+      rs,
+      _aiLbl(lang, 'Atrofdagi obyektlar', 'Объекты рядом', 'Nearby POIs'),
+      '${snap.nearbyPoisCount}',
+    );
   }
   if (rs.isNotEmpty) {
     sections.add((_aiLbl(lang, 'Natija', 'Результат', 'Result'), rs));
@@ -1126,14 +1207,22 @@ class _Kadastr3dFullDetailState extends State<_Kadastr3dFullDetail> {
 }
 
 String _k3dObjectType(String lang, String? wire) => switch (wire) {
-      'residential' => _aiLbl(lang, 'Turar joy', 'Жилое', 'Residential'),
-      'non_residential' =>
-        _aiLbl(lang, 'Noturar joy', 'Нежилое', 'Non-residential'),
-      'warehouse' => _aiLbl(lang, 'Ombor', 'Склад', 'Warehouse'),
-      'industrial' =>
-        _aiLbl(lang, 'Sanoat obyektlari', 'Промышленные объекты', 'Industrial'),
-      _ => wire ?? '',
-    };
+  'residential' => _aiLbl(lang, 'Turar joy', 'Жилое', 'Residential'),
+  'non_residential' => _aiLbl(
+    lang,
+    'Noturar joy',
+    'Нежилое',
+    'Non-residential',
+  ),
+  'warehouse' => _aiLbl(lang, 'Ombor', 'Склад', 'Warehouse'),
+  'industrial' => _aiLbl(
+    lang,
+    'Sanoat obyektlari',
+    'Промышленные объекты',
+    'Industrial',
+  ),
+  _ => wire ?? '',
+};
 
 /// Build the grouped (sectionTitle, rows) list from a 3D Kadastr request
 /// payload. Only non-empty fields/sections are included.
@@ -1163,30 +1252,59 @@ List<(String, List<(String, String)>)> _buildKadastr3dSections(
 
   // ── Obyekt ────────────────────────────────────────────────────────────
   final prop = <(String, String)>[];
-  add(prop, _aiLbl(lang, 'Kadastr raqami', 'Кадастровый номер', 'Cadastre no.'),
-      str(kad['cadastre_number']));
-  add(prop, _aiLbl(lang, 'Manzil', 'Адрес', 'Address'),
-      str(kad['address']) ?? str(loc['address_text']));
+  add(
+    prop,
+    _aiLbl(lang, 'Kadastr raqami', 'Кадастровый номер', 'Cadastre no.'),
+    str(kad['cadastre_number']),
+  );
+  add(
+    prop,
+    _aiLbl(lang, 'Manzil', 'Адрес', 'Address'),
+    str(kad['address']) ?? str(loc['address_text']),
+  );
   final ot = str(req['object_type']);
   if (ot != null) {
-    add(prop, _aiLbl(lang, 'Obyekt turi', 'Тип объекта', 'Object type'),
-        _k3dObjectType(lang, ot));
+    add(
+      prop,
+      _aiLbl(lang, 'Obyekt turi', 'Тип объекта', 'Object type'),
+      _k3dObjectType(lang, ot),
+    );
   }
-  add(prop, _aiLbl(lang, 'Davreestr turi', 'Тип (davreestr)', 'Type (davreestr)'),
-      str(kad['object_type_hint']));
-  add(prop, _aiLbl(lang, 'Umumiy maydon', 'Общая площадь', 'Total area'),
-      kad['total_area'] != null ? '${kad['total_area']} m²' : null);
-  add(prop, _aiLbl(lang, 'Yashash maydoni', 'Жилая площадь', 'Living area'),
-      kad['living_area'] != null ? '${kad['living_area']} m²' : null);
+  add(
+    prop,
+    _aiLbl(lang, 'Davreestr turi', 'Тип (davreestr)', 'Type (davreestr)'),
+    str(kad['object_type_hint']),
+  );
+  add(
+    prop,
+    _aiLbl(lang, 'Umumiy maydon', 'Общая площадь', 'Total area'),
+    kad['total_area'] != null ? '${kad['total_area']} m²' : null,
+  );
+  add(
+    prop,
+    _aiLbl(lang, 'Yashash maydoni', 'Жилая площадь', 'Living area'),
+    kad['living_area'] != null ? '${kad['living_area']} m²' : null,
+  );
   final floor = str(req['floor']);
   if (floor != null) {
     final total = str(req['total_floors']);
-    add(prop, _aiLbl(lang, 'Qavat', 'Этаж', 'Floor'),
-        total != null ? '$floor / $total' : floor);
+    add(
+      prop,
+      _aiLbl(lang, 'Qavat', 'Этаж', 'Floor'),
+      total != null ? '$floor / $total' : floor,
+    );
   }
   if (kad['cadastre_value'] is num) {
-    add(prop, _aiLbl(lang, 'Kadastr qiymati', 'Кадастровая стоимость',
-        'Cadastre value'), _aiMoney(kad['cadastre_value'] as num));
+    add(
+      prop,
+      _aiLbl(
+        lang,
+        'Kadastr qiymati',
+        'Кадастровая стоимость',
+        'Cadastre value',
+      ),
+      _aiMoney(kad['cadastre_value'] as num),
+    );
   }
   if (prop.isNotEmpty) {
     sections.add((_aiLbl(lang, 'Obyekt', 'Объект', 'Property'), prop));
@@ -1205,8 +1323,11 @@ List<(String, List<(String, String)>)> _buildKadastr3dSections(
   // ── Joylashuv ───────────────────────────────────────────────────────────
   final lc = <(String, String)>[];
   if (loc['lat'] != null && loc['lng'] != null) {
-    add(lc, _aiLbl(lang, 'Koordinatalar', 'Координаты', 'Coordinates'),
-        '${loc['lat']}, ${loc['lng']}');
+    add(
+      lc,
+      _aiLbl(lang, 'Koordinatalar', 'Координаты', 'Coordinates'),
+      '${loc['lat']}, ${loc['lng']}',
+    );
   }
   if (lc.isNotEmpty) {
     sections.add((_aiLbl(lang, 'Joylashuv', 'Локация', 'Location'), lc));
@@ -1232,19 +1353,29 @@ List<(String, List<(String, String)>)> _buildKadastr3dSections(
   // ── Yuklangan fayllar ────────────────────────────────────────────────────
   final files = <(String, String)>[];
   if (imageKeys.isNotEmpty) {
-    add(files, _aiLbl(lang, 'Obyekt rasmlari', 'Фото объекта', 'Object photos'),
-        '${imageKeys.length} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
+    add(
+      files,
+      _aiLbl(lang, 'Obyekt rasmlari', 'Фото объекта', 'Object photos'),
+      '${imageKeys.length} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}',
+    );
   }
   if (kadastrKeys.isNotEmpty) {
     add(
-        files,
-        _aiLbl(lang, 'Kadastr hujjatlari', 'Кадастровые документы',
-            'Cadastre docs'),
-        '${kadastrKeys.length} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
+      files,
+      _aiLbl(
+        lang,
+        'Kadastr hujjatlari',
+        'Кадастровые документы',
+        'Cadastre docs',
+      ),
+      '${kadastrKeys.length} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}',
+    );
   }
   if (files.isNotEmpty) {
-    sections.add(
-        (_aiLbl(lang, 'Yuklangan fayllar', 'Загруженные файлы', 'Files'), files));
+    sections.add((
+      _aiLbl(lang, 'Yuklangan fayllar', 'Загруженные файлы', 'Files'),
+      files,
+    ));
   }
 
   return sections;
@@ -1378,8 +1509,10 @@ class _AiScanCardState extends State<_AiScanCard> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded,
-                color: ColorTokens.secondaryText(context)),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: ColorTokens.secondaryText(context),
+            ),
           ],
         ),
       ),
@@ -1420,9 +1553,10 @@ class _AiScanFramesGalleryState extends State<_AiScanFramesGallery> {
     final svc = AiValuationJobService();
     try {
       final snap = await svc.get(widget.jobId, token: token);
-      final frames = (snap.scanFiles?['frames'] as List?)
-              ?.whereType<String>()
-              .toList(growable: false) ??
+      final frames =
+          (snap.scanFiles?['frames'] as List?)?.whereType<String>().toList(
+            growable: false,
+          ) ??
           const <String>[];
       if (!mounted) return;
       setState(() {
@@ -1444,13 +1578,15 @@ class _AiScanFramesGalleryState extends State<_AiScanFramesGallery> {
   Map<String, String> get _headers => {'Authorization': 'Bearer $_token'};
 
   void _openViewer(int index) {
-    Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => _FramesViewerPage(
-        urls: _frames.map(_url).toList(growable: false),
-        headers: _headers,
-        initialIndex: index,
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FramesViewerPage(
+          urls: _frames.map(_url).toList(growable: false),
+          headers: _headers,
+          initialIndex: index,
+        ),
       ),
-    ));
+    );
   }
 
   @override
@@ -1471,8 +1607,11 @@ class _AiScanFramesGalleryState extends State<_AiScanFramesGallery> {
           children: [
             Row(
               children: [
-                Icon(Icons.photo_library_outlined,
-                    size: 18, color: ColorTokens.secondaryText(context)),
+                Icon(
+                  Icons.photo_library_outlined,
+                  size: 18,
+                  color: ColorTokens.secondaryText(context),
+                ),
                 const SizedBox(width: 8),
                 Text(
                   '${_DetailStrings.scanPhotos(lang)} (${_frames.length})',
@@ -1505,26 +1644,29 @@ class _AiScanFramesGalleryState extends State<_AiScanFramesGallery> {
                       gaplessPlayback: true,
                       loadingBuilder: (context, child, progress) =>
                           progress == null
-                              ? child
-                              : Container(
-                                  width: 96,
-                                  height: 96,
-                                  color: ColorTokens.iconBg(context),
-                                  alignment: Alignment.center,
-                                  child: const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                        strokeWidth: 2),
-                                  ),
+                          ? child
+                          : Container(
+                              width: 96,
+                              height: 96,
+                              color: ColorTokens.iconBg(context),
+                              alignment: Alignment.center,
+                              child: const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
+                              ),
+                            ),
                       errorBuilder: (context, _, _) => Container(
                         width: 96,
                         height: 96,
                         color: ColorTokens.iconBg(context),
                         alignment: Alignment.center,
-                        child: Icon(Icons.broken_image_outlined,
-                            color: ColorTokens.secondaryText(context)),
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: ColorTokens.secondaryText(context),
+                        ),
                       ),
                     ),
                   ),
@@ -1555,8 +1697,9 @@ class _FramesViewerPage extends StatefulWidget {
 }
 
 class _FramesViewerPageState extends State<_FramesViewerPage> {
-  late final PageController _controller =
-      PageController(initialPage: widget.initialIndex);
+  late final PageController _controller = PageController(
+    initialPage: widget.initialIndex,
+  );
   late int _index = widget.initialIndex;
 
   @override
@@ -1587,14 +1730,17 @@ class _FramesViewerPageState extends State<_FramesViewerPage> {
                     gaplessPlayback: true,
                     loadingBuilder: (context, child, progress) =>
                         progress == null
-                            ? child
-                            : const Center(
-                                child: CircularProgressIndicator(
-                                    color: Colors.white)),
+                        ? child
+                        : const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
+                          ),
                     errorBuilder: (context, _, _) => const Icon(
-                        Icons.broken_image_outlined,
-                        color: Colors.white54,
-                        size: 48),
+                      Icons.broken_image_outlined,
+                      color: Colors.white54,
+                      size: 48,
+                    ),
                   ),
                 ),
               ),
@@ -1667,7 +1813,11 @@ class _FileCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '3D_Kadastr_Xulosa.pdf',
+                  switch (localeNotifier.value.languageCode) {
+                    'ru' => 'Заключение 3D Kadastr',
+                    'en' => '3D Kadastr report',
+                    _ => '3D Kadastr xulosasi',
+                  },
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -1723,31 +1873,31 @@ class _EstimatorCard extends StatelessWidget {
     final cz = cause?.trim() ?? '';
 
     Widget block(String label, String value) => Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w400,
-                fontSize: 12,
-                height: 1.3,
-                color: ColorTokens.secondaryText(context),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
-                height: 1.35,
-                color: ColorTokens.primaryText(context),
-              ),
-            ),
-          ],
-        );
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w400,
+            fontSize: 12,
+            height: 1.3,
+            color: ColorTokens.secondaryText(context),
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w500,
+            fontSize: 14,
+            height: 1.35,
+            color: ColorTokens.primaryText(context),
+          ),
+        ),
+      ],
+    );
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1814,7 +1964,8 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
     try {
       final path = await _ensureResultCached(
         jobId: widget.jobId,
-        downloadUrl: '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/report',
+        downloadUrl:
+            '${ApiConfig.baseUrl}/ai-valuations/${widget.jobId}/report',
         format: 'pdf',
         prefix: 'xulosa',
         onProgress: (received, total) {
@@ -1849,37 +2000,36 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
 
   // Tap the card → view in-app.
   void _open() => _run((path) async {
-        final lang = localeNotifier.value.languageCode;
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => PdfViewerScreen(
-              filePath: path,
-              title: '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
-              shareName: '${_shareName}_${widget.jobId}.pdf',
-            ),
-          ),
-        );
-      });
+    final lang = localeNotifier.value.languageCode;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PdfViewerScreen(
+          filePath: path,
+          title: '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+          shareName: '${_shareName}_${widget.jobId}.pdf',
+        ),
+      ),
+    );
+  });
 
   // Tap "Yuklash" → download / save / share.
   void _download() => _run((path) async {
-        await Share.shareXFiles(
-          [
-            XFile(path,
-                mimeType: 'application/pdf',
-                name: '${_shareName}_${widget.jobId}.pdf'),
-          ],
-          sharePositionOrigin: _shareOrigin(context),
-        );
-      });
+    await Share.shareXFiles([
+      XFile(
+        path,
+        mimeType: 'application/pdf',
+        name: '${_shareName}_${widget.jobId}.pdf',
+      ),
+    ], sharePositionOrigin: _shareOrigin(context));
+  });
 
   @override
   Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
     final subtitle = _loading
         ? (_progress != null
-            ? '${(_progress! * 100).toStringAsFixed(0)}%'
-            : (_total > 0 ? _fmtBytes(_total) : '…'))
+              ? '${(_progress! * 100).toStringAsFixed(0)}%'
+              : (_total > 0 ? _fmtBytes(_total) : '…'))
         : 'PDF';
     return InkWell(
       onTap: _loading ? null : _open,
@@ -2017,28 +2167,27 @@ class _AiOrderCardState extends State<_AiOrderCard> {
   }
 
   void _open() => _run((path) async {
-        final lang = localeNotifier.value.languageCode;
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => PdfViewerScreen(
-              filePath: path,
-              title: '${_DetailStrings.orderFile(lang)} #${widget.jobId}',
-              shareName: 'Narxlash_Malumotnomasi_${widget.jobId}.pdf',
-            ),
-          ),
-        );
-      });
+    final lang = localeNotifier.value.languageCode;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PdfViewerScreen(
+          filePath: path,
+          title: '${_DetailStrings.orderFile(lang)} #${widget.jobId}',
+          shareName: 'Narxlash_Malumotnomasi_${widget.jobId}.pdf',
+        ),
+      ),
+    );
+  });
 
   void _download() => _run((path) async {
-        await Share.shareXFiles(
-          [
-            XFile(path,
-                mimeType: 'application/pdf',
-                name: 'Narxlash_Malumotnomasi_${widget.jobId}.pdf'),
-          ],
-          sharePositionOrigin: _shareOrigin(context),
-        );
-      });
+    await Share.shareXFiles([
+      XFile(
+        path,
+        mimeType: 'application/pdf',
+        name: 'Narxlash_Malumotnomasi_${widget.jobId}.pdf',
+      ),
+    ], sharePositionOrigin: _shareOrigin(context));
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2191,36 +2340,35 @@ class _K3dReportCardState extends State<_K3dReportCard> {
   }
 
   void _open() => _run((path) async {
-        final lang = localeNotifier.value.languageCode;
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => PdfViewerScreen(
-              filePath: path,
-              title: '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
-              shareName: '${_shareName}_${widget.jobId}.pdf',
-            ),
-          ),
-        );
-      });
+    final lang = localeNotifier.value.languageCode;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PdfViewerScreen(
+          filePath: path,
+          title: '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+          shareName: '${_shareName}_${widget.jobId}.pdf',
+        ),
+      ),
+    );
+  });
 
   void _download() => _run((path) async {
-        await Share.shareXFiles(
-          [
-            XFile(path,
-                mimeType: 'application/pdf',
-                name: '${_shareName}_${widget.jobId}.pdf'),
-          ],
-          sharePositionOrigin: _shareOrigin(context),
-        );
-      });
+    await Share.shareXFiles([
+      XFile(
+        path,
+        mimeType: 'application/pdf',
+        name: '${_shareName}_${widget.jobId}.pdf',
+      ),
+    ], sharePositionOrigin: _shareOrigin(context));
+  });
 
   @override
   Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
     final subtitle = _loading
         ? (_progress != null
-            ? '${(_progress! * 100).toStringAsFixed(0)}%'
-            : (_total > 0 ? _fmtBytes(_total) : '…'))
+              ? '${(_progress! * 100).toStringAsFixed(0)}%'
+              : (_total > 0 ? _fmtBytes(_total) : '…'))
         : 'PDF';
     return InkWell(
       onTap: _loading ? null : _open,
@@ -2436,8 +2584,10 @@ class _K3dModelCardState extends State<_K3dModelCard> {
                 ],
               ),
             ),
-            Icon(Icons.chevron_right_rounded,
-                color: ColorTokens.secondaryText(context)),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: ColorTokens.secondaryText(context),
+            ),
           ],
         ),
       ),
@@ -2501,14 +2651,20 @@ class _ModelCardState extends State<_ModelCard> {
           context,
           job.status == 'failed'
               ? switch (locale.languageCode) {
-                  'ru' => 'Не удалось построить 3D-модель: ${job.errorMessage ?? 'ошибка'}',
-                  'en' => 'Failed to build 3D model: ${job.errorMessage ?? 'error'}',
-                  _ => '3D model qurib bo\'lmadi: ${job.errorMessage ?? 'xato'}',
+                  'ru' =>
+                    'Не удалось построить 3D-модель: ${job.errorMessage ?? 'ошибка'}',
+                  'en' =>
+                    'Failed to build 3D model: ${job.errorMessage ?? 'error'}',
+                  _ =>
+                    '3D model qurib bo\'lmadi: ${job.errorMessage ?? 'xato'}',
                 }
               : switch (locale.languageCode) {
-                  'ru' => '3D-модель ещё не готова (${job.status}). Пожалуйста, подождите.',
-                  'en' => '3D model is not ready yet (${job.status}). Please wait.',
-                  _ => '3D model hali tayyor emas (${job.status}). Iltimos, kuting.',
+                  'ru' =>
+                    '3D-модель ещё не готова (${job.status}). Пожалуйста, подождите.',
+                  'en' =>
+                    '3D model is not ready yet (${job.status}). Please wait.',
+                  _ =>
+                    '3D model hali tayyor emas (${job.status}). Iltimos, kuting.',
                 },
         );
         return;
@@ -2548,7 +2704,11 @@ class _ModelCardState extends State<_ModelCard> {
           MaterialPageRoute(
             builder: (_) => SplatViewerScreen(
               splatFilePath: filePath,
-              title: '3D skan #$jobId',
+              title: switch (localeNotifier.value.languageCode) {
+                'ru' => '3D-скан №$jobId',
+                'en' => '3D scan #$jobId',
+                _ => '3D skan №$jobId',
+              },
             ),
           ),
         );
@@ -2587,89 +2747,89 @@ class _ModelCardState extends State<_ModelCard> {
       onTap: _onTap,
       borderRadius: BorderRadius.circular(24),
       child: Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: ColorTokens.cardBg(context),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: ColorTokens.outline(context), width: 0.6),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: ColorTokens.iconBg(context),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: SvgPicture.asset(
-              'assets/icons/chart-scatter-3d.svg',
-              width: 20,
-              height: 20,
-              colorFilter: ColorFilter.mode(
-                ColorTokens.secondaryText(context),
-                BlendMode.srcIn,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: ColorTokens.cardBg(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: ColorTokens.outline(context), width: 0.6),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: ColorTokens.iconBg(context),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: SvgPicture.asset(
+                'assets/icons/chart-scatter-3d.svg',
+                width: 20,
+                height: 20,
+                colorFilter: ColorFilter.mode(
+                  ColorTokens.secondaryText(context),
+                  BlendMode.srcIn,
+                ),
               ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _DetailStrings.model3d(lang),
-                  style: TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    height: 1.3,
-                    color: ColorTokens.primaryText(context),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  !_loading
-                      ? _DetailStrings.roomPlanViewerOpens(lang)
-                      : _total > 0
-                          ? '${_DetailStrings.downloading(lang)} ${(_progress! * 100).toStringAsFixed(0)}% '
-                              '(${_fmtBytes(_received)} / ${_fmtBytes(_total)})'
-                          : '${_DetailStrings.downloading(lang)} ${_fmtBytes(_received)}',
-                  style: TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontWeight: FontWeight.w400,
-                    fontSize: 12,
-                    height: 1.3,
-                    color: ColorTokens.secondaryText(context),
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (_loading) ...[
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: _progress,
-                      minHeight: 4,
-                      backgroundColor: ColorTokens.iconBg(context),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _DetailStrings.model3d(lang),
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      height: 1.3,
+                      color: ColorTokens.primaryText(context),
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  Text(
+                    !_loading
+                        ? _DetailStrings.roomPlanViewerOpens(lang)
+                        : _total > 0
+                        ? '${_DetailStrings.downloading(lang)} ${(_progress! * 100).toStringAsFixed(0)}% '
+                              '(${_fmtBytes(_received)} / ${_fmtBytes(_total)})'
+                        : '${_DetailStrings.downloading(lang)} ${_fmtBytes(_received)}',
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w400,
+                      fontSize: 12,
+                      height: 1.3,
+                      color: ColorTokens.secondaryText(context),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (_loading) ...[
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: _progress,
+                        minHeight: 4,
+                        backgroundColor: ColorTokens.iconBg(context),
+                      ),
+                    ),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-          if (!_loading)
-            _MiniPillButton(
-              label: _DetailStrings.view(lang),
-              fg: ColorTokens.primaryText(context),
-              bg: ColorTokens.iconBg(context),
-              iconAsset: 'assets/icons/chevron-right.svg',
-            ),
-        ],
-      ),
+            if (!_loading)
+              _MiniPillButton(
+                label: _DetailStrings.view(lang),
+                fg: ColorTokens.primaryText(context),
+                bg: ColorTokens.iconBg(context),
+                iconAsset: 'assets/icons/chevron-right.svg',
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -2837,6 +2997,49 @@ class _PrimaryBlackAction extends StatelessWidget {
   }
 }
 
+/// Green CTA shown on a DRAFT's detail — resumes the wizard at the saved step.
+class _ResumeDraftAction extends StatelessWidget {
+  const _ResumeDraftAction({required this.label, required this.jobId});
+
+  final String label;
+  final int jobId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.splashGreen,
+      borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => resumeAiDraft(context, jobId),
+        child: SizedBox(
+          height: 56,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppColors.buttonTextBlack,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Icon(
+                Icons.arrow_forward_rounded,
+                size: 22,
+                color: AppColors.buttonTextBlack,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _PrimaryGreenAction extends StatefulWidget {
   const _PrimaryGreenAction({required this.label, required this.item});
 
@@ -2891,7 +3094,11 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
           MaterialPageRoute(
             builder: (_) => SplatViewerScreen(
               splatFilePath: filePath,
-              title: '3D skan #$jobId',
+              title: switch (localeNotifier.value.languageCode) {
+                'ru' => '3D-скан №$jobId',
+                'en' => '3D scan #$jobId',
+                _ => '3D skan №$jobId',
+              },
             ),
           ),
         );
