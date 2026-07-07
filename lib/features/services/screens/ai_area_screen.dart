@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../ai_draft_saver.dart';
 import '../models/ai_scan_result.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -47,16 +48,26 @@ class _AiAreaScreenState extends State<AiAreaScreen> {
     return double.tryParse(t);
   }
 
-  void _continue() {
+  Future<void> _continue() async {
     final area = _area;
     if (area == null || area <= 0) return;
     HapticFeedback.lightImpact();
+    // Make sure a DRAFT exists so every following step autosaves. Normally the
+    // draft is created after the 3D scan; this covers the paths where it wasn't
+    // (the testing skip, or a scan whose draft-create failed). No-op when one
+    // already exists. Seeds `total_area` so the area isn't lost on resume.
+    var draftId = widget.draftId;
+    draftId ??= await createAiDraft(
+      payload: {'total_area': area},
+      currentStep: 'cadastre',
+    );
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'ai/area'),
         builder: (_) => AiCadastreScreen(
           scan: widget.scan,
-          draftId: widget.draftId,
+          draftId: draftId,
           scanJobId: widget.scanJobId,
           areaM2: area,
         ),

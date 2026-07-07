@@ -18,7 +18,6 @@ import '../models/ai_baholash_bundle.dart';
 import '../widgets/file_preview_gallery.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
-import '../widgets/terms_consent.dart';
 import '../widgets/wizard_review_section.dart';
 import 'ai_target_price_screen.dart';
 
@@ -32,9 +31,6 @@ class AiReviewScreen extends StatefulWidget {
 }
 
 class _AiReviewScreenState extends State<AiReviewScreen> {
-  // The user must tick the terms box before the request can fire.
-  bool _agreed = false;
-
   // Jump back to a step to edit it. popUntil removes the screens above the
   // target (incl. this review), so re-traversing forward rebuilds them from the
   // shared bundle — no duplicate routes. NOTE: editing Kadastr re-enters from
@@ -46,7 +42,6 @@ class _AiReviewScreenState extends State<AiReviewScreen> {
   }
 
   void _submit(BuildContext context) {
-    if (!_agreed) return;
     HapticFeedback.lightImpact();
     // Natijadan OLDIN maqsadli narxni so'raymiz; narx ekrani natija ekraniga
     // (AiStatusScreen) o'tadi va u yerda ariza yuboriladi.
@@ -171,17 +166,10 @@ class _AiReviewScreenState extends State<AiReviewScreen> {
                   ),
                 ),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: TermsConsent(
-                    value: _agreed,
-                    onChanged: (v) => setState(() => _agreed = v),
-                  ),
-                ),
-                Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
                     label: _S.calculate(l),
-                    enabled: _agreed,
+                    enabled: true,
                     onTap: () => _submit(context),
                   ),
                 ),

@@ -22,6 +22,7 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
+import '../widgets/terms_consent.dart';
 import 'ai_credentials_screen.dart';
 
 class AiStatusScreen extends StatefulWidget {
@@ -593,24 +594,11 @@ class _ResultView extends StatelessWidget {
             ],
           ),
         ),
-        // Fixed bottom CTA — "Ariza yuborish" → to'lov bottom-sheet'i (Payme).
+        // Paywall — the demo ends here. Consent checkbox + the paid CTA
+        // ("Pullik xizmatdan foydalanish") → appraiser docs → to'lov (Payme).
         // Reviewer (demo) akkaunti uchun yashiriladi — AI dastlabki natijasi
         // bepul ko'rinadi, lekin pullik rasmiy ariza topshirish ko'rsatilmaydi.
-        if (!paymentsHidden)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: ListingCtaButton(
-              label: _AiStatusStrings.submitApplication(l),
-              enabled: true,
-              // Narx endi natijadan OLDIN so'raladi — bu yerdan to'g'ridan-to'g'ri
-              // appraiser hujjatlari → to'lov oqimiga o'tamiz.
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => AiCredentialsScreen(referenceId: snapshot.id),
-                ),
-              ),
-            ),
-          ),
+        if (!paymentsHidden) _PaidSubmitBar(referenceId: snapshot.id),
       ],
     );
   }
@@ -619,6 +607,41 @@ class _ResultView extends StatelessWidget {
     if (v == null) return null;
     if (v is num) return v.toDouble();
     return double.tryParse(v.toString());
+  }
+}
+
+// Paywall bar shown at the end of the free demo: the consent checkbox
+// ("Yolg'on ma'lumot yuklamayman") gates the paid submission button. Stateful
+// so the tick lives here without turning _ResultView stateful.
+class _PaidSubmitBar extends StatelessWidget {
+  const _PaidSubmitBar({required this.referenceId});
+
+  final int? referenceId;
+
+  // Tapping the paid CTA opens the terms as a scroll-through consent drawer.
+  // The user must read to the end and tap "QABUL QILAMAN" before the paid
+  // (appraiser docs → payment) flow opens.
+  Future<void> _onTap(BuildContext context) async {
+    final accepted = await showTermsAcceptanceSheet(context);
+    if (!accepted || !context.mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AiCredentialsScreen(referenceId: referenceId),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: ListingCtaButton(
+        label: _AiStatusStrings.usePaidService(l),
+        enabled: true,
+        onTap: () => _onTap(context),
+      ),
+    );
   }
 }
 
@@ -1590,10 +1613,10 @@ class _AiStatusStrings {
     _ => 'Nomsiz',
   };
 
-  static String submitApplication(Locale l) => switch (l.languageCode) {
-    'ru' => 'Подать заявку',
-    'en' => 'Submit application',
-    _ => 'Ariza yuborish',
+  static String usePaidService(Locale l) => switch (l.languageCode) {
+    'ru' => 'Воспользоваться платной услугой',
+    'en' => 'Use paid service',
+    _ => 'Pullik xizmatdan foydalanish',
   };
 
   static String unitBln(Locale l) => switch (l.languageCode) {

@@ -135,7 +135,12 @@ class TermsConsent extends StatelessWidget {
 }
 
 class _TermsSheet extends StatefulWidget {
-  const _TermsSheet();
+  const _TermsSheet({this.acceptMode = false});
+
+  /// When true the sheet is a consent gate: it shows an "QABUL QILAMAN" button
+  /// (enabled only once the user has scrolled through the terms) and pops
+  /// `true` on accept. When false it's read-only with a "Yopish" button.
+  final bool acceptMode;
 
   @override
   State<_TermsSheet> createState() => _TermsSheetState();
@@ -147,6 +152,43 @@ class _TermsSheetState extends State<_TermsSheet> {
   bool _loading = true;
   bool _offline = false; // true → show the bundled fallback text
   bool _started = false;
+
+  final ScrollController _scrollCtrl = ScrollController();
+  // Accept mode: enabled once the user has scrolled to the end of the terms
+  // (or the text already fits without scrolling).
+  bool _read = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollCtrl.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollCtrl.removeListener(_onScroll);
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_read || !_scrollCtrl.hasClients) return;
+    final pos = _scrollCtrl.position;
+    if (pos.pixels >= pos.maxScrollExtent - 12) {
+      setState(() => _read = true);
+    }
+  }
+
+  // After content lays out, if it isn't tall enough to scroll, count it as read.
+  void _markReadIfFits() {
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
+      if (!mounted || _read) return;
+      if (_scrollCtrl.hasClients &&
+          _scrollCtrl.position.maxScrollExtent <= 0) {
+        setState(() => _read = true);
+      }
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -170,6 +212,7 @@ class _TermsSheetState extends State<_TermsSheet> {
           _html = body['content'] as String?;
           _loading = false;
         });
+        if (widget.acceptMode) _markReadIfFits();
         return;
       }
     } catch (_) {
@@ -180,6 +223,7 @@ class _TermsSheetState extends State<_TermsSheet> {
         _offline = true;
         _loading = false;
       });
+      if (widget.acceptMode) _markReadIfFits();
     }
   }
 
@@ -249,6 +293,7 @@ class _TermsSheetState extends State<_TermsSheet> {
                     child: Center(child: CircularProgressIndicator()),
                   )
                 : ListView(
+                    controller: _scrollCtrl,
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                     children: [
                       if (_offline) ...[
@@ -264,33 +309,72 @@ class _TermsSheetState extends State<_TermsSheet> {
           ),
           Padding(
             padding: EdgeInsets.fromLTRB(20, 8, 20, 16 + media.padding.bottom),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.splashGreen,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.acceptMode && !_read && !_loading) ...[
+                  Text(
+                    _S.scrollHint(l),
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontSize: 12.5,
+                      color: muted,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.splashGreen,
+                      disabledBackgroundColor:
+                          AppColors.splashGreen.withValues(alpha: 0.35),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    onPressed: widget.acceptMode
+                        ? (_read
+                            ? () {
+                                HapticFeedback.lightImpact();
+                                Navigator.of(context).pop(true);
+                              }
+                            : null)
+                        : () => Navigator.of(context).pop(),
+                    child: Text(
+                      widget.acceptMode ? _S.accept(l) : _S.close(l),
+                      style: const TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  _S.close(l),
-                  style: const TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Shows the terms as a consent gate: the user scrolls through them and taps
+/// "QABUL QILAMAN". Returns true only if accepted (false if dismissed).
+Future<bool> showTermsAcceptanceSheet(BuildContext context) async {
+  HapticFeedback.selectionClick();
+  final accepted = await showModalBottomSheet<bool>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (_) => const _TermsSheet(acceptMode: true),
+  );
+  return accepted == true;
 }
 
 class _S {
@@ -322,6 +406,16 @@ class _S {
       );
 
   static String close(Locale l) => _pick(l, 'Yopish', 'Закрыть', 'Close');
+
+  static String accept(Locale l) =>
+      _pick(l, 'QABUL QILAMAN', 'ПРИНИМАЮ', 'I ACCEPT');
+
+  static String scrollHint(Locale l) => _pick(
+        l,
+        'Davom etish uchun shartlarni oxirigacha o\'qing',
+        'Прочитайте условия до конца, чтобы продолжить',
+        'Read the terms to the end to continue',
+      );
 
   static List<String> paragraphs(Locale l) => switch (l.languageCode) {
         'ru' => const [
