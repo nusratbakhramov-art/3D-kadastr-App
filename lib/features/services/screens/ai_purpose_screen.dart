@@ -49,6 +49,10 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
   /// free-text textarea bound to [_basisCtrl].
   String? _basisValue;
 
+  /// Last locale seen in build — used by dispose (Orqaga) to resolve the basis
+  /// label without a BuildContext.
+  Locale? _lastLocale;
+
   @override
   void initState() {
     super.initState();
@@ -99,6 +103,12 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
 
   @override
   void dispose() {
+    // Orqaga qaytishда ham fon rejimida saqlash.
+    final l = _lastLocale;
+    if (l != null) {
+      _captureToBundle(l);
+      saveAiDraftStepInBackground(widget.bundle, 'purpose');
+    }
     _basisCtrl.dispose();
     _addresseeCtrl.dispose();
     super.dispose();
@@ -124,19 +134,23 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
 
   Future<void> _next() async {
     HapticFeedback.lightImpact();
-    final l = Localizations.localeOf(context);
-    widget.bundle.purpose = _purpose;
-    final addressee = _addresseeCtrl.text.trim();
-    widget.bundle.purposeBasis = _resolveBasis(l);
-    widget.bundle.addressee = addressee.isEmpty ? null : addressee;
-    await saveAiDraftStep(widget.bundle, 'intake'); // qadam saqlash
-    if (!mounted) return;
+    _captureToBundle(Localizations.localeOf(context));
+    // Fon rejimida saqlash — sekin backend navigatsiyani muzlatmasin.
+    saveAiDraftStepInBackground(widget.bundle, 'intake');
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'ai/intake'),
         builder: (_) => AiIntakeScreen(bundle: widget.bundle),
       ),
     );
+  }
+
+  /// Joriy maqsad/asos/kimga'ni bundle'ga yozadi (oldinga ham, Orqaga ham).
+  void _captureToBundle(Locale l) {
+    widget.bundle.purpose = _purpose;
+    final addressee = _addresseeCtrl.text.trim();
+    widget.bundle.purposeBasis = _resolveBasis(l);
+    widget.bundle.addressee = addressee.isEmpty ? null : addressee;
   }
 
   Future<void> _pickBasis(Locale l) async {
@@ -182,6 +196,7 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
   @override
   Widget build(BuildContext context) {
     final l = Localizations.localeOf(context);
+    _lastLocale = l; // Orqaga ketishда (dispose) asos matnini hal qilish uchun.
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 

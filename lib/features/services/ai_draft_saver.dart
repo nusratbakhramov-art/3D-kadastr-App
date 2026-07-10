@@ -4,6 +4,8 @@
 /// xato/offline navigatsiyani bloklamaydi (kelajak: lokal queue + retry).
 library;
 
+import 'dart:async';
+
 import '../auth/auth_storage.dart';
 import 'api_ai_valuation_job_service.dart';
 import 'models/ai_baholash_bundle.dart';
@@ -33,6 +35,13 @@ Future<int?> createAiDraft({
   } finally {
     service.dispose();
   }
+}
+
+/// Fire-and-forget draft save — UI'ni HECH QACHON bloklamaydi. Sekin yoki
+/// ishlamayotgan backend wizard navigatsiyasini muzlatmasligi kerak, shuning
+/// uchun chaqiruvchilar buni `await` qilishmaydi (xato/offline jim yutiladi).
+void saveAiDraftStepInBackground(AiBaholashBundle bundle, String step) {
+  unawaited(saveAiDraftStep(bundle, step));
 }
 
 /// DRAFT arizani joriy bundle bilan saqlaydi (qadam + payload). Jim ishlaydi —

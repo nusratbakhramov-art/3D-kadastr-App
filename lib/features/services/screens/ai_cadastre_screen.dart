@@ -239,8 +239,8 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
       );
       _bundle = bundle;
     }
-    await saveAiDraftStep(bundle, 'client'); // DRAFT'ni shu qadam bilan saqlash
-    if (!mounted) return;
+    // Fon rejimida saqlash — sekin backend "Davom etish"'ni muzlatmasin.
+    saveAiDraftStepInBackground(bundle, 'client');
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'ai/client'),

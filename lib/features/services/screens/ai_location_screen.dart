@@ -104,6 +104,11 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
 
   @override
   void dispose() {
+    // Orqaga qaytishда ham fon rejimida saqlash — tanlangan joy yo'qolmasin.
+    if (_hasResolvedLocation) {
+      _captureToBundle();
+      saveAiDraftStepInBackground(widget.bundle, 'location');
+    }
     _searchDebounce?.cancel();
     _reverseDebounce?.cancel();
     _searchCtrl
@@ -330,13 +335,9 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
 
   Future<void> _confirm() async {
     HapticFeedback.lightImpact();
-    widget.bundle.location = AiLocationInfo(
-      lat: _center.latitude,
-      lng: _center.longitude,
-      addressText: _addressText,
-    );
-    await saveAiDraftStep(widget.bundle, 'purpose'); // qadam saqlash
-    if (!mounted) return;
+    _captureToBundle();
+    // Fon rejimida saqlash — sekin backend navigatsiyani muzlatmasin.
+    saveAiDraftStepInBackground(widget.bundle, 'purpose');
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'ai/purpose'),
@@ -344,6 +345,19 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
       ),
     );
   }
+
+  /// Joriy tanlangan joyni bundle'ga yozadi (oldinga ham, Orqaga ham).
+  void _captureToBundle() {
+    widget.bundle.location = AiLocationInfo(
+      lat: _center.latitude,
+      lng: _center.longitude,
+      addressText: _addressText,
+    );
+  }
+
+  /// Haqiqiy joy aniqlanganmi — Toshkent default'ini draftga yozmaslik uchun.
+  bool get _hasResolvedLocation =>
+      _addressText != null || _center != _defaultCenter;
 
   // ── Build ────────────────────────────────────────────────────────────
 

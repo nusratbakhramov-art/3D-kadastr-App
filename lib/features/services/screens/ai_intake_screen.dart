@@ -108,6 +108,11 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
 
   @override
   void dispose() {
+    // Orqaga qaytishда ham fon rejimida saqlash — bundle allaqachon jonli
+    // yangilanadi (qavatlar/rasmlar), shuning uchun shunchaki saqlashni uchiramiz.
+    if (widget.bundle.draftId != null) {
+      saveAiDraftStepInBackground(widget.bundle, 'intake');
+    }
     _uploads.dispose();
     _floorCtrl.dispose();
     _totalFloorsCtrl.dispose();
@@ -424,8 +429,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   // first so the draft/resume flow keeps working.
   Future<void> _continue() async {
     HapticFeedback.lightImpact();
-    await saveAiDraftStep(widget.bundle, 'payment'); // oxirgi qadam: to'lov
-    if (!mounted) return;
+    // Fon rejimida saqlash — sekin backend "Davom etish"'ni muzlatmasin.
+    saveAiDraftStepInBackground(widget.bundle, 'payment');
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'ai/review'),

@@ -74,6 +74,11 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
 
   @override
   void dispose() {
+    // Orqaga qaytishда ham saqlash (fon rejimida) — kiritilgan narsa yo'qolmasin.
+    if (_hasInput) {
+      _captureToBundle();
+      saveAiDraftStepInBackground(widget.bundle, 'client');
+    }
     _nameCtrl.dispose();
     _stirCtrl.dispose();
     _phoneCtrl.dispose();
@@ -112,14 +117,9 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
       return;
     }
     HapticFeedback.lightImpact();
-    widget.bundle.client = AiClientInfo(
-      name: _nameCtrl.text.trim(),
-      stir: _stirCtrl.text.trim(),
-      phone: _normalizePhone(_phoneCtrl.text),
-      email: _emailCtrl.text.trim().toLowerCase(),
-    );
-    await saveAiDraftStep(widget.bundle, 'location'); // qadam saqlash
-    if (!mounted) return;
+    _captureToBundle();
+    // Fon rejimida saqlash — sekin backend navigatsiyani muzlatmasin.
+    saveAiDraftStepInBackground(widget.bundle, 'location');
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: const RouteSettings(name: 'ai/location'),
@@ -127,6 +127,24 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
       ),
     );
   }
+
+  /// Joriy maydonlarni bundle'ga yozadi (oldinga ham, Orqaga ketishda ham).
+  void _captureToBundle() {
+    widget.bundle.client = AiClientInfo(
+      name: _nameCtrl.text.trim(),
+      stir: _stirCtrl.text.trim(),
+      phone: _normalizePhone(_phoneCtrl.text),
+      email: _emailCtrl.text.trim().toLowerCase(),
+    );
+  }
+
+  /// Foydalanuvchi biror narsa kiritganmi — bo'sh formani draftga yozib,
+  /// profildan avto-to'ldirishni buzmaslik uchun.
+  bool get _hasInput =>
+      _nameCtrl.text.trim().isNotEmpty ||
+      _stirCtrl.text.trim().isNotEmpty ||
+      _phoneCtrl.text.trim().isNotEmpty ||
+      _emailCtrl.text.trim().isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
