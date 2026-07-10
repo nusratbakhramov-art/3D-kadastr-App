@@ -290,9 +290,10 @@ class AiValuationJobService {
     return body['id'] as int;
   }
 
-  /// AI bahodan keyin foydalanuvchi kiritgan MAQSADLI sotuv narxini (so'm) va
-  /// bino/uy maydonini (m²) arizaga biriktiradi. Ikkalasi ham ixtiyoriy — null
-  /// qiymat tegishli ustunni tozalaydi.
+  /// Foydalanuvchi kiritgan SMETA (qurilish) qiymatini (so'm) va obyekt
+  /// maydonini (m²) arizaga biriktiradi. Berilsa backend smeta qiymatini xarajat
+  /// yondashuvida ishlatadi. Ikkalasi ham ixtiyoriy — null tegishli ustunni
+  /// tozalaydi. Wire kaliti (`target_sell_price`) moslik uchun saqlangan.
   Future<void> setTargetPrice({
     required int jobId,
     required double? price,

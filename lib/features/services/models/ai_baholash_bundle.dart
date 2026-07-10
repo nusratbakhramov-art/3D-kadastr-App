@@ -68,9 +68,11 @@ class AiBaholashBundle {
   /// skipped) and is echoed to `area_m2` via the target-price PATCH.
   double? areaM2;
 
-  /// Desired selling price (so'm) the user enters BEFORE the AI result. Not sent
-  /// in the create payload — the status screen PATCHes it right after the job is
-  /// created (`/target-price`), so the specialist sees it from the start.
+  /// SMETA (construction / replacement) cost (so'm) the user optionally enters
+  /// on the «Smeta qiymati» step. When given, the backend uses it to DRIVE the
+  /// cost approach (replacement cost → wear + land → reconciliation). Not sent in
+  /// the create payload — the status screen PATCHes it right after the job is
+  /// created (`/target-price`). Field name kept for wire/DB compatibility.
   double? targetSellPrice;
 
   /// Which floor the object is on, and total floors in the building. Both are

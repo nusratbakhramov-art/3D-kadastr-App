@@ -1,10 +1,11 @@
-/// AI Baholash — natijadan OLDINGI qadam: foydalanuvchidan MAQSADLI sotuv
-/// narxini so'raydi ("Qaysi narxda sotmoqchisiz?").
+/// AI Baholash — natijadan OLDINGI qadam: foydalanuvchidan obyektning SMETA
+/// (qurilish / o'rnini bosish) qiymatini so'raydi.
 ///
 /// Ixtiyoriy — bo'sh qoldirib davom etish mumkin. Kiritilgan qiymat bundle'ga
-/// (`targetSellPrice`) yoziladi; keyingi (natija) ekrani arizani yaratgach uni
-/// `PATCH /ai-valuations/{id}/target-price` orqali biriktiradi — shu bois
-/// baholovchi qancha so'ralayotganini boshidanoq ko'radi. Keyin natija ekrani.
+/// (`targetSellPrice` — nomi mobil/DB moslik uchun saqlangan) yoziladi; keyingi
+/// (natija) ekrani arizani yaratgach uni `PATCH /ai-valuations/{id}/target-price`
+/// orqali biriktiradi. Berilsa backend uni XARAJAT (tannarx) yondashuvini
+/// hisoblashda ishlatadi. Keyin natija ekrani.
 library;
 
 import 'package:flutter/material.dart';
@@ -313,21 +314,24 @@ class _S {
   static String appBar(Locale l) =>
       _pick(l, 'AI Baholash', 'AI оценка', 'AI valuation');
 
-  static String appBarSub(Locale l) =>
-      _pick(l, 'Sotuv narxingiz', 'Ваша цена продажи', 'Your selling price');
+  static String appBarSub(Locale l) => _pick(
+      l, 'Smeta (qurilish) qiymati', 'Сметная стоимость', 'Estimate (construction) cost');
 
   static String heading(Locale l) => _pick(
         l,
-        'Siz tomoningizdan taklif etilayotgan narx summasini yozing',
-        'Укажите сумму цены, предлагаемую с вашей стороны',
-        'Enter the price amount you are proposing',
+        'Obyektning smeta (qurilish) qiymatini kiriting',
+        'Укажите сметную (строительную) стоимость объекта',
+        'Enter the object\'s estimate (construction) cost',
       );
 
   static String subheading(Locale l) => _pick(
         l,
-        'Ixtiyoriy. Mutaxassis siz taklif etgan narxni inobatga oladi.',
-        'Необязательно. Специалист учтёт предложенную вами цену.',
-        'Optional. The specialist will take your proposed price into account.',
+        'Ixtiyoriy. Smeta hujjatlaringiz bo\'lsa, xarajat (tannarx) yondashuvi '
+            'shu qiymat asosida hisoblanadi.',
+        'Необязательно. При наличии сметных документов затратный подход '
+            'рассчитывается по этой стоимости.',
+        'Optional. If you have estimate documents, the cost approach is computed '
+            'from this value.',
       );
 
   static String assessment(Locale l) => _pick(
