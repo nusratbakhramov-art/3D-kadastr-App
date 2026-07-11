@@ -965,6 +965,45 @@ class _ApproachesCard extends StatelessWidget {
       );
     }
 
+    // Cost approach comes only from an owner-supplied смета. When none was entered
+    // it isn't computed (weight 0) — show it explicitly, greyed, instead of
+    // silently omitting the row, so the user knows WHY there's no cost figure.
+    Widget costNotApplied() {
+      final w = _d(weights['cost']);
+      if (cost != null && w != null && w > 0) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 5,
+              child: Text(
+                _AiStatusStrings.approachCost(locale),
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontSize: 13,
+                  color: sub,
+                ),
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: Text(
+                _AiStatusStrings.costNotApplied(locale),
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: sub,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -1009,6 +1048,7 @@ class _ApproachesCard extends StatelessWidget {
           row('comparison'),
           row('income'),
           row('cost'),
+          costNotApplied(),
         ],
       ),
     );
@@ -1563,6 +1603,12 @@ class _AiStatusStrings {
     'ru' => 'Затраты (восстановление)',
     'en' => 'Cost (replacement)',
     _ => 'Xarajat (qayta tiklash)',
+  };
+
+  static String costNotApplied(Locale l) => switch (l.languageCode) {
+    'ru' => 'смета не введена',
+    'en' => 'no estimate provided',
+    _ => 'smeta kiritilmagan',
   };
 
   static String approachIncome(Locale l) => switch (l.languageCode) {
