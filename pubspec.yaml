@@ -53,6 +53,7 @@ flutter:
     - assets/3d/lib/
     - assets/branding/
     - assets/branding/splash/
+    - assets/branding/logo-frames/
     - assets/icons/
     - assets/images/
     - assets/images/auth/

@@ -12,6 +12,7 @@ import '../market/listing_detail_screen.dart';
 import '../market/widgets/featured_carousel.dart';
 import '../chat/screens/chat_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
+import '../splash/animated_splash_screen.dart';
 import 'user_profile.dart';
 import 'widgets/home_card.dart';
 import 'widgets/home_cta.dart';
@@ -127,6 +128,19 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Splash animatsiyasini Home ustidan qayta ishga tushiradi — tugagach
+  /// (onComplete) o'zi Home'ga qaytadi. Splash UI'ni sozlash/preview uchun.
+  void _replaySplash() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (ctx) => AnimatedSplashScreen(
+          onComplete: () => Navigator.of(ctx).maybePop(),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final date = widget.today ?? DateTime.now();
@@ -137,21 +151,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'homeChatFab',
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ChatScreen(locale: widget.locale),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Splash preview — splash animatsiyasini qayta ishga tushiradi
+          // (splash UI'ni o'zgartirganда tez ko'rish uchun; keyin Home'ga qaytadi).
+          FloatingActionButton.small(
+            heroTag: 'homeSplashPreviewFab',
+            onPressed: _replaySplash,
+            backgroundColor: AppColors.greenBlack,
+            foregroundColor: AppColors.splashGreen,
+            tooltip: 'Splash',
+            child: const Icon(Icons.slideshow_rounded),
           ),
-        ),
-        backgroundColor: AppColors.splashGreen,
-        foregroundColor: AppColors.greenBlack,
-        tooltip: switch (widget.locale.languageCode) {
-          'ru' => 'Помощник',
-          'en' => 'Assistant',
-          _ => 'Yordamchi',
-        },
-        child: const Icon(Icons.chat_bubble_rounded),
+          const SizedBox(height: 12),
+          FloatingActionButton(
+            heroTag: 'homeChatFab',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ChatScreen(locale: widget.locale),
+              ),
+            ),
+            backgroundColor: AppColors.splashGreen,
+            foregroundColor: AppColors.greenBlack,
+            tooltip: switch (widget.locale.languageCode) {
+              'ru' => 'Помощник',
+              'en' => 'Assistant',
+              _ => 'Yordamchi',
+            },
+            child: const Icon(Icons.chat_bubble_rounded),
+          ),
+        ],
       ),
       body: Stack(
         fit: StackFit.expand,

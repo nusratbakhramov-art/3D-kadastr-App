@@ -20,8 +20,7 @@
                             <imageView userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchPatternTR" translatesAutoresizingMaskIntoConstraints="NO" id="ptr-aa-001"/>
                             <!-- Bottom-left pattern: square = screen width -->
                             <imageView userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchPatternBL" translatesAutoresizingMaskIntoConstraints="NO" id="pbl-bb-002"/>
-                            <!-- Logo: fixed 217x217pt (matches Flutter _logoSizePx * _logoStartScale) -->
-                            <imageView opaque="NO" contentMode="scaleAspectFit" image="LaunchImage" translatesAutoresizingMaskIntoConstraints="NO" id="YRO-k0-Ey4"/>
+                            <!-- Logo intentionally omitted: 3D logo animatsiyasi Flutter splashда pastdan ko'tariladi -->
                         </subviews>
                         <color key="backgroundColor" red="0" green="0.882352941" blue="0.207843137" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                         <constraints>
@@ -35,11 +34,6 @@
                             <constraint firstItem="pbl-bb-002" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="pbl-lead"/>
                             <constraint firstItem="pbl-bb-002" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" id="pbl-w"/>
                             <constraint firstItem="pbl-bb-002" firstAttribute="height" secondItem="pbl-bb-002" secondAttribute="width" id="pbl-h"/>
-                            <!-- Logo: centered, fixed 217x217pt -->
-                            <constraint firstItem="YRO-k0-Ey4" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="logo-cx"/>
-                            <constraint firstItem="YRO-k0-Ey4" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="logo-cy"/>
-                            <constraint firstItem="YRO-k0-Ey4" firstAttribute="width" constant="217" id="logo-w"/>
-                            <constraint firstItem="YRO-k0-Ey4" firstAttribute="height" constant="217" id="logo-h"/>
                         </constraints>
                     </view>
                 </viewController>
@@ -49,7 +43,6 @@
         </scene>
     </scenes>
     <resources>
-        <image name="LaunchImage" width="217" height="217"/>
         <image name="LaunchPatternTR" width="1404" height="1404"/>
         <image name="LaunchPatternBL" width="1500" height="1396"/>
     </resources>

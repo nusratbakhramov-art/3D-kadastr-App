@@ -1,11 +1,16 @@
-import 'dart:math' as math;
-import 'dart:ui';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 import '../../theme/app_colors.dart';
 
+/// Splash — oldindan render qilingan 3D logo kadrlari (webp, shaffof):
+///   1) logo pastdan markazga ko'tariladi va YON → YUZ ga buriladi (frame 0→35)
+///   2) markazda yuzi bilan turadi (DWELL)
+///   3) chapga suriladi, "3D kadastr" matni o'ngdan chiqadi (REVEAL)
+/// Kadrlar `dart:ui` bilan bir marta `ui.Image` ga dekod qilinib, `RawImage`
+/// orqali chiziladi — kesh qidiruvi/qayta-dekod yo'q, silliq o'ynaydi.
 class AnimatedSplashScreen extends StatefulWidget {
   const AnimatedSplashScreen({super.key, required this.onComplete});
 
@@ -17,78 +22,102 @@ class AnimatedSplashScreen extends StatefulWidget {
 
 class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     with SingleTickerProviderStateMixin {
-  static const double _logoStartScale = 1.55;
-  static const double _logoEndScale = 0.72;
-  static const double _logoStartTiltDeg = 15;
-  static const double _logoEndOffsetX = -98;
+  static const int _frameCount = 36;
+  static const int _decodeWidth = 300; // retina (~128px ekran)
+  static const double _logoBox = 128;
+  static const double _textFontSize = 30;
+  static const double _logoRiseFromY = 300; // pastdan shu balandlikda paydo
+  static const double _logoEndOffsetX = -82; // REVEAL: chapga
   static const double _textStartOffsetX = 0;
-  static const double _textEndOffsetX = 52;
-  static const double _logoSizePx = 140;
-  static const double _textFontSize = 32;
+  static const double _textEndOffsetX = 62; // REVEAL: o'ngga
 
+  static const Cubic _riseCurve = Cubic(0.16, 1.0, 0.3, 1.0);
   static const Cubic _emphasizedMove = Cubic(0.22, 1.0, 0.36, 1.0);
-  static const Cubic _settleCurve = Cubic(0.65, 0.0, 0.35, 1.0);
   static const Cubic _gentleOvershoot = Cubic(0.34, 1.12, 0.64, 1.0);
   static const Cubic _crispOut = Cubic(0.16, 1.0, 0.3, 1.0);
 
   late final AnimationController _controller;
-  late final Animation<double> _scaleT;
+  late final Animation<double> _riseT;
+  late final Animation<double> _spinT;
   late final Animation<double> _logoSlideT;
   late final Animation<double> _textSlideT;
   late final Animation<double> _textOpacityT;
   late final Animation<double> _textScaleT;
 
+  List<ui.Image> _frames = const [];
   bool _completed = false;
+  bool _started = false;
+
+  static String _framePath(int i) =>
+      'assets/branding/logo-frames/frame_${i.toString().padLeft(3, '0')}.webp';
 
   @override
   void initState() {
     super.initState();
-    // Timeline (2800ms total):
-    //   0 –  900ms  HOLD    logo big + tilted 15°, dead-center
-    // 900 – 1600ms  SETTLE  logo rotates 15°→0° and shrinks, stays centered
-    //1600 – 2500ms  REVEAL  logo slides left; text extrudes from under it and slides right
-    //2500 – 2800ms  DWELL   locked-up final frame before handoff
+    // Timeline (3800ms):
+    //   0 –1520ms  RISE+SPIN  pastdan markazga + yon→yuz (frame 0→35)
+    //1520 –2450ms  DWELL      markazda yuzi bilan turadi
+    //2450 –3460ms  REVEAL     chapga suriladi; matn o'ngdan chiqadi
+    //3460 –3800ms  SETTLE
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2800),
+      duration: const Duration(milliseconds: 3800),
     );
-
-    _scaleT = CurvedAnimation(
+    _riseT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.321, 0.571, curve: _settleCurve),
+      curve: const Interval(0.0, 0.40, curve: _riseCurve),
     );
-
+    _spinT = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, 0.40, curve: Curves.easeInOut),
+    );
     _logoSlideT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.571, 0.893, curve: _emphasizedMove),
+      curve: const Interval(0.645, 0.91, curve: _emphasizedMove),
     );
-
     _textSlideT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.60, 0.893, curve: _gentleOvershoot),
+      curve: const Interval(0.675, 0.91, curve: _gentleOvershoot),
     );
-
     _textOpacityT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.62, 0.85, curve: Curves.easeOutQuart),
+      curve: const Interval(0.70, 0.88, curve: Curves.easeOutQuart),
     );
-
     _textScaleT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.60, 0.88, curve: _crispOut),
+      curve: const Interval(0.675, 0.90, curve: _crispOut),
     );
-
     _controller.addStatusListener(_handleStatus);
+    _loadFramesAndStart();
+  }
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _controller.forward();
-    });
+  Future<void> _loadFramesAndStart() async {
+    if (_started) return;
+    _started = true;
+    try {
+      _frames = await Future.wait([
+        for (int i = 0; i < _frameCount; i++) _decodeFrame(i),
+      ]);
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {}); // kadrlar tayyor
+    _controller.forward();
+  }
+
+  Future<ui.Image> _decodeFrame(int i) async {
+    final data = await rootBundle.load(_framePath(i));
+    final codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: _decodeWidth,
+    );
+    final frame = await codec.getNextFrame();
+    return frame.image;
   }
 
   void _handleStatus(AnimationStatus status) {
     if (status == AnimationStatus.completed && !_completed) {
       _completed = true;
-      Future.delayed(const Duration(milliseconds: 450), () {
+      Future.delayed(const Duration(milliseconds: 350), () {
         if (mounted) widget.onComplete();
       });
     }
@@ -98,6 +127,9 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   void dispose() {
     _controller.removeStatusListener(_handleStatus);
     _controller.dispose();
+    for (final img in _frames) {
+      img.dispose();
+    }
     super.dispose();
   }
 
@@ -110,58 +142,65 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
           const Positioned.fill(child: _SplashPatternBackground()),
           Center(
             child: AnimatedBuilder(
-          animation: _controller,
-          builder: (context, _) {
-            final scale = lerpDouble(
-              _logoStartScale,
-              _logoEndScale,
-              _scaleT.value,
-            )!;
-            // The splash SVG has a built-in rotate(-15) baked in.
-            // Apply a constant +15° offset so the logo is always upright.
-            const tilt = _logoStartTiltDeg * math.pi / 180;
-            final logoDx = lerpDouble(0.0, _logoEndOffsetX, _logoSlideT.value)!;
-            final textDx = lerpDouble(
-              _textStartOffsetX,
-              _textEndOffsetX,
-              _textSlideT.value,
-            )!;
-            final textScale = lerpDouble(0.88, 1.0, _textScaleT.value)!;
-            final textOpacity = _textOpacityT.value.clamp(0.0, 1.0);
-
-            return Stack(
-              alignment: Alignment.center,
-              clipBehavior: Clip.none,
-              children: [
-                Transform.translate(
-                  offset: Offset(textDx, 0),
-                  child: Opacity(
-                    opacity: textOpacity,
-                    child: Transform.scale(
-                      scale: textScale,
-                      alignment: Alignment.centerLeft,
-                      child: const _BrandText(),
-                    ),
-                  ),
-                ),
-                Transform.translate(
-                  offset: Offset(logoDx, 0),
-                  child: Transform.rotate(
-                    angle: tilt,
-                    child: Transform.scale(
-                      scale: scale,
-                      child: SvgPicture.asset(
-                        'assets/branding/splash-logo.svg',
-                        width: _logoSizePx,
-                        height: _logoSizePx,
-                        semanticsLabel: 'Kadastr',
+              animation: _controller,
+              builder: (context, _) {
+                final riseDy = ui.lerpDouble(
+                  _logoRiseFromY,
+                  0.0,
+                  _riseT.value,
+                )!;
+                final frameIdx = _frames.isEmpty
+                    ? 0
+                    : (_spinT.value * (_frameCount - 1))
+                        .round()
+                        .clamp(0, _frameCount - 1);
+                final logoDx = ui.lerpDouble(
+                  0.0,
+                  _logoEndOffsetX,
+                  _logoSlideT.value,
+                )!;
+                final textDx = ui.lerpDouble(
+                  _textStartOffsetX,
+                  _textEndOffsetX,
+                  _textSlideT.value,
+                )!;
+                final textOpacity = _textOpacityT.value.clamp(0.0, 1.0);
+                final textScale =
+                    ui.lerpDouble(0.88, 1.0, _textScaleT.value)!;
+                return Stack(
+                  alignment: Alignment.center,
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Matn — logo ostidan chiqib o'ngga suriladi.
+                    Transform.translate(
+                      offset: Offset(textDx, 0),
+                      child: Opacity(
+                        opacity: textOpacity,
+                        child: Transform.scale(
+                          scale: textScale,
+                          alignment: Alignment.centerLeft,
+                          child: const _BrandText(),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            );
-          },
+                    // 3D logo kadri — pastdan ko'tariladi, yon→yuz, keyin chapga.
+                    Transform.translate(
+                      offset: Offset(logoDx, riseDy),
+                      child: SizedBox(
+                        width: _logoBox,
+                        height: _logoBox,
+                        child: _frames.isEmpty
+                            ? const SizedBox.shrink()
+                            : RawImage(
+                                image: _frames[frameIdx],
+                                fit: BoxFit.contain,
+                                filterQuality: FilterQuality.medium,
+                              ),
+                      ),
+                    ),
+                  ],
+                );
+              },
             ),
           ),
         ],
