@@ -7,6 +7,7 @@ import '../../data/calculator_pricing_store.dart';
 import '../../models/calculator_draft.dart';
 import '../../widgets/choice_tile.dart';
 import '../../widgets/service_app_bar.dart';
+import '../kadastr_3d_screen.dart';
 import '../online_calculator_result_screen.dart';
 import '_calculator_field.dart';
 
@@ -52,7 +53,17 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => OnlineCalculatorResultScreen(result: result),
+        builder: (ctx) => OnlineCalculatorResultScreen(
+          result: result,
+          placeOrderLabel: _Strings.submitOrder(locale),
+          // "Ariza topshirish" → eski 3D kadastr oqimiga o'tamiz
+          // (davreestr lookup → mijoz → lokatsiya → skan).
+          onPlaceOrder: () => Navigator.of(ctx).push(
+            MaterialPageRoute<void>(
+              builder: (_) => const Kadastr3dScreen(),
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -156,4 +167,11 @@ class _Strings {
 
   static String calculate(Locale l) =>
       _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
+
+  static String submitOrder(Locale l) => _pick(
+        l,
+        'Ariza topshirish',
+        'Подать заявку',
+        'Submit application',
+      );
 }
