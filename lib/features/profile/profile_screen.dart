@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_avatar.dart';
 import '../../widgets/app_bell_button.dart';
@@ -325,11 +326,13 @@ class _ProfileStrings {
     _ => 'Mening arizalarim',
   };
 
-  static String aboutApp(Locale l) => switch (l.languageCode) {
-    'ru' => 'О приложении',
-    'en' => 'About app',
-    _ => 'Ilova haqida',
-  };
+  static String aboutApp(Locale l) => tr(
+    l,
+    'profile.about_app',
+    uz: 'Ilova haqida',
+    ru: 'О приложении',
+    en: 'About app',
+  );
 
   static String ratings(Locale l) => switch (l.languageCode) {
     'ru' => 'Мои оценки',

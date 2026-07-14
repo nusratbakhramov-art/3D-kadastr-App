@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
@@ -307,53 +308,68 @@ class _EmptyNote extends StatelessWidget {
 }
 
 // ── Localized strings ─────────────────────────────────────────────────
+// Backend orqali yangilanadigan (app_translations) kalitlar — inline qiymatlar
+// faqat zaxira (override kelmasa). Admin i18n'da `about.*` kalitlarini qo'shib
+// matnni ilova yangilanmasdan o'zgartirish mumkin.
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'О приложении',
-    'en' => 'About app',
-    _ => 'Ilova haqida',
-  };
+  static String title(Locale l) => tr(
+    l,
+    'about.title',
+    uz: 'Ilova haqida',
+    ru: 'О приложении',
+    en: 'About app',
+  );
 
-  static String appName(Locale l) => switch (l.languageCode) {
-    'ru' => 'Kadastr',
-    'en' => 'Kadastr',
-    _ => 'Kadastr',
-  };
+  static String appName(Locale l) => tr(
+    l,
+    'about.app_name',
+    uz: 'Kadastr',
+    ru: 'Kadastr',
+    en: 'Kadastr',
+  );
 
-  static String versionLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Версия',
-    'en' => 'Version',
-    _ => 'Versiya',
-  };
+  static String versionLabel(Locale l) => tr(
+    l,
+    'about.version',
+    uz: 'Versiya',
+    ru: 'Версия',
+    en: 'Version',
+  );
 
-  static String tagline(Locale l) => switch (l.languageCode) {
-    'ru' =>
-        'Оценка недвижимости, 3D-кадастр и расчёт услуг — с лицензированными '
-            'экспертами.',
-    'en' =>
-        'Property valuation, 3D cadastre and service estimates — backed by '
-            'licensed experts.',
-    _ => 'Ko\'chmas mulkni baholash, 3D kadastr va xizmatlar hisobi — '
+  static String tagline(Locale l) => tr(
+    l,
+    'about.tagline',
+    uz: 'Ko\'chmas mulkni baholash, 3D kadastr va xizmatlar hisobi — '
         'litsenziyalangan ekspertlar bilan.',
-  };
+    ru: 'Оценка недвижимости, 3D-кадастр и расчёт услуг — с лицензированными '
+        'экспертами.',
+    en: 'Property valuation, 3D cadastre and service estimates — backed by '
+        'licensed experts.',
+  );
 
-  static String docsSection(Locale l) => switch (l.languageCode) {
-    'ru' => 'Документы оценщика',
-    'en' => 'Appraiser documents',
-    _ => 'Baholovchi hujjatlari',
-  };
+  static String docsSection(Locale l) => tr(
+    l,
+    'about.docs_section',
+    uz: 'Baholovchi hujjatlari',
+    ru: 'Документы оценщика',
+    en: 'Appraiser documents',
+  );
 
-  static String viewHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Нажмите, чтобы открыть',
-    'en' => 'Tap to view',
-    _ => 'Ko\'rish uchun bosing',
-  };
+  static String viewHint(Locale l) => tr(
+    l,
+    'about.view_hint',
+    uz: 'Ko\'rish uchun bosing',
+    ru: 'Нажмите, чтобы открыть',
+    en: 'Tap to view',
+  );
 
-  static String empty(Locale l) => switch (l.languageCode) {
-    'ru' => 'Документы пока недоступны',
-    'en' => 'Documents are not available yet',
-    _ => 'Hujjatlar hozircha mavjud emas',
-  };
+  static String empty(Locale l) => tr(
+    l,
+    'about.empty',
+    uz: 'Hujjatlar hozircha mavjud emas',
+    ru: 'Документы пока недоступны',
+    en: 'Documents are not available yet',
+  );
 }
