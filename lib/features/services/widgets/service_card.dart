@@ -18,82 +18,97 @@ class ServiceCard extends StatelessWidget {
     return PressableScale(
       child: Material(
         color: const Color(0xFF0E1213),
-        borderRadius: radius,
         clipBehavior: Clip.antiAlias,
+        // Soft accent-tinted rim + a colored drop shadow so the card lifts off
+        // the light background and reads as a premium, tactile surface.
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(color: item.accent.withValues(alpha: 0.20), width: 1),
+        ),
+        elevation: 10,
+        shadowColor: item.accent.withValues(alpha: 0.30),
         child: InkWell(
           onTap: () {
             HapticFeedback.selectionClick();
             onTap();
           },
           child: Stack(
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: isWide
-                        ? const Alignment(-0.45, 1.15)
-                        : const Alignment(-0.15, 1.15),
-                    radius: isWide ? 0.65 : 1.05,
-                    colors: [
-                      item.accent.withValues(alpha: 0.6),
-                      item.accent.withValues(alpha: 0.22),
-                      Colors.transparent,
-                    ],
-                    stops: const [0.0, 0.45, 1.0],
+            children: [
+              // Accent glow — anchored to the SAME corner as the 3D image
+              // (bottom-right) so the object appears to emit its colour.
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: isWide
+                          ? const Alignment(0.72, 1.05)
+                          : const Alignment(0.55, 1.15),
+                      radius: isWide ? 0.95 : 1.25,
+                      colors: [
+                        item.accent.withValues(alpha: 0.55),
+                        item.accent.withValues(alpha: 0.16),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.5, 1.0],
+                    ),
                   ),
                 ),
               ),
-            ),
-            Positioned(
-              right: isWide ? -8 : -14,
-              bottom: isWide ? -8 : -18,
-              child: Image.asset(
-                item.asset,
-                height: isWide ? 150 : 130,
-                fit: BoxFit.fitHeight,
-                filterQuality: FilterQuality.medium,
+              // 3D object — anchored firmly to the bottom-right corner, sized
+              // to fill the lower third and bleed slightly off the edge.
+              Positioned(
+                right: isWide ? -6 : -10,
+                bottom: isWide ? -6 : -12,
+                child: Image.asset(
+                  item.asset,
+                  height: isWide ? 158 : 124,
+                  fit: BoxFit.fitHeight,
+                  filterQuality: FilterQuality.medium,
+                ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w700,
-                      fontSize: 19,
-                      height: 1.25,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: isWide ? 220 : double.infinity,
-                    child: Text(
-                      item.subtitle,
-                      maxLines: isWide ? 2 : 4,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontFamily: 'MTSText',
-                        fontWeight: FontWeight.w400,
-                        fontSize: 13,
-                        height: 1.4,
-                        color: Color(0xFFC2C7CC),
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 19,
+                        height: 1.2,
+                        letterSpacing: -0.2,
+                        color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 6),
+                    // Keep the copy on the left so it never collides with the
+                    // 3D object in the bottom-right.
+                    FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: isWide ? 0.62 : 0.9,
+                      child: Text(
+                        item.subtitle,
+                        maxLines: isWide ? 2 : 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'MTSText',
+                          fontWeight: FontWeight.w400,
+                          fontSize: 12.5,
+                          height: 1.4,
+                          color: Color(0xFFB7BDC2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
