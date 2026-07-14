@@ -16,7 +16,6 @@ import '../onboarding/onboarding_page_data.dart';
 import '../services/models/service_item.dart';
 import '../services/widgets/service_card.dart';
 import 'user_profile.dart';
-import 'widgets/home_cta.dart';
 import 'widgets/home_header.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -197,18 +196,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     onOpenKadastr3d: widget.onOpenKadastr3d,
                     onOpenAiValuation: widget.onOpenAiValuation,
                     onOpenKalkulyator: widget.onOpenKalkulyator,
-                  ),
-                  const SizedBox(height: 12),
-                  ValueListenableBuilder<UserProfile?>(
-                    valueListenable: userProfileNotifier,
-                    builder: (context, profile, _) {
-                      return HomeCta(
-                        isGuest: profile == null,
-                        locale: widget.locale,
-                        onLoginTap: widget.onLoginTap,
-                        onOrderTap: widget.onOpenOrder,
-                      );
-                    },
                   ),
                   const SizedBox(height: 24),
                   _SectionHeader(
@@ -391,7 +378,7 @@ class _CardsGrid extends StatelessWidget {
         final squareWidth = (constraints.maxWidth - gap) / 2;
         const squareAspect = 0.84;
         final squareHeight = squareWidth / squareAspect;
-        final wideHeight = (squareHeight * 0.78).clamp(150.0, 220.0);
+        final wideHeight = (squareHeight * 0.88).clamp(160.0, 240.0);
 
         return Column(
           mainAxisSize: MainAxisSize.min,

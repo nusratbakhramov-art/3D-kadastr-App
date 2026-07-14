@@ -54,14 +54,30 @@ class ServiceCard extends StatelessWidget {
                   ),
                 ),
               ),
+              // Subtle top sheen — a faint light fall-off from the top edge for
+              // a glossy, premium finish (top-light + bottom-accent depth).
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.center,
+                      colors: [
+                        Colors.white.withValues(alpha: 0.06),
+                        Colors.transparent,
+                      ],
+                    ),
+                  ),
+                ),
+              ),
               // 3D object — anchored firmly to the bottom-right corner, sized
-              // to fill the lower third and bleed slightly off the edge.
+              // to be a hero element that bleeds slightly off the edge.
               Positioned(
-                right: isWide ? -6 : -10,
+                right: isWide ? -4 : -8,
                 bottom: isWide ? -6 : -12,
                 child: Image.asset(
                   item.asset,
-                  height: isWide ? 158 : 124,
+                  height: isWide ? 188 : 142,
                   fit: BoxFit.fitHeight,
                   filterQuality: FilterQuality.medium,
                 ),
