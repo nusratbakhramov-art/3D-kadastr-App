@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
+
 class SkipButton extends StatelessWidget {
   const SkipButton({super.key, required this.onPressed, required this.label});
 
@@ -9,7 +11,7 @@ class SkipButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      onPressed: onPressed,
+      onPressed: hapticTap(onPressed),
       style: TextButton.styleFrom(
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),

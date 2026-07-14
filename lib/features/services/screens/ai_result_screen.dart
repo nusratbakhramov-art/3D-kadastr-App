@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
@@ -861,7 +862,7 @@ class _ErrorBlock extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           OutlinedButton(
-            onPressed: onRetry,
+            onPressed: hapticTap(onRetry),
             child: Text(_AiResultStrings.retry(locale)),
           ),
         ],

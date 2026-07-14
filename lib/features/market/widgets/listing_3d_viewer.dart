@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:model_viewer_plus/model_viewer_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../core/haptics.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../settings/settings_state.dart';
 import '../../../theme/color_tokens.dart';
@@ -193,7 +194,7 @@ class _CircleButton extends StatelessWidget {
       shadowColor: ColorTokens.shadow(context),
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: SizedBox(
           width: 40,
           height: 40,

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 enum ScanCardState { idle, scanning, done }
@@ -46,7 +47,7 @@ class ScanCameraCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: state == ScanCardState.scanning ? null : onTap,
+        onTap: hapticTap(state == ScanCardState.scanning ? null : onTap),
         onLongPress: state == ScanCardState.scanning ? null : onLongPress,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 16),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../onboarding_page_data.dart';
 
@@ -37,7 +38,7 @@ class LanguageSelector extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(32),
-        onTap: () => _openSheet(context),
+        onTap: hapticTap(() => _openSheet(context)),
         child: Ink(
           decoration: BoxDecoration(
             color: const Color(0x33FFFFFF),
@@ -162,7 +163,7 @@ class _CloseButton extends StatelessWidget {
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: const SizedBox(
           width: 40,
           height: 40,
@@ -202,7 +203,7 @@ class _LanguageRow extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(

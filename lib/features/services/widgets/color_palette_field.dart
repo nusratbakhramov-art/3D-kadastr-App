@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../data/calculator_pricing_store.dart';
 import '../models/calculator_pricing.dart';
@@ -177,7 +178,7 @@ class _Swatch extends StatelessWidget {
     final checkColor = luminance > 0.6 ? Colors.black87 : Colors.white;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: hapticSelect(onTap),
       behavior: HitTestBehavior.opaque,
       child: Column(
         mainAxisSize: MainAxisSize.min,

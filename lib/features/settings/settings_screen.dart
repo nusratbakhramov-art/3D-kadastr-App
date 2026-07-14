@@ -2,11 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:http/http.dart' as http;
 import 'package:in_app_review/in_app_review.dart';
 
 import '../../core/api_config.dart';
+import '../../core/haptics.dart';
 import '../../core/i18n.dart';
 import '../../core/i18n/app_translations.dart';
 import '../auth/auth_http_client.dart';
@@ -646,7 +648,7 @@ class _SheetButton extends StatelessWidget {
       color: background,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         borderRadius: BorderRadius.circular(14),
         child: SizedBox(
           height: 52,
@@ -863,7 +865,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
             ],
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _loading ? null : (_otpSent ? _confirm : _sendOtp),
+              onPressed: hapticTap(_loading ? null : (_otpSent ? _confirm : _sendOtp)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.splashGreen,
                 foregroundColor: const Color(0xFF011606),
@@ -1165,6 +1167,7 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
                     const SizedBox(height: 12),
                     TextButton(
                       onPressed: () {
+                        HapticFeedback.lightImpact();
                         setState(() {
                           _loading = true;
                           _error = null;
@@ -1314,7 +1317,7 @@ class _OptionSheet<T> extends StatelessWidget {
             const SizedBox(height: 12),
             for (final option in options)
               InkWell(
-                onTap: () => Navigator.pop(context, option),
+                onTap: hapticSelect(() => Navigator.pop(context, option)),
                 borderRadius: BorderRadius.circular(12),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(

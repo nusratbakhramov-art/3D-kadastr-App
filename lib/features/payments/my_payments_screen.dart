@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/haptics.dart';
 import '../../core/i18n.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
@@ -169,7 +170,7 @@ class _FilterChips extends StatelessWidget {
           final f = _filters[i];
           final active = f.value == selected;
           return GestureDetector(
-            onTap: () => onSelect(f.value),
+            onTap: hapticSelect(() => onSelect(f.value)),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 160),
               alignment: Alignment.center,

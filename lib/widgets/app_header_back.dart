@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../core/haptics.dart';
 import '../theme/color_tokens.dart';
 
 /// Standard inner-page header: leading 40dp white circle with a default
@@ -69,7 +70,7 @@ class _BackButton extends StatelessWidget {
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Container(
           width: 40,
           height: 40,

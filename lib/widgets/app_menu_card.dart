@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../theme/color_tokens.dart';
 import 'circle_chevron_right.dart';
+import 'pressable_scale.dart';
 
 /// Rounded card that hosts a vertical list of [AppMenuRow]s separated by
 /// hairline dividers. Background and divider colors adapt to the active theme.
@@ -87,12 +89,20 @@ class AppMenuRow extends StatelessWidget {
         trailing ??
         (destructive ? const SizedBox.shrink() : const CircleChevronRight());
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+    return PressableScale(
+      enabled: onTap != null,
+      pressedScale: 0.985,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.selectionClick();
+                  onTap!();
+                },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
               leading,
@@ -114,6 +124,7 @@ class AppMenuRow extends StatelessWidget {
               const SizedBox(width: 8),
               trailingWidget,
             ],
+          ),
           ),
         ),
       ),

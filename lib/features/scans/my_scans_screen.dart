@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -69,12 +70,12 @@ class _MyScansScreenState extends State<MyScansScreen>
         content: Text(_S.deletePrompt(locale, item.name)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: hapticTap(() => Navigator.pop(ctx, false)),
             child: Text(_S.cancel(locale)),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: hapticTap(() => Navigator.pop(ctx, true)),
             child: Text(_S.delete(locale)),
           ),
         ],
@@ -186,7 +187,7 @@ class _LocalScanCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         onLongPress: onDelete,
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -249,7 +250,7 @@ class _LocalScanCard extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20),
                 color: Colors.red.withValues(alpha: 0.7),
-                onPressed: onDelete,
+                onPressed: hapticTap(onDelete),
                 tooltip: _S.delete(locale),
               ),
             ],

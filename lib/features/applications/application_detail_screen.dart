@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/api_config.dart';
+import '../../core/haptics.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
@@ -1440,7 +1441,7 @@ class _AiScanCardState extends State<_AiScanCard> {
   Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
     return InkWell(
-      onTap: _onTap,
+      onTap: hapticTap(_onTap),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -1632,7 +1633,7 @@ class _AiScanFramesGalleryState extends State<_AiScanFramesGallery> {
                 itemCount: _frames.length,
                 separatorBuilder: (_, _) => const SizedBox(width: 8),
                 itemBuilder: (context, i) => GestureDetector(
-                  onTap: () => _openViewer(i),
+                  onTap: hapticTap(() => _openViewer(i)),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(12),
                     child: Image.network(
@@ -1750,7 +1751,7 @@ class _FramesViewerPageState extends State<_FramesViewerPage> {
               left: 8,
               child: IconButton(
                 icon: const Icon(Icons.close_rounded, color: Colors.white),
-                onPressed: () => Navigator.of(context).maybePop(),
+                onPressed: hapticTap(() => Navigator.of(context).maybePop()),
               ),
             ),
             Positioned(
@@ -2032,7 +2033,7 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
               : (_total > 0 ? _fmtBytes(_total) : '…'))
         : 'PDF';
     return InkWell(
-      onTap: _loading ? null : _open,
+      onTap: hapticTap(_loading ? null : _open),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -2193,7 +2194,7 @@ class _AiOrderCardState extends State<_AiOrderCard> {
   Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
     return InkWell(
-      onTap: _loading ? null : _open,
+      onTap: hapticTap(_loading ? null : _open),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -2371,7 +2372,7 @@ class _K3dReportCardState extends State<_K3dReportCard> {
               : (_total > 0 ? _fmtBytes(_total) : '…'))
         : 'PDF';
     return InkWell(
-      onTap: _loading ? null : _open,
+      onTap: hapticTap(_loading ? null : _open),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -2515,7 +2516,7 @@ class _K3dModelCardState extends State<_K3dModelCard> {
   Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
     return InkWell(
-      onTap: _onTap,
+      onTap: hapticTap(_onTap),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -2744,7 +2745,7 @@ class _ModelCardState extends State<_ModelCard> {
   Widget build(BuildContext context) {
     final lang = Localizations.localeOf(context).languageCode;
     return InkWell(
-      onTap: _onTap,
+      onTap: hapticTap(_onTap),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -2853,7 +2854,7 @@ class _ViewChip extends StatelessWidget {
       borderRadius: BorderRadius.circular(10000),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(11, 5, 10, 5),
           child: Row(
@@ -2890,7 +2891,7 @@ class _DownloadIconButton extends StatelessWidget {
       shape: const CircleBorder(),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: SizedBox(
           width: 34,
           height: 34,
@@ -2972,7 +2973,7 @@ class _PrimaryBlackAction extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: hapticTap(() {}),
         child: SizedBox(
           height: 56,
           child: Row(
@@ -3011,7 +3012,7 @@ class _ResumeDraftAction extends StatelessWidget {
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => resumeAiDraft(context, jobId),
+        onTap: hapticTap(() => resumeAiDraft(context, jobId)),
         child: SizedBox(
           height: 56,
           child: Row(
@@ -3128,7 +3129,7 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
       borderRadius: BorderRadius.circular(999),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: _onTap,
+        onTap: hapticTap(_onTap),
         child: SizedBox(
           height: 52,
           child: Row(

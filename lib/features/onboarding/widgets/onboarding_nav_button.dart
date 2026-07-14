@@ -3,7 +3,9 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/pressable_scale.dart';
 
 enum OnboardingNavVariant { primary, secondary }
 
@@ -64,33 +66,37 @@ class OnboardingNavButton extends StatelessWidget {
     );
 
     if (isPrimary) {
-      return Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(radius),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onPressed,
-          child: SizedBox(height: 52, child: Center(child: content)),
+      return PressableScale(
+        child: Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(radius),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: hapticTap(onPressed),
+            child: SizedBox(height: 52, child: Center(child: content)),
+          ),
         ),
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Material(
-          color: const Color(0x0FFFFFFF),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(radius),
-            side: const BorderSide(color: Color(0x1FFFFFFF), width: 1),
-          ),
-          child: InkWell(
-            onTap: onPressed,
-            customBorder: RoundedRectangleBorder(
+    return PressableScale(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(radius),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Material(
+            color: const Color(0x0FFFFFFF),
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(radius),
+              side: const BorderSide(color: Color(0x1FFFFFFF), width: 1),
             ),
-            child: SizedBox(height: 52, child: Center(child: content)),
+            child: InkWell(
+              onTap: hapticTap(onPressed),
+              customBorder: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(radius),
+              ),
+              child: SizedBox(height: 52, child: Center(child: content)),
+            ),
           ),
         ),
       ),

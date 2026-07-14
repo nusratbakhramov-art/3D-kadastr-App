@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/haptics.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -159,7 +160,7 @@ class _NotificationCard extends StatelessWidget {
       color: ColorTokens.cardBg(context),
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         borderRadius: BorderRadius.circular(18),
         child: Container(
           decoration: BoxDecoration(
@@ -237,7 +238,7 @@ class _MarkAllCircle extends StatelessWidget {
       color: active ? AppColors.brandGreen : ColorTokens.cardBg(context),
       shape: const CircleBorder(),
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         customBorder: const CircleBorder(),
         child: SizedBox(
           width: 40,

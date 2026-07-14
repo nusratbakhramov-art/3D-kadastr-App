@@ -250,6 +250,7 @@ class _ResultSummary extends StatelessWidget {
         // Manzil/maydonni nusxalash — kichik, bilinar-bilinmas tugma.
         InkWell(
           onTap: () async {
+            HapticFeedback.lightImpact();
             await Clipboard.setData(ClipboardData(text: text));
             if (!context.mounted) return;
             ScaffoldMessenger.of(context)

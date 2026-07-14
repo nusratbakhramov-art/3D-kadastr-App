@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/haptics.dart';
 import '../../../core/i18n.dart';
 import '../../../theme/app_colors.dart';
 
@@ -109,7 +110,7 @@ class _MarketSearchBarState extends State<MarketSearchBar> {
               if (value.text.isNotEmpty)
                 GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: widget.onClear,
+                  onTap: hapticTap(widget.onClear),
                   child: Padding(
                     padding: const EdgeInsets.all(4),
                     child: Icon(

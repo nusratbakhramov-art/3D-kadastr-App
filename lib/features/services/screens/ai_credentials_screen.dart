@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/remote_image.dart';
 import '../../market/widgets/fullscreen_gallery.dart';
@@ -191,7 +192,7 @@ class _CredentialCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(

@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../../../core/haptics.dart';
 import '../../../../theme/app_colors.dart';
 import '../../data/smeta_api_service.dart';
 import '../../models/smeta_draft.dart';
@@ -313,7 +314,7 @@ class _ResultView extends StatelessWidget {
           _SectionLabel(_Strings.vedomost(locale)),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () {
+            onPressed: hapticTap(() {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => _VedomostViewer(
@@ -323,16 +324,16 @@ class _ResultView extends StatelessWidget {
                   ),
                 ),
               );
-            },
+            }),
             icon: const Icon(Icons.description_outlined),
             label: Text(_Strings.openFile(locale, primary)),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
-            onPressed: () => launchUrl(
+            onPressed: hapticTap(() => launchUrl(
               Uri.parse(service.exportUrl(snap.id, primary)),
               mode: LaunchMode.externalApplication,
-            ),
+            )),
             icon: const Icon(Icons.open_in_new),
             label: Text(_Strings.openExternal(locale)),
           ),
@@ -495,10 +496,10 @@ class _SmallExportButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: TextButton.icon(
-        onPressed: () => launchUrl(
+        onPressed: hapticTap(() => launchUrl(
           Uri.parse(url),
           mode: LaunchMode.externalApplication,
-        ),
+        )),
         icon: const Icon(Icons.insert_drive_file_outlined, size: 16),
         label: Text(filename),
         style: TextButton.styleFrom(

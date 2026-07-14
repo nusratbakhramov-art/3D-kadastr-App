@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class MarketHeader extends StatelessWidget {
@@ -54,7 +55,7 @@ class MarketHeader extends StatelessWidget {
                     border: border,
                   ),
                   child: InkWell(
-                    onTap: onFilterTap,
+                    onTap: hapticTap(onFilterTap),
                     customBorder: const CircleBorder(),
                     child: SizedBox(
                       width: 40,

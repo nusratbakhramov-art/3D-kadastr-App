@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../auth/widgets/login_required_sheet.dart';
@@ -150,8 +151,8 @@ class _OnlineCalculatorResultScreenState
                             ),
                             const SizedBox(height: 8),
                             TextButton(
-                              onPressed: () => Navigator.of(context)
-                                  .popUntil((r) => r.isFirst),
+                              onPressed: hapticTap(() => Navigator.of(context)
+                                  .popUntil((r) => r.isFirst)),
                               child: Text(_Strings.close(locale)),
                             ),
                           ] else ...[
@@ -166,8 +167,8 @@ class _OnlineCalculatorResultScreenState
                             ),
                             const SizedBox(height: 8),
                             TextButton(
-                              onPressed: () => Navigator.of(context)
-                                  .popUntil((r) => r.isFirst),
+                              onPressed: hapticTap(() => Navigator.of(context)
+                                  .popUntil((r) => r.isFirst)),
                               child: Text(_Strings.close(locale)),
                             ),
                           ],

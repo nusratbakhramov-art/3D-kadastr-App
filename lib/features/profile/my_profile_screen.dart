@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../core/haptics.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_avatar.dart';
@@ -339,7 +340,7 @@ class _EditToggle extends StatelessWidget {
       color: ColorTokens.cardBg(context),
       borderRadius: borderRadius,
       child: InkWell(
-        onTap: saving ? null : (editing ? onSave : onEdit),
+        onTap: hapticTap(saving ? null : (editing ? onSave : onEdit)),
         borderRadius: borderRadius,
         child: Tooltip(
           message: semanticsLabel,
@@ -428,7 +429,7 @@ class _AvatarBlock extends StatelessWidget {
               ),
               child: InkWell(
                 customBorder: const CircleBorder(),
-                onTap: onTap,
+                onTap: hapticTap(onTap),
                 child: const SizedBox(
                   width: 36,
                   height: 36,

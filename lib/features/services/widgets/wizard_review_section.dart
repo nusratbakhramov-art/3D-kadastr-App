@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class WizardReviewSection extends StatelessWidget {
@@ -70,7 +71,7 @@ class WizardReviewSection extends StatelessWidget {
                 ),
               ),
               InkWell(
-                onTap: onEdit,
+                onTap: hapticTap(onEdit),
                 borderRadius: BorderRadius.circular(20),
                 child: const Padding(
                   padding: EdgeInsets.all(8),

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../../widgets/pressable_scale.dart';
 
 class HomeCta extends StatelessWidget {
   const HomeCta({
@@ -84,13 +87,20 @@ class _CtaButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(28),
-      child: InkWell(
+    return PressableScale(
+      enabled: onTap != null,
+      child: Material(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(28),
-        onTap: onTap,
-        child: Padding(
+        child: InkWell(
+          borderRadius: BorderRadius.circular(28),
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.lightImpact();
+                  onTap!();
+                },
+          child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 12, 14, 12),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -112,6 +122,7 @@ class _CtaButton extends StatelessWidget {
                 color: Color(0xFF151515),
               ),
             ],
+          ),
           ),
         ),
       ),

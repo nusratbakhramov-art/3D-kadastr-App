@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class MarketEmptyState extends StatelessWidget {
@@ -61,7 +62,7 @@ class MarketEmptyState extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
                 clipBehavior: Clip.antiAlias,
                 child: InkWell(
-                  onTap: onAction,
+                  onTap: hapticTap(onAction),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 20,

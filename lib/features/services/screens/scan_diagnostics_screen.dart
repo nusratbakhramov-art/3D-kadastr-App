@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../../settings/settings_state.dart';
 import '../data/scan_capability_probe.dart';
@@ -389,7 +390,7 @@ class _ErrorBody extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           FilledButton(
-            onPressed: onRetry,
+            onPressed: hapticTap(onRetry),
             child: Text(_ScanDiagnosticsStrings.retry(locale)),
           ),
         ],

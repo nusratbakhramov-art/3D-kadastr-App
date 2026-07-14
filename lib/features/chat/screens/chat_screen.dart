@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../api_chat_service.dart';
 import '../models/chat_message.dart';
@@ -308,7 +309,7 @@ class _InputBar extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             GestureDetector(
-              onTap: enabled ? () => onSend(controller.text) : null,
+              onTap: hapticTap(enabled ? () => onSend(controller.text) : null),
               child: Container(
                 width: 46,
                 height: 46,
@@ -374,7 +375,7 @@ class _EmptyState extends StatelessWidget {
               (q) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: InkWell(
-                  onTap: () => onPick(q),
+                  onTap: hapticTap(() => onPick(q)),
                   borderRadius: BorderRadius.circular(14),
                   child: Container(
                     padding: const EdgeInsets.symmetric(

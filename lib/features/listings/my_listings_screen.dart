@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/haptics.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -112,7 +113,7 @@ class _Header extends StatelessWidget {
           color: AppColors.brandGreen,
           borderRadius: BorderRadius.circular(20),
           child: InkWell(
-            onTap: () {},
+            onTap: hapticTap(() {}),
             borderRadius: BorderRadius.circular(20),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
@@ -153,7 +154,7 @@ class _ListingCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {},
+        onTap: hapticTap(() {}),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
@@ -383,7 +384,7 @@ class _ActionButton extends StatelessWidget {
       color: ColorTokens.primaryText(context),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         borderRadius: BorderRadius.circular(20),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -474,7 +475,7 @@ class _EmptyState extends StatelessWidget {
             color: AppColors.brandGreen,
             borderRadius: BorderRadius.circular(20),
             child: InkWell(
-              onTap: () {},
+              onTap: hapticTap(() {}),
               borderRadius: BorderRadius.circular(20),
               child: Padding(
                 padding: const EdgeInsets.symmetric(
