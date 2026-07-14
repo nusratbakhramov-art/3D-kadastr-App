@@ -96,8 +96,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         _ProfileStrings.help(locale),
         widget.onHelpTap,
       ),
-      _RowSpec.icon(
-        Icons.info_outline_rounded,
+      _RowSpec(
+        'assets/icons/menu-about.svg',
         _ProfileStrings.aboutApp(locale),
         widget.onAboutTap,
       ),
@@ -116,8 +116,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         _ProfileStrings.help(locale),
         widget.onHelpTap,
       ),
-      _RowSpec.icon(
-        Icons.info_outline_rounded,
+      _RowSpec(
+        'assets/icons/menu-about.svg',
         _ProfileStrings.aboutApp(locale),
         widget.onAboutTap,
       ),
@@ -298,7 +298,6 @@ class _ProfileScreenState extends State<ProfileScreen>
 
 class _RowSpec {
   const _RowSpec(this.iconAsset, this.label, this.onTap) : icon = null;
-  const _RowSpec.icon(this.icon, this.label, this.onTap) : iconAsset = null;
   final String? iconAsset;
   final IconData? icon;
   final String label;
