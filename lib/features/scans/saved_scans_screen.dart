@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -67,12 +68,12 @@ class _SavedScansScreenState extends State<SavedScansScreen>
         content: Text(_Strings.deletePrompt(locale, item.name)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: hapticTap(() => Navigator.pop(ctx, false)),
             child: Text(_Strings.cancel(locale)),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: hapticTap(() => Navigator.pop(ctx, true)),
             child: Text(_Strings.delete(locale)),
           ),
         ],
@@ -179,7 +180,7 @@ class _SavedScanCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         onLongPress: onDelete,
         child: Padding(
           padding: const EdgeInsets.all(14),

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../support/support_service.dart';
@@ -139,9 +140,11 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: backgroundColor,
       floatingActionButton: FloatingActionButton(
         heroTag: 'homeChatFab',
-        onPressed: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => ChatScreen(locale: widget.locale),
+        onPressed: hapticTap(
+          () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ChatScreen(locale: widget.locale),
+            ),
           ),
         ),
         backgroundColor: AppColors.splashGreen,
@@ -228,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: 16,
             child: FloatingActionButton(
               heroTag: 'homeCallFab',
-              onPressed: _callSupport,
+              onPressed: hapticTap(_callSupport),
               backgroundColor: AppColors.splashGreen,
               foregroundColor: AppColors.greenBlack,
               tooltip: switch (widget.locale.languageCode) {
@@ -281,7 +284,7 @@ class _SectionHeader extends StatelessWidget {
         ),
         if (onSeeAll != null)
           GestureDetector(
-            onTap: onSeeAll,
+            onTap: hapticTap(onSeeAll),
             child: Text(
               _HomeScreenStrings.seeAll(locale),
               style: TextStyle(

@@ -11,8 +11,9 @@ import 'payment_deep_links.dart';
 /// initState'da o'qiydi.
 final ValueNotifier<int> shellTabRequest = ValueNotifier<int>(-1);
 
-/// Arizalar (Applications) tab indeksi.
-const int kApplicationsTabIndex = 3;
+/// Arizalar (Applications) tab indeksi. Xizmatlar tab'i olib tashlangач
+/// (Home, Market, Arizalar, Profil) — Arizalar 3-dan 2-ga suriladi.
+const int kApplicationsTabIndex = 2;
 
 /// Ochiq ekranlarni yopib, asosiy shell'da "Arizalar" tab'ini ochadi.
 void navigateToApplicationsTab() {

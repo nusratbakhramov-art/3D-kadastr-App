@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -113,12 +114,12 @@ class _SavedScanDetailScreenState extends State<SavedScanDetailScreen>
         content: Text(_Strings.deleteOutputPrompt(locale, output.version)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
+            onPressed: hapticTap(() => Navigator.pop(ctx, false)),
             child: Text(_Strings.cancel(locale)),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
-            onPressed: () => Navigator.pop(ctx, true),
+            onPressed: hapticTap(() => Navigator.pop(ctx, true)),
             child: Text(_Strings.delete(locale)),
           ),
         ],
@@ -376,7 +377,7 @@ class _ProcessButton extends StatelessWidget {
           : ColorTokens.brandPrimary(context),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: processing ? null : onTap,
+        onTap: hapticTap(processing ? null : onTap),
         borderRadius: BorderRadius.circular(14),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 16),
@@ -441,7 +442,7 @@ class _ClayButton extends StatelessWidget {
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
-        onTap: processing ? null : onTap,
+        onTap: hapticTap(processing ? null : onTap),
         borderRadius: BorderRadius.circular(14),
         child: Container(
           decoration: BoxDecoration(
@@ -507,7 +508,7 @@ class _OutputCard extends StatelessWidget {
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
-          onTap: onView,
+          onTap: hapticTap(onView),
           onLongPress: onDelete,
           borderRadius: BorderRadius.circular(14),
           child: Padding(
@@ -608,7 +609,7 @@ class _OutputCard extends StatelessWidget {
                 IconButton(
                   icon: const Icon(Icons.delete_outline, size: 18),
                   color: Colors.red.withValues(alpha: 0.6),
-                  onPressed: onDelete,
+                  onPressed: hapticTap(onDelete),
                 ),
               ],
             ),

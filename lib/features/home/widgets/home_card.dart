@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../widgets/circle_chevron_right.dart';
+import '../../../widgets/pressable_scale.dart';
 
 class HomeCard extends StatelessWidget {
   const HomeCard({
@@ -27,13 +29,20 @@ class HomeCard extends StatelessWidget {
           : const BorderSide(color: Color(0xFFE1E1E1), width: 1),
     );
 
-    return Material(
-      color: cardColor,
-      shape: shape,
-      child: InkWell(
-        customBorder: shape,
-        onTap: onTap,
-        child: Padding(
+    return PressableScale(
+      enabled: onTap != null,
+      child: Material(
+        color: cardColor,
+        shape: shape,
+        child: InkWell(
+          customBorder: shape,
+          onTap: onTap == null
+              ? null
+              : () {
+                  HapticFeedback.lightImpact();
+                  onTap!();
+                },
+          child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -59,6 +68,7 @@ class HomeCard extends StatelessWidget {
                 ).copyWith(color: textColor),
               ),
             ],
+          ),
           ),
         ),
       ),

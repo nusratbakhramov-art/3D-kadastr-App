@@ -18,11 +18,11 @@ class ProfileScreen extends StatefulWidget {
     this.onBellTap,
     this.onMyProfileTap,
     this.onMyScansTap,
-    this.onSavedScansTap,
     this.onRatingsTap,
     this.onPaymentsTap,
     this.onSettingsTap,
     this.onHelpTap,
+    this.onAboutTap,
     this.onLoginTap,
   });
 
@@ -31,11 +31,11 @@ class ProfileScreen extends StatefulWidget {
   final VoidCallback? onBellTap;
   final VoidCallback? onMyProfileTap;
   final VoidCallback? onMyScansTap;
-  final VoidCallback? onSavedScansTap;
   final VoidCallback? onRatingsTap;
   final VoidCallback? onPaymentsTap;
   final VoidCallback? onSettingsTap;
   final VoidCallback? onHelpTap;
+  final VoidCallback? onAboutTap;
 
   /// Foydalanuvchi tizimga kirmagan (`profile == null` yoki bo'sh) bo'lsa,
   /// menyu o'rniga "Kirish" tugmasi shu callback'ni chaqiradi.
@@ -74,11 +74,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         widget.onMyScansTap,
       ),
       _RowSpec(
-        'assets/icons/menu-scan.svg',
-        _ProfileStrings.mySavedScans(locale),
-        widget.onSavedScansTap,
-      ),
-      _RowSpec(
         'assets/icons/menu-ratings.svg',
         _ProfileStrings.ratings(locale),
         widget.onRatingsTap,
@@ -100,6 +95,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         _ProfileStrings.help(locale),
         widget.onHelpTap,
       ),
+      _RowSpec.icon(
+        Icons.info_outline_rounded,
+        _ProfileStrings.aboutApp(locale),
+        widget.onAboutTap,
+      ),
     ];
 
     // Mehmon (login qilmagan) uchun cheklangan menyu — faqat Sozlamalar +
@@ -114,6 +114,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         'assets/icons/menu-help.svg',
         _ProfileStrings.help(locale),
         widget.onHelpTap,
+      ),
+      _RowSpec.icon(
+        Icons.info_outline_rounded,
+        _ProfileStrings.aboutApp(locale),
+        widget.onAboutTap,
       ),
     ];
 
@@ -292,6 +297,7 @@ class _ProfileScreenState extends State<ProfileScreen>
 
 class _RowSpec {
   const _RowSpec(this.iconAsset, this.label, this.onTap) : icon = null;
+  const _RowSpec.icon(this.icon, this.label, this.onTap) : iconAsset = null;
   final String? iconAsset;
   final IconData? icon;
   final String label;
@@ -319,10 +325,10 @@ class _ProfileStrings {
     _ => 'Mening arizalarim',
   };
 
-  static String mySavedScans(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мои сканы',
-    'en' => 'My scans',
-    _ => 'Mening skanlarim',
+  static String aboutApp(Locale l) => switch (l.languageCode) {
+    'ru' => 'О приложении',
+    'en' => 'About app',
+    _ => 'Ilova haqida',
   };
 
   static String ratings(Locale l) => switch (l.languageCode) {

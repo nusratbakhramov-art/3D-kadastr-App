@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:pdfx/pdfx.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/haptics.dart';
 import '../../theme/color_tokens.dart';
 
 class PdfViewerScreen extends StatefulWidget {
@@ -90,7 +91,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         actions: [
           IconButton(
             tooltip: _PdfStrings.share(lang),
-            onPressed: _share,
+            onPressed: hapticTap(_share),
             icon: const Icon(Icons.ios_share_rounded),
           ),
         ],

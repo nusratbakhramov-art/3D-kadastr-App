@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../auth/auth_storage.dart';
@@ -143,7 +144,7 @@ class _Listing3DViewerScreenState extends State<Listing3DViewerScreen> {
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.close_rounded, color: fg),
-          onPressed: () => Navigator.of(context).maybePop(),
+          onPressed: hapticTap(() => Navigator.of(context).maybePop()),
         ),
         title: Text(
           widget.listing.title,

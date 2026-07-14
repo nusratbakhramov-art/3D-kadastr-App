@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../core/haptics.dart';
 import '../theme/app_colors.dart';
 
 /// Circular bell button used in screen headers. Shows a small red dot when
@@ -31,7 +32,7 @@ class AppBellButton extends StatelessWidget {
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Stack(
           clipBehavior: Clip.none,
           children: [

@@ -16,13 +16,12 @@ import '../market/market_screen.dart';
 import '../notifications/notifications_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
 import '../payments/payments_screen.dart';
+import '../profile/about_app_screen.dart';
 import '../profile/my_profile_screen.dart';
 import '../profile/profile_screen.dart';
-import '../scans/saved_scans_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr/kadastr_area_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
-import '../services/services_screen.dart';
 import '../settings/settings_screen.dart';
 import 'app_bottom_nav.dart';
 
@@ -42,7 +41,6 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _index = 0;
-  int _servicesAnimToken = 0;
   int _profileAnimToken = 0;
   int _applicationsAnimToken = 0;
   final PageController _pageController = PageController();
@@ -77,9 +75,8 @@ class _MainShellState extends State<MainShell> {
     final delta = (i - _index).abs();
     setState(() {
       _index = i;
-      if (i == 1) _servicesAnimToken++;
-      if (i == 3) _applicationsAnimToken++;
-      if (i == 4) _profileAnimToken++;
+      if (i == 2) _applicationsAnimToken++;
+      if (i == 3) _profileAnimToken++;
     });
     if (delta > 1) {
       _pageController.jumpToPage(i);
@@ -211,12 +208,13 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  Future<void> _openSavedScans() async {
-    // Lokal "Mening skanlarim" — saqlangan raw skanlar + qayta ishlash (outputs
-    // history) bilan natijani yaxshilash/test qilish uchun.
+  Future<void> _openAbout() async {
+    // "Ilova haqida" — ilova ma'lumoti + Baholovchi hujjatlari (AI Baholash
+    // to'lovdan oldingi qadamdagi bilan bir xil, ochiq endpoint). Mehmon ham,
+    // tizimga kirgan foydalanuvchi ham ko'ra oladi.
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SavedScansScreen()));
+    ).push(MaterialPageRoute<void>(builder: (_) => const AboutAppScreen()));
   }
 
   Future<void> _openPayments() async {
@@ -256,7 +254,7 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  void _openMarketTab() => _onTabChanged(2);
+  void _openMarketTab() => _onTabChanged(1);
 
   @override
   Widget build(BuildContext context) {
@@ -282,12 +280,8 @@ class _MainShellState extends State<MainShell> {
             onOpenKalkulyator: _openCombinedCalc,
             // Banner "Online kalkulyator" → birlashgan kalkulyator.
             onOpenOrder: _openCombinedCalc,
-            onOpenProfile: () => _onTabChanged(4),
+            onOpenProfile: () => _onTabChanged(3),
             onOpenNotifications: _openNotifications,
-          ),
-          ServicesScreen(
-            locale: widget.locale,
-            animateToken: _servicesAnimToken,
           ),
           const MarketScreen(),
           ApplicationsScreen(animateToken: _applicationsAnimToken),
@@ -300,7 +294,7 @@ class _MainShellState extends State<MainShell> {
             onHelpTap: _openHelp,
             onRatingsTap: _openRatings,
             onMyScansTap: _openScans,
-            onSavedScansTap: _openSavedScans,
+            onAboutTap: _openAbout,
             onPaymentsTap: _openPayments,
             onLoginTap: _openAuth,
           ),
@@ -324,10 +318,6 @@ class _ShellStrings {
       iconAsset: 'assets/icons/tab-home.svg',
     ),
     AppBottomNavItem(
-      label: _services(locale),
-      iconAsset: 'assets/icons/tab-services.svg',
-    ),
-    AppBottomNavItem(
       label: _market(locale),
       iconAsset: 'assets/icons/tab-market.svg',
     ),
@@ -345,12 +335,6 @@ class _ShellStrings {
     'ru' => 'Главная',
     'en' => 'Home',
     _ => 'Asosiy',
-  };
-
-  static String _services(Locale l) => switch (l.languageCode) {
-    'ru' => 'Услуги',
-    'en' => 'Services',
-    _ => 'Xizmatlar',
   };
 
   static String _market(Locale l) => switch (l.languageCode) {

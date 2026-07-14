@@ -26,6 +26,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:share_plus/share_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../settings/settings_state.dart';
 
@@ -178,7 +179,7 @@ class _SplatViewerScreenState extends State<SplatViewerScreen> {
             IconButton(
               tooltip: _Strings.share(locale),
               icon: const Icon(Icons.ios_share_rounded),
-              onPressed: _shareSplat,
+              onPressed: hapticTap(_shareSplat),
             ),
           ],
         ),

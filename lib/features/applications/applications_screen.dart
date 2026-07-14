@@ -4,6 +4,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/haptics.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
@@ -1087,7 +1088,7 @@ class _ScrollToTopButton extends StatelessWidget {
             shape: const CircleBorder(),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: onTap,
+              onTap: hapticTap(onTap),
               customBorder: const CircleBorder(),
               child: SizedBox(
                 width: 44,
@@ -1342,7 +1343,7 @@ class _EmptyState extends StatelessWidget {
             if (onReset != null) ...[
               const SizedBox(height: 12),
               TextButton(
-                onPressed: onReset,
+                onPressed: hapticTap(onReset),
                 child: Text(
                   _ApplicationsStrings.reset(lang),
                   style: const TextStyle(
@@ -1524,7 +1525,7 @@ class _SearchFilterBar extends StatelessWidget {
                 ),
                 if (hasQuery)
                   GestureDetector(
-                    onTap: onClear,
+                    onTap: hapticTap(onClear),
                     behavior: HitTestBehavior.opaque,
                     child: Padding(
                       padding: const EdgeInsets.only(left: 6),
@@ -1537,7 +1538,7 @@ class _SearchFilterBar extends StatelessWidget {
         ),
         const SizedBox(width: 10),
         GestureDetector(
-          onTap: onOpenFilters,
+          onTap: hapticTap(onOpenFilters),
           child: Container(
             width: 46,
             height: 46,
@@ -1641,7 +1642,7 @@ class _ActiveFilters extends StatelessWidget {
         itemBuilder: (context, i) {
           if (i < chips.length) return chips[i];
           return GestureDetector(
-            onTap: onClearAll,
+            onTap: hapticTap(onClearAll),
             child: Container(
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1696,7 +1697,7 @@ class _FilterChipPill extends StatelessWidget {
           ),
           const SizedBox(width: 3),
           GestureDetector(
-            onTap: onRemove,
+            onTap: hapticTap(onRemove),
             behavior: HitTestBehavior.opaque,
             child: Padding(
               padding: const EdgeInsets.all(4),
@@ -1813,7 +1814,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 child: Row(
                   children: [
                     TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(),
+                      onPressed: hapticTap(() => Navigator.of(ctx).pop()),
                       child: Text(
                         _ApplicationsStrings.cancelBtn(lang),
                         style: TextStyle(
@@ -1836,7 +1837,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       ),
                     ),
                     TextButton(
-                      onPressed: () => Navigator.of(ctx).pop(temp),
+                      onPressed: hapticTap(() => Navigator.of(ctx).pop(temp)),
                       child: Text(
                         _ApplicationsStrings.done(lang),
                         style: const TextStyle(
@@ -1963,11 +1964,11 @@ class _FilterSheetState extends State<_FilterSheet> {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => setState(() {
+                  onPressed: hapticTap(() => setState(() {
                     _statuses.clear();
                     _from = null;
                     _to = null;
-                  }),
+                  })),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -1989,9 +1990,9 @@ class _FilterSheetState extends State<_FilterSheet> {
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
-                  onPressed: () => Navigator.of(context).pop(
+                  onPressed: hapticTap(() => Navigator.of(context).pop(
                     _FilterResult(statuses: _statuses, from: _from, to: _to),
-                  ),
+                  )),
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.splashGreen,
                     padding: const EdgeInsets.symmetric(vertical: 14),
@@ -2048,7 +2049,7 @@ class _StatusToggle extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = style.fgColor;
     return GestureDetector(
-      onTap: onTap,
+      onTap: hapticTap(onTap),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
         padding: EdgeInsets.fromLTRB(selected ? 11 : 14, 9, 14, 9),
@@ -2106,7 +2107,7 @@ class _DateField extends StatelessWidget {
     final hasValue = value != null;
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: hapticTap(onTap),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
@@ -2500,7 +2501,7 @@ class _CardActionButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(10000),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: SizedBox(
           width: double.infinity,
           height: 32,
@@ -2563,7 +2564,7 @@ class _ApplicationCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Container(
           constraints: const BoxConstraints(minHeight: 125),
           width: 335,

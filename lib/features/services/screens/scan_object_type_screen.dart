@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -181,7 +182,7 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
               ),
               const SizedBox(height: 16),
               TextButton(
-                onPressed: _loadOptions,
+                onPressed: hapticTap(_loadOptions),
                 child: Text(
                   _ScanObjectTypeStrings.retry(locale),
                   style: const TextStyle(

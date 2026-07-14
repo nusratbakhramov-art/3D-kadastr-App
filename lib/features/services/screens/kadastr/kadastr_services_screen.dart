@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/haptics.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/calculator_pricing_store.dart';
@@ -280,7 +281,7 @@ class _SelectableServiceCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(18),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 150),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),

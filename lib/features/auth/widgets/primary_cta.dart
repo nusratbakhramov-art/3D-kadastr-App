@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class PrimaryCta extends StatelessWidget {
@@ -35,7 +36,7 @@ class PrimaryCta extends StatelessWidget {
       borderRadius: BorderRadius.circular(28),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: isActive ? onPressed : null,
+        onTap: hapticTap(isActive ? onPressed : null),
         child: SizedBox(
           height: 56,
           child: Center(

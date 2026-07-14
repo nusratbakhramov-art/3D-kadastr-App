@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class WizardField extends StatelessWidget {
@@ -185,7 +186,7 @@ class WizardSwitchTile extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: () => onChanged(!value),
+        onTap: hapticSelect(() => onChanged(!value)),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
@@ -284,7 +285,7 @@ class WizardChipPicker<T> extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
               child: InkWell(
                 borderRadius: BorderRadius.circular(999),
-                onTap: () => onChanged(selected ? null : opt),
+                onTap: hapticSelect(() => onChanged(selected ? null : opt)),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 14,

@@ -1,34 +1,31 @@
-/// AI Baholash — appraiser credentials step (shown before the Payme sheet).
-///
-/// Reassures the user that the valuation is backed by a licensed, insured,
-/// certified appraiser by showing the company's legal documents (admin-managed,
-/// fetched from `GET /api/v1/appraiser/credentials`). Tapping a document opens
-/// a full-screen zoomable viewer. The "To'lovga o'tish" CTA then opens the
-/// payment sheet. Resilient: if the docs fail to load, the user can still pay.
+/// Profile → "Ilova haqida" (About app): app identity plus the appraiser
+/// ("Baholovchi") certificates. The documents come from the same public source
+/// as the AI Baholash pre-payment step (`GET /api/v1/appraiser/credentials`),
+/// so both guests and logged-in users can view them here. Tapping a document
+/// opens the shared full-screen zoomable gallery.
 library;
 
 import 'package:flutter/material.dart';
 
-import '../../../core/haptics.dart';
-import '../../../theme/app_colors.dart';
-import '../../../widgets/remote_image.dart';
-import '../../market/widgets/fullscreen_gallery.dart';
-import '../../market/widgets/listing_cta_button.dart';
-import '../../payments/ai_payment_sheet.dart';
-import '../api_appraiser_service.dart';
-import '../widgets/service_app_bar.dart';
+import '../../core/haptics.dart';
+import '../../theme/app_colors.dart';
+import '../../theme/color_tokens.dart';
+import '../../widgets/app_header_back.dart';
+import '../../widgets/remote_image.dart';
+import '../market/widgets/fullscreen_gallery.dart';
+import '../services/api_appraiser_service.dart';
 
-class AiCredentialsScreen extends StatefulWidget {
-  const AiCredentialsScreen({super.key, required this.referenceId});
+/// Mirrors pubspec `version:` — bump alongside a release.
+const String _kAppVersion = '1.0.2';
 
-  /// AI valuation job id — forwarded to the payment sheet.
-  final int? referenceId;
+class AboutAppScreen extends StatefulWidget {
+  const AboutAppScreen({super.key});
 
   @override
-  State<AiCredentialsScreen> createState() => _AiCredentialsScreenState();
+  State<AboutAppScreen> createState() => _AboutAppScreenState();
 }
 
-class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
+class _AboutAppScreenState extends State<AboutAppScreen> {
   final AppraiserService _service = AppraiserService();
   late final Future<List<AppraiserCredential>> _future = _service
       .fetchCredentials();
@@ -53,10 +50,9 @@ class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
   Widget build(BuildContext context) {
     final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
 
     return Scaffold(
-      backgroundColor: bg,
+      backgroundColor: ColorTokens.scaffoldBg(context),
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -64,31 +60,34 @@ class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                  child: ServiceAppBar(
-                    title: _S.title(l),
-                    subtitle: _S.subtitle(l),
-                  ),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: AppHeaderBack(title: _S.title(l)),
                 ),
-                const SizedBox(height: 8),
                 Expanded(
                   child: FutureBuilder<List<AppraiserCredential>>(
                     future: _future,
                     builder: (context, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.splashGreen,
-                          ),
-                        );
-                      }
-                      final creds = snap.data ?? const <AppraiserCredential>[];
+                      final loading =
+                          snap.connectionState == ConnectionState.waiting;
+                      final creds =
+                          snap.data ?? const <AppraiserCredential>[];
                       return ListView(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                         children: [
-                          _TrustBanner(text: _S.trust(l), isDark: isDark),
-                          const SizedBox(height: 14),
-                          if (creds.isEmpty)
+                          _AppIdentity(isDark: isDark, locale: l),
+                          const SizedBox(height: 24),
+                          _SectionLabel(text: _S.docsSection(l), isDark: isDark),
+                          const SizedBox(height: 12),
+                          if (loading)
+                            const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 32),
+                              child: Center(
+                                child: CircularProgressIndicator(
+                                  color: AppColors.splashGreen,
+                                ),
+                              ),
+                            )
+                          else if (creds.isEmpty)
                             _EmptyNote(text: _S.empty(l), isDark: isDark)
                           else
                             for (final c in creds) ...[
@@ -105,17 +104,6 @@ class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
                     },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: ListingCtaButton(
-                    label: _S.continueLabel(l),
-                    enabled: true,
-                    onTap: () => showAiPaymentSheet(
-                      context,
-                      referenceId: widget.referenceId,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -125,48 +113,95 @@ class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
   }
 }
 
-// ── Trust banner ──────────────────────────────────────────────────────
-class _TrustBanner extends StatelessWidget {
-  const _TrustBanner({required this.text, required this.isDark});
+// ── App identity header ───────────────────────────────────────────────
+class _AppIdentity extends StatelessWidget {
+  const _AppIdentity({required this.isDark, required this.locale});
+
+  final bool isDark;
+  final Locale locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Image.asset(
+            'assets/branding/appicon.png',
+            width: 96,
+            height: 96,
+            fit: BoxFit.cover,
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          _S.appName(locale),
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w700,
+            fontSize: 20,
+            color: titleColor,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${_S.versionLabel(locale)} $_kAppVersion',
+          style: TextStyle(fontFamily: 'MTSText', fontSize: 13, color: muted),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          _S.tagline(locale),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'MTSText',
+            fontSize: 13.5,
+            height: 1.4,
+            color: muted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.text, required this.isDark});
 
   final String text;
   final bool isDark;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.splashGreen.withValues(alpha: isDark ? 0.12 : 0.10),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.verified_user_rounded,
-            size: 22,
-            color: AppColors.splashGreen,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(
-                fontFamily: 'MTSText',
-                fontSize: 13,
-                height: 1.3,
-                fontWeight: FontWeight.w600,
-                color: AppColors.splashGreen,
-              ),
+    final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    return Row(
+      children: [
+        const Icon(
+          Icons.verified_user_rounded,
+          size: 20,
+          color: AppColors.splashGreen,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: titleColor,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-// ── One credential document ───────────────────────────────────────────
+// ── One credential document (mirrors the AI Baholash credentials card) ─
 class _CredentialCard extends StatelessWidget {
   const _CredentialCard({
     required this.credential,
@@ -276,33 +311,44 @@ class _S {
   const _S._();
 
   static String title(Locale l) => switch (l.languageCode) {
+    'ru' => 'О приложении',
+    'en' => 'About app',
+    _ => 'Ilova haqida',
+  };
+
+  static String appName(Locale l) => switch (l.languageCode) {
+    'ru' => 'Kadastr',
+    'en' => 'Kadastr',
+    _ => 'Kadastr',
+  };
+
+  static String versionLabel(Locale l) => switch (l.languageCode) {
+    'ru' => 'Версия',
+    'en' => 'Version',
+    _ => 'Versiya',
+  };
+
+  static String tagline(Locale l) => switch (l.languageCode) {
+    'ru' =>
+        'Оценка недвижимости, 3D-кадастр и расчёт услуг — с лицензированными '
+            'экспертами.',
+    'en' =>
+        'Property valuation, 3D cadastre and service estimates — backed by '
+            'licensed experts.',
+    _ => 'Ko\'chmas mulkni baholash, 3D kadastr va xizmatlar hisobi — '
+        'litsenziyalangan ekspertlar bilan.',
+  };
+
+  static String docsSection(Locale l) => switch (l.languageCode) {
     'ru' => 'Документы оценщика',
     'en' => 'Appraiser documents',
     _ => 'Baholovchi hujjatlari',
-  };
-
-  static String subtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Лицензированный эксперт',
-    'en' => 'Licensed expert',
-    _ => 'Litsenziyalangan ekspert',
-  };
-
-  static String trust(Locale l) => switch (l.languageCode) {
-    'ru' => 'Оценку проводит лицензированный и застрахованный эксперт',
-    'en' => 'Valuation is performed by a licensed, insured expert',
-    _ => 'Baholash litsenziyalangan va sug\'urtalangan ekspert tomonidan',
   };
 
   static String viewHint(Locale l) => switch (l.languageCode) {
     'ru' => 'Нажмите, чтобы открыть',
     'en' => 'Tap to view',
     _ => 'Ko\'rish uchun bosing',
-  };
-
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Воспользоваться платной услугой',
-    'en' => 'Use paid service',
-    _ => 'Pullik xizmatdan foydalanish',
   };
 
   static String empty(Locale l) => switch (l.languageCode) {

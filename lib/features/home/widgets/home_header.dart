@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../user_profile.dart';
@@ -104,7 +105,7 @@ class _LoginButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Text(
@@ -190,7 +191,7 @@ class _Avatar extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: avatar,
       ),
     );
@@ -219,7 +220,7 @@ class _BellButton extends StatelessWidget {
       shape: const CircleBorder(),
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Stack(
           clipBehavior: Clip.none,
           children: [

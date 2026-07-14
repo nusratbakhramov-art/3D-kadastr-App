@@ -1,6 +1,7 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class DobField extends StatelessWidget {
@@ -151,7 +152,7 @@ class DobField extends StatelessWidget {
       borderRadius: BorderRadius.circular(12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => _pick(context),
+        onTap: hapticTap(() => _pick(context)),
         child: Container(
           height: 52,
           padding: const EdgeInsets.symmetric(horizontal: 14),

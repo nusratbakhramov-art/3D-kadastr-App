@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 enum OnboardingNavVariant { primary, secondary }
@@ -69,7 +70,7 @@ class OnboardingNavButton extends StatelessWidget {
         borderRadius: BorderRadius.circular(radius),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: onPressed,
+          onTap: hapticTap(onPressed),
           child: SizedBox(height: 52, child: Center(child: content)),
         ),
       );
@@ -86,7 +87,7 @@ class OnboardingNavButton extends StatelessWidget {
             side: const BorderSide(color: Color(0x1FFFFFFF), width: 1),
           ),
           child: InkWell(
-            onTap: onPressed,
+            onTap: hapticTap(onPressed),
             customBorder: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(radius),
             ),

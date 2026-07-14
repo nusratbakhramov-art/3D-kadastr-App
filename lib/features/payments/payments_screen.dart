@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../core/haptics.dart';
 import '../../core/i18n.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -464,7 +465,7 @@ class _PaymentTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticTap(onTap),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(

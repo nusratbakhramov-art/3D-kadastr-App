@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class ResendTimer extends StatefulWidget {
@@ -104,7 +105,7 @@ class _ResendTimerState extends State<ResendTimer> {
             shape: const CircleBorder(),
             clipBehavior: Clip.antiAlias,
             child: InkWell(
-              onTap: _handleResend,
+              onTap: hapticTap(_handleResend),
               child: const SizedBox(
                 width: 28,
                 height: 28,

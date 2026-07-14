@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/haptics.dart';
+
 /// Full-screen, swipeable image preview with pinch-to-zoom. Takes a list of
 /// LOCAL file paths. Shared by the AI Baholash intake and review steps.
 class FilePreviewGallery extends StatefulWidget {
@@ -63,7 +65,7 @@ class _FilePreviewGalleryState extends State<FilePreviewGallery> {
                   color: Colors.white,
                   size: 28,
                 ),
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: hapticTap(() => Navigator.of(context).pop()),
               ),
             ),
             if (widget.paths.length > 1)

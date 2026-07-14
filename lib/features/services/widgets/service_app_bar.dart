@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class ServiceAppBar extends StatelessWidget {
@@ -86,7 +87,7 @@ class _CircleBackButton extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         customBorder: const CircleBorder(),
-        onTap: onBack ?? () => Navigator.of(context).maybePop(),
+        onTap: hapticTap(onBack ?? () => Navigator.of(context).maybePop()),
         child: SizedBox(
           width: 40,
           height: 40,

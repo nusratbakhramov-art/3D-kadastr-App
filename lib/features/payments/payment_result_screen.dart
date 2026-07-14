@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../theme/app_colors.dart';
 import 'payment_checkout_service.dart';
@@ -168,6 +169,7 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
                         clipBehavior: Clip.antiAlias,
                         child: InkWell(
                           onTap: () {
+                            HapticFeedback.lightImpact();
                             // Muvaffaqiyatда oqimdan TOZA chiqamiz (asosiy
                             // ekranga) — ariza/natija ekranida qoldirib qo'ymaymiz
                             // (qayta to'lash tugmasi bilan "qolib ketish" oldini

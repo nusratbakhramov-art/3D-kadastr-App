@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 
 class AuthScaffold extends StatelessWidget {
@@ -130,7 +131,7 @@ class _CircleIconButton extends StatelessWidget {
       shape: const CircleBorder(),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onPressed,
+        onTap: hapticTap(onPressed),
         child: SizedBox(
           width: 40,
           height: 40,
@@ -169,7 +170,7 @@ class _SkipButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(20),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: onPressed,
+        onTap: hapticTap(onPressed),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(

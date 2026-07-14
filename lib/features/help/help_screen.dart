@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/haptics.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
@@ -190,7 +191,7 @@ class _FaqItemState extends State<_FaqItem>
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: _toggle,
+        onTap: hapticSelect(_toggle),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Column(

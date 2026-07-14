@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../core/haptics.dart';
 import '../../theme/app_colors.dart';
 
 class AppBottomNavItem {
@@ -71,7 +72,7 @@ class _NavTab extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: hapticSelect(onTap),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
