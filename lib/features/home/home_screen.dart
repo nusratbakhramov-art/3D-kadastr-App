@@ -13,9 +13,9 @@ import '../market/listing_detail_screen.dart';
 import '../market/widgets/featured_carousel.dart';
 import '../chat/screens/chat_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
+import '../services/models/service_item.dart';
+import '../services/widgets/service_card.dart';
 import 'user_profile.dart';
-import 'widgets/home_card.dart';
-import 'widgets/home_cta.dart';
 import 'widgets/home_header.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -195,20 +195,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     locale: widget.locale,
                     onOpenKadastr3d: widget.onOpenKadastr3d,
                     onOpenAiValuation: widget.onOpenAiValuation,
-                    onOpenMarket: widget.onOpenMarket,
                     onOpenKalkulyator: widget.onOpenKalkulyator,
-                  ),
-                  const SizedBox(height: 12),
-                  ValueListenableBuilder<UserProfile?>(
-                    valueListenable: userProfileNotifier,
-                    builder: (context, profile, _) {
-                      return HomeCta(
-                        isGuest: profile == null,
-                        locale: widget.locale,
-                        onLoginTap: widget.onLoginTap,
-                        onOrderTap: widget.onOpenOrder,
-                      );
-                    },
                   ),
                   const SizedBox(height: 24),
                   _SectionHeader(
@@ -340,75 +327,94 @@ class _HomePatternBackground extends StatelessWidget {
   }
 }
 
+/// The Home service grid — the rich dark cards brought over from the (removed)
+/// Services page: two square cards (3D Kadastr, AI Baholash) + one wide card
+/// (Kalkulyator), each with an accent glow and a 3D image. Market lives in the
+/// bottom tab + "Top modellar", so it's not a card here.
 class _CardsGrid extends StatelessWidget {
   const _CardsGrid({
     required this.locale,
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
-    this.onOpenMarket,
     this.onOpenKalkulyator,
   });
 
   final Locale locale;
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
-  final VoidCallback? onOpenMarket;
   final VoidCallback? onOpenKalkulyator;
 
   @override
   Widget build(BuildContext context) {
-    const gap = 12.0;
-    const height = 97.0;
+    final l = locale;
+    final kadastr = ServiceItem(
+      id: ServiceId.kadastr3d,
+      title: _CardStrings.kadastr3d(l),
+      subtitle: _CardStrings.kadastr3dSub(l),
+      asset: 'assets/images/home/cta-icon.png',
+      accent: const Color(0xFF00E135),
+      layout: ServiceLayout.square,
+    );
+    final ai = ServiceItem(
+      id: ServiceId.aiValuation,
+      title: _CardStrings.aiValuation(l),
+      subtitle: _CardStrings.aiValuationSub(l),
+      asset: 'assets/images/services/ai.png',
+      accent: const Color(0xFF7C3AED),
+      layout: ServiceLayout.square,
+    );
+    final calculator = ServiceItem(
+      id: ServiceId.calculator,
+      title: _CardStrings.calculator(l),
+      subtitle: _CardStrings.calculatorSub(l),
+      asset: 'assets/images/services/calculator.png',
+      accent: const Color(0xFF22D3EE),
+      layout: ServiceLayout.wide,
+    );
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          height: height,
-          child: Row(
-            children: [
-              Expanded(
-                child: HomeCard(
-                  title: _CardStrings.kadastr3d(locale),
-                  iconAsset: 'assets/images/home/card-3d.svg',
-                  onTap: onOpenKadastr3d,
-                ),
+    const gap = 12.0;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final squareWidth = (constraints.maxWidth - gap) / 2;
+        const squareAspect = 0.84;
+        final squareHeight = squareWidth / squareAspect;
+        final wideHeight = (squareHeight * 0.88).clamp(160.0, 240.0);
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              height: squareHeight,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ServiceCard(
+                      item: kadastr,
+                      onTap: onOpenKadastr3d ?? () {},
+                    ),
+                  ),
+                  const SizedBox(width: gap),
+                  Expanded(
+                    child: ServiceCard(
+                      item: ai,
+                      onTap: onOpenAiValuation ?? () {},
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: gap),
-              Expanded(
-                child: HomeCard(
-                  title: _CardStrings.aiValuation(locale),
-                  iconAsset: 'assets/images/home/card-ai.svg',
-                  onTap: onOpenAiValuation,
-                ),
+            ),
+            const SizedBox(height: gap),
+            SizedBox(
+              height: wideHeight,
+              width: double.infinity,
+              child: ServiceCard(
+                item: calculator,
+                onTap: onOpenKalkulyator ?? () {},
               ),
-            ],
-          ),
-        ),
-        const SizedBox(height: gap),
-        SizedBox(
-          height: height,
-          child: Row(
-            children: [
-              Expanded(
-                child: HomeCard(
-                  title: _CardStrings.calculator(locale),
-                  iconAsset: 'assets/images/home/card-calculator.svg',
-                  onTap: onOpenKalkulyator,
-                ),
-              ),
-              const SizedBox(width: gap),
-              Expanded(
-                child: HomeCard(
-                  title: _CardStrings.market(locale),
-                  iconAsset: 'assets/images/home/card-market.svg',
-                  onTap: onOpenMarket,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -427,6 +433,14 @@ class _CardStrings {
     '3D cadastre',
   );
 
+  static String kadastr3dSub(Locale l) => _pick(
+    l,
+    'home.card.kadastr3d_sub',
+    'Xizmatlar narxini hisoblang va ariza qoldiring.',
+    'Рассчитайте стоимость услуг и оставьте заявку.',
+    'Calculate service prices and submit an application.',
+  );
+
   static String aiValuation(Locale l) => _pick(
     l,
     'home.card.ai_valuation',
@@ -435,8 +449,13 @@ class _CardStrings {
     'AI valuation',
   );
 
-  static String market(Locale l) =>
-      _pick(l, 'home.card.market', 'Market', 'Маркет', 'Market');
+  static String aiValuationSub(Locale l) => _pick(
+    l,
+    'home.card.ai_valuation_sub',
+    'Sun\'iy intellekt yordamida ko\'chmas mulk qiymatini aniqlash.',
+    'Оценка стоимости недвижимости с помощью ИИ.',
+    'Real estate valuation powered by AI.',
+  );
 
   static String calculator(Locale l) => _pick(
     l,
@@ -444,6 +463,14 @@ class _CardStrings {
     'Kalkulyator',
     'Калькулятор',
     'Calculator',
+  );
+
+  static String calculatorSub(Locale l) => _pick(
+    l,
+    'home.card.calculator_sub',
+    'Arxitektura, dizayn, qurilish narxlarini hisoblash.',
+    'Расчёт стоимости архитектуры, дизайна и строительства.',
+    'Calculate architecture, design and construction costs.',
   );
 }
 
