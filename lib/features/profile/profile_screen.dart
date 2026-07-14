@@ -323,8 +323,8 @@ class _ProfileScreenState extends State<ProfileScreen>
 }
 
 /// "Skan qilish" varag'i — foydalanuvchi qaysi skan modelidan foydalanishni
-/// tanlaydi. Hozircha ikki variant (#1, #2); ularning onTap'lari bo'sh
-/// (keyinroq ulanadi).
+/// tanlaydi. Ikki variant: "#1" → nsdk (ScansKit), "#2" → PCScan
+/// (RoomPlan+ObjectCapture). Ikkalasi ham iOS 17+/LiDAR native skaner.
 class _ScanPickerSheet extends StatelessWidget {
   const _ScanPickerSheet({required this.locale});
 
@@ -335,11 +335,29 @@ class _ScanPickerSheet extends StatelessWidget {
     'kadastr/nsdk_scanner',
   );
 
+  /// Native PCScan (RoomPlan+ObjectCapture) skanerini ochadigan kanal
+  /// (iOS, faqat 17+/LiDAR).
+  static const MethodChannel _pcscanScanner = MethodChannel(
+    'kadastr/pcscan_scanner',
+  );
+
   /// "#1" — nsdk skanerini ochadi. Muvaffaqiyatda varaqni yopamiz (native VC
   /// ustidan ochiladi); qo'llab-quvvatlanmasa ogohlantiramiz.
   Future<void> _openNsdk(BuildContext context) async {
     try {
       await _nsdkScanner.invokeMethod('open');
+      if (context.mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (context.mounted) {
+        AppToast.error(context, _ProfileStrings.scanUnsupported(locale));
+      }
+    }
+  }
+
+  /// "#2" — PCScan skanerini ochadi (nsdk "#1" bilan bir xil oqim).
+  Future<void> _openPcscan(BuildContext context) async {
+    try {
+      await _pcscanScanner.invokeMethod('open');
       if (context.mounted) Navigator.of(context).pop();
     } catch (_) {
       if (context.mounted) {
@@ -389,9 +407,7 @@ class _ScanPickerSheet extends StatelessWidget {
             AppMenuRow(
               icon: Icons.looks_two_outlined,
               label: '#2',
-              onTap: () {
-                // TODO(scan): #2 skan modelini ulash (keyinroq aniqlanadi).
-              },
+              onTap: () => _openPcscan(context),
             ),
           ],
         ),
