@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../widgets/pressable_scale.dart';
 import '../models/service_item.dart';
 
 class ServiceCard extends StatelessWidget {
@@ -14,16 +15,17 @@ class ServiceCard extends StatelessWidget {
     final isWide = item.layout == ServiceLayout.wide;
     final radius = BorderRadius.circular(24);
 
-    return Material(
-      color: const Color(0xFF0E1213),
-      borderRadius: radius,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        child: Stack(
+    return PressableScale(
+      child: Material(
+        color: const Color(0xFF0E1213),
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: Stack(
           children: [
             Positioned.fill(
               child: DecoratedBox(
@@ -91,6 +93,7 @@ class ServiceCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }
