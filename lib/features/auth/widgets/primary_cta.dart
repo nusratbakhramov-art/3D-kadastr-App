@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/pressable_scale.dart';
 
 class PrimaryCta extends StatelessWidget {
   const PrimaryCta({
@@ -31,12 +32,14 @@ class PrimaryCta extends StatelessWidget {
         : (isDark
               ? Colors.white.withValues(alpha: 0.55)
               : const Color(0xFF8A9097));
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(28),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: hapticTap(isActive ? onPressed : null),
+    return PressableScale(
+      enabled: isActive,
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(28),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: hapticTap(isActive ? onPressed : null),
         child: SizedBox(
           height: 56,
           child: Center(
@@ -67,6 +70,7 @@ class PrimaryCta extends StatelessWidget {
                   ),
           ),
         ),
+      ),
       ),
     );
   }

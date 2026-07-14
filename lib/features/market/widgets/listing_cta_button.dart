@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/pressable_scale.dart';
 
 class ListingCtaButton extends StatelessWidget {
   const ListingCtaButton({
@@ -29,20 +30,22 @@ class ListingCtaButton extends StatelessWidget {
               ? Colors.white.withValues(alpha: 0.55)
               : const Color(0xFF8A9097));
 
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(999),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: enabled
-            ? () {
-                HapticFeedback.lightImpact();
-                onTap();
-              }
-            : null,
-        child: SizedBox(
-          height: 56,
-          child: Row(
+    return PressableScale(
+      enabled: enabled,
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: enabled
+              ? () {
+                  HapticFeedback.lightImpact();
+                  onTap();
+                }
+              : null,
+          child: SizedBox(
+            height: 56,
+            child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
@@ -60,6 +63,7 @@ class ListingCtaButton extends StatelessWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
