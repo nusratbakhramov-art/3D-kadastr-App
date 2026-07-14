@@ -5,6 +5,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
@@ -23,9 +24,43 @@ class AppraiserService {
 
   final http.Client _client;
 
+  // Session cache — credentials rarely change, so we fetch them once per app
+  // process and reuse the result across screen opens (About page, AI Baholash
+  // step). Lives only in memory: killing the app clears it, so a fresh launch
+  // fetches again. `_inflight` de-dupes concurrent first requests.
+  static List<AppraiserCredential>? _cache;
+  static Future<List<AppraiserCredential>>? _inflight;
+
+  /// Clears the session cache so the next call re-fetches (e.g. pull-to-refresh
+  /// or after an admin update).
+  static void invalidateCache() {
+    _cache = null;
+    _inflight = null;
+  }
+
   void dispose() => _client.close();
 
-  Future<List<AppraiserCredential>> fetchCredentials() async {
+  Future<List<AppraiserCredential>> fetchCredentials({
+    bool forceRefresh = false,
+  }) {
+    if (!forceRefresh) {
+      // Warm cache → resolve synchronously so FutureBuilder renders instantly
+      // (no loading-spinner flash on re-open).
+      if (_cache != null) return SynchronousFuture(_cache!);
+      if (_inflight != null) return _inflight!;
+    }
+    final future = _load().then((result) {
+      _cache = result; // cache only successful results
+      return result;
+    });
+    _inflight = future;
+    future.whenComplete(() {
+      if (identical(_inflight, future)) _inflight = null;
+    });
+    return future;
+  }
+
+  Future<List<AppraiserCredential>> _load() async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/appraiser/credentials');
     final res = await _client
         .get(uri, headers: {'Accept': 'application/json'})
