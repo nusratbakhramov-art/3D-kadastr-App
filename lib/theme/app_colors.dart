@@ -9,6 +9,10 @@ class AppColors {
   static const Color splashGreen = Color(0xFF00E135);
   static const Color greenBlack = Color(0xFF000702);
 
+  /// Decline-red, paired with [splashGreen] on the home call/chat buttons so
+  /// they read as a native incoming-call accept/decline pair.
+  static const Color declineRed = Color(0xFFFF3B30);
+
   static const Color textBlack = Color(0xFF18181B);
   static const Color buttonTextBlack = Color(0xFF151515);
 
