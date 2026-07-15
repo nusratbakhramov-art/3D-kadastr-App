@@ -1,0 +1,12 @@
+<!-- "Skan qilish" — 3D box, drawn to the menu-tile family contract: 32x32,
+     rx=8 #F4F4F4 tile, black 2px round stroke, glyph inset to ~8..24.
+     The group is scaled from a 24 grid, so stroke-width is pre-divided by the
+     scale (2 / 0.8 = 2.5) to land on the family's 2px. -->
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="32" height="32" rx="8" fill="#F4F4F4"/>
+<g transform="translate(6.4 6.29) scale(0.8)" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>
+<path d="m3.3 7 8.7 5 8.7-5"/>
+<path d="M12 22V12"/>
+</g>
+</svg>

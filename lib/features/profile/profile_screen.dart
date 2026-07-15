@@ -71,8 +71,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         _ProfileStrings.myProfile(locale),
         widget.onMyProfileTap,
       ),
-      _RowSpec.icon(
-        Icons.view_in_ar_outlined,
+      _RowSpec(
+        'assets/icons/menu-scan-3d.svg',
         _ProfileStrings.scan(locale),
         () => _openScanPicker(context),
       ),
@@ -113,8 +113,8 @@ class _ProfileScreenState extends State<ProfileScreen>
     // Mehmon (login qilmagan) uchun cheklangan menyu — faqat Sozlamalar +
     // Yordam. "Skan qilish" hozircha auth'siz ham ko'rinadi (vaqtinchalik).
     final guestRows = <_RowSpec>[
-      _RowSpec.icon(
-        Icons.view_in_ar_outlined,
+      _RowSpec(
+        'assets/icons/menu-scan-3d.svg',
         _ProfileStrings.scan(locale),
         () => _openScanPicker(context),
       ),
