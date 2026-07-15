@@ -164,7 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: false,
             child: SingleChildScrollView(
               clipBehavior: Clip.none,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              // Bottom pad clears the call/chat FABs (56dp + 16dp inset), so
+              // the last card isn't sitting under them at rest.
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
