@@ -5,6 +5,10 @@ import SceneKit
 #if canImport(RoomPlan)
 import RoomPlan
 #endif
+// ScansKit (nsdk) skaner Runner'ga IMPORT/LINK QILINMAYDI — ScansKit iOS 17,
+// Runner iOS 15 (Swift yuqori-min modulni past target'ga import qildirmaydi).
+// Runner uni ish vaqtida `Bundle.load()` bilan yuklab, `NSDKScannerEntry` @objc
+// klassini ObjC runtime orqali chaqiradi (dlopen). Qarang: loadScansKitEntry().
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -393,9 +397,114 @@ import RoomPlan
           result(FlutterMethodNotImplemented)
         }
       }
+
+      // ScansKit (nsdk) scanner — profil skan-picker "#1" shu kanalni chaqiradi.
+      // iOS 17+ + weak-linked ScansKit framework. iOS 15/16'da UNSUPPORTED.
+      let nsdkScannerChannel = FlutterMethodChannel(
+        name: "kadastr/nsdk_scanner",
+        binaryMessenger: controller.binaryMessenger
+      )
+      nsdkScannerChannel.setMethodCallHandler { [weak controller] call, result in
+        switch call.method {
+        case "isAvailable":
+          if #available(iOS 17, *) {
+            result(AppDelegate.loadScansKitEntry() != nil)
+          } else {
+            result(false)
+          }
+
+        case "open":
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
+            return
+          }
+          if #available(iOS 17, *), let entry = AppDelegate.loadScansKitEntry() {
+            let sel = NSSelectorFromString("presentFrom:")
+            if entry.responds(to: sel) {
+              entry.perform(sel, with: controller)
+              result(true)
+            } else {
+              result(FlutterError(code: "ENTRY", message: "ScansKit entry topilmadi", details: nil))
+            }
+          } else {
+            result(FlutterError(code: "UNSUPPORTED", message: "Skan iOS 17+ qurilma talab qiladi", details: nil))
+          }
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      // PCScan (RoomPlan+ObjectCapture) scanner — profil skan-picker "#2" shu
+      // kanalni chaqiradi. iOS 17+ + weak-linked PCScanKit framework. ScansKit
+      // ("#1") ning egizagi; iOS 15/16'da UNSUPPORTED.
+      let pcscanScannerChannel = FlutterMethodChannel(
+        name: "kadastr/pcscan_scanner",
+        binaryMessenger: controller.binaryMessenger
+      )
+      pcscanScannerChannel.setMethodCallHandler { [weak controller] call, result in
+        switch call.method {
+        case "isAvailable":
+          if #available(iOS 17, *) {
+            result(AppDelegate.loadPCScanEntry() != nil)
+          } else {
+            result(false)
+          }
+
+        case "open":
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
+            return
+          }
+          if #available(iOS 17, *), let entry = AppDelegate.loadPCScanEntry() {
+            let sel = NSSelectorFromString("presentFrom:")
+            if entry.responds(to: sel) {
+              entry.perform(sel, with: controller)
+              result(true)
+            } else {
+              result(FlutterError(code: "ENTRY", message: "PCScan entry topilmadi", details: nil))
+            }
+          } else {
+            result(FlutterError(code: "UNSUPPORTED", message: "Skan iOS 17+ qurilma talab qiladi", details: nil))
+          }
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
+  }
+
+  /// PCScanKit.framework'ni (embedded, Runner'ga LINK QILINMAGAN) ish vaqtida
+  /// yuklab, `PCScanEntry` namunasini qaytaradi — `loadScansKitEntry()` egizagi.
+  /// iOS 15/16'da `bundle.load()` false qaytaradi (crash yo'q) va
+  /// NSClassFromString nil beradi, shu sabab nil qaytamiz.
+  private static func loadPCScanEntry() -> NSObject? {
+    guard let url = Bundle.main.privateFrameworksURL?
+            .appendingPathComponent("PCScanKit.framework"),
+          let bundle = Bundle(url: url) else { return nil }
+    if !bundle.isLoaded { bundle.load() }
+    guard let cls = NSClassFromString("PCScanEntry") as? NSObject.Type else {
+      return nil
+    }
+    return cls.init()
+  }
+
+  /// ScansKit.framework'ni (embedded, Runner'ga LINK QILINMAGAN) ish vaqtida
+  /// yuklab, `NSDKScannerEntry` namunasini qaytaradi — framework mavjud va
+  /// yuklanadigan bo'lsa. iOS 15/16'da `bundle.load()` false qaytaradi (crash
+  /// yo'q) va NSClassFromString nil beradi, shu sabab nil qaytamiz.
+  private static func loadScansKitEntry() -> NSObject? {
+    guard let url = Bundle.main.privateFrameworksURL?
+            .appendingPathComponent("ScansKit.framework"),
+          let bundle = Bundle(url: url) else { return nil }
+    if !bundle.isLoaded { bundle.load() }
+    guard let cls = NSClassFromString("NSDKScannerEntry") as? NSObject.Type else {
+      return nil
+    }
+    return cls.init()
   }
 
   private func probe() -> [String: Any] {

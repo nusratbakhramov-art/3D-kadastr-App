@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
@@ -7,6 +8,7 @@ import '../../widgets/app_bell_button.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_menu_card.dart';
 import '../../widgets/app_reveal.dart';
+import '../../widgets/app_toast.dart';
 import '../home/user_profile.dart';
 import '../market/widgets/listing_cta_button.dart';
 import '../onboarding/onboarding_page_data.dart';
@@ -69,6 +71,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         _ProfileStrings.myProfile(locale),
         widget.onMyProfileTap,
       ),
+      _RowSpec.icon(
+        Icons.view_in_ar_outlined,
+        _ProfileStrings.scan(locale),
+        () => _openScanPicker(context),
+      ),
       _RowSpec(
         'assets/icons/menu-scan.svg',
         _ProfileStrings.myScans(locale),
@@ -104,8 +111,13 @@ class _ProfileScreenState extends State<ProfileScreen>
     ];
 
     // Mehmon (login qilmagan) uchun cheklangan menyu — faqat Sozlamalar +
-    // Yordam.
+    // Yordam. "Skan qilish" hozircha auth'siz ham ko'rinadi (vaqtinchalik).
     final guestRows = <_RowSpec>[
+      _RowSpec.icon(
+        Icons.view_in_ar_outlined,
+        _ProfileStrings.scan(locale),
+        () => _openScanPicker(context),
+      ),
       _RowSpec(
         'assets/icons/menu-settings.svg',
         _ProfileStrings.settings(locale),
@@ -294,10 +306,119 @@ class _ProfileScreenState extends State<ProfileScreen>
       ),
     );
   }
+
+  /// "Skan qilish" bosilganda — qaysi skan modelidan foydalanishni tanlash
+  /// varag'ini ochadi. Hozircha #1 / #2 variantlari (onTap'lar bo'sh —
+  /// keyinroq ulanadi).
+  Future<void> _openScanPicker(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: ColorTokens.cardBg(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _ScanPickerSheet(locale: widget.locale),
+    );
+  }
+}
+
+/// "Skan qilish" varag'i — foydalanuvchi qaysi skan modelidan foydalanishni
+/// tanlaydi. Ikki variant: "#1" → nsdk (ScansKit), "#2" → PCScan
+/// (RoomPlan+ObjectCapture). Ikkalasi ham iOS 17+/LiDAR native skaner.
+class _ScanPickerSheet extends StatelessWidget {
+  const _ScanPickerSheet({required this.locale});
+
+  final Locale locale;
+
+  /// Native ScansKit (nsdk) skanerini ochadigan kanal (iOS, faqat 17+/LiDAR).
+  static const MethodChannel _nsdkScanner = MethodChannel(
+    'kadastr/nsdk_scanner',
+  );
+
+  /// Native PCScan (RoomPlan+ObjectCapture) skanerini ochadigan kanal
+  /// (iOS, faqat 17+/LiDAR).
+  static const MethodChannel _pcscanScanner = MethodChannel(
+    'kadastr/pcscan_scanner',
+  );
+
+  /// "#1" — nsdk skanerini ochadi. Muvaffaqiyatda varaqni yopamiz (native VC
+  /// ustidan ochiladi); qo'llab-quvvatlanmasa ogohlantiramiz.
+  Future<void> _openNsdk(BuildContext context) async {
+    try {
+      await _nsdkScanner.invokeMethod('open');
+      if (context.mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (context.mounted) {
+        AppToast.error(context, _ProfileStrings.scanUnsupported(locale));
+      }
+    }
+  }
+
+  /// "#2" — PCScan skanerini ochadi (nsdk "#1" bilan bir xil oqim).
+  Future<void> _openPcscan(BuildContext context) async {
+    try {
+      await _pcscanScanner.invokeMethod('open');
+      if (context.mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (context.mounted) {
+        AppToast.error(context, _ProfileStrings.scanUnsupported(locale));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: ColorTokens.divider(context),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Text(
+                _ProfileStrings.scanPickerTitle(locale),
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: ColorTokens.primaryText(context),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            AppMenuRow(
+              icon: Icons.looks_one_outlined,
+              label: '#1',
+              onTap: () => _openNsdk(context),
+            ),
+            AppMenuRow(
+              icon: Icons.looks_two_outlined,
+              label: '#2',
+              onTap: () => _openPcscan(context),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _RowSpec {
   const _RowSpec(this.iconAsset, this.label, this.onTap) : icon = null;
+  const _RowSpec.icon(this.icon, this.label, this.onTap) : iconAsset = null;
   final String? iconAsset;
   final IconData? icon;
   final String label;
@@ -318,6 +439,25 @@ class _ProfileStrings {
     'en' => 'My profile',
     _ => 'Mening profilim',
   };
+
+  static String scan(Locale l) =>
+      tr(l, 'profile.scan', uz: 'Skan qilish', ru: 'Сканировать', en: 'Scan');
+
+  static String scanPickerTitle(Locale l) => tr(
+    l,
+    'profile.scan_picker_title',
+    uz: 'Skan modelini tanlang',
+    ru: 'Выберите модель сканирования',
+    en: 'Choose scan model',
+  );
+
+  static String scanUnsupported(Locale l) => tr(
+    l,
+    'profile.scan_unsupported',
+    uz: 'Skan bu qurilmada mavjud emas (iOS 17+ va LiDAR kerak)',
+    ru: 'Сканирование недоступно на этом устройстве (нужен iOS 17+ и LiDAR)',
+    en: 'Scanning is unavailable on this device (needs iOS 17+ and LiDAR)',
+  );
 
   static String myScans(Locale l) => switch (l.languageCode) {
     'ru' => 'Мои заявки',
