@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/haptics.dart';
@@ -138,23 +139,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
+      // Pastki-o'ng: qo'ng'iroq — kiruvchi qo'ng'iroqdagi "javob berish" kabi
+      // yashil (chap tomondagi qizil chat bilan juftlikda).
       floatingActionButton: FloatingActionButton(
-        heroTag: 'homeChatFab',
-        onPressed: hapticTap(
-          () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ChatScreen(locale: widget.locale),
-            ),
-          ),
-        ),
+        heroTag: 'homeCallFab',
+        onPressed: hapticTap(_callSupport),
         backgroundColor: AppColors.splashGreen,
         foregroundColor: AppColors.greenBlack,
         tooltip: switch (widget.locale.languageCode) {
-          'ru' => 'Помощник',
-          'en' => 'Assistant',
-          _ => 'Yordamchi',
+          'ru' => 'Позвонить',
+          'en' => 'Call',
+          _ => 'Qo\'ng\'iroq',
         },
-        child: const Icon(Icons.chat_bubble_rounded),
+        child: const Icon(Icons.call_rounded),
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -212,21 +209,39 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-          // Pastki-chap: qo'ng'iroq tugmasi (chat tugmasi bilan bir xil uslub).
+          // Pastki-chap: chat — kiruvchi qo'ng'iroqdagi "rad etish" kabi qizil.
           Positioned(
             left: 16,
             bottom: 16,
             child: FloatingActionButton(
-              heroTag: 'homeCallFab',
-              onPressed: hapticTap(_callSupport),
-              backgroundColor: AppColors.splashGreen,
-              foregroundColor: AppColors.greenBlack,
+              heroTag: 'homeChatFab',
+              onPressed: hapticTap(
+                () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ChatScreen(locale: widget.locale),
+                  ),
+                ),
+              ),
+              backgroundColor: AppColors.declineRed,
+              foregroundColor: Colors.white,
               tooltip: switch (widget.locale.languageCode) {
-                'ru' => 'Позвонить',
-                'en' => 'Call',
-                _ => 'Qo\'ng\'iroq',
+                'ru' => 'Помощник',
+                'en' => 'Assistant',
+                _ => 'Yordamchi',
               },
-              child: const Icon(Icons.call_rounded),
+              // Agent/bot mark — stroke-based, so it needs an explicit tint:
+              // SvgPicture doesn't inherit the FAB's foregroundColor. Sized a
+              // touch over the 24pt icon grid because a stroked glyph reads
+              // lighter than the solid phone it's paired with.
+              child: SvgPicture.asset(
+                'assets/icons/chat-bot.svg',
+                width: 26,
+                height: 26,
+                colorFilter: const ColorFilter.mode(
+                  Colors.white,
+                  BlendMode.srcIn,
+                ),
+              ),
             ),
           ),
         ],
@@ -328,7 +343,7 @@ class _HomePatternBackground extends StatelessWidget {
 }
 
 /// The Home service grid — the rich dark cards brought over from the (removed)
-/// Services page: two square cards (3D Kadastr, AI Baholash) + one wide card
+/// Services page: two square cards (AI Baholash, 3D Kadastr) + one wide card
 /// (Kalkulyator), each with an accent glow and a 3D image. Market lives in the
 /// bottom tab + "Top modellar", so it's not a card here.
 class _CardsGrid extends StatelessWidget {
@@ -377,7 +392,12 @@ class _CardsGrid extends StatelessWidget {
       builder: (context, constraints) {
         final squareWidth = (constraints.maxWidth - gap) / 2;
         const squareAspect = 0.84;
-        final squareHeight = squareWidth / squareAspect;
+        // The cards are sized by aspect ratio, so on a Pro Max-class phone the
+        // extra width used to stretch them ~30pt taller than the artwork and
+        // copy need — a dead gap under the subtitle, and "Top modellar" pushed
+        // off-screen. Cap the height so surplus width widens the cards instead
+        // of stretching them; narrow phones keep the original proportions.
+        final squareHeight = (squareWidth / squareAspect).clamp(150.0, 208.0);
         final wideHeight = (squareHeight * 0.88).clamp(160.0, 240.0);
 
         return Column(
@@ -389,15 +409,15 @@ class _CardsGrid extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ServiceCard(
-                      item: kadastr,
-                      onTap: onOpenKadastr3d ?? () {},
+                      item: ai,
+                      onTap: onOpenAiValuation ?? () {},
                     ),
                   ),
                   const SizedBox(width: gap),
                   Expanded(
                     child: ServiceCard(
-                      item: ai,
-                      onTap: onOpenAiValuation ?? () {},
+                      item: kadastr,
+                      onTap: onOpenKadastr3d ?? () {},
                     ),
                   ),
                 ],
