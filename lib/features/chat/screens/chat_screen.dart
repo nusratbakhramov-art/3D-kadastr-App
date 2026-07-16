@@ -1,4 +1,4 @@
-import 'dart:async' show Timer;
+import 'dart:async' show Completer, StreamSubscription, Timer;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -31,6 +31,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _sending = false;
   double _lastInset = 0;
 
+  /// Held so the reply can actually be cancelled. An `await for` loop can only
+  /// break when the *next* event arrives, which is useless for a stop button —
+  /// a stalled stream would ignore it.
+  StreamSubscription<ChatStreamEvent>? _sub;
+  Completer<void>? _done;
+  bool _stopped = false;
+
   String get _lang => widget.locale.languageCode;
 
   @override
@@ -42,6 +49,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _sub?.cancel();
     _input.dispose();
     _scroll.dispose();
     super.dispose();
@@ -98,42 +106,80 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _input.clear();
     _jumpToBottom();
 
-    try {
-      await for (final ev in _api.streamReply(
-        message: text,
-        conversationId: _conversationId,
-        lang: _lang,
-      )) {
-        if (!mounted) return;
-        switch (ev.type) {
-          case 'meta':
-            _conversationId = ev.conversationId ?? _conversationId;
-          case 'delta':
-            setState(() => assistant.content += ev.content ?? '');
-            _followBottom();
-          case 'error':
-            setState(() {
-              final sep = assistant.content.isEmpty ? '' : '\n\n';
-              assistant.content += sep + (ev.content ?? _S.errorGeneric(_lang));
-            });
-        }
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          if (assistant.content.isEmpty) {
-            assistant.content = _S.errorConnect(_lang);
-          }
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          assistant.isStreaming = false;
-          _sending = false;
-        });
-      }
+    final done = Completer<void>();
+    _done = done;
+    _stopped = false;
+
+    _sub = _api
+        .streamReply(
+          message: text,
+          conversationId: _conversationId,
+          lang: _lang,
+        )
+        .listen(
+          (ev) {
+            if (!mounted) return;
+            switch (ev.type) {
+              case 'meta':
+                _conversationId = ev.conversationId ?? _conversationId;
+              case 'delta':
+                setState(() => assistant.content += ev.content ?? '');
+                _followBottom();
+              case 'error':
+                setState(() {
+                  final sep = assistant.content.isEmpty ? '' : '\n\n';
+                  assistant.content +=
+                      sep + (ev.content ?? _S.errorGeneric(_lang));
+                });
+            }
+          },
+          onError: (Object _) {
+            if (mounted && assistant.content.isEmpty) {
+              setState(() => assistant.content = _S.errorConnect(_lang));
+            }
+            if (!done.isCompleted) done.complete();
+          },
+          onDone: () {
+            if (!done.isCompleted) done.complete();
+          },
+          cancelOnError: true,
+        );
+
+    await done.future;
+    await _sub?.cancel();
+    _sub = null;
+    _done = null;
+
+    if (mounted) {
+      setState(() {
+        assistant.isStreaming = false;
+        // Stopped before a single token landed — drop the turn rather than
+        // leave an empty bubble sitting there.
+        if (_stopped && assistant.content.isEmpty) _messages.remove(assistant);
+        _sending = false;
+      });
     }
+    _stopped = false;
+  }
+
+  /// Cancels an in-flight reply. Keeps whatever already streamed in.
+  void _stop() {
+    if (!_sending) return;
+    _stopped = true;
+    _sub?.cancel();
+    _sub = null;
+    // Releases the awaiting _send, which does the cleanup in one place.
+    if (_done?.isCompleted == false) _done!.complete();
+  }
+
+  /// Clears the thread and forgets the server-side conversation, so the next
+  /// question starts fresh instead of inheriting the whole history.
+  void _newChat() {
+    _stop();
+    setState(() {
+      _messages.clear();
+      _conversationId = null;
+    });
   }
 
   @override
@@ -174,9 +220,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         systemOverlayStyle: isDark
             ? SystemUiOverlayStyle.light
             : SystemUiOverlayStyle.dark,
-        // Explicit: AppBarTheme.titleTextStyle hardcodes white, and it wins
-        // over foregroundColor — which rendered a white title on the old white
-        // bar in light mode.
+        // Smaller than the app's 20dp bars — this header is meant to recede.
+        // The colour has to be repeated: naming titleTextStyle at all blocks
+        // foregroundColor from reaching the title (AppBar only applies it to
+        // the *defaults*), so omitting it here leaves the title colourless.
         titleTextStyle: TextStyle(
           fontFamily: 'MTSCompact',
           fontSize: 17,
@@ -201,6 +248,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             ),
           ],
         ),
+        actions: [
+          // Only offered once there's a thread to clear.
+          if (_messages.isNotEmpty)
+            IconButton(
+              onPressed: hapticTap(_newChat),
+              tooltip: _S.newChat(_lang),
+              icon: const Icon(Icons.edit_square, size: 20),
+            ),
+        ],
       ),
       // The input floats *over* the list rather than sitting beside it in a
       // Column — that's what lets messages dissolve behind it instead of being
@@ -247,9 +303,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             child: _InputBar(
               controller: _input,
               isDark: isDark,
-              enabled: !_sending,
+              sending: _sending,
               hint: _S.hint(_lang),
               onSend: _send,
+              onStop: _stop,
             ),
           ),
         ],
@@ -390,6 +447,45 @@ class _Bubble extends StatelessWidget {
     final textColor = isUser
         ? AppColors.greenBlack
         : (isDark ? Colors.white : AppColors.textBlack);
+
+    // The assistant writes paragraphs, so its reply is set as a document, not
+    // a text message: full width, no bubble, the mark alongside. A 78%-wide
+    // bubble is what made long answers feel cramped. Only the user — who sends
+    // short lines — keeps a bubble.
+    if (!isUser) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 8, 14),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: SvgPicture.asset(
+                'assets/icons/tab-home.svg',
+                width: 15,
+                height: 15,
+                colorFilter: const ColorFilter.mode(
+                  AppColors.splashGreen,
+                  BlendMode.srcIn,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: SelectableText(
+                message.content,
+                style: TextStyle(
+                  color: textColor,
+                  fontSize: 15,
+                  height: 1.45,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Align(
@@ -550,16 +646,18 @@ class _InputBar extends StatefulWidget {
   const _InputBar({
     required this.controller,
     required this.isDark,
-    required this.enabled,
+    required this.sending,
     required this.hint,
     required this.onSend,
+    required this.onStop,
   });
 
   final TextEditingController controller;
   final bool isDark;
-  final bool enabled;
+  final bool sending;
   final String hint;
   final ValueChanged<String> onSend;
+  final VoidCallback onStop;
 
   @override
   State<_InputBar> createState() => _InputBarState();
@@ -596,7 +694,7 @@ class _InputBarState extends State<_InputBar> {
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
     final controller = widget.controller;
-    final enabled = widget.enabled;
+    final sending = widget.sending;
     final onSend = widget.onSend;
 
     final textColor = isDark ? Colors.white : AppColors.textBlack;
@@ -607,7 +705,10 @@ class _InputBarState extends State<_InputBar> {
         ? Colors.white.withValues(alpha: 0.13)
         : Colors.black.withValues(alpha: 0.09);
     // Send only lights up when there's something to send.
-    final canSend = enabled && _hasText;
+    final canSend = !sending && _hasText;
+    // While a reply streams the button becomes stop — always live, because a
+    // stalled answer is exactly when you need it.
+    final active = sending || canSend;
     final radius = BorderRadius.circular(26);
 
     return SafeArea(
@@ -660,9 +761,10 @@ class _InputBarState extends State<_InputBar> {
                   children: [
                     Expanded(
                       child: TextField(
+                        // Stays live while a reply streams — you can draft the
+                        // next question; only sending is gated.
                         controller: controller,
                         focusNode: _focus,
-                        enabled: enabled,
                         minLines: 1,
                         maxLines: 4,
                         // Return inserts a newline; sending is the button's job.
@@ -724,22 +826,26 @@ class _InputBarState extends State<_InputBar> {
                     const SizedBox(width: 8),
                     GestureDetector(
                       onTap: hapticTap(
-                        canSend ? () => onSend(controller.text) : null,
+                        sending
+                            ? widget.onStop
+                            : (canSend ? () => onSend(controller.text) : null),
                       ),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 180),
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: canSend
+                          color: active
                               ? AppColors.splashGreen
                               : textColor.withValues(alpha: 0.10),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
-                          Icons.arrow_upward_rounded,
-                          size: 19,
-                          color: canSend
+                          sending
+                              ? Icons.stop_rounded
+                              : Icons.arrow_upward_rounded,
+                          size: sending ? 20 : 19,
+                          color: active
                               ? AppColors.greenBlack
                               : textColor.withValues(alpha: 0.3),
                         ),
@@ -891,6 +997,9 @@ class _S {
 
   static String thinking(String l) =>
       _p(l, "O'ylayapman…", 'Думаю…', 'Thinking…');
+
+  static String newChat(String l) =>
+      _p(l, 'Yangi suhbat', 'Новый чат', 'New chat');
 
   /// "Salom, Ilxomjon." — falls back to a plain greeting for guests, and for
   /// anyone whose profile hasn't loaded yet.
