@@ -5,19 +5,22 @@
 /// opens the shared full-screen zoomable gallery.
 library;
 
-import 'package:flutter/material.dart';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+
+import '../../core/app_version.dart';
 import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/remote_image.dart';
+import '../applications/pdf_viewer_screen.dart';
 import '../market/widgets/fullscreen_gallery.dart';
 import '../services/api_appraiser_service.dart';
-
-/// Mirrors pubspec `version:` — bump alongside a release.
-const String _kAppVersion = '1.0.2';
 
 class AboutAppScreen extends StatefulWidget {
   const AboutAppScreen({super.key});
@@ -31,20 +34,67 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
   late final Future<List<AppraiserCredential>> _future = _service
       .fetchCredentials();
 
+  /// Guards against a second tap while a PDF is downloading.
+  bool _busyPdf = false;
+
   @override
   void dispose() {
     _service.dispose();
     super.dispose();
   }
 
-  void _openDoc(List<AppraiserCredential> creds, AppraiserCredential tapped) {
+  Future<void> _openDoc(
+    List<AppraiserCredential> creds,
+    AppraiserCredential tapped,
+  ) async {
+    // PDFs can't go through the image gallery — download and hand to the PDF
+    // viewer, which needs a local path.
+    if (tapped.isPdf) {
+      await _openPdf(tapped);
+      return;
+    }
+    // Gallery holds images only, so swiping never lands on a PDF that can't
+    // render.
     final images = creds
-        .where((c) => c.imageUrl.isNotEmpty)
+        .where((c) => !c.isPdf && c.imageUrl.isNotEmpty)
         .map((c) => c.imageUrl)
         .toList();
     final start = images.indexOf(tapped.imageUrl);
     if (start < 0) return;
     openFullscreenGallery(context, images: images, initialIndex: start);
+  }
+
+  Future<void> _openPdf(AppraiserCredential doc) async {
+    if (doc.imageUrl.isEmpty || _busyPdf) return;
+    setState(() => _busyPdf = true);
+    try {
+      final res = await http
+          .get(Uri.parse(doc.imageUrl))
+          .timeout(const Duration(seconds: 30));
+      if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');
+      final dir = await getTemporaryDirectory();
+      // Name it after the document so the viewer's share sheet is meaningful.
+      final safe = doc.title.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
+      final file = File('${dir.path}/${safe.isEmpty ? 'hujjat' : safe}.pdf');
+      await file.writeAsBytes(res.bodyBytes);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              PdfViewerScreen(filePath: file.path, title: doc.title),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_S.openError(Localizations.localeOf(context))),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busyPdf = false);
+    }
   }
 
   @override
@@ -70,15 +120,12 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                     builder: (context, snap) {
                       final loading =
                           snap.connectionState == ConnectionState.waiting;
-                      final creds =
-                          snap.data ?? const <AppraiserCredential>[];
+                      final creds = snap.data ?? const <AppraiserCredential>[];
                       return ListView(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                         children: [
                           _AppIdentity(isDark: isDark, locale: l),
-                          const SizedBox(height: 24),
-                          _SectionLabel(text: _S.docsSection(l), isDark: isDark),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 20),
                           if (loading)
                             const Padding(
                               padding: EdgeInsets.symmetric(vertical: 32),
@@ -91,14 +138,25 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                           else if (creds.isEmpty)
                             _EmptyNote(text: _S.empty(l), isDark: isDark)
                           else
-                            for (final c in creds) ...[
-                              _CredentialCard(
-                                credential: c,
-                                viewHint: _S.viewHint(l),
+                            // One section per service line. An empty category
+                            // never appears — it isn't in the payload at all.
+                            for (final entry
+                                in groupCredentialsByCategory(creds).entries) ...[
+                              const SizedBox(height: 12),
+                              _SectionLabel(
+                                text: entry.key.name(l.languageCode),
                                 isDark: isDark,
-                                onTap: () => _openDoc(creds, c),
+                                count: entry.value.length,
                               ),
-                              const SizedBox(height: 10),
+                              const SizedBox(height: 4),
+                              for (var i = 0; i < entry.value.length; i++)
+                                _CredentialRow(
+                                  credential: entry.value[i],
+                                  viewHint: _S.viewHint(l),
+                                  isDark: isDark,
+                                  isLast: i == entry.value.length - 1,
+                                  onTap: () => _openDoc(creds, entry.value[i]),
+                                ),
                             ],
                         ],
                       );
@@ -148,10 +206,28 @@ class _AppIdentity extends StatelessWidget {
             color: titleColor,
           ),
         ),
-        const SizedBox(height: 4),
-        Text(
-          '${_S.versionLabel(locale)} $_kAppVersion',
-          style: TextStyle(fontFamily: 'MTSText', fontSize: 13, color: muted),
+        const SizedBox(height: 6),
+        // A chip, not grey body text: the version is the one fact people come
+        // to this screen to read out to support.
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.splashGreen.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: AppColors.splashGreen.withValues(alpha: 0.30),
+            ),
+          ),
+          child: Text(
+            '${_S.versionLabel(locale)} $kAppVersionFull',
+            style: const TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w600,
+              fontSize: 11.5,
+              height: 1.1,
+              color: AppColors.splashGreen,
+            ),
+          ),
         ),
         const SizedBox(height: 12),
         Text(
@@ -170,10 +246,13 @@ class _AppIdentity extends StatelessWidget {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.text, required this.isDark});
+  const _SectionLabel({required this.text, required this.isDark, this.count});
 
   final String text;
   final bool isDark;
+
+  /// Shown as a chip once the documents have loaded. Null while loading.
+  final int? count;
 
   @override
   Widget build(BuildContext context) {
@@ -197,87 +276,119 @@ class _SectionLabel extends StatelessWidget {
             ),
           ),
         ),
+        if (count != null && count! > 0)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: AppColors.splashGreen.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                color: AppColors.splashGreen.withValues(alpha: 0.28),
+              ),
+            ),
+            child: Text(
+              '$count',
+              style: const TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w600,
+                fontSize: 10.5,
+                height: 1.1,
+                color: AppColors.splashGreen,
+              ),
+            ),
+          ),
       ],
     );
   }
 }
 
-// ── One credential document (mirrors the AI Baholash credentials card) ─
-class _CredentialCard extends StatelessWidget {
-  const _CredentialCard({
+/// One credential document, as a quiet row.
+///
+/// Was a bordered card repeating "Ko'rish uchun bosing" and a ⤢ glyph on every
+/// entry — ten elements saying what one says. Now: hairline rows, the hint
+/// collapsed into a single green affordance, and no card chrome competing with
+/// the documents themselves.
+class _CredentialRow extends StatelessWidget {
+  const _CredentialRow({
     required this.credential,
     required this.viewHint,
     required this.isDark,
+    required this.isLast,
     required this.onTap,
   });
 
   final AppraiserCredential credential;
   final String viewHint;
   final bool isDark;
+  final bool isLast;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final surface = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final titleColor = isDark ? Colors.white : AppColors.textBlack;
-    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+    final divider = isDark
+        ? Colors.white.withValues(alpha: 0.07)
+        : Colors.black.withValues(alpha: 0.07);
 
-    return Material(
-      color: surface,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: hapticTap(onTap),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: border),
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 58,
-                  height: 78,
-                  child: RemoteImage(
-                    url: credential.imageUrl,
-                    fit: BoxFit.cover,
-                    memCacheWidth: 240,
-                  ),
+    return InkWell(
+      onTap: hapticTap(onTap),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2),
+        decoration: BoxDecoration(
+          border: isLast ? null : Border(bottom: BorderSide(color: divider)),
+        ),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(5),
+              child: SizedBox(
+                width: 36,
+                height: 47,
+                // A PDF has no thumbnail to fetch — RemoteImage would just show
+                // a broken placeholder. Show what it is instead.
+                child: credential.isPdf
+                    ? ColoredBox(
+                        color: AppColors.declineRed.withValues(alpha: 0.12),
+                        child: const Center(
+                          child: Icon(
+                            Icons.picture_as_pdf_rounded,
+                            size: 20,
+                            color: AppColors.declineRed,
+                          ),
+                        ),
+                      )
+                    : RemoteImage(
+                        url: credential.imageUrl,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 150,
+                      ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                credential.title,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13.5,
+                  height: 1.3,
+                  color: titleColor,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      credential.title,
-                      style: TextStyle(
-                        fontFamily: 'MTSCompact',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.5,
-                        color: titleColor,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      viewHint,
-                      style: TextStyle(
-                        fontFamily: 'MTSText',
-                        fontSize: 12,
-                        color: muted,
-                      ),
-                    ),
-                  ],
-                ),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              viewHint,
+              style: const TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+                height: 1.1,
+                color: AppColors.splashGreen,
               ),
-              Icon(Icons.zoom_out_map_rounded, size: 20, color: muted),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -322,48 +433,30 @@ class _S {
     en: 'About app',
   );
 
-  static String appName(Locale l) => tr(
-    l,
-    'about.app_name',
-    uz: 'Kadastr',
-    ru: 'Kadastr',
-    en: 'Kadastr',
-  );
+  static String appName(Locale l) =>
+      tr(l, 'about.app_name', uz: 'Kadastr', ru: 'Kadastr', en: 'Kadastr');
 
-  static String versionLabel(Locale l) => tr(
-    l,
-    'about.version',
-    uz: 'Versiya',
-    ru: 'Версия',
-    en: 'Version',
-  );
+  static String versionLabel(Locale l) =>
+      tr(l, 'about.version', uz: 'Versiya', ru: 'Версия', en: 'Version');
 
   static String tagline(Locale l) => tr(
     l,
     'about.tagline',
-    uz: 'Ko\'chmas mulkni baholash, 3D kadastr va xizmatlar hisobi — '
+    uz:
+        'Ko\'chmas mulkni baholash, 3D kadastr va xizmatlar hisobi — '
         'litsenziyalangan ekspertlar bilan.',
-    ru: 'Оценка недвижимости, 3D-кадастр и расчёт услуг — с лицензированными '
+    ru:
+        'Оценка недвижимости, 3D-кадастр и расчёт услуг — с лицензированными '
         'экспертами.',
-    en: 'Property valuation, 3D cadastre and service estimates — backed by '
+    en:
+        'Property valuation, 3D cadastre and service estimates — backed by '
         'licensed experts.',
   );
 
-  static String docsSection(Locale l) => tr(
-    l,
-    'about.docs_section',
-    uz: 'Baholovchi hujjatlari',
-    ru: 'Документы оценщика',
-    en: 'Appraiser documents',
-  );
-
-  static String viewHint(Locale l) => tr(
-    l,
-    'about.view_hint',
-    uz: 'Ko\'rish uchun bosing',
-    ru: 'Нажмите, чтобы открыть',
-    en: 'Tap to view',
-  );
+  // Short, because it now sits on every row as the tap affordance rather than
+  // as a sentence of instructions under each title.
+  static String viewHint(Locale l) =>
+      tr(l, 'about.view_hint', uz: 'Ko\'rish →', ru: 'Открыть →', en: 'View →');
 
   static String empty(Locale l) => tr(
     l,
@@ -371,5 +464,13 @@ class _S {
     uz: 'Hujjatlar hozircha mavjud emas',
     ru: 'Документы пока недоступны',
     en: 'Documents are not available yet',
+  );
+
+  static String openError(Locale l) => tr(
+    l,
+    'about.open_error',
+    uz: 'Hujjatni ochib bo\'lmadi',
+    ru: 'Не удалось открыть документ',
+    en: 'Could not open the document',
   );
 }

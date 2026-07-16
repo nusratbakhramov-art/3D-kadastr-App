@@ -7,13 +7,18 @@
 /// payment sheet. Resilient: if the docs fail to load, the user can still pay.
 library;
 
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/remote_image.dart';
 import '../../market/widgets/fullscreen_gallery.dart';
 import '../../market/widgets/listing_cta_button.dart';
+import '../../applications/pdf_viewer_screen.dart';
 import '../../payments/ai_payment_sheet.dart';
 import '../api_appraiser_service.dart';
 import '../widgets/service_app_bar.dart';
@@ -30,8 +35,13 @@ class AiCredentialsScreen extends StatefulWidget {
 
 class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
   final AppraiserService _service = AppraiserService();
+
   late final Future<List<AppraiserCredential>> _future = _service
-      .fetchCredentials();
+      .fetchCredentials()
+      .then(appraiserCredentialsOnly);
+
+  /// Guards against a second tap while a PDF is downloading.
+  bool _busyPdf = false;
 
   @override
   void dispose() {
@@ -39,14 +49,56 @@ class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
     super.dispose();
   }
 
-  void _openDoc(List<AppraiserCredential> creds, AppraiserCredential tapped) {
+  Future<void> _openDoc(
+    List<AppraiserCredential> creds,
+    AppraiserCredential tapped,
+  ) async {
+    if (tapped.isPdf) {
+      await _openPdf(tapped);
+      return;
+    }
+    // Images only — the gallery can't render a PDF, so swiping must never land
+    // on one.
     final images = creds
-        .where((c) => c.imageUrl.isNotEmpty)
+        .where((c) => !c.isPdf && c.imageUrl.isNotEmpty)
         .map((c) => c.imageUrl)
         .toList();
     final start = images.indexOf(tapped.imageUrl);
     if (start < 0) return;
     openFullscreenGallery(context, images: images, initialIndex: start);
+  }
+
+  /// The PDF viewer needs a local path, so fetch to a temp file first.
+  Future<void> _openPdf(AppraiserCredential doc) async {
+    if (doc.imageUrl.isEmpty || _busyPdf) return;
+    setState(() => _busyPdf = true);
+    try {
+      final res = await http
+          .get(Uri.parse(doc.imageUrl))
+          .timeout(const Duration(seconds: 30));
+      if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');
+      final dir = await getTemporaryDirectory();
+      final safe = doc.title.replaceAll(RegExp(r'[^\w\s-]'), '').trim();
+      final file = File('${dir.path}/${safe.isEmpty ? 'hujjat' : safe}.pdf');
+      await file.writeAsBytes(res.bodyBytes);
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              PdfViewerScreen(filePath: file.path, title: doc.title),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_S.openError(Localizations.localeOf(context))),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _busyPdf = false);
+    }
   }
 
   @override
@@ -206,11 +258,24 @@ class _CredentialCard extends StatelessWidget {
                 child: SizedBox(
                   width: 58,
                   height: 78,
-                  child: RemoteImage(
-                    url: credential.imageUrl,
-                    fit: BoxFit.cover,
-                    memCacheWidth: 240,
-                  ),
+                  // A PDF has no thumbnail to fetch — RemoteImage would show a
+                  // broken placeholder.
+                  child: credential.isPdf
+                      ? ColoredBox(
+                          color: AppColors.declineRed.withValues(alpha: 0.12),
+                          child: const Center(
+                            child: Icon(
+                              Icons.picture_as_pdf_rounded,
+                              size: 26,
+                              color: AppColors.declineRed,
+                            ),
+                          ),
+                        )
+                      : RemoteImage(
+                          url: credential.imageUrl,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 240,
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -309,5 +374,11 @@ class _S {
     'ru' => 'Документы пока недоступны',
     'en' => 'Documents are not available yet',
     _ => 'Hujjatlar hozircha mavjud emas',
+  };
+
+  static String openError(Locale l) => switch (l.languageCode) {
+    'ru' => 'Не удалось открыть документ',
+    'en' => 'Could not open the document',
+    _ => 'Hujjatni ochib bo\'lmadi',
   };
 }
