@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -16,6 +17,7 @@ import '../chat/screens/chat_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
 import '../services/models/service_item.dart';
 import '../services/widgets/service_card.dart';
+import '../../widgets/gradient_surface.dart';
 import 'user_profile.dart';
 import 'widgets/home_header.dart';
 
@@ -51,7 +53,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   late final MarketController _marketController;
+  final ScrollController _scroll = ScrollController();
   final SupportService _supportService = SupportService();
+
+  /// The FABs float over the feed, so at rest they cover whatever happens to be
+  /// under them — bottom padding only buys clearance at the *end* of the
+  /// scroll. Getting out of the way while the user is actually moving through
+  /// the content is the part that matters.
+  bool _fabsVisible = true;
   SupportInfo _supportInfo = const SupportInfo(
     phone: SupportService.fallbackPhone,
   );
@@ -64,6 +73,23 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     unawaited(_marketController.initialize());
     unawaited(_loadSupportInfo());
+    _scroll.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    // Reverse == dragging content up (reading downward). Hide then; bring them
+    // back the moment the user scrolls up, which is when they're heading for
+    // the buttons anyway.
+    final show =
+        _scroll.position.userScrollDirection != ScrollDirection.reverse;
+    if (show != _fabsVisible) setState(() => _fabsVisible = show);
   }
 
   Future<void> _loadSupportInfo() async {
@@ -141,17 +167,20 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: backgroundColor,
       // Pastki-o'ng: qo'ng'iroq — kiruvchi qo'ng'iroqdagi "javob berish" kabi
       // yashil (chap tomondagi qizil chat bilan juftlikda).
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'homeCallFab',
-        onPressed: hapticTap(_callSupport),
-        backgroundColor: AppColors.splashGreen,
-        foregroundColor: AppColors.greenBlack,
-        tooltip: switch (widget.locale.languageCode) {
-          'ru' => 'Позвонить',
-          'en' => 'Call',
-          _ => 'Qo\'ng\'iroq',
-        },
-        child: const Icon(Icons.call_rounded),
+      floatingActionButton: _FabReveal(
+        visible: _fabsVisible,
+        child: _GradientFab(
+          light: AppColors.callGreenLight,
+          base: AppColors.callGreen,
+          deep: AppColors.callGreenDeep,
+          onTap: hapticTap(_callSupport),
+          tooltip: switch (widget.locale.languageCode) {
+            'ru' => 'Позвонить',
+            'en' => 'Call',
+            _ => 'Qo\'ng\'iroq',
+          },
+          child: const Icon(Icons.call_rounded, size: 26, color: Colors.white),
+        ),
       ),
       body: Stack(
         fit: StackFit.expand,
@@ -163,6 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
           SafeArea(
             bottom: false,
             child: SingleChildScrollView(
+              controller: _scroll,
               clipBehavior: Clip.none,
               // Bottom pad clears the call/chat FABs (56dp + 16dp inset), so
               // the last card isn't sitting under them at rest.
@@ -215,33 +245,35 @@ class _HomeScreenState extends State<HomeScreen> {
           Positioned(
             left: 16,
             bottom: 16,
-            child: FloatingActionButton(
-              heroTag: 'homeChatFab',
-              onPressed: hapticTap(
-                () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ChatScreen(locale: widget.locale),
+            child: _FabReveal(
+              visible: _fabsVisible,
+              child: _GradientFab(
+                light: AppColors.chatRedLight,
+                base: AppColors.declineRed,
+                deep: AppColors.chatRedDeep,
+                onTap: hapticTap(
+                  () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ChatScreen(locale: widget.locale),
+                    ),
                   ),
                 ),
-              ),
-              backgroundColor: AppColors.declineRed,
-              foregroundColor: Colors.white,
-              tooltip: switch (widget.locale.languageCode) {
-                'ru' => 'Помощник',
-                'en' => 'Assistant',
-                _ => 'Yordamchi',
-              },
-              // Agent/bot mark — stroke-based, so it needs an explicit tint:
-              // SvgPicture doesn't inherit the FAB's foregroundColor. Sized a
-              // touch over the 24pt icon grid because a stroked glyph reads
-              // lighter than the solid phone it's paired with.
-              child: SvgPicture.asset(
-                'assets/icons/chat-bot.svg',
-                width: 26,
-                height: 26,
-                colorFilter: const ColorFilter.mode(
-                  Colors.white,
-                  BlendMode.srcIn,
+                tooltip: switch (widget.locale.languageCode) {
+                  'ru' => 'Помощник',
+                  'en' => 'Assistant',
+                  _ => 'Yordamchi',
+                },
+                // Agent/bot mark — stroke-based, so it needs an explicit tint.
+                // Sized a touch over the 24pt icon grid because a stroked glyph
+                // reads lighter than the solid phone it's paired with.
+                child: SvgPicture.asset(
+                  'assets/icons/chat-bot.svg',
+                  width: 26,
+                  height: 26,
+                  colorFilter: const ColorFilter.mode(
+                    Colors.white,
+                    BlendMode.srcIn,
+                  ),
                 ),
               ),
             ),
@@ -251,11 +283,81 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  static String _sectionTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Топ модели',
-    'en' => 'Top models',
-    _ => 'Top modellar',
-  };
+  // Keyed so the panel can reword it; "home.see_all" beside it already is.
+  static String _sectionTitle(Locale l) => tr(
+    l,
+    'home.section.top_models',
+    uz: 'Top modellar',
+    ru: 'Топ модели',
+    en: 'Top models',
+  );
+}
+
+/// Gradient-glass action button — the home call/chat pair.
+///
+/// Not a [FloatingActionButton]: that paints a single flat `backgroundColor`,
+/// and a solid 56dp swatch is exactly what made these read as cheap. The look
+/// itself lives in [GradientSurface], shared with the carousel chip these float
+/// over.
+class _GradientFab extends StatelessWidget {
+  const _GradientFab({
+    required this.light,
+    required this.base,
+    required this.deep,
+    required this.onTap,
+    required this.tooltip,
+    required this.child,
+  });
+
+  final Color light;
+  final Color base;
+  final Color deep;
+  final VoidCallback? onTap;
+  final String tooltip;
+  final Widget child;
+
+  static const double _size = 56;
+  // Squircle, not a circle: at _size/2 these read as two plain dots, and the
+  // rounded-square is what made the reference mock feel like a lit object.
+  static const double _radius = 16;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GradientSurface(
+        light: light,
+        base: base,
+        deep: deep,
+        size: _size,
+        radius: _radius,
+        onTap: onTap,
+        child: child,
+      ),
+    );
+  }
+}
+
+/// Scales + fades a FAB away while the feed scrolls under it.
+class _FabReveal extends StatelessWidget {
+  const _FabReveal({required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedScale(
+      scale: visible ? 1 : 0,
+      duration: const Duration(milliseconds: 170),
+      curve: Curves.easeOutCubic,
+      child: AnimatedOpacity(
+        opacity: visible ? 1 : 0,
+        duration: const Duration(milliseconds: 170),
+        child: child,
+      ),
+    );
+  }
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -463,12 +565,15 @@ class _CardStrings {
     'Calculate service prices and submit an application.',
   );
 
+  // Fallbacks track what the admin panel already serves. They only surface
+  // before the i18n bundle lands (first launch, offline), and drifting from
+  // the panel means the old wording flashes on exactly those launches.
   static String aiValuation(Locale l) => _pick(
     l,
     'home.card.ai_valuation',
-    'AI baholash',
-    'AI оценка',
-    'AI valuation',
+    'Ai baholash',
+    'Ai оценка',
+    'Ai valuation',
   );
 
   static String aiValuationSub(Locale l) => _pick(
@@ -482,9 +587,9 @@ class _CardStrings {
   static String calculator(Locale l) => _pick(
     l,
     'home.card.calculator',
-    'Kalkulyator',
-    'Калькулятор',
-    'Calculator',
+    'Ai Kalkulyator',
+    'Ai Калькулятор',
+    'Ai calculator',
   );
 
   static String calculatorSub(Locale l) => _pick(

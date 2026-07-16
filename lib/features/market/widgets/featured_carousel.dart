@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../theme/app_colors.dart';
+import '../../../widgets/gradient_surface.dart';
 import '../../../widgets/remote_image.dart';
 import '../market_controller.dart';
 import '../models/market_listing.dart';
@@ -93,10 +94,16 @@ class _FeaturedCarouselState extends State<FeaturedCarousel> {
                       // as the subject. Anchored left: padEnds is false, so the
                       // active card is the leftmost one and its edge must not
                       // drift while the others shrink.
+                      //
+                      // Scale carries the depth; the fade is only a hint. It
+                      // stays shallow because Opacity blends toward whatever is
+                      // behind it — on the light background a deeper fade turned
+                      // the neighbouring photo milky, which read as a broken
+                      // image rather than a card standing further back.
                       return Transform.scale(
                         scale: 0.92 + 0.08 * t,
                         alignment: Alignment.centerLeft,
-                        child: Opacity(opacity: 0.55 + 0.45 * t, child: child),
+                        child: Opacity(opacity: 0.88 + 0.12 * t, child: child),
                       );
                     },
                     child: Padding(
@@ -264,20 +271,20 @@ class _GlassPanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                width: 28,
-                height: 28,
-                decoration: BoxDecoration(
-                  color: AppColors.splashGreen.withValues(alpha: 0.16),
-                  borderRadius: BorderRadius.circular(9),
-                  border: Border.all(
-                    color: AppColors.splashGreen.withValues(alpha: 0.45),
-                  ),
-                ),
-                child: const Icon(
+              // Same gradient material as the home call/chat FABs that float
+              // over this card. As a flat green-tinted outline it was the odd
+              // one out on the screen and read as decoration; on the shared
+              // surface it reads as the button it always was.
+              const GradientSurface(
+                light: AppColors.callGreenLight,
+                base: AppColors.callGreen,
+                deep: AppColors.callGreenDeep,
+                size: 28,
+                radius: 9,
+                child: Icon(
                   Icons.arrow_forward_rounded,
                   size: 15,
-                  color: AppColors.splashGreen,
+                  color: Colors.white,
                 ),
               ),
             ],
