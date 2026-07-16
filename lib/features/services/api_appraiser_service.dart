@@ -112,6 +112,18 @@ Map<CredentialCategory, List<AppraiserCredential>> groupCredentialsByCategory(
   return out;
 }
 
+/// Whether grouped sections should carry headers.
+///
+/// When nothing is categorised there is exactly one implicit group, and heading
+/// it "Boshqa hujjatlar" marks it as other than something that isn't on screen
+/// — the documents are the appraiser's licence and insurance, not leftovers.
+/// The flat, unheaded list the design had before categories is the honest
+/// rendering. Headers come back the moment the server files anything.
+bool credentialSectionsAreLabelled(
+  Map<CredentialCategory, List<AppraiserCredential>> grouped,
+) =>
+    !(grouped.length == 1 && grouped.keys.single == CredentialCategory.other);
+
 /// The valuation documents, for the AI Baholash pre-payment screen.
 ///
 /// That screen justifies *that* fee, so an architect's or lawyer's certificate
