@@ -1,7 +1,9 @@
+import 'dart:async' show Timer;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
@@ -219,8 +221,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     controller: _scroll,
                     padding: EdgeInsets.fromLTRB(12, 16, 12, inputH + 8),
                     itemCount: _messages.length,
-                    itemBuilder: (_, i) =>
-                        _Bubble(message: _messages[i], isDark: isDark),
+                    itemBuilder: (_, i) => _Bubble(
+                      message: _messages[i],
+                      isDark: isDark,
+                      lang: _lang,
+                    ),
                   ),
           ),
           Positioned(
@@ -355,12 +360,29 @@ class _Bloom extends StatelessWidget {
 }
 
 class _Bubble extends StatelessWidget {
-  const _Bubble({required this.message, required this.isDark});
+  const _Bubble({
+    required this.message,
+    required this.isDark,
+    required this.lang,
+  });
   final ChatMessage message;
   final bool isDark;
+  final String lang;
 
   @override
   Widget build(BuildContext context) {
+    // Waiting on the first token: show the working indicator bare, not wrapped
+    // in a bubble — there's no message yet, so a bubble would be a lie.
+    if (message.isStreaming && message.content.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: _ThinkingRow(isDark: isDark, lang: lang),
+        ),
+      );
+    }
+
     final isUser = message.isUser;
     final bubbleColor = isUser
         ? AppColors.splashGreen
@@ -368,8 +390,6 @@ class _Bubble extends StatelessWidget {
     final textColor = isUser
         ? AppColors.greenBlack
         : (isDark ? Colors.white : AppColors.textBlack);
-    final showDots = message.isStreaming && message.content.isEmpty;
-
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Align(
@@ -388,20 +408,140 @@ class _Bubble extends StatelessWidget {
               bottomRight: Radius.circular(isUser ? 4 : 16),
             ),
           ),
-          child: showDots
-              ? Text('•••',
-                  style: TextStyle(
-                      color: textColor.withValues(alpha: 0.5), fontSize: 16))
-              : SelectableText(
-                  message.content,
-                  style:
-                      TextStyle(color: textColor, fontSize: 15, height: 1.35),
-                ),
+          child: SelectableText(
+            message.content,
+            style: TextStyle(color: textColor, fontSize: 15, height: 1.35),
+          ),
         ),
       ),
     );
   }
 }
+
+/// Working indicator: the brand mark sits still, the label shimmers, and the
+/// elapsed seconds tick alongside.
+///
+/// The seconds are the point. Before this, a slow reply looked identical to a
+/// hang — the UI just froze behind a "•••" with nothing to say it was alive.
+/// The shimmer carries the motion, so the mark never has to rotate (it's a
+/// house — it has an "up", and spinning it reads wrong).
+class _ThinkingRow extends StatefulWidget {
+  const _ThinkingRow({required this.isDark, required this.lang});
+
+  final bool isDark;
+  final String lang;
+
+  @override
+  State<_ThinkingRow> createState() => _ThinkingRowState();
+}
+
+class _ThinkingRowState extends State<_ThinkingRow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shimmer;
+  Timer? _tick;
+
+  /// Counted from the timer's own ticks rather than a Stopwatch: a Stopwatch
+  /// reads wall-clock time, which no widget test can advance, so the label
+  /// would be untestable. Drift across one answer is not worth caring about.
+  int _seconds = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _shimmer = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+    // Only rebuilds the counter; the shimmer rides its own controller.
+    _tick = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _seconds++);
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final base = widget.isDark
+        ? Colors.white.withValues(alpha: 0.42)
+        : Colors.black.withValues(alpha: 0.38);
+    final highlight = widget.isDark
+        ? Colors.white.withValues(alpha: 0.95)
+        : Colors.black.withValues(alpha: 0.88);
+    final seconds = _seconds;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SvgPicture.asset(
+            'assets/icons/tab-home.svg',
+            width: 16,
+            height: 16,
+            colorFilter: const ColorFilter.mode(
+              AppColors.splashGreen,
+              BlendMode.srcIn,
+            ),
+          ),
+          const SizedBox(width: 9),
+          AnimatedBuilder(
+            animation: _shimmer,
+            builder: (context, child) {
+              // Highlight band slides from just off the left edge to just off
+              // the right, so the sweep enters and leaves cleanly.
+              final v = -0.3 + 1.6 * _shimmer.value;
+              return ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) => LinearGradient(
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                  colors: [base, highlight, base],
+                  stops: [
+                    (v - 0.28).clamp(0.0, 1.0),
+                    v.clamp(0.0, 1.0),
+                    (v + 0.28).clamp(0.0, 1.0),
+                  ],
+                ).createShader(bounds),
+                child: child,
+              );
+            },
+            // srcIn paints the gradient through the glyphs, so the child's own
+            // colour just has to be opaque.
+            child: Text(
+              _S.thinking(widget.lang),
+              style: const TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+          ),
+          // Only once it's worth mentioning — a "0s" that flashes and vanishes
+          // is noise.
+          if (seconds >= 1) ...[
+            const SizedBox(width: 7),
+            Text(
+              '${seconds}s',
+              style: TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 12,
+                color: base,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
 
 /// Floating glass capsule. Detached from the edge and blurred so it lifts off
 /// the page: on a deliberately quiet screen it should be the one object that
@@ -748,6 +888,9 @@ class _S {
       'Введите вопрос...', 'Type your question...');
 
   static String kicker(String l) => '3D KADASTR AI';
+
+  static String thinking(String l) =>
+      _p(l, "O'ylayapman…", 'Думаю…', 'Thinking…');
 
   /// "Salom, Ilxomjon." — falls back to a plain greeting for guests, and for
   /// anyone whose profile hasn't loaded yet.
