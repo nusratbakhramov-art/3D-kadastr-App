@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'package:in_app_review/in_app_review.dart';
 
 import '../../core/api_config.dart';
+import '../../core/app_version.dart';
 import '../../core/haptics.dart';
 import '../../core/i18n.dart';
 import '../../core/i18n/app_translations.dart';
@@ -280,7 +281,9 @@ class _SettingsScreenState extends State<SettingsScreen>
         AppMenuRow(
           icon: Icons.info_outline_rounded,
           label: _S.version(locale),
-          trailing: const _ValueChip(text: '1.0.0 (4)', showChevron: false),
+          // Was a hardcoded '1.0.0 (4)' — two releases stale, and disagreeing
+          // with the About screen's own hardcoded copy. One source now.
+          trailing: const _ValueChip(text: kAppVersionFull, showChevron: false),
           onTap: null,
         ),
         AppMenuRow(

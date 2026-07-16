@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/app_env.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
 import '../data/room_plan_scanner.dart';
 import '../widgets/service_app_bar.dart';
+import 'ai_area_screen.dart';
 import 'ai_scan_process_screen.dart';
 
 /// AI Baholashning 1-qadami — 3D LiDAR skan.
@@ -36,6 +38,21 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
     final ok = await RoomPlanScanner.isSupported();
     if (!mounted) return;
     setState(() => _supported = ok);
+  }
+
+  /// Dev-only: jumps to the area step with no scan, so the rest of the wizard
+  /// can be exercised on a device without LiDAR. Gated on [AppEnv.isAdmin] —
+  /// never reachable in production. The draft is created by the area step,
+  /// which covers the missing scan upload.
+  void _skipScan() {
+    if (_scanning) return;
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'ai/area'),
+        builder: (_) => const AiAreaScreen(),
+      ),
+    );
   }
 
   Future<void> _startScan() async {
@@ -169,6 +186,21 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
                               enabled: _supported == true,
                               onTap: _startScan,
                             ),
+                      // Dev-only escape hatch (.env admin=true + debug build):
+                      // continue without a scan on a device that has no LiDAR.
+                      if (AppEnv.isAdmin)
+                        TextButton(
+                          onPressed: _scanning ? null : _skipScan,
+                          child: Text(
+                            _S.skipScanDev(l),
+                            style: TextStyle(
+                              fontFamily: 'MTSText',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: subColor,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -386,6 +418,12 @@ class _S {
         'ru' => 'Начать сканирование',
         'en' => 'Start scanning',
         _ => 'Skanlashni boshlash',
+      };
+
+  static String skipScanDev(Locale l) => switch (l.languageCode) {
+        'ru' => 'Пропустить скан (DEV)',
+        'en' => 'Skip scan (DEV)',
+        _ => 'Skanni o\'tkazib yuborish (DEV)',
       };
 
   static String checking(Locale l) => switch (l.languageCode) {

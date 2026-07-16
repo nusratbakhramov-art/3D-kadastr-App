@@ -15,7 +15,7 @@ library;
 const String kAppVersion = '1.0.2';
 
 /// Build number — the part after the `+` in pubspec `version:`.
-const String kAppBuild = '18';
+const String kAppBuild = '19';
 
 /// "1.0.2 (18)" — what both About and Settings display.
 const String kAppVersionFull = '$kAppVersion ($kAppBuild)';

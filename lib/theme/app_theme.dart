@@ -24,16 +24,18 @@ class AppTheme {
 
     return base.copyWith(
       textTheme: _buildTextTheme(base.textTheme, AppColors.onSurface),
+      // titleTextStyle is deliberately NOT set here. AppBar resolves the title
+      // as `widget.titleTextStyle ?? appBarTheme.titleTextStyle ??
+      // defaults.titleTextStyle?.copyWith(color: foregroundColor)` — so naming
+      // one here permanently blocks foregroundColor from reaching the title,
+      // and every screen that overrides the bar's background kept getting a
+      // hardcoded white title (invisible on a light bar). Leaving it null lets
+      // the M3 default (textTheme.titleLarge) take foregroundColor. The font
+      // and size live in titleLarge, so the bars look identical.
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.brandGreenDark,
         foregroundColor: Colors.white,
         centerTitle: false,
-        titleTextStyle: TextStyle(
-          fontFamily: displayFont,
-          fontWeight: FontWeight.w700,
-          fontSize: 20,
-          color: Colors.white,
-        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -81,17 +83,12 @@ class AppTheme {
         color: AppColors.darkDivider,
         thickness: 1,
       ),
+      // titleTextStyle omitted deliberately — see the light theme's note.
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.darkBackground,
         foregroundColor: Colors.white,
         centerTitle: false,
         elevation: 0,
-        titleTextStyle: TextStyle(
-          fontFamily: displayFont,
-          fontWeight: FontWeight.w700,
-          fontSize: 20,
-          color: Colors.white,
-        ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -132,7 +129,11 @@ class AppTheme {
       headlineLarge: display(24, FontWeight.w700),
       headlineMedium: display(20, FontWeight.w700),
       headlineSmall: display(18, FontWeight.w500),
-      titleLarge: display(18, FontWeight.w700),
+      // 20, not 18: this is what an AppBar title resolves to in M3
+      // (defaults.titleTextStyle => textTheme.titleLarge), and the bars used to
+      // get 20 from AppBarTheme.titleTextStyle before that was removed. Nothing
+      // else reads titleLarge, so this only governs app bars.
+      titleLarge: display(20, FontWeight.w700),
       titleMedium: text(16, FontWeight.w500),
       titleSmall: text(14, FontWeight.w500),
       bodyLarge: text(16, FontWeight.w400),

@@ -1,7 +1,7 @@
 name: kadastr
 description: "Kadastr — Flutter starter."
 publish_to: 'none'
-version: 1.0.2+17
+version: 1.0.2+19
 
 environment:
   sdk: ^3.10.1
@@ -38,6 +38,7 @@ dependencies:
   pdfx: ^2.9.2
   app_badge_plus: ^1.2.0
   flutter_widget_from_html_core: ^0.16.0
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:
@@ -49,6 +50,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - .env
     - assets/3d/
     - assets/3d/lib/
     - assets/branding/
