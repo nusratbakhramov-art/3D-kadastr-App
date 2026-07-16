@@ -48,3 +48,6 @@ app.*.map.json
 /_kadastr_scans/   # ~GBs of captured scan data + per-tune render outputs
 /_check/           # headless render/check scratch (atlas.png, usdz, renders)
 /Tools/            # ScanCheck headless harness (local dev tooling)
+
+# Local env flags (see .env.example) — never commit real values
+.env

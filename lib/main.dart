@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 
+import 'core/app_env.dart';
 import 'core/app_navigation.dart';
 import 'core/i18n/app_translations.dart';
 import 'core/i18n/app_translations_store.dart';
@@ -26,9 +27,12 @@ import 'features/splash/animated_splash_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+Future<void> main() async {
   final binding = WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: binding);
+  // Local `.env` flags (AppEnv.isAdmin) — read before the first frame so the
+  // developer-only shortcuts know whether to show. No-op in production.
+  await AppEnv.load();
   // Faqat portret rejim — ilova hech qachon yon (landscape) aylanmaydi.
   SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.portraitUp,
