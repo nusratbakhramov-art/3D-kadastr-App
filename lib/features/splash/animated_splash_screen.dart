@@ -1,7 +1,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show HapticFeedback, rootBundle;
 
 import '../../theme/app_colors.dart';
 
@@ -48,6 +48,14 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   bool _completed = false;
   bool _started = false;
 
+  // Haptics land on the two moments the animation *arrives* somewhere, not on
+  // the motion itself — buzzing through a move feels like a rattle, a tap at
+  // the end of one feels like weight. Flags because the tick fires every frame.
+  static const double _tLanded = 0.40; // rise+spin ends: the logo touches down
+  static const double _tRevealed = 0.675; // the wordmark springs in
+  bool _hapticLanded = false;
+  bool _hapticRevealed = false;
+
   static String _framePath(int i) =>
       'assets/branding/logo-frames/frame_${i.toString().padLeft(3, '0')}.webp';
 
@@ -88,7 +96,26 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
       curve: const Interval(0.675, 0.90, curve: _crispOut),
     );
     _controller.addStatusListener(_handleStatus);
+    _controller.addListener(_handleHaptics);
     _loadFramesAndStart();
+  }
+
+  /// Fires each beat once as the controller passes it.
+  ///
+  /// Driven off controller *value* rather than timers so it can never drift
+  /// from the visuals: the animation only starts once 36 frames have decoded,
+  /// and a timer scheduled in initState would run against a logo still waiting
+  /// to appear.
+  void _handleHaptics() {
+    final v = _controller.value;
+    if (!_hapticLanded && v >= _tLanded) {
+      _hapticLanded = true;
+      HapticFeedback.mediumImpact();
+    }
+    if (!_hapticRevealed && v >= _tRevealed) {
+      _hapticRevealed = true;
+      HapticFeedback.lightImpact();
+    }
   }
 
   Future<void> _loadFramesAndStart() async {
@@ -126,6 +153,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   @override
   void dispose() {
     _controller.removeStatusListener(_handleStatus);
+    _controller.removeListener(_handleHaptics);
     _controller.dispose();
     for (final img in _frames) {
       img.dispose();
