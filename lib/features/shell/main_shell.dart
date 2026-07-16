@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_navigation.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../core/push_notifications.dart';
 import '../auth/api_auth_service.dart';
 import '../auth/auth_flow_screen.dart';
@@ -331,27 +332,17 @@ class _ShellStrings {
     ),
   ];
 
-  static String _home(Locale l) => switch (l.languageCode) {
-    'ru' => 'Главная',
-    'en' => 'Home',
-    _ => 'Asosiy',
-  };
+  // Keyed through tr() so the admin panel can rename the tabs. A bare switch
+  // means a code change and a store release to reword one label.
+  static String _home(Locale l) =>
+      tr(l, 'nav.home', uz: 'Asosiy', ru: 'Главная', en: 'Home');
 
-  static String _market(Locale l) => switch (l.languageCode) {
-    'ru' => 'Маркет',
-    'en' => 'Market',
-    _ => 'Market',
-  };
+  static String _market(Locale l) =>
+      tr(l, 'nav.market', uz: 'Market', ru: 'Маркет', en: 'Market');
 
-  static String _applications(Locale l) => switch (l.languageCode) {
-    'ru' => 'Заявки',
-    'en' => 'Applications',
-    _ => 'Arizalar',
-  };
+  static String _applications(Locale l) =>
+      tr(l, 'nav.applications', uz: 'Arizalar', ru: 'Заявки', en: 'Applications');
 
-  static String _profile(Locale l) => switch (l.languageCode) {
-    'ru' => 'Профиль',
-    'en' => 'Profile',
-    _ => 'Profil',
-  };
+  static String _profile(Locale l) =>
+      tr(l, 'nav.profile', uz: 'Profil', ru: 'Профиль', en: 'Profile');
 }
