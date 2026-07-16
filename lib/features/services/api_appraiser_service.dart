@@ -10,13 +10,129 @@ import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
 
+/// The service line a document is filed under — a section header on screen.
+class CredentialCategory {
+  const CredentialCategory({
+    required this.slug,
+    required this.nameUz,
+    this.nameRu,
+    this.nameEn,
+    this.sortOrder = 0,
+  });
+
+  /// Stable key. Behaviour hangs off this, never off the display name, so the
+  /// admin can rename or translate a category without breaking the app.
+  final String slug;
+  final String nameUz;
+  final String? nameRu;
+  final String? nameEn;
+  final int sortOrder;
+
+  /// Valuation documents — the only ones that justify the AI Baholash fee.
+  static const String slugAppraiser = 'appraiser';
+
+  /// Home for documents that arrive with no category, which means a backend
+  /// older than this feature. The app and the API can never ship in lockstep —
+  /// App Store review sees to that — so the screens must survive the window
+  /// where the app knows about categories and the server doesn't. Dropping
+  /// those documents renders an empty screen while the payload is full of
+  /// them; filing them here at least shows the user what they came for.
+  static const CredentialCategory other = CredentialCategory(
+    slug: '',
+    nameUz: 'Boshqa hujjatlar',
+    nameRu: 'Другие документы',
+    nameEn: 'Other documents',
+  );
+
+  String name(String lang) => switch (lang) {
+    'ru' => (nameRu?.isNotEmpty ?? false) ? nameRu! : nameUz,
+    'en' => (nameEn?.isNotEmpty ?? false) ? nameEn! : nameUz,
+    _ => nameUz,
+  };
+
+  factory CredentialCategory.fromJson(Map<String, dynamic> j) =>
+      CredentialCategory(
+        slug: (j['slug'] as String?) ?? '',
+        nameUz: (j['name_uz'] as String?) ?? '',
+        nameRu: j['name_ru'] as String?,
+        nameEn: j['name_en'] as String?,
+        sortOrder: (j['sort_order'] as num?)?.toInt() ?? 0,
+      );
+
+  // Value equality on `slug`, and it is load-bearing: every credential parses
+  // its OWN category object, so with Dart's default identity equality five
+  // Baholovchi documents would group into five separate "Baholovchi" sections.
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is CredentialCategory && other.slug == slug);
+
+  @override
+  int get hashCode => slug.hashCode;
+}
+
 class AppraiserCredential {
-  const AppraiserCredential({required this.title, required this.imageUrl});
+  const AppraiserCredential({
+    required this.title,
+    required this.imageUrl,
+    this.isPdf = false,
+    this.category,
+  });
 
   final String title;
 
-  /// Absolute, device-loadable URL ('' when no image is set yet).
+  /// Absolute, device-loadable URL ('' when no file is set yet).
   final String imageUrl;
+
+  /// A licence is often issued as a PDF. The server decides this (`kind`)
+  /// rather than the app sniffing the URL, and it decides which viewer opens —
+  /// handing a PDF to an image widget just renders a broken thumbnail.
+  final bool isPdf;
+
+  final CredentialCategory? category;
+}
+
+/// Groups documents into on-screen sections, preserving the server's ordering.
+///
+/// The API already sorts by category then document, so an insertion-ordered
+/// map keeps that order without re-sorting — the admin's "Tartib" column stays
+/// the single source of truth for sequence.
+///
+/// Documents with no category are filed under [CredentialCategory.other]
+/// rather than skipped: skipping them turns a payload full of documents into a
+/// blank screen, and the list is not empty so the empty-state note never fires
+/// either.
+Map<CredentialCategory, List<AppraiserCredential>> groupCredentialsByCategory(
+  List<AppraiserCredential> creds,
+) {
+  final out = <CredentialCategory, List<AppraiserCredential>>{};
+  for (final c in creds) {
+    out.putIfAbsent(c.category ?? CredentialCategory.other, () => []).add(c);
+  }
+  return out;
+}
+
+/// The valuation documents, for the AI Baholash pre-payment screen.
+///
+/// That screen justifies *that* fee, so an architect's or lawyer's certificate
+/// has no business on it — adding a document to another service line must not
+/// silently change what the user sees before paying.
+///
+/// A payload carrying no category information at all comes from a backend
+/// older than this feature, whose `/credentials` only ever served valuation
+/// documents; every row in it is an appraiser credential by definition. Left
+/// unhandled, the filter would empty this screen during the window between
+/// shipping the app and deploying the API — and this is the one screen where a
+/// blank list really costs something, being the trust the user is about to pay
+/// on. Once any row is categorised the server is new and the filter is strict
+/// again: a half-filed document is excluded, not guessed at.
+List<AppraiserCredential> appraiserCredentialsOnly(
+  List<AppraiserCredential> all,
+) {
+  if (all.every((c) => c.category == null)) return all;
+  return all
+      .where((c) => c.category?.slug == CredentialCategory.slugAppraiser)
+      .toList();
 }
 
 class AppraiserService {
@@ -76,6 +192,12 @@ class AppraiserService {
           AppraiserCredential(
             title: (raw['title'] as String?) ?? '',
             imageUrl: _resolve((raw['image_url'] as String?) ?? ''),
+            isPdf: (raw['kind'] as String?) == 'pdf',
+            category: raw['category'] is Map
+                ? CredentialCategory.fromJson(
+                    Map<String, dynamic>.from(raw['category'] as Map),
+                  )
+                : null,
           ),
     ];
   }
