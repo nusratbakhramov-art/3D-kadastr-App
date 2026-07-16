@@ -93,6 +93,39 @@ void main() {
       expect(grouped.values.single, hasLength(2));
     });
 
+    // "Other" only means something when there is something to be other than.
+    test('an all-uncategorised payload renders without headers', () async {
+      final creds = await _serviceReturning(_oldBackendJson).fetchCredentials();
+
+      expect(
+        credentialSectionsAreLabelled(groupCredentialsByCategory(creds)),
+        isFalse,
+      );
+    });
+
+    test('a categorised payload keeps its headers', () async {
+      final creds = await _serviceReturning(_newBackendJson).fetchCredentials();
+
+      expect(
+        credentialSectionsAreLabelled(groupCredentialsByCategory(creds)),
+        isTrue,
+      );
+    });
+
+    // Mixed is the one case where the fallback header earns its name.
+    test('a half-filed payload keeps headers, fallback included', () async {
+      final creds = await _serviceReturning('''
+        [{"id":1,"title":"Litsenziya","image_url":"/a.png",
+          "category":{"slug":"appraiser","name_uz":"Baholovchi"}},
+         {"id":2,"title":"Nomalum","image_url":"/b.png"}]
+      ''').fetchCredentials();
+
+      final grouped = groupCredentialsByCategory(creds);
+
+      expect(credentialSectionsAreLabelled(grouped), isTrue);
+      expect(grouped.keys.map((c) => c.slug), ['appraiser', '']);
+    });
+
     test('the fallback category is named in all three locales', () {
       expect(CredentialCategory.other.name('uz'), "Boshqa hujjatlar");
       expect(CredentialCategory.other.name('ru'), 'Другие документы');

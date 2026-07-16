@@ -121,6 +121,8 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                       final loading =
                           snap.connectionState == ConnectionState.waiting;
                       final creds = snap.data ?? const <AppraiserCredential>[];
+                      final grouped = groupCredentialsByCategory(creds);
+                      final labelled = credentialSectionsAreLabelled(grouped);
                       return ListView(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                         children: [
@@ -140,15 +142,16 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                           else
                             // One section per service line. An empty category
                             // never appears — it isn't in the payload at all.
-                            for (final entry
-                                in groupCredentialsByCategory(creds).entries) ...[
+                            for (final entry in grouped.entries) ...[
                               const SizedBox(height: 12),
-                              _SectionLabel(
-                                text: entry.key.name(l.languageCode),
-                                isDark: isDark,
-                                count: entry.value.length,
-                              ),
-                              const SizedBox(height: 4),
+                              if (labelled) ...[
+                                _SectionLabel(
+                                  text: entry.key.name(l.languageCode),
+                                  isDark: isDark,
+                                  count: entry.value.length,
+                                ),
+                                const SizedBox(height: 4),
+                              ],
                               for (var i = 0; i < entry.value.length; i++)
                                 _CredentialRow(
                                   credential: entry.value[i],
