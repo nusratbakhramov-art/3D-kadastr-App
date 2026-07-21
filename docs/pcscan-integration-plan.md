@@ -109,6 +109,44 @@ public enum PCScanKit {
       qaytardi** (foydalanuvchi tasdiqladi). `Library not loaded` yo'q — dlopen
       zanjiri sog'lom (hammasi statik, yo'qolgan dinamik dep yo'q).
 
+## Re-sync tarixi
+
+Kit upstream'ning **`video-capture` liniyasidan** keladi. Branchlar parallel
+(`6.0.0` ≠ `6.0.0-vc`) — re-sync'dan oldin **har doim** kit qaysi commit'dan
+kelganini fayllarni solishtirib tekshiring, aks holda jimgina boshqa liniyaga
+sakraysiz.
+
+| Sana | Dan | Ga | Hajm |
+|---|---|---|---|
+| 2026-07-14 | — | `video-capture` `8c6276d` (6.0.2-vc) | boshlang'ich port, 48 swift |
+| 2026-07-21 | `8c6276d` | `6.1.5-vc` `248e126` | 10 fayl, +2996/−82 |
+
+**2026-07-21 re-sync** (`8c6276d..248e126`, chiziqli davomi — ajdodlik tasdiqlangan):
+- Yangi: `AtlasDilate` (159), `AtlasSharpen` (127), `StructurePlanes` (385).
+- O'zgargan: `AtlasInpainter` (+1292), `TSDFGeometry` (+685), `TexturedOBJLoader`
+  (+148), `TexReconService` (+108), `RoomClipper` (+88), `FillColorizer` (+79),
+  `RoomSceneController` (+7).
+- `Vendor/`+`native/` o'zgarmagan → 29M statik lib qayta ko'chirilmadi.
+- Tasdiqlandi: simulyator ✓, device (Release, arm64) ✓ — `PCScanEntry` symbol,
+  3 native bridge symbol, dinamik bog'liqlik faqat system + o'z `@rpath`.
+
+### ⚠️ Re-sync'da saqlanadigan mahalliy o'zgarishlar
+
+- **`PoissonService.swift`** — `pcscan_poisson` (~85) va `pcscan_simplify` (~197)
+  chaqiruvlari `#if targetEnvironment(simulator)` bilan o'ralgan (Phase 1b). Statik
+  lib'lar device-only → gate'siz simulyator link undefined-symbol bilan sinadi.
+  **Oddiy `cp` bularni o'chiradi.** (2026-07-21 da bu fayl upstream'da o'zgarmagan
+  edi → ko'chirilmadi, gate'lar o'z-o'zidan saqlandi.) `TexReconService` gate'i esa
+  upstream'ning o'zida — uni saqlash shart emas.
+- **`PCScanKit.swift`** — kitga xos entry, manbada yo'q. Ustiga yozilmasin.
+- **`App/PCScanApp.swift`** (`@main`) — ataylab ko'chirilmaydi.
+
+### Yangi fayl qo'shish
+
+`add_pcscankit.rb` **idempotent emas** (target mavjud bo'lsa `abort`). Uni qayta
+ishlatmang — `ruby sync_pcscankit_sources.rb` diskdagi daraxtni target bilan
+solishtirib faqat yetishmayotganini qo'shadi (`--dry-run` bor, idempotent).
+
 ## Ochiq savollar / risklar
 - **Bundle o'lchami:** PCScan +29M (poisson yolg'iz 24M). ScansKit +16M bilan
   birga ~45M sof skan lib'lari. Kerak bo'lsa poisson strip/thin ko'riladi.

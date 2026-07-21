@@ -304,6 +304,13 @@ final class RoomSceneController: NSObject {
 
     func setFirstPerson(_ enabled: Bool) {
         firstPerson = enabled
+        // Parcha qatlami (unseen_vc + fillmat) faqat XONA ICHIDAN ko'rinadi.
+        // Winding'ni to'g'rilash ularni orqadan kesadi, lekin qiya burchakda
+        // normal hali kameraga qaragan bo'lib qolaveradi — shuning uchun
+        // tashqaridan (orbita) butun qatlam yashiriladi.
+        texturedRoot?.enumerateHierarchy { node, _ in
+            if node.name == TexturedOBJLoader.fragmentNodeName { node.isHidden = !enabled }
+        }
         if enabled {
             fpYaw = 0
             fpPitch = 0

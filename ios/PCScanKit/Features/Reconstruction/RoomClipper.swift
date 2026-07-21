@@ -2,15 +2,18 @@ import Foundation
 import RoomPlan
 import simd
 
-/// RoomPlan devor tekisliklari bo'yicha xona TASHQARISIDAGI geometriyani kesish.
+/// RoomPlan POL KONTURI bo'yicha xona TASHQARISIDAGI geometriyani kesish.
 ///
 /// TSDF/Poisson meshi ba'zan devor ortiga 15–25sm "chiqib ketadi" (oyna/plitka
 /// aksi, eshik oralig'idan ko'ringan qo'shni hudud, LiDAR multipath). Bu
 /// bo'laklar orbit ko'rinishda devor tashqarisida osilib qoladi.
 ///
-/// RoomPlan devorlari ishonchli tekisliklar: har devorning TASHQI tomonida
-/// (o'sha devor to'rtburchagi doirasida) margin'dan nariga o'tgan cho'qqilar
-/// kesiladi. Pol ostidagi va shift tepasidagi geometriya ham xuddi shunday.
+/// Mezon — POL KONTURI (footprint) + zaxira, "har devor tekisligining ortidagi
+/// hamma narsa" EMAS. Eski mezon faqat QAVARIQ xonada to'g'ri edi: L-shaklli
+/// xonada bitta devorning ortida xonaning HAQIQIY qismi turadi va u kesilardi
+/// (o'lchandi: 33.7% vs 1.3% — batafsil `footprintMargin` izohida). Kontur
+/// bo'lmagan/buzuq skanlarda eski devor-mezoni zaxira sifatida qoladi.
+/// Pol ostidagi va shift tepasidagi geometriya balandlik bo'yicha kesiladi.
 ///
 /// Xavfsizlik darvozasi: kesish uchburchaklarning 60% dan ko'pini olsa —
 /// room ma'lumoti meshga mos emas deb hisoblanadi, asl mesh qaytariladi.
@@ -26,6 +29,19 @@ enum RoomClipper {
     private static let extentPad: Float = 0.25
     private static let floorMargin: Float = 0.10
     private static let ceilingMargin: Float = 0.15
+    /// Pol konturidan tashqariga ruxsat etilgan masofa (m).
+    ///
+    /// NEGA KONTUR, DEVOR EMAS: ilgari har devor uchun "shu devor tekisligining
+    /// ORTIDAGI hamma narsa — tashqarida" deb hisoblanardi. Bu faqat QAVARIQ
+    /// (to'rtburchak) xonada to'g'ri. Bu xona esa L-shaklli (pol konturi 14
+    /// burchak) — unda bitta devorning "ortida" xonaning HAQIQIY qismi turadi.
+    /// O'lchandi (skan 20260717-110900, ARKit meshiga solib):
+    ///   devor yarim-fazolari -> 92105 cho'qqi (33.7%) kesilardi
+    ///   pol konturi + 0.25m  ->  3488 cho'qqi ( 1.3%)
+    /// Ya'ni eski mezon 26 barobar ortiqcha kesardi — pol va shiftni ham
+    /// (kesilganlarning 21691 tasi pol balandligida, 19329 tasi shift).
+    /// Kontur yuzasi 65.8 m² — RoomPlan'ning o'z raqami bilan aynan mos.
+    private static let footprintMargin: Float = 0.25
     /// Kesishdan keyin qolgan mayda orollar chegarasi.
     private static let minComponentVerts = 120
 
@@ -36,6 +52,54 @@ enum RoomClipper {
         let yAxis: SIMD3<Float>
         let halfW: Float
         let halfH: Float
+    }
+
+    // MARK: - Pol konturi (footprint)
+
+    /// Pol konturi world XZ da. `polygonCorners` surface-lokal — floor.transform
+    /// bilan world'ga o'tkaziladi. Kontur yo'q/buzuq bo'lsa — bo'sh (zaxira yo'lga).
+    private static func footprintXZ(of room: CapturedRoom) -> [SIMD2<Float>] {
+        guard let floor = room.floors.max(by: {
+            RoomGeometry.polygonArea($0.polygonCorners) < RoomGeometry.polygonArea($1.polygonCorners)
+        }), floor.polygonCorners.count >= 3 else { return [] }
+        let t = floor.transform
+        let world = floor.polygonCorners.map { c -> SIMD2<Float> in
+            let w = t * SIMD4<Float>(c.x, c.y, c.z, 1)
+            return SIMD2(w.x, w.z)
+        }
+        // Aql-idrok: kontur devor markazlari atrofida bo'lsin (koordinata buzuq emas).
+        var c = SIMD2<Float>.zero
+        for p in world { c += p }
+        c /= Float(world.count)
+        var wc = SIMD2<Float>.zero
+        for w in room.walls {
+            wc += SIMD2(w.transform.columns.3.x, w.transform.columns.3.z)
+        }
+        wc /= Float(max(room.walls.count, 1))
+        guard simd_distance(c, wc) < 3 else { return [] }
+        return world
+    }
+
+    /// Nuqta konturning ICHIDA yoki undan `margin` dan yaqinda (qirraga masofa).
+    private static func insideFootprint(_ p: SIMD2<Float>, _ poly: [SIMD2<Float>],
+                                        margin: Float) -> Bool {
+        var inside = false
+        var j = poly.count - 1
+        var best = Float.greatestFiniteMagnitude
+        for i in 0..<poly.count {
+            let a = poly[i], b = poly[j]
+            if (a.y > p.y) != (b.y > p.y) {
+                let x = (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x
+                if p.x < x { inside.toggle() }
+            }
+            // qirraga masofa (chegaradan tashqaridagi zaxira uchun)
+            let ab = b - a
+            let len2 = simd_dot(ab, ab)
+            let t = len2 > 1e-9 ? min(max(simd_dot(p - a, ab) / len2, 0), 1) : 0
+            best = min(best, simd_distance(p, a + ab * t))
+            j = i
+        }
+        return inside || best <= margin
     }
 
     // MARK: - Kesish
@@ -82,8 +146,10 @@ enum RoomClipper {
             floorY = min(floorY, f.transform.columns.3.y)
         }
 
-        // 1. Har cho'qqi: birorta devor ORTIDA (o'sha devor doirasida) yoki
-        //    pol/shift chegarasidan tashqarida bo'lsa — outside.
+        // Pol konturi (world XZ) — xona TASHQARISINI aniqlashning to'g'ri mezoni.
+        let footprint = footprintXZ(of: room)
+
+        // 1. Har cho'qqi: pol konturidan (yoki pol/shift chegarasidan) tashqarida?
         let vc = mesh.vertexCount
         var outside = [Bool](repeating: false, count: vc)
         let chunk = 8192
@@ -97,6 +163,14 @@ enum RoomClipper {
                             ob[vi] = true
                             continue
                         }
+                        // Xona TASHQARISI = pol KONTURIDAN tashqarida (footprint),
+                        // "birorta devor tekisligining ortida" EMAS.
+                        if !footprint.isEmpty {
+                            ob[vi] = !insideFootprint(SIMD2(p.x, p.z), footprint,
+                                                      margin: footprintMargin)
+                            continue
+                        }
+                        // Kontur yo'q (eski skan) — zaxira: devor yarim-fazolari.
                         for pl in planes {
                             let d = p - pl.c
                             if simd_dot(d, pl.nIn) < -wallMargin,
@@ -142,7 +216,7 @@ enum RoomClipper {
         let cleaned = FreeSpaceCarver.removeSmallComponents(indices: kept, vertexCount: vc,
                                                             minVerts: minComponentVerts, log: log)
         let out = compact(positions: mesh.positions, normals: mesh.normals, indices: cleaned)
-        log?("ROOMCLIP tris \(totalTris) -> \(out.indices.count / 3) (devor ortida \(removed))")
+        log?("ROOMCLIP tris \(totalTris) -> \(out.indices.count / 3) (xona tashqarisida \(removed), mezon=\(footprint.isEmpty ? "devor" : "kontur"))")
         return out.isEmpty ? mesh : out
     }
 
