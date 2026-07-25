@@ -1,29 +1,12 @@
 import Flutter
 import UIKit
 
-/// AI Baholash skan-provayderi. Default `.roomScan`. `.pcScan` da PCScanKit ("#2")
-/// ishlaydi; PCScan mavjud bo'lmasa (iOS<17 / kit yuklanmadi) avtomatik RoomScan'ga
-/// tushadi (qarang `AppDelegate.scanBridge`).
-enum ScanProvider {
-    case roomScan
-    case pcScan
-}
-
-/// Runner'dagi skaner bridge'lari uchun umumiy interfeys — AppDelegate provayder
-/// bo'yicha bittasini tanlaydi. `RoomScanBridge` va `PCScanBridge` shunga muvofiq.
-protocol ScanBridge: AnyObject {
-    @discardableResult
-    func handleRoomPlan(_ call: FlutterMethodCall, presenter: UIViewController?,
-                        result: @escaping FlutterResult) -> Bool
-    func handleSavedScans(_ call: FlutterMethodCall, presenter: UIViewController?,
-                          result: @escaping FlutterResult)
-}
-
-/// "#2" PCScanKit skanerini AI Baholash kanallariga ulaydigan bridge —
-/// `RoomScanBridge` egizagi. Runner PCScanKit'ni LINK QILMAYDI, shuning uchun kit
-/// ish vaqtida `Bundle.load()` bilan yuklanib, `PCScanFacade` orqali chaqiriladi
-/// (dlopen). PCScan id'lari `1_000_000 + index` bilan RoomScan id'laridan ajratiladi.
-final class PCScanBridge: ScanBridge {
+/// "#2" PCScanKit skanerini AI Baholash kanallariga (`room_plan_scanner` +
+/// `saved_scans`) ulaydigan YAGONA bridge (eski RoomScanPlanAI olib tashlangan).
+/// Runner PCScanKit'ni LINK QILMAYDI, shuning uchun kit ish vaqtida `Bundle.load()`
+/// bilan yuklanib, `PCScanFacade` orqali chaqiriladi (dlopen). PCScan skan id'lari
+/// `1_000_000 + ScanRecord.index`.
+final class PCScanBridge {
     static let shared = PCScanBridge()
     private init() {}
 

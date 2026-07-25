@@ -47,17 +47,8 @@ import RoomPlan
       scannerChannel.setMethodCallHandler { [weak controller] call, result in
         switch call.method {
         case "isSupported":
-          if AppDelegate.scanProvider == .pcScan && PCScanBridge.shared.isAvailable {
-            result(true)   // PCScan: iOS17 + kit; LiDAR PCScan onboarding'ida
-          } else {
-            var supported = false
-            #if canImport(RoomPlan)
-            if #available(iOS 16, *) {
-              supported = RoomCaptureSession.isSupported
-            }
-            #endif
-            result(supported)
-          }
+          // Faqat #2 (PCScanKit) — iOS17 + kit yuklanadi. iOS<17 → qo'llab-quvvatlanmaydi.
+          result(PCScanBridge.shared.isAvailable)
 
         case "startScan":
           guard let controller = controller else {
@@ -79,10 +70,8 @@ import RoomPlan
           }
 
         case "startTexturedScan":
-          // Skan-provayder bo'yicha bridge (RoomScanPlanAI yoki PCScanKit) — bir
-          // xil kanal kontrakti saqlanadi.
-          AppDelegate.scanBridge(AppDelegate.scanProvider)
-            .handleRoomPlan(call, presenter: controller, result: result)
+          // #2 (PCScanKit) capture-only oqim.
+          PCScanBridge.shared.handleRoomPlan(call, presenter: controller, result: result)
 
         case "startTexturedRoomPlan":
           guard let controller = controller else {
@@ -163,9 +152,8 @@ import RoomPlan
           }
 
         case "previewModel":
-          // Provayder bo'yicha viewer (RoomScan: atlas.geo+png; PCScan: room.obj).
-          AppDelegate.scanBridge(AppDelegate.scanProvider)
-            .handleRoomPlan(call, presenter: controller, result: result)
+          // #2 viewer (room.obj → SceneKit).
+          PCScanBridge.shared.handleRoomPlan(call, presenter: controller, result: result)
 
         default:
           result(FlutterMethodNotImplemented)
@@ -183,13 +171,8 @@ import RoomPlan
         // RoomScanPlanAI pipeline (Documents/Scans/scanNNN). Debug-log helpers
         // stay on the legacy path below.
         if call.method != "readDebugLog" && call.method != "clearDebugLog" {
-          // id-prefiks bo'yicha yo'naltiramiz: PCScan id'lari ≥ 1_000_000. id
-          // bo'lmaganda (masalan "list") joriy provayderni ishlatamiz.
-          let idArg = (call.arguments as? [String: Any])?["id"] as? Int
-          let provider: ScanProvider = idArg.map { $0 >= 1_000_000 ? .pcScan : .roomScan }
-            ?? AppDelegate.scanProvider
-          AppDelegate.scanBridge(provider)
-            .handleSavedScans(call, presenter: controller, result: result)
+          // #2 (PCScanKit) — barcha saved_scans amallari.
+          PCScanBridge.shared.handleSavedScans(call, presenter: controller, result: result)
           return
         }
         switch call.method {
@@ -445,22 +428,6 @@ import RoomPlan
     }
 
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-
-  /// AI Baholash skan-provayderi. **Default `.pcScan`** — PCScanKit ("#2") ishlaydi
-  /// (P8 go-live). PCScan mavjud bo'lmasa (iOS<17 / kit yuklanmadi) `scanBridge`
-  /// avtomatik RoomScan'ga tushadi. Rollback: UserDefaults "scan_provider" ==
-  /// "roomscan" → eski RoomScanPlanAI.
-  static var scanProvider: ScanProvider {
-    UserDefaults.standard.string(forKey: "scan_provider") == "roomscan" ? .roomScan : .pcScan
-  }
-
-  /// Provayder bo'yicha skan-bridge; PCScan mavjud bo'lmasa RoomScan fallback.
-  static func scanBridge(_ provider: ScanProvider) -> ScanBridge {
-    let pcAvailable = PCScanBridge.shared.isAvailable
-    let usePc = provider == .pcScan && pcAvailable
-    NSLog("PCSCAN-BRIDGE: provider=\(provider == .pcScan ? "pcScan" : "roomScan") pcAvailable=\(pcAvailable) → \(usePc ? "PCScan (#2)" : "RoomScan (eski)")")
-    return usePc ? PCScanBridge.shared : RoomScanBridge.shared
   }
 
   /// PCScanKit.framework'ni (embedded, Runner'ga LINK QILINMAGAN) ish vaqtida
