@@ -31,11 +31,17 @@ import UIKit
     /// Ishlab chiqilgan model (OBJ/GLB) uchun viewer ochadi.
     func presentViewer(from presenter: UIViewController, path: String)
 
-    /// Mavjud skan id'lari (list/get/delete uchun).
-    func availableScanIds() -> [NSNumber]
+    /// Barcha PCScan skanlar — "Skanlarim" ro'yxati uchun (scanMap massivi).
+    func listScans() -> [[String: Any]]
 
-    /// Skanni o'chiradi.
+    /// Bitta skan xulosasi (scanMap) yoki nil.
+    func scanSummary(_ savedScanId: Int) -> [String: Any]?
+
+    /// Skanni butunlay o'chiradi.
     func deleteScan(_ savedScanId: Int) -> Bool
+
+    /// Skanning chiqish modellarini (glb/usdz) o'chiradi.
+    func deleteOutput(_ savedScanId: Int) -> Bool
 
     /// Skanning asosiy model faylining yo'li (agar mavjud bo'lsa).
     func outputPath(_ savedScanId: Int) -> String?

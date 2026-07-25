@@ -116,13 +116,18 @@ final class PCScanBridge: ScanBridge {
             guard let id = args["id"] as? Int else { result(false); return }
             result(f.deleteScan(id))
 
-        // list/get/deleteOutput/rename/viewLidarMesh — to'liqrog'i P7 da.
         case "list":
-            result(f.availableScanIds().map { ["id": $0.intValue] })
-        case "get", "viewLidarMesh", "deleteOutput":
-            result(nil)
+            result(f.listScans())
+        case "get":
+            guard let id = args["id"] as? Int else { result(nil); return }
+            result(f.scanSummary(id))
+        case "deleteOutput":
+            guard let id = args["id"] as? Int else { result(false); return }
+            result(f.deleteOutput(id))
+        case "viewLidarMesh":
+            result(nil)   // PCScan xom LiDAR mesh ko'rish qo'llab-quvvatlanmaydi (graceful)
         case "rename":
-            result(true)
+            result(true)  // PCScan nomlari index-asosli ("Skan #N")
 
         default:
             result(FlutterMethodNotImplemented)

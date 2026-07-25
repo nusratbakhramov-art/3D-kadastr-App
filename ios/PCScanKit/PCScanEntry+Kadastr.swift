@@ -163,9 +163,73 @@ extension PCScanEntry: PCScanFacade {
         }
     }
 
-    public func availableScanIds() -> [NSNumber] { [] }   // TODO(P7)
+    /// Barcha PCScan skanlar (scanMap) — "Skanlarim" ro'yxati.
+    public func listScans() -> [[String: Any]] {
+        MainActor.assumeIsolated {
+            let lib = ScanLibrary()
+            return lib.records.map { rec in
+                Self.scanMap(record: rec, paths: StorageService.session(named: rec.folderName))
+            }
+        }
+    }
 
-    public func deleteScan(_ savedScanId: Int) -> Bool { false }   // TODO(P7)
+    /// Bitta skan xulosasi.
+    public func scanSummary(_ savedScanId: Int) -> [String: Any]? {
+        MainActor.assumeIsolated {
+            let index = savedScanId - 1_000_000
+            let lib = ScanLibrary()
+            guard let rec = lib.records.first(where: { $0.index == index }) else { return nil }
+            return Self.scanMap(record: rec, paths: StorageService.session(named: rec.folderName))
+        }
+    }
+
+    /// Skanni butunlay o'chiradi (papka bilan).
+    public func deleteScan(_ savedScanId: Int) -> Bool {
+        MainActor.assumeIsolated {
+            let index = savedScanId - 1_000_000
+            let lib = ScanLibrary()
+            guard let rec = lib.records.first(where: { $0.index == index }) else { return false }
+            lib.delete(rec)
+            return true
+        }
+    }
+
+    /// Chiqish modellarini (atlas.glb/atlas.usdz) o'chiradi (skan/xom ma'lumot qoladi).
+    public func deleteOutput(_ savedScanId: Int) -> Bool {
+        guard let paths = Self.resolvePaths(savedScanId) else { return false }
+        let fm = FileManager.default
+        var any = false
+        for name in ["atlas.glb", "atlas.usdz"] {
+            let u = paths.texturesDir.appendingPathComponent(name)
+            if fm.fileExists(atPath: u.path) { try? fm.removeItem(at: u); any = true }
+        }
+        return any
+    }
+
+    /// `RoomScanBridge.scanMap` shakliga mos skan xulosasi (Flutter SavedScanService o'qiydi).
+    private static func scanMap(record: ScanRecord, paths: ScanPaths) -> [String: Any] {
+        let fm = FileManager.default
+        var outputs: [[String: Any]] = []
+        let glb = paths.texturesDir.appendingPathComponent("atlas.glb")
+        if fm.fileExists(atPath: glb.path) {
+            let size = ((try? fm.attributesOfItem(atPath: glb.path))?[.size] as? Int) ?? 0
+            outputs.append([
+                "version": 1,
+                "fileName": "atlas.glb",
+                "createdAt": record.createdAt.timeIntervalSince1970,
+                "sizeBytes": size,
+                "params": [String: String](),
+            ])
+        }
+        return [
+            "id": 1_000_000 + record.index,
+            "name": record.title,
+            "createdAt": record.createdAt.timeIntervalSince1970,
+            "photoCount": record.frameCount,
+            "areaSqm": Double(record.floorArea),
+            "outputs": outputs,
+        ]
+    }
 
     /// Asosiy model yo'li (GLB ustuvor, aks holda USDZ).
     public func outputPath(_ savedScanId: Int) -> String? {
