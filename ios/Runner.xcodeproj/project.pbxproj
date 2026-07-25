@@ -69,6 +69,7 @@
 		7AC0E5D5BE51E90B4E1EF83F /* MeshCleanup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52CCF17209C90596E36829D4 /* MeshCleanup.swift */; };
 		7D2D1335FB09ADF86AC0338D /* PCScanEntry+Kadastr.swift in Sources */ = {isa = PBXBuildFile; fileRef = 158A2DC0DB7A2641FBD84420 /* PCScanEntry+Kadastr.swift */; };
 		7FDB08DCFCA7F512962F1716 /* TexReconService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9885E2C3F21D63475974A6BE /* TexReconService.swift */; };
+		868E44576933C0EBF5794C4D /* PCScanUSDZExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8DE281BF582BC29470805C9 /* PCScanUSDZExport.swift */; };
 		887BFDCD711AB83D9C4994C7 /* RealESRGAN.mlmodelc in Resources */ = {isa = PBXBuildFile; fileRef = F4FB3B98676C61260A4F713D /* RealESRGAN.mlmodelc */; };
 		8BEED8753061B449CA1F4B08 /* MeshWireframe.swift in Sources */ = {isa = PBXBuildFile; fileRef = 708AFA49930100F698D63941 /* MeshWireframe.swift */; };
 		8E04855D8529E3EAF60DF4B3 /* MeasurementUnit.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A8A863771EAE1406F88E38F /* MeasurementUnit.swift */; };
@@ -264,6 +265,7 @@
 		A566E3010C1D942773A8F743 /* MathHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MathHelpers.swift; sourceTree = "<group>"; };
 		A5DB922D0008F4C907794641 /* CoverageGrid.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CoverageGrid.swift; sourceTree = "<group>"; };
 		A893E4AE5E28C17597D98158 /* ViewerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ViewerView.swift; sourceTree = "<group>"; };
+		A8DE281BF582BC29470805C9 /* PCScanUSDZExport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PCScanUSDZExport.swift; sourceTree = "<group>"; };
 		AB6A75B996B6D4FCB2813BC2 /* libtbbmalloc.a */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = archive.ar; path = libtbbmalloc.a; sourceTree = "<group>"; };
 		ABB503F0C4A367698C5AF7FF /* MeshCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MeshCapture.swift; sourceTree = "<group>"; };
 		AC05DC5FFDACEBB486FD23FC /* RoomPlanScanner.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = RoomPlanScanner.swift; sourceTree = "<group>"; };
@@ -397,6 +399,7 @@
 				6CA5F03441B74523EAABA783 /* Vendor */,
 				158A2DC0DB7A2641FBD84420 /* PCScanEntry+Kadastr.swift */,
 				BB3D029D6DF6F9B08FA636C9 /* PCScanGLBExport.swift */,
+				A8DE281BF582BC29470805C9 /* PCScanUSDZExport.swift */,
 			);
 			name = PCScanKit;
 			path = PCScanKit;
@@ -1013,6 +1016,7 @@
 				C22BD9CAE4D3E612DE3EAC6C /* PCScanFacade.swift in Sources */,
 				7D2D1335FB09ADF86AC0338D /* PCScanEntry+Kadastr.swift in Sources */,
 				E90BF6A8A76F6B453D309045 /* PCScanGLBExport.swift in Sources */,
+				868E44576933C0EBF5794C4D /* PCScanUSDZExport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

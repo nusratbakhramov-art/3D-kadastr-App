@@ -98,6 +98,15 @@ extension PCScanEntry: PCScanFacade {
                         .log("GLB export xato: \(error.localizedDescription) — OBJ'ga qaytildi")
                     primary = objURL
                 }
+                // P4: room.obj → atlas.usdz (backend'ga GLB bilan birga; QuickLook/AR).
+                // Ikkilamchi — xato bo'lsa faqat log, GLB asosiy bo'lib qolaveradi.
+                let usdzURL = artifacts.paths.texturesDir.appendingPathComponent("atlas.usdz")
+                do {
+                    try PCScanUSDZExport.export(objURL: objURL, to: usdzURL)
+                } catch {
+                    DebugLog(url: artifacts.paths.debugLog)
+                        .log("USDZ export xato: \(error.localizedDescription)")
+                }
             } else if let modelURL, fm.fileExists(atPath: modelURL.path) {
                 primary = modelURL
             } else if fm.fileExists(atPath: artifacts.paths.modelURL.path) {
