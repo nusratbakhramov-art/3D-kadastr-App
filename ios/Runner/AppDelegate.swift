@@ -447,11 +447,12 @@ import RoomPlan
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
-  /// AI Baholash skan-provayderi. `.pcScan` da PCScanKit ("#2") ishlaydi; PCScan
-  /// mavjud bo'lmasa (iOS<17 / kit yo'q) `scanBridge` avtomatik RoomScan'ga tushadi.
-  /// Default `.roomScan` (UserDefaults "scan_provider" == "pcscan" bo'lsa .pcScan).
+  /// AI Baholash skan-provayderi. **Default `.pcScan`** — PCScanKit ("#2") ishlaydi
+  /// (P8 go-live). PCScan mavjud bo'lmasa (iOS<17 / kit yuklanmadi) `scanBridge`
+  /// avtomatik RoomScan'ga tushadi. Rollback: UserDefaults "scan_provider" ==
+  /// "roomscan" → eski RoomScanPlanAI.
   static var scanProvider: ScanProvider {
-    UserDefaults.standard.string(forKey: "scan_provider") == "pcscan" ? .pcScan : .roomScan
+    UserDefaults.standard.string(forKey: "scan_provider") == "roomscan" ? .roomScan : .pcScan
   }
 
   /// Provayder bo'yicha skan-bridge; PCScan mavjud bo'lmasa RoomScan fallback.
