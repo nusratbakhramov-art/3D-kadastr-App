@@ -6,14 +6,18 @@ import simd
 /// (UIKit/SceneKit YO'Q) → simulyatorda ham ishlaydi va macOS harness'da sinaladi.
 ///
 /// texrecon OBJ **ko'p-materialli + ko'p atlas-sahifali**; `unseen_vc`/`fillmat`
-/// guruhlari TEKSTURASIZ (per-vertex rang: `v x y z r g b`). Shuning uchun:
+/// guruhlari — "parcha" qatlami (fillmat TEKSTURALI, unseen_vc vertex-rangli). Shuning uchun:
 ///   • har `usemtl` guruhi → alohida glTF primitiv;
 ///   • teksturali guruh → `baseColorTexture` (mos atlas PNG, BIN chunk'ga embed);
 ///   • vertex-rangli guruh → `COLOR_0` (tekstura'siz).
 /// UV `1-v` ga flip qilinadi (OBJ pastki-chap → glTF yuqori-chap). Materiallar
-/// `KHR_materials_unlit` — ranglar allaqachon kadr yorug'ligini o'zida saqlaydi
-/// (kit viewer'ining `.constant` ko'rinishiga mos). `TexturedOBJLoader` parse mantig'i
-/// aynan takrorlangan (dedup, fan-triangulyatsiya).
+/// `KHR_materials_unlit` (ranglar allaqachon kadr yorug'ligini o'zida saqlaydi).
+///
+/// **Parcha-guruhlar (`fillmat`/`unseen_vc`) `TexturedOBJLoader` kabi ishlanadi:**
+/// winding kamera yo'liga qaratiladi (`orientToScanPath`) va single-sided qilinadi —
+/// shunda orbita'da (tashqaridan) ular back-face bo'lib culling'ga uchraydi (viewer
+/// orbita'da yashirishiga mos), ichkaridan (walk) ko'rinadi. Kamera yo'li bo'lmasa
+/// (eski skan) ular double-sided (viewer'ning `isDoubleSided = cams.isEmpty` zaxirasi).
 enum PCScanGLBExport {
 
     struct ExportError: LocalizedError {
@@ -89,6 +93,17 @@ enum PCScanGLBExport {
             throw ExportError(message: "OBJ bo'sh yoki uchburchaksiz")
         }
 
+        // Parcha-guruhlar (fillmat/unseen_vc) uchun winding'ni skan kamera yo'liga
+        // qaratamiz (TexturedOBJLoader kabi) — orbita'da culling = viewer bilan parity.
+        let cams = loadCameraPositions(objURL: objURL)
+        struct Prepared { let mat: String; let indices: [UInt32]; let isFragment: Bool }
+        let prepared: [Prepared] = nonEmpty.map { g in
+            let isFragment = g.mat == "fillmat" || mtl[g.mat] == nil
+            var idx = g.indices
+            if isFragment, !cams.isEmpty { idx = orientToScanPath(idx, outPos, cams) }
+            return Prepared(mat: g.mat, indices: idx, isFragment: isFragment)
+        }
+
         // ---- BIN buferi + bufferView'lar ----
         var bin = Data()
         var bufferViews: [[String: Any]] = []
@@ -106,11 +121,11 @@ enum PCScanGLBExport {
 
         var accessors: [[String: Any]] = []
 
-        // Har guruh uchun indeks accessor (u32).
+        // Har guruh uchun indeks accessor (u32) — parcha guruhlar winding-tuzatilgan.
         var idxAcc: [Int] = []
-        for g in nonEmpty {
-            let bv = addBV(g.indices.withUnsafeBufferPointer { Data(buffer: $0) }, target: 34963)  // ELEMENT_ARRAY_BUFFER
-            accessors.append(["bufferView": bv, "componentType": 5125, "count": g.indices.count, "type": "SCALAR"])
+        for p in prepared {
+            let bv = addBV(p.indices.withUnsafeBufferPointer { Data(buffer: $0) }, target: 34963)  // ELEMENT_ARRAY_BUFFER
+            accessors.append(["bufferView": bv, "componentType": 5125, "count": p.indices.count, "type": "SCALAR"])
             idxAcc.append(accessors.count - 1)
         }
 
@@ -145,19 +160,22 @@ enum PCScanGLBExport {
             accessors.append(["bufferView": colBV, "componentType": 5126, "count": outCol.count, "type": "VEC3"])
         }
 
-        // Noyob atlas PNG'lar (BIN chunk'ga embed).
+        // Noyob atlas PNG'lar (BIN chunk'ga embed). O'qib bo'lmagan/bo'sh PNG →
+        // ro'yxatga OLINMAYDI (material baseColorFactor'ga tushadi; bo'sh bufferView
+        // glTF'da taqiqlangan).
         var imagePaths: [String] = []
         var imageIndexFor: [String: Int] = [:]
-        for g in nonEmpty {
-            if let url = mtl[g.mat], FileManager.default.fileExists(atPath: url.path), imageIndexFor[url.path] == nil {
-                imageIndexFor[url.path] = imagePaths.count
-                imagePaths.append(url.path)
-            }
+        var imageDatas: [Data] = []
+        for p in prepared {
+            guard let url = mtl[p.mat], imageIndexFor[url.path] == nil,
+                  let data = try? Data(contentsOf: url), !data.isEmpty else { continue }
+            imageIndexFor[url.path] = imagePaths.count
+            imagePaths.append(url.path)
+            imageDatas.append(data)
         }
         var images: [[String: Any]] = []
         var textures: [[String: Any]] = []
-        for path in imagePaths {
-            let data = (try? Data(contentsOf: URL(fileURLWithPath: path))) ?? Data()
+        for data in imageDatas {
             let bv = addBV(data, target: nil)
             images.append(["bufferView": bv, "mimeType": "image/png"])
             textures.append(["source": images.count - 1, "sampler": 0])
@@ -166,19 +184,23 @@ enum PCScanGLBExport {
         // Materiallar + primitivlar (har guruh uchun bittadan).
         var materials: [[String: Any]] = []
         var primitives: [[String: Any]] = []
-        for (gi, g) in nonEmpty.enumerated() {
+        for (gi, p) in prepared.enumerated() {
             var attrs: [String: Any] = ["POSITION": posAcc, "TEXCOORD_0": uvAcc]
             if let colAcc { attrs["COLOR_0"] = colAcc }
             var pbr: [String: Any] = ["metallicFactor": 0, "roughnessFactor": 1]
-            if let url = mtl[g.mat], let ti = imageIndexFor[url.path] {
+            if let url = mtl[p.mat], let ti = imageIndexFor[url.path] {
                 pbr["baseColorTexture"] = ["index": ti]
             } else {
                 pbr["baseColorFactor"] = [1, 1, 1, 1]   // vertex-rang COLOR_0'dan keladi
             }
+            // Parcha (fillmat/unseen_vc): kamera yo'li bo'lsa winding-tuzatilgan →
+            // single-sided (orbita'da culling); yo'q bo'lsa double-sided (teshik ochilmasin).
+            // Devor/asosiy shell: doim single-sided (dollhouse cull).
+            let doubleSided = p.isFragment ? cams.isEmpty : false
             materials.append([
                 "pbrMetallicRoughness": pbr,
                 "extensions": ["KHR_materials_unlit": [String: Any]()],
-                "doubleSided": false,   // dollhouse cull (Flutter ham single-sided qiladi)
+                "doubleSided": doubleSided,
             ])
             primitives.append(["attributes": attrs, "indices": idxAcc[gi],
                                "material": materials.count - 1, "mode": 4])
@@ -214,24 +236,67 @@ enum PCScanGLBExport {
     }
 
     /// MTL: material nomi → atlas PNG URL (`map_Kd`). `map_Kd`'siz material = vertex-rangli.
+    /// `.whitespacesAndNewlines` — CRLF fayllarda ham to'g'ri (trailing `\r` yo'qoladi).
     private static func parseMTL(objText: String, dir: URL) -> [String: URL] {
         var mtlName: String?
         for line in objText.split(separator: "\n") where line.hasPrefix("mtllib ") {
-            mtlName = line.dropFirst(7).trimmingCharacters(in: .whitespaces); break
+            mtlName = line.dropFirst(7).trimmingCharacters(in: .whitespacesAndNewlines); break
         }
         guard let name = mtlName,
               let mtl = try? String(contentsOf: dir.appendingPathComponent(name), encoding: .utf8) else { return [:] }
         var result: [String: URL] = [:]
         var current: String?
         for raw in mtl.split(separator: "\n") {
-            let line = raw.trimmingCharacters(in: .whitespaces)
+            let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             if line.hasPrefix("newmtl ") {
-                current = String(line.dropFirst(7)).trimmingCharacters(in: .whitespaces)
+                current = String(line.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
             } else if line.hasPrefix("map_Kd "), let cur = current {
-                let png = String(line.dropFirst(7)).trimmingCharacters(in: .whitespaces)
+                let png = String(line.dropFirst(7)).trimmingCharacters(in: .whitespacesAndNewlines)
                 result[cur] = dir.appendingPathComponent(png)
             }
         }
         return result
+    }
+
+    /// Skan kamera pozitsiyalari (`frames.json`, obj'dan bir pog'ona yuqorida —
+    /// scan-root). `[{transform:[16]}]`; pozitsiya = t[12..14]. 200 tagacha
+    /// siyraklashtiriladi. (Port: TexturedOBJLoader.loadCameraPositions.)
+    private static func loadCameraPositions(objURL: URL) -> [SIMD3<Float>] {
+        let root = objURL.deletingLastPathComponent().deletingLastPathComponent()
+        guard let data = try? Data(contentsOf: root.appendingPathComponent("frames.json")),
+              let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        else { return [] }
+        var out: [SIMD3<Float>] = []
+        out.reserveCapacity(arr.count)
+        for f in arr {
+            guard let t = f["transform"] as? [Double], t.count >= 16 else { continue }
+            out.append(SIMD3(Float(t[12]), Float(t[13]), Float(t[14])))
+        }
+        guard out.count > 200 else { return out }
+        let step = out.count / 200 + 1
+        return Swift.stride(from: 0, to: out.count, by: step).map { out[$0] }
+    }
+
+    /// Har uchburchak winding'ini eng yaqin skan kamerasiga qaratadi (normal kameraga
+    /// qarasin). Shunda single-sided qilinganda orbita'da (tashqaridan) back-face bo'lib
+    /// culling'ga uchraydi. (Port: TexturedOBJLoader.orientToScanPath, simd bilan.)
+    private static func orientToScanPath(_ indices: [UInt32], _ pos: [SIMD3<Float>],
+                                         _ cams: [SIMD3<Float>]) -> [UInt32] {
+        var out = indices
+        var i = 0
+        while i + 2 < out.count {
+            let a = pos[Int(out[i])], b = pos[Int(out[i + 1])], c = pos[Int(out[i + 2])]
+            let n = simd_cross(b - a, c - a)
+            let ctr = (a + b + c) / 3
+            var best = Float.greatestFiniteMagnitude
+            var bestCam = cams[0]
+            for cam in cams {
+                let d = simd_length_squared(cam - ctr)
+                if d < best { best = d; bestCam = cam }
+            }
+            if simd_dot(n, bestCam - ctr) < 0 { out.swapAt(i + 1, i + 2) }
+            i += 3
+        }
+        return out
     }
 }
