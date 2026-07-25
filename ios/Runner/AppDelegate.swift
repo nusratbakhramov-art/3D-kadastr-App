@@ -47,8 +47,15 @@ import RoomPlan
       scannerChannel.setMethodCallHandler { [weak controller] call, result in
         switch call.method {
         case "isSupported":
-          // Faqat #2 (PCScanKit) — iOS17 + kit yuklanadi. iOS<17 → qo'llab-quvvatlanmaydi.
-          result(PCScanBridge.shared.isAvailable)
+          // Qurilma qobiliyati (LiDAR + RoomPlan) VA #2 (PCScanKit) yuklanishi — IKKALASI.
+          // Simulyator (LiDAR yo'q) → RoomCaptureSession.isSupported=false → disabled.
+          var capable = false
+          #if canImport(RoomPlan)
+          if #available(iOS 16, *) { capable = RoomCaptureSession.isSupported }
+          #endif
+          let pc = PCScanBridge.shared.isAvailable
+          NSLog("PCSCAN-ISSUPPORTED: capable(LiDAR/RoomPlan)=\(capable) pcAvailable=\(pc) → \(capable && pc)")
+          result(capable && pc)
 
         case "startScan":
           guard let controller = controller else {
