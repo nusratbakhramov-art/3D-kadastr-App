@@ -457,8 +457,10 @@ import RoomPlan
 
   /// Provayder bo'yicha skan-bridge; PCScan mavjud bo'lmasa RoomScan fallback.
   static func scanBridge(_ provider: ScanProvider) -> ScanBridge {
-    (provider == .pcScan && PCScanBridge.shared.isAvailable)
-      ? PCScanBridge.shared : RoomScanBridge.shared
+    let pcAvailable = PCScanBridge.shared.isAvailable
+    let usePc = provider == .pcScan && pcAvailable
+    NSLog("PCSCAN-BRIDGE: provider=\(provider == .pcScan ? "pcScan" : "roomScan") pcAvailable=\(pcAvailable) → \(usePc ? "PCScan (#2)" : "RoomScan (eski)")")
+    return usePc ? PCScanBridge.shared : RoomScanBridge.shared
   }
 
   /// PCScanKit.framework'ni (embedded, Runner'ga LINK QILINMAGAN) ish vaqtida

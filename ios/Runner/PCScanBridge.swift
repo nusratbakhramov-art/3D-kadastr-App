@@ -33,13 +33,26 @@ final class PCScanBridge: ScanBridge {
     /// qaytaradi. iOS<17 / kit yo'q / cast muvaffaqiyatsiz bo'lsa nil.
     func facade() -> PCScanFacade? {
         if let f = cachedFacade { return f }
-        guard #available(iOS 17, *),
-              let url = Bundle.main.privateFrameworksURL?
+        guard #available(iOS 17, *) else { NSLog("PCSCAN-FACADE: iOS<17"); return nil }
+        guard let url = Bundle.main.privateFrameworksURL?
                 .appendingPathComponent("PCScanKit.framework"),
-              let bundle = Bundle(url: url) else { return nil }
-        if !bundle.isLoaded { bundle.load() }
-        guard let cls = NSClassFromString("PCScanEntry") as? NSObject.Type,
-              let facade = cls.init() as? PCScanFacade else { return nil }
+              let bundle = Bundle(url: url) else {
+            NSLog("PCSCAN-FACADE: bundle URL/init nil"); return nil
+        }
+        if !bundle.isLoaded {
+            let ok = bundle.load()
+            NSLog("PCSCAN-FACADE: bundle.load() = \(ok) @ \(url.lastPathComponent)")
+        }
+        guard let cls = NSClassFromString("PCScanEntry") as? NSObject.Type else {
+            NSLog("PCSCAN-FACADE: NSClassFromString(PCScanEntry) = nil (framework yuklanmadi?)")
+            return nil
+        }
+        let obj = cls.init()
+        guard let facade = obj as? PCScanFacade else {
+            NSLog("PCSCAN-FACADE: cast 'as? PCScanFacade' FAILED (obj=\(type(of: obj))) — dlopen protokol chegarasi")
+            return nil
+        }
+        NSLog("PCSCAN-FACADE: OK — PCScanKit yuklandi va cast muvaffaqiyatli")
         cachedFacade = facade
         return facade
     }
