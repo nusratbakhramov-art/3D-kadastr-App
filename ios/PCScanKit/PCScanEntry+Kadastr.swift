@@ -82,13 +82,27 @@ extension PCScanEntry: PCScanFacade {
             arts.texturedModelURL = modelURL
             library.updateAfterReprocess(folderName: record.folderName, artifacts: arts)
 
-            // Asosiy model: texrecon `room.obj` ustuvor → `run()` qaytargani → `model.usdz`.
+            // P3: texrecon room.obj → atlas.glb (backend'ga yuklanadigan asosiy model).
+            // GLB export xato bo'lsa OBJ'ga qaytamiz; texrecon umuman ishlamasa (eski
+            // skan / OC zaxira) model.usdz.
             let fm = FileManager.default
             let objURL = artifacts.paths.texturesDir.appendingPathComponent("room.obj")
-            let primary: URL? = fm.fileExists(atPath: objURL.path)
-                ? objURL
-                : (modelURL ?? (fm.fileExists(atPath: artifacts.paths.modelURL.path)
-                    ? artifacts.paths.modelURL : nil))
+            var primary: URL?
+            if fm.fileExists(atPath: objURL.path) {
+                let glbURL = artifacts.paths.texturesDir.appendingPathComponent("atlas.glb")
+                do {
+                    try PCScanGLBExport.export(objURL: objURL, to: glbURL)
+                    primary = glbURL
+                } catch {
+                    DebugLog(url: artifacts.paths.debugLog)
+                        .log("GLB export xato: \(error.localizedDescription) — OBJ'ga qaytildi")
+                    primary = objURL
+                }
+            } else if let modelURL, fm.fileExists(atPath: modelURL.path) {
+                primary = modelURL
+            } else if fm.fileExists(atPath: artifacts.paths.modelURL.path) {
+                primary = artifacts.paths.modelURL
+            }
             guard let primary else {
                 completion(nil, pcscanError("model yaratilmadi"))
                 return

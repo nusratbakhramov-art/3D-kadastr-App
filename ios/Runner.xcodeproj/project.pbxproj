@@ -116,6 +116,7 @@
 		E3AC59B8C04CEA7DD634E104 /* MemoryBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D3D4CD3B8321B91702527A0 /* MemoryBudget.swift */; };
 		E5561857166B8C546437B610 /* CategoryDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B01F87D863E1682186B4D40A /* CategoryDisplay.swift */; };
 		E7932F76DF7A531D2BD84C7E /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A262A4AAFA39C9A9953A8AF /* AppState.swift */; };
+		E90BF6A8A76F6B453D309045 /* PCScanGLBExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3D029D6DF6F9B08FA636C9 /* PCScanGLBExport.swift */; };
 		EB20FB0822A738195E831DC3 /* PCScanBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33A06A29ED8D1040C96D021 /* PCScanBridge.swift */; };
 		EC113D1B9FA2B1B7FF6B7AD3 /* MeshExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6DD5D460CD7DF3E5CC14D1F /* MeshExporter.swift */; };
 		EE3DEB2DDABF71FA4D3797D3 /* CubeProjectionUV.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */; };
@@ -275,6 +276,7 @@
 		B1DD1A33C4AD4640172812E1 /* CubeProjectionUV.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CubeProjectionUV.swift; sourceTree = "<group>"; };
 		B1FCE0FD14A3A8035A71D6AC /* AtlasSceneBuilder.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AtlasSceneBuilder.swift; sourceTree = "<group>"; };
 		B67E80CFDD59064294A95149 /* OnboardingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
+		BB3D029D6DF6F9B08FA636C9 /* PCScanGLBExport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PCScanGLBExport.swift; sourceTree = "<group>"; };
 		BBD769A067E08B9418A44EFA /* MarchingCubesTables.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarchingCubesTables.swift; sourceTree = "<group>"; };
 		C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MLAtlasEnhancer.swift; sourceTree = "<group>"; };
 		C33A06A29ED8D1040C96D021 /* PCScanBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PCScanBridge.swift; sourceTree = "<group>"; };
@@ -394,6 +396,7 @@
 				5C75AE3A87623F5425B8D3F3 /* UI */,
 				6CA5F03441B74523EAABA783 /* Vendor */,
 				158A2DC0DB7A2641FBD84420 /* PCScanEntry+Kadastr.swift */,
+				BB3D029D6DF6F9B08FA636C9 /* PCScanGLBExport.swift */,
 			);
 			name = PCScanKit;
 			path = PCScanKit;
@@ -1009,6 +1012,7 @@
 				E3AC59B8C04CEA7DD634E104 /* MemoryBudget.swift in Sources */,
 				C22BD9CAE4D3E612DE3EAC6C /* PCScanFacade.swift in Sources */,
 				7D2D1335FB09ADF86AC0338D /* PCScanEntry+Kadastr.swift in Sources */,
+				E90BF6A8A76F6B453D309045 /* PCScanGLBExport.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
