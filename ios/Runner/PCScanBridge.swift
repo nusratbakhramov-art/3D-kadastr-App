@@ -31,11 +31,17 @@ final class PCScanBridge {
             return nil
         }
         let obj = cls.init()
-        guard let facade = obj as? PCScanFacade else {
-            NSLog("PCSCAN-FACADE: cast 'as? PCScanFacade' FAILED (obj=\(type(of: obj))) — dlopen protokol chegarasi")
+        // ⚠️ `obj as? PCScanFacade` dlopen chegarasida ISHLAMAYDI — @objc protokol IKKALA
+        // modulda alohida kompilyatsiya qilinadi, Swift conformance metadata mos kelmaydi
+        // (device+sim'da tasdiqlangan). PCScanEntry metodlari @objc (selector orqali
+        // dispatch), shuning uchun responds(to:) bilan tekshirib, unsafeBitCast qilamiz —
+        // metod chaqiruvlari objc_msgSend orqali selector bo'yicha ketadi (dlopen plagin patterni).
+        guard obj.responds(to: NSSelectorFromString("presentCaptureFrom:onFinished:")) else {
+            NSLog("PCSCAN-FACADE: PCScanEntry facade selektorlariga javob bermaydi (@objc yo'q?)")
             return nil
         }
-        NSLog("PCSCAN-FACADE: OK — PCScanKit yuklandi va cast muvaffaqiyatli")
+        let facade = unsafeBitCast(obj, to: PCScanFacade.self)
+        NSLog("PCSCAN-FACADE: OK — unsafeBitCast (obj=\(type(of: obj)))")
         cachedFacade = facade
         return facade
     }

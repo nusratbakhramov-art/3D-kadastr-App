@@ -16,7 +16,7 @@ extension PCScanEntry: PCScanFacade {
     /// tomonda (`process`) chaqiriladi. Natija shakli `RoomScanBridge.startCapture`
     /// ga aynan mos; `savedScanId = 1_000_000 + record.index` (RoomScan id'laridan
     /// ajratish uchun).
-    public func presentCapture(from presenter: UIViewController,
+    @objc public func presentCapture(from presenter: UIViewController,
                                onFinished: @escaping ([String: Any]?) -> Void) {
         guard #available(iOS 17, *) else { onFinished(nil); return }
         MainActor.assumeIsolated {
@@ -60,7 +60,7 @@ extension PCScanEntry: PCScanFacade {
     /// (`ReconstructionViewModel.run` — UI shart emas) va asosiy model yo'lини
     /// qaytaradi. P2: `filePath` = texrecon `room.obj` (aks holda `run()` qaytargani
     /// yoki `model.usdz`). GLB+USDZ eksporti P3/P4 da qo'shiladi.
-    public func processScan(_ savedScanId: Int,
+    @objc public func processScan(_ savedScanId: Int,
                             completion: @escaping ([String: Any]?, NSError?) -> Void) {
         guard #available(iOS 17, *) else {
             completion(nil, pcscanError("iOS 17+ kerak")); return
@@ -129,7 +129,7 @@ extension PCScanEntry: PCScanFacade {
 
     /// Yuklanadigan artefaktlar: `atlas.glb` + `atlas.usdz` (`[{path,rel,type,sizeBytes}]`).
     /// AI Baholash happy-path faqat `glb`+`usdz`'ni yuklaydi (Flutter filtri).
-    public func listScanFiles(_ savedScanId: Int) -> [[String: Any]] {
+    @objc public func listScanFiles(_ savedScanId: Int) -> [[String: Any]] {
         guard let paths = Self.resolvePaths(savedScanId) else { return [] }
         let fm = FileManager.default
         let rootPath = paths.root.path
@@ -147,7 +147,7 @@ extension PCScanEntry: PCScanFacade {
 
     /// 3D modelni ko'rsatadi. `path` = asosiy model (GLB); GLB SceneKit'da render
     /// bo'lmaydi → yonidagi `room.obj`'ni ko'rsatamiz (u yo'q bo'lsa berilgan faylni).
-    public func presentViewer(from presenter: UIViewController, path: String) {
+    @objc public func presentViewer(from presenter: UIViewController, path: String) {
         guard #available(iOS 17, *) else { return }
         MainActor.assumeIsolated {
             let dir = (path as NSString).deletingLastPathComponent
@@ -164,7 +164,7 @@ extension PCScanEntry: PCScanFacade {
     }
 
     /// Barcha PCScan skanlar (scanMap) — "Skanlarim" ro'yxati.
-    public func listScans() -> [[String: Any]] {
+    @objc public func listScans() -> [[String: Any]] {
         MainActor.assumeIsolated {
             let lib = ScanLibrary()
             return lib.records.map { rec in
@@ -174,7 +174,7 @@ extension PCScanEntry: PCScanFacade {
     }
 
     /// Bitta skan xulosasi.
-    public func scanSummary(_ savedScanId: Int) -> [String: Any]? {
+    @objc public func scanSummary(_ savedScanId: Int) -> [String: Any]? {
         MainActor.assumeIsolated {
             let index = savedScanId - 1_000_000
             let lib = ScanLibrary()
@@ -184,7 +184,7 @@ extension PCScanEntry: PCScanFacade {
     }
 
     /// Skanni butunlay o'chiradi (papka bilan).
-    public func deleteScan(_ savedScanId: Int) -> Bool {
+    @objc public func deleteScan(_ savedScanId: Int) -> Bool {
         MainActor.assumeIsolated {
             let index = savedScanId - 1_000_000
             let lib = ScanLibrary()
@@ -195,7 +195,7 @@ extension PCScanEntry: PCScanFacade {
     }
 
     /// Chiqish modellarini (atlas.glb/atlas.usdz) o'chiradi (skan/xom ma'lumot qoladi).
-    public func deleteOutput(_ savedScanId: Int) -> Bool {
+    @objc public func deleteOutput(_ savedScanId: Int) -> Bool {
         guard let paths = Self.resolvePaths(savedScanId) else { return false }
         let fm = FileManager.default
         var any = false
@@ -232,7 +232,7 @@ extension PCScanEntry: PCScanFacade {
     }
 
     /// Asosiy model yo'li (GLB ustuvor, aks holda USDZ).
-    public func outputPath(_ savedScanId: Int) -> String? {
+    @objc public func outputPath(_ savedScanId: Int) -> String? {
         guard let paths = Self.resolvePaths(savedScanId) else { return nil }
         let fm = FileManager.default
         let glb = paths.texturesDir.appendingPathComponent("atlas.glb")
