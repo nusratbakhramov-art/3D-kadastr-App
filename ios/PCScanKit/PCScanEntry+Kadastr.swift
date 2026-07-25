@@ -56,11 +56,52 @@ extension PCScanEntry: PCScanFacade {
         }
     }
 
+    /// Saqlangan xom skanni (id = 1_000_000 + index) HEADLESS teksturalaydi
+    /// (`ReconstructionViewModel.run` — UI shart emas) va asosiy model yo'lини
+    /// qaytaradi. P2: `filePath` = texrecon `room.obj` (aks holda `run()` qaytargani
+    /// yoki `model.usdz`). GLB+USDZ eksporti P3/P4 da qo'shiladi.
     public func processScan(_ savedScanId: Int,
                             completion: @escaping ([String: Any]?, NSError?) -> Void) {
-        // TODO(P2): headless texturing → GLB path.
-        completion(nil, NSError(domain: "PCScanKit", code: -1,
-                               userInfo: [NSLocalizedDescriptionKey: "processScan not implemented (P2)"]))
+        guard #available(iOS 17, *) else {
+            completion(nil, pcscanError("iOS 17+ kerak")); return
+        }
+        let index = savedScanId - 1_000_000
+        Task { @MainActor in
+            let library = ScanLibrary()   // init reload qiladi
+            guard let record = library.records.first(where: { $0.index == index }),
+                  let artifacts = library.loadArtifacts(record) else {
+                completion(nil, pcscanError("skan topilmadi: #\(index)"))
+                return
+            }
+            // Headless rekonstruksiya (texrecon → OBJ; zaxira: fusion/OC).
+            let modelURL = await ReconstructionViewModel().run(
+                paths: artifacts.paths, room: artifacts.capturedRoom
+            )
+            // Ro'yxat yozuvini yangilaymiz (hasTexture/hasMesh).
+            var arts = artifacts
+            arts.texturedModelURL = modelURL
+            library.updateAfterReprocess(folderName: record.folderName, artifacts: arts)
+
+            // Asosiy model: texrecon `room.obj` ustuvor → `run()` qaytargani → `model.usdz`.
+            let fm = FileManager.default
+            let objURL = artifacts.paths.texturesDir.appendingPathComponent("room.obj")
+            let primary: URL? = fm.fileExists(atPath: objURL.path)
+                ? objURL
+                : (modelURL ?? (fm.fileExists(atPath: artifacts.paths.modelURL.path)
+                    ? artifacts.paths.modelURL : nil))
+            guard let primary else {
+                completion(nil, pcscanError("model yaratilmadi"))
+                return
+            }
+            let size = ((try? fm.attributesOfItem(atPath: primary.path))?[.size] as? Int) ?? 0
+            completion([
+                "scanId": savedScanId,
+                "version": 1,
+                "filePath": primary.path,   // P3/P4: bu GLB'ga almashtiriladi
+                "fileSize": size,
+                "mode": "offline_processed",
+            ], nil)
+        }
     }
 
     public func listScanFiles(_ savedScanId: Int) -> [[String: Any]] { [] }   // TODO(P5)
@@ -72,6 +113,11 @@ extension PCScanEntry: PCScanFacade {
     public func deleteScan(_ savedScanId: Int) -> Bool { false }   // TODO(P7)
 
     public func outputPath(_ savedScanId: Int) -> String? { nil }   // TODO(P7)
+}
+
+/// Facade uchun qisqa NSError yordamchisi (dlopen chegarasidan o'tadi).
+private func pcscanError(_ message: String) -> NSError {
+    NSError(domain: "PCScanKit", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
 }
 
 /// Capture-only modal konteyneri — `PCScanContainerViewController` ga o'xshash, lekin
