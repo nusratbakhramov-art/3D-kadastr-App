@@ -127,15 +127,66 @@ extension PCScanEntry: PCScanFacade {
         }
     }
 
-    public func listScanFiles(_ savedScanId: Int) -> [[String: Any]] { [] }   // TODO(P5)
+    /// Yuklanadigan artefaktlar: `atlas.glb` + `atlas.usdz` (`[{path,rel,type,sizeBytes}]`).
+    /// AI Baholash happy-path faqat `glb`+`usdz`'ni yuklaydi (Flutter filtri).
+    public func listScanFiles(_ savedScanId: Int) -> [[String: Any]] {
+        guard let paths = Self.resolvePaths(savedScanId) else { return [] }
+        let fm = FileManager.default
+        let rootPath = paths.root.path
+        var out: [[String: Any]] = []
+        func add(_ url: URL, _ type: String) {
+            guard fm.fileExists(atPath: url.path) else { return }
+            let size = ((try? fm.attributesOfItem(atPath: url.path))?[.size] as? Int) ?? 0
+            let rel = url.path.replacingOccurrences(of: rootPath + "/", with: "")
+            out.append(["path": url.path, "rel": rel, "type": type, "sizeBytes": size])
+        }
+        add(paths.texturesDir.appendingPathComponent("atlas.glb"), "glb")
+        add(paths.texturesDir.appendingPathComponent("atlas.usdz"), "usdz")
+        return out
+    }
 
-    public func presentViewer(from presenter: UIViewController, path: String) {}  // TODO(P5)
+    /// 3D modelni ko'rsatadi. `path` = asosiy model (GLB); GLB SceneKit'da render
+    /// bo'lmaydi → yonidagi `room.obj`'ni ko'rsatamiz (u yo'q bo'lsa berilgan faylni).
+    public func presentViewer(from presenter: UIViewController, path: String) {
+        guard #available(iOS 17, *) else { return }
+        MainActor.assumeIsolated {
+            let dir = (path as NSString).deletingLastPathComponent
+            let objURL = URL(fileURLWithPath: dir).appendingPathComponent("room.obj")
+            let viewer: PCScanModelViewerController
+            if FileManager.default.fileExists(atPath: objURL.path) {
+                viewer = PCScanModelViewerController(objURL: objURL)
+            } else {
+                viewer = PCScanModelViewerController(fileURL: URL(fileURLWithPath: path))
+            }
+            viewer.modalPresentationStyle = .fullScreen
+            presenter.present(viewer, animated: true)
+        }
+    }
 
     public func availableScanIds() -> [NSNumber] { [] }   // TODO(P7)
 
     public func deleteScan(_ savedScanId: Int) -> Bool { false }   // TODO(P7)
 
-    public func outputPath(_ savedScanId: Int) -> String? { nil }   // TODO(P7)
+    /// Asosiy model yo'li (GLB ustuvor, aks holda USDZ).
+    public func outputPath(_ savedScanId: Int) -> String? {
+        guard let paths = Self.resolvePaths(savedScanId) else { return nil }
+        let fm = FileManager.default
+        let glb = paths.texturesDir.appendingPathComponent("atlas.glb")
+        if fm.fileExists(atPath: glb.path) { return glb.path }
+        let usdz = paths.texturesDir.appendingPathComponent("atlas.usdz")
+        return fm.fileExists(atPath: usdz.path) ? usdz.path : nil
+    }
+
+    /// `savedScanId` (1_000_000 + index) → PCScan scan papkasi yo'llari.
+    /// Main-thread'da chaqiriladi (Flutter kanal handleri) — `ScanLibrary` @MainActor.
+    static func resolvePaths(_ savedScanId: Int) -> ScanPaths? {
+        MainActor.assumeIsolated {
+            let index = savedScanId - 1_000_000
+            let lib = ScanLibrary()
+            guard let rec = lib.records.first(where: { $0.index == index }) else { return nil }
+            return StorageService.session(named: rec.folderName)
+        }
+    }
 }
 
 /// Facade uchun qisqa NSError yordamchisi (dlopen chegarasidan o'tadi).
