@@ -38,8 +38,12 @@ enum AtlasSharpen {
             pngs.insert(f)
         }
         var done = 0
-        for name in pngs.sorted() where sharpenPNG(dir.appendingPathComponent(name), amount: amt) {
-            done += 1
+        // Har PNG autoreleasepool ichida — dekodlangan CGImage/CGContext (yana bir
+        // to'liq w*h*4 bufer) darhol bo'shatilsin, scope oxirigacha yig'ilib qolmasin.
+        for name in pngs.sorted() {
+            autoreleasepool {
+                if sharpenPNG(dir.appendingPathComponent(name), amount: amt) { done += 1 }
+            }
         }
         log("SHARPEN atlas=\(done) amount=\(String(format: "%.2f", amt)) radius=\(radius)")
     }
@@ -50,6 +54,10 @@ enum AtlasSharpen {
               let img = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return false }
         let w = img.width, h = img.height
         guard w > 2 * radius, h > 2 * radius else { return false }
+        // Xotira qopqog'i: sharpenPNG ~9 ta Float massiv (~40 B/piksel) ajratadi —
+        // 4096² atlas ≈ 640MB. Qurilma byudjetidan oshsa o'tkirlashni O'TKAZIB
+        // YUBORAMIZ (kosmetik effekt; jetsam OOM'ni oldini olish muhimroq).
+        guard 40 * w * h <= MemoryBudget.current().atlasFloatBudget else { return false }
         var px = [UInt8](repeating: 0, count: w * h * 4)
         let cs = CGColorSpaceCreateDeviceRGB()
         guard let ctx = CGContext(data: &px, width: w, height: h, bitsPerComponent: 8,

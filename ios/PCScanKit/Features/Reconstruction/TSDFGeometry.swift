@@ -245,8 +245,7 @@ enum TSDFGeometry {
             var plane = plane
             if plane.snapToMeasured {
                 if let off = measuredOffset(plane, tsdf: &tsdf, wsum: &wsum, dims: dims,
-                                            mins: mins, vox: vox, trunc: trunc,
-                                            planeW: planeW) {
+                                            mins: mins, vox: vox, planeW: planeW) {
                     plane.center += plane.normalOut * off
                     log?("PLANE[\(plane.label)] snap=\(String(format: "%+.3f", off)) m")
                 } else {
@@ -351,7 +350,7 @@ enum TSDFGeometry {
     private static func measuredOffset(_ plane: WallPlane,
                                        tsdf: inout [Float], wsum: inout [Float],
                                        dims: SIMD3<Int>, mins: SIMD3<Float>,
-                                       vox: Float, trunc: Float, planeW: Float) -> Float? {
+                                       vox: Float, planeW: Float) -> Float? {
         let ny = dims.y, nz = dims.z
         let range: Float = 0.12
         let nu = 48, nv = 28
@@ -375,13 +374,7 @@ enum TSDFGeometry {
                         let w = wsum[idx]
                         if w > 0, w != planeW, abs(tsdf[idx]) < bestAbs {
                             bestAbs = abs(tsdf[idx])
-                            // VOXEL ICHIDAGI aniq joy: TSDF normallashgan masofa
-                            // (`tsdf = -t/trunc`), demak yuza `t + tsdf*trunc` da.
-                            // Busiz natija voxelga yaxlitlanardi va qo'pol gridda
-                            // (o'lchandi, skan #26: vox=56mm) snap atigi 3 ta qiymat
-                            // berardi (-0.064/+0.047/-0.008, orasi aynan 1 voxel) —
-                            // ya'ni o'lchov emas, kvantlanish shovqini.
-                            best = t + tsdf[idx] * trunc
+                            best = t
                         }
                     }
                     t += vox
@@ -560,13 +553,16 @@ enum TSDFGeometry {
         maxs += SIMD3(repeating: 0.12)
 
         // ===== 2. Voxel o'lchami (xotira qopqog'i ostida eng mayda) =====
+        // Voxel qopqog'i qurilma xotirasiga MOSLASHADI (jetsam OOM'ni oldini olish):
+        // kam xotirali qurilma yirikroq voxel oladi (kamroq detal, lekin crash yo'q).
+        let voxelCap = min(maxVoxels, MemoryBudget.current().maxVoxels)
         var vox = voxelStart
         var dims = SIMD3<Int>(0, 0, 0)
         while true {
             dims = SIMD3(Int(ceil((maxs.x - mins.x) / vox)),
                          Int(ceil((maxs.y - mins.y) / vox)),
                          Int(ceil((maxs.z - mins.z) / vox)))
-            if dims.x * dims.y * dims.z <= maxVoxels { break }
+            if dims.x * dims.y * dims.z <= voxelCap { break }
             vox *= 1.15
         }
         let total = dims.x * dims.y * dims.z

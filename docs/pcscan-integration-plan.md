@@ -3,14 +3,18 @@
 **Maqsad:** `/Users/ofoqovabdulboriy/StudioProjects/PCScan` (native iOS LiDAR xona
 skaneri — RoomPlan struktura + Object Capture tekstura + texrecon/poisson
 rekonstruksiya) ni kadastr Flutter ilovasi ichiga olib o'tish. Profildagi
-skan-picker'da **"#2"** bosilganda PCScan ochiladi. **"#1" = nsdk (ScansKit)**
-allaqachon ulangan — bu uni takrorlaydi, buzmaydi.
+skan-picker'da **"#2"** bosilganda PCScan ochiladi.
 
-## Bu ScansKit (nsdk) integratsiyasining egizagi
+> **Yangilanish (2026-07-25):** "#1" (nsdk / ScansKit) skaner ilovadan
+> **butunlay olib tashlandi** (`ios/ScansKit/`, target, NSDK SPM, kanal —
+> hammasi). Quyidagi ScansKit taqqoslashlari faqat **tarixiy kontekst** uchun
+> (endi ulanmagan). Ilovada faqat "#2" (PCScan) skaneri qoladi.
+
+## Bu (endi olib tashlangan) ScansKit (nsdk) integratsiyasining egizagi edi
 
 Xuddi shu isbotlangan pattern: alohida embedded framework (`PCScanKit`), iOS 17
 target, min-15 Runner uni **import qilmaydi** — ish vaqtida `Bundle.load()` +
-`@objc PCScanEntry` (dlopen). Qarang: [nsdk-integration-plan.md](nsdk-integration-plan.md).
+`@objc PCScanEntry` (dlopen).
 
 | | PCScan | ScansKit (nsdk) — ulangan |
 |---|---|---|

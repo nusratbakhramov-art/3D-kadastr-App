@@ -78,15 +78,19 @@ enum PoissonService {
         // kamaytiriladi, shuning uchun katta xonada depth 8 deyarli bir xil natija
         // beradi, lekin ~2.6× kam xotira (143MB vs 378MB). Kichik xona depth 9 qoladi.
         let diag = simd_length(maxB - minB)
-        let effectiveDepth: Int32 = diag > 9.0 ? min(depth, 8) : depth
+        // Chuqurlik ikki chegaraning kichigi: (1) bbox diagonali (katta xona -> 8),
+        // (2) QURILMA XOTIRASI (octree d9≈378MB, d8≈143MB, d7≈54MB — jetsam OOM'ni
+        // oldini olish uchun kam xotirada pastroq depth).
+        let diagDepth: Int32 = diag > 9.0 ? min(depth, 8) : depth
+        let effectiveDepth: Int32 = min(diagDepth, MemoryBudget.current().poissonDepth)
         if effectiveDepth != depth {
             log?("POISSON depth \(depth)→\(effectiveDepth) (katta xona diag=\(String(format: "%.1f", diag))m)")
         }
-        log?("POISSON reconstructing (depth=\(effectiveDepth))…")
         #if targetEnvironment(simulator)
         // Native PoissonRecon faqat qurilmada (kutubxonalar simulyatorга linklanmaydi).
         log?("POISSON: native recon faqat qurilmada mavjud"); return nil
         #else
+        log?("POISSON reconstructing (depth=\(effectiveDepth))…")
         let rc = ptsPLY.path.withCString { ip in
             outPLY.path.withCString { op in pcscan_poisson(ip, op, effectiveDepth) }
         }
@@ -199,11 +203,11 @@ enum PoissonService {
     static func decimate(_ mesh: LiDARMeshData, targetTris: Int) -> LiDARMeshData {
         let indexCount = mesh.indices.count
         guard indexCount / 3 > targetTris, mesh.vertexCount > 0 else { return mesh }
-        let ratio = Float(targetTris * 3) / Float(indexCount)
         #if targetEnvironment(simulator)
         // meshoptimizer (pcscan_simplify) faqat qurilmada — simulyatorда decimation'siz.
         return mesh
         #else
+        let ratio = Float(targetTris * 3) / Float(indexCount)
         var out = [UInt32](repeating: 0, count: indexCount)
         let n = mesh.positions.withUnsafeBufferPointer { pp -> Int32 in
             mesh.indices.withUnsafeBufferPointer { ip in

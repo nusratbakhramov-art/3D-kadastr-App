@@ -5,10 +5,6 @@ import SceneKit
 #if canImport(RoomPlan)
 import RoomPlan
 #endif
-// ScansKit (nsdk) skaner Runner'ga IMPORT/LINK QILINMAYDI — ScansKit iOS 17,
-// Runner iOS 15 (Swift yuqori-min modulni past target'ga import qildirmaydi).
-// Runner uni ish vaqtida `Bundle.load()` bilan yuklab, `NSDKScannerEntry` @objc
-// klassini ObjC runtime orqali chaqiradi (dlopen). Qarang: loadScansKitEntry().
 
 @main
 @objc class AppDelegate: FlutterAppDelegate {
@@ -51,13 +47,17 @@ import RoomPlan
       scannerChannel.setMethodCallHandler { [weak controller] call, result in
         switch call.method {
         case "isSupported":
-          var supported = false
-          #if canImport(RoomPlan)
-          if #available(iOS 16, *) {
-            supported = RoomCaptureSession.isSupported
+          if AppDelegate.scanProvider == .pcScan && PCScanBridge.shared.isAvailable {
+            result(true)   // PCScan: iOS17 + kit; LiDAR PCScan onboarding'ida
+          } else {
+            var supported = false
+            #if canImport(RoomPlan)
+            if #available(iOS 16, *) {
+              supported = RoomCaptureSession.isSupported
+            }
+            #endif
+            result(supported)
           }
-          #endif
-          result(supported)
 
         case "startScan":
           guard let controller = controller else {
@@ -79,9 +79,10 @@ import RoomPlan
           }
 
         case "startTexturedScan":
-          // Ported RoomScanPlanAI pipeline (RoomPlan capture → atlas texturing
-          // with mesh-depth occlusion). Keeps the same channel contract.
-          RoomScanBridge.shared.handleRoomPlan(call, presenter: controller, result: result)
+          // Skan-provayder bo'yicha bridge (RoomScanPlanAI yoki PCScanKit) — bir
+          // xil kanal kontrakti saqlanadi.
+          AppDelegate.scanBridge(AppDelegate.scanProvider)
+            .handleRoomPlan(call, presenter: controller, result: result)
 
         case "startTexturedRoomPlan":
           guard let controller = controller else {
@@ -162,9 +163,9 @@ import RoomPlan
           }
 
         case "previewModel":
-          // Ported RoomScanPlanAI viewer: render atlas.geo + atlas.png directly in
-          // SceneKit (no USDZ round-trip), falling back to the file if needed.
-          RoomScanBridge.shared.handleRoomPlan(call, presenter: controller, result: result)
+          // Provayder bo'yicha viewer (RoomScan: atlas.geo+png; PCScan: room.obj).
+          AppDelegate.scanBridge(AppDelegate.scanProvider)
+            .handleRoomPlan(call, presenter: controller, result: result)
 
         default:
           result(FlutterMethodNotImplemented)
@@ -182,7 +183,13 @@ import RoomPlan
         // RoomScanPlanAI pipeline (Documents/Scans/scanNNN). Debug-log helpers
         // stay on the legacy path below.
         if call.method != "readDebugLog" && call.method != "clearDebugLog" {
-          RoomScanBridge.shared.handleSavedScans(call, presenter: controller, result: result)
+          // id-prefiks bo'yicha yo'naltiramiz: PCScan id'lari ≥ 1_000_000. id
+          // bo'lmaganda (masalan "list") joriy provayderni ishlatamiz.
+          let idArg = (call.arguments as? [String: Any])?["id"] as? Int
+          let provider: ScanProvider = idArg.map { $0 >= 1_000_000 ? .pcScan : .roomScan }
+            ?? AppDelegate.scanProvider
+          AppDelegate.scanBridge(provider)
+            .handleSavedScans(call, presenter: controller, result: result)
           return
         }
         switch call.method {
@@ -398,46 +405,9 @@ import RoomPlan
         }
       }
 
-      // ScansKit (nsdk) scanner — profil skan-picker "#1" shu kanalni chaqiradi.
-      // iOS 17+ + weak-linked ScansKit framework. iOS 15/16'da UNSUPPORTED.
-      let nsdkScannerChannel = FlutterMethodChannel(
-        name: "kadastr/nsdk_scanner",
-        binaryMessenger: controller.binaryMessenger
-      )
-      nsdkScannerChannel.setMethodCallHandler { [weak controller] call, result in
-        switch call.method {
-        case "isAvailable":
-          if #available(iOS 17, *) {
-            result(AppDelegate.loadScansKitEntry() != nil)
-          } else {
-            result(false)
-          }
-
-        case "open":
-          guard let controller = controller else {
-            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
-            return
-          }
-          if #available(iOS 17, *), let entry = AppDelegate.loadScansKitEntry() {
-            let sel = NSSelectorFromString("presentFrom:")
-            if entry.responds(to: sel) {
-              entry.perform(sel, with: controller)
-              result(true)
-            } else {
-              result(FlutterError(code: "ENTRY", message: "ScansKit entry topilmadi", details: nil))
-            }
-          } else {
-            result(FlutterError(code: "UNSUPPORTED", message: "Skan iOS 17+ qurilma talab qiladi", details: nil))
-          }
-
-        default:
-          result(FlutterMethodNotImplemented)
-        }
-      }
-
       // PCScan (RoomPlan+ObjectCapture) scanner — profil skan-picker "#2" shu
-      // kanalni chaqiradi. iOS 17+ + weak-linked PCScanKit framework. ScansKit
-      // ("#1") ning egizagi; iOS 15/16'da UNSUPPORTED.
+      // kanalni chaqiradi. iOS 17+ + weak-linked PCScanKit framework.
+      // iOS 15/16'da UNSUPPORTED.
       let pcscanScannerChannel = FlutterMethodChannel(
         name: "kadastr/pcscan_scanner",
         binaryMessenger: controller.binaryMessenger
@@ -477,8 +447,21 @@ import RoomPlan
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
   }
 
+  /// AI Baholash skan-provayderi. `.pcScan` da PCScanKit ("#2") ishlaydi; PCScan
+  /// mavjud bo'lmasa (iOS<17 / kit yo'q) `scanBridge` avtomatik RoomScan'ga tushadi.
+  /// Default `.roomScan` (UserDefaults "scan_provider" == "pcscan" bo'lsa .pcScan).
+  static var scanProvider: ScanProvider {
+    UserDefaults.standard.string(forKey: "scan_provider") == "pcscan" ? .pcScan : .roomScan
+  }
+
+  /// Provayder bo'yicha skan-bridge; PCScan mavjud bo'lmasa RoomScan fallback.
+  static func scanBridge(_ provider: ScanProvider) -> ScanBridge {
+    (provider == .pcScan && PCScanBridge.shared.isAvailable)
+      ? PCScanBridge.shared : RoomScanBridge.shared
+  }
+
   /// PCScanKit.framework'ni (embedded, Runner'ga LINK QILINMAGAN) ish vaqtida
-  /// yuklab, `PCScanEntry` namunasini qaytaradi — `loadScansKitEntry()` egizagi.
+  /// yuklab, `PCScanEntry` namunasini qaytaradi.
   /// iOS 15/16'da `bundle.load()` false qaytaradi (crash yo'q) va
   /// NSClassFromString nil beradi, shu sabab nil qaytamiz.
   private static func loadPCScanEntry() -> NSObject? {
@@ -487,21 +470,6 @@ import RoomPlan
           let bundle = Bundle(url: url) else { return nil }
     if !bundle.isLoaded { bundle.load() }
     guard let cls = NSClassFromString("PCScanEntry") as? NSObject.Type else {
-      return nil
-    }
-    return cls.init()
-  }
-
-  /// ScansKit.framework'ni (embedded, Runner'ga LINK QILINMAGAN) ish vaqtida
-  /// yuklab, `NSDKScannerEntry` namunasini qaytaradi — framework mavjud va
-  /// yuklanadigan bo'lsa. iOS 15/16'da `bundle.load()` false qaytaradi (crash
-  /// yo'q) va NSClassFromString nil beradi, shu sabab nil qaytamiz.
-  private static func loadScansKitEntry() -> NSObject? {
-    guard let url = Bundle.main.privateFrameworksURL?
-            .appendingPathComponent("ScansKit.framework"),
-          let bundle = Bundle(url: url) else { return nil }
-    if !bundle.isLoaded { bundle.load() }
-    guard let cls = NSClassFromString("NSDKScannerEntry") as? NSObject.Type else {
       return nil
     }
     return cls.init()

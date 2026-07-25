@@ -31,6 +31,10 @@ enum StructurePlanes {
     /// Devor to'rtburchagi chetiga zaxira (m) — burchaklar va RoomPlan kalta
     /// o'lchagan devorlar uchun (RoomClipper'dagi `extentPad` bilan bir xil mantiq).
     private static let extentPad: Float = 0.20
+    /// "Yopiq eshik" aslida SHISHA TO'SIQ deb hisoblanadigan chegara — proyom
+    /// yuzasining ota-devor yuzasiga nisbati. O'lchangan ajratish: shisha
+    /// 98.5/99.2/98.9%, haqiqiy eshik 14.4% (2 skan, 4 proyom).
+    private static let glassWallRatio: Float = 0.70
 
     // MARK: - Sof yadro (RoomPlan'siz — macOS'da haqiqiy skanda test qilinadi)
 
@@ -51,8 +55,7 @@ enum StructurePlanes {
     static func planes(walls: [SurfaceInput], openings: [SurfaceInput],
                        floorPolygon: [SIMD2<Float>],
                        floorY: Float, ceilingY: Float,
-                       screens: [TSDFGeometry.WallPlane] = [],
-                       cameras: [SIMD3<Float>] = []) -> [TSDFGeometry.WallPlane] {
+                       screens: [TSDFGeometry.WallPlane] = []) -> [TSDFGeometry.WallPlane] {
         guard !walls.isEmpty else { return [] }
 
         // Xona markazi — devorning qaysi tomoni "ichkari" ekanini aniqlash uchun.
@@ -71,25 +74,7 @@ enum StructurePlanes {
             guard l > 1e-6 else { continue }
             nIn /= l
             let c = SIMD3<Float>(t.columns.3.x, t.columns.3.y, t.columns.3.z)
-            // ICHKARI TOMON — skan KAMERA YO'LI bo'yicha, devorlar markazi bo'yicha EMAS.
-            //
-            // NEGA (o'lchandi, skan #26 devor[8] markaz=(4.17,-0.14,0.46)): 15 devor
-            // markazi (3.77,-0.14,0.90) shu devor uchun NOTO'G'RI tomonda qoladi —
-            // koridor uzun va L-shaklli. Holbuki unga qaragan kameralar 0.90 m da,
-            // qarama-qarshi tomonda. Markazga qarab yo'naltirilganda tekislik TESKARI
-            // inject qilinadi, yuza koridordan teskari qaraydi va `cullMode = .back`
-            // uni kesib tashlaydi -> devor QORA ko'rinadi.
-            //
-            // O'lchangan natija (ko'rinadigan yuza ulushi): devor[8] 45%->89%,
-            // devor[1] 60%->98%, [11] 24%->92%, [12] 21%->88%. Maydon shishishi ham
-            // tuzaldi: [1] 111.9->69.5 m2 (nazariy 63.5) — oldin ikkala varaq chiqardi.
-            //
-            // Kamera yo'q bo'lsa (eski skan) — eski xatti-harakat, markaz bo'yicha.
-            if let near = nearestCamera(to: c, cameras: cameras) {
-                if simd_dot(near - c, nIn) < 0 { nIn = -nIn }
-            } else if simd_dot(center - c, nIn) < 0 {
-                nIn = -nIn
-            }
+            if simd_dot(center - c, nIn) < 0 { nIn = -nIn }   // ichkariga qaratamiz
             out.append(TSDFGeometry.WallPlane(
                 center: c,
                 normalOut: -nIn,                               // TSDF: xonadan TASHQARIGA
@@ -124,32 +109,12 @@ enum StructurePlanes {
         return out
     }
 
-    /// Devor markaziga eng yaqin skan kamerasi (2.5 m radius; topilmasa nil).
-    /// Radius cheklovi: uzoqdagi kamera boshqa xonada bo'lishi mumkin.
-    private static func nearestCamera(to p: SIMD3<Float>,
-                                      cameras: [SIMD3<Float>]) -> SIMD3<Float>? {
-        var best: SIMD3<Float>?
-        var bestD = Float(2.5 * 2.5)
-        for cam in cameras {
-            let d = simd_length_squared(cam - p)
-            if d < bestD { bestD = d; best = cam }
-        }
-        return best
-    }
-
     // MARK: - Proyom tekisliklari (SHISHA MUHRI, 5.4.0.1 porti)
 
     /// Eshik/deraza tekisliklari — LiDAR qaytarmagan shisha zonasi TESHIK emas,
     /// YUZA bo'lsin.
     ///
-    /// Semantika: deraza — DOIM muhrlanadi; eshik — YOPIQ bo'lsa muhrlanadi.
-    ///
-    /// 6.1.2 ning 70% "shisha to'siq" mezoni OLIB TASHLANDI (foydalanuvchi bisekti:
-    /// 6.1.1 da #28 zo'r, 6.1.2 da devor muammosi). O'lchandi: #28 eshigi
-    /// ota-devorining 28.2% ini egallaydi (1.33/4.72 m2) -> 70% dan past ->
-    /// muhrlanmasdi -> nurlar eshikdan o'tib qo'shni devor[6] burchagini
-    /// `wsum > 0` qilib qo'yardi, lekin kuzatuv sifatsiz bo'lgani uchun yuza
-    /// chiqmasdi. Natija: 0.40 x 2.60 m tik qora tasma.
+    /// Semantika: deraza — DOIM muhrlanadi; eshik — faqat SHISHA TO'SIQ bo'lsa.
     ///
     /// NEGA `isOpen` GA ISHONMAYMIZ (o'lchandi, skan 20260720-194938 #26): RoomPlan
     /// ochiq turgan oddiy eshikni ham `isOpen=false` deb beradi. O'sha eshikni
@@ -165,9 +130,12 @@ enum StructurePlanes {
     /// O'lchandi (2 skan, 4 ta eshik): shisha 98.5% / 99.2% / 98.9%, haqiqiy eshik
     /// 14.4%. Oradagi bo'shliq ulkan — chegara 70% xavfsiz.
     static func openings(doors: [SurfaceInput], windows: [SurfaceInput],
+                         walls: [SurfaceInput],
                          roomCenter: SIMD3<Float>) -> [TSDFGeometry.WallPlane] {
         var out: [TSDFGeometry.WallPlane] = []
         for (s, isWindow) in windows.map({ ($0, true) }) + doors.map({ ($0, false) }) {
+            // Shisha to'siqmi? (deraza uchun ahamiyatsiz — u doim muhrlanadi)
+            let glass = !isWindow && spansWholeWall(s, walls: walls)
             let t = s.transform
             var nIn = SIMD3<Float>(t.columns.2.x, t.columns.2.y, t.columns.2.z)
             let l = simd_length(nIn)
@@ -181,10 +149,10 @@ enum StructurePlanes {
                 yAxis: simd_normalize(SIMD3(t.columns.1.x, t.columns.1.y, t.columns.1.z)),
                 halfW: s.dimensions.x / 2, halfH: s.dimensions.y / 2,
                 cutouts: [], polygonXZ: nil,
-                seal: isWindow || s.doorClosed,
+                seal: isWindow || glass,
                 isOpening: true,
                 snapToMeasured: true,
-                label: isWindow ? "deraza" : (s.doorClosed ? "eshik(yopiq)" : "eshik(ochiq)")))
+                label: isWindow ? "deraza" : (glass ? "eshik(shisha)" : "eshik(oddiy)")))
         }
         return out
     }
@@ -254,6 +222,37 @@ enum StructurePlanes {
         }, roomCenter: c)
     }
 
+    /// Proyom ota-devorning deyarli hammasini egallaydimi (= shisha to'siq).
+    ///
+    /// `parentIdentifier` ISHONCHSIZ (RoomPlan ba'zan nil yoki eskirgan qoldiradi),
+    /// shuning uchun mos kelmasa ota-devor GEOMETRIK topiladi: proyom markazi devor
+    /// to'rtburchagi ichida va tekisligiga yaqin bo'lgan eng kichik devor.
+    private static func spansWholeWall(_ opening: SurfaceInput,
+                                       walls: [SurfaceInput]) -> Bool {
+        var parent: SurfaceInput?
+        if let pid = opening.parentIdentifier,
+           let w = walls.first(where: { $0.identifier == pid }) {
+            parent = w
+        } else {
+            var bestArea = Float.greatestFiniteMagnitude
+            for w in walls {
+                let local = w.transform.inverse * opening.transform
+                let c = SIMD2<Float>(local.columns.3.x, local.columns.3.y)
+                guard abs(local.columns.3.z) < 0.15,
+                      abs(c.x) < w.dimensions.x / 2,
+                      abs(c.y) < w.dimensions.y / 2 else { continue }
+                let a = w.dimensions.x * w.dimensions.y
+                if a < bestArea { bestArea = a; parent = w }
+            }
+        }
+        // Ota-devor topilmasa muhrlamaymiz: noma'lum holatda sun'iy tekislik
+        // yozgandan ko'ra halol teshik qoldirgan afzal.
+        guard let p = parent, p.dimensions.x > 0.01, p.dimensions.y > 0.01 else { return false }
+        let ratio = (opening.dimensions.x * opening.dimensions.y)
+                  / (p.dimensions.x * p.dimensions.y)
+        return ratio > glassWallRatio
+    }
+
     // MARK: - RoomPlan adapteri
 
     /// RoomPlan yuzasini yadro turiga o'giradi (eshik yopiqligi bilan).
@@ -267,14 +266,13 @@ enum StructurePlanes {
 
     /// Xonaning devor + pol + shift tekisliklari.
     static func planes(room: CapturedRoom,
-                       screens: [TSDFGeometry.WallPlane] = [],
-                       cameras: [SIMD3<Float>] = []) -> [TSDFGeometry.WallPlane] {
+                       screens: [TSDFGeometry.WallPlane] = []) -> [TSDFGeometry.WallPlane] {
         let b = RoomGeometry.bounds(of: room)
         return planes(walls: room.walls.map(input),
                       openings: (room.doors + room.windows).map(input),
                       floorPolygon: floorPolygonXZ(of: room, bounds: b),
                       floorY: b.floorY, ceilingY: b.ceilingY,
-                      screens: screens, cameras: cameras)
+                      screens: screens)
     }
 
     /// Proyom (eshik/deraza) tekisliklari — shisha muhri uchun.
@@ -287,7 +285,7 @@ enum StructurePlanes {
         }
         c /= Float(room.walls.count)
         return openings(doors: room.doors.map(input), windows: room.windows.map(input),
-                        roomCenter: c)
+                        walls: room.walls.map(input), roomCenter: c)
     }
 
     // MARK: - Proyomlar (5.4.0 PlaneOcclusionFiller dan)

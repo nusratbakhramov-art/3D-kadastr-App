@@ -10,7 +10,7 @@ import SceneKit
 /// ID mapping: Flutter uses Int ids; ScanStore uses "scanNNN" strings. We map
 /// N ⇄ String(format: "scan%03d", N). Each scan has ONE textured output
 /// (result/atlas.usdz), surfaced to the UI as version 1.
-final class RoomScanBridge {
+final class RoomScanBridge: ScanBridge {
     static let shared = RoomScanBridge()
 
     private func scanID(_ n: Int) -> String { String(format: "scan%03d", n) }

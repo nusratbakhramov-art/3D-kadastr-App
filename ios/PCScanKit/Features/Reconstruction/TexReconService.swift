@@ -69,8 +69,7 @@ enum TexReconService {
         let ekranON = UserDefaults.standard.object(forKey: "ekranPlane") as? Bool ?? true
         let screens = ekranON ? StructurePlanes.objectPlanes(room: room) : []
         // Ekran ortidagi devor bo'lagi kesiladi — ikki qavat yuza qolmasin.
-        let structure = strukturaON ? StructurePlanes.planes(room: room, screens: screens,
-                                                            cameras: camPositions) : []
+        let structure = strukturaON ? StructurePlanes.planes(room: room, screens: screens) : []
         let openings = glassON ? StructurePlanes.openings(room: room) : []
         // Ekran devordan OLDIN — devor inject qilingan voxel snap qidiruviga tushmasin.
         let planes = screens + structure + openings
@@ -82,11 +81,27 @@ enum TexReconService {
         log.log("GLASS on=\(glassON) proyom=\(openings.count) muhrlangan=\(openings.filter { $0.seal }.count) "
                 + "(" + openings.map { $0.label }.joined(separator: ",") + ")")
         if let tsdf = TSDFGeometry.build(paths: paths, planes: planes, log: { log.log($0) }) {
+            // DIAGNOSTIKA (UserDefaults "dumpMesh"): detsimatsiyadan OLDIN va KEYIN
+            // geometriyani diskka yozamiz. Tekshirilayotgan savol sof geometrik —
+            // eshik zonasidagi ignabargli uchburchaklar (67% maydon, sifat 0.21)
+            // SurfaceNets chiqishidami yoki qisqartirish hosil qiladimi. Texturing
+            // bosqichiga tegmaydi (450k bilan A/B aynan o'sha yerda crash bergan:
+            // geometriya 342186 tris'gacha yetgan, nativ texrecon esa sig'magan).
+            let dumpMesh = UserDefaults.standard.bool(forKey: "dumpMesh")
+            if dumpMesh {
+                let u = paths.root.appendingPathComponent("mesh_raw.ply")
+                try? writePLY(tsdf, to: u)
+                log.log("DUMP xom mesh -> mesh_raw.ply tris=\(tsdf.indices.count / 3)")
+            }
             var decimated = PoissonService.decimate(tsdf, targetTris: 180_000)
             // Qisqartirish g'ijimlikni qaytaradi (o'lchandi: rough p90 0.044 -> 0.218),
             // shuning uchun ishonch bo'yicha silliqlashni SHU YERDA takrorlaymiz.
             decimated = TSDFGeometry.smoothLowConfidenceAfterDecimation(decimated,
                                                                         log: { log.log($0) })
+            if dumpMesh {
+                try? writePLY(decimated, to: paths.root.appendingPathComponent("mesh_dec.ply"))
+                log.log("DUMP detsimatsiyadan keyin -> mesh_dec.ply tris=\(decimated.indices.count / 3)")
+            }
             // Devor ortiga chiqib ketgan geometriya kesiladi — teshik-to'ldirish
             // KEYIN ishlaydi (kesish hosil qilgan mayda teshiklarni ham yopadi).
             decimated = RoomClipper.clip(decimated, room: room, log: { log.log($0) })
@@ -96,6 +111,10 @@ enum TexReconService {
             // Ochiq chegara arra-tishlarini silliqlash (teshik-fill'dan OLDIN —
             // fill halqalari silliqlangan pozitsiyalarga mos bo'lsin).
             decimated = TSDFGeometry.smoothBoundary(decimated, log: { log.log($0) })
+            if dumpMesh {
+                try? writePLY(decimated, to: paths.root.appendingPathComponent("mesh_final.ply"))
+                log.log("DUMP yakuniy mesh -> mesh_final.ply tris=\(decimated.indices.count / 3)")
+            }
             meshForTexrecon = decimated
             fillMesh = TSDFGeometry.smallHoleFill(decimated, log: { log.log($0) })
             log.log("GEOMETRY=tsdf verts=\(decimated.vertexCount) tris=\(decimated.indices.count/3)")
@@ -127,6 +146,15 @@ enum TexReconService {
         //    kadrlar 2048px gacha KICHRAYTIRILADI va 150 tadan ortiq bo'lsa
         //    pozalar bo'ylab tekis tanlanadi. .cam/.depth/.exp normalizatsiya-
         //    langan — kichraytirish ta'sir qilmaydi.
+        // Native texrecon ~350MB fixed + ko'rinishlar oladi. Qurilmada shuncha xotira
+        // qolmasa (juda band) — native'ni ISHLATMAYMIZ, throw qilamiz: ReconstructionViewModel
+        // YENGIL fallback'ga (runFusion / FusionEngine — rangli mesh, native texrecon YO'Q,
+        // ancha kam xotira) o'tadi. Crash o'rniga past-sifat lekin ISHLAYDIGAN natija.
+        guard MemoryBudget.current().canRunNativeTexrecon else {
+            log.log("TEXRECON LOW-MEMORY: native o'tkazib yuborildi -> yengil fallback")
+            throw TexError.cppFailed(-98)
+        }
+
         progress(0.12, "Kadrlar tayyorlanmoqda…")
         let sceneDir = try writeScene(paths: paths, log: { log.log($0) })
         defer { try? FileManager.default.removeItem(at: sceneDir) }
@@ -268,12 +296,18 @@ enum TexReconService {
             FileManager.default.fileExists(
                 atPath: paths.imagesFolder.appendingPathComponent(String(format: "frame_%04d.jpg", pose.index)).path)
         }
+        // Ko'rinish soni va kadr o'lchami QURILMA XOTIRASIGA moslashadi (native
+        // texrecon peak'i ≈ views·dim² — ASOSIY jetsam OOM manbai). Byudjet UserDefaults
+        // qiymatini CHEGARALAydi (foydalanuvchi ko'proq so'rasa ham, qurilma ko'targancha).
+        let budget = MemoryBudget.current()
+        let effViews = min(maxTexViews, budget.maxTexViews)
+        let maxDim = min(texImageMaxDim, budget.texImageMaxDim)
         var poses = withImage
-        if withImage.count > maxTexViews {
-            let step = Float(withImage.count) / Float(maxTexViews)
+        if withImage.count > effViews {
+            let step = Float(withImage.count) / Float(effViews)
             var sel: [KeyframePose] = []
             var acc: Float = 0
-            while Int(acc) < withImage.count && sel.count < maxTexViews {
+            while Int(acc) < withImage.count && sel.count < effViews {
                 sel.append(withImage[Int(acc)])
                 acc += step
             }
@@ -282,30 +316,34 @@ enum TexReconService {
 
         var downscaled = 0
         var copied = 0
-        let maxDim = texImageMaxDim
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: poses.count) { i in
-            let idx = poses[i].index
-            let src = paths.imagesFolder.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
-            let dst = sceneDir.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
-            // Hi-res YOQ va kadr qopqoqdan KICHIK bo'lsa — qayta siqmasdan asl JPEG
-            // ni ko'chiramiz (detal yo'qolmasin). Tumbler o'chiq bo'lsa — eski
-            // xatti-harakat (doim qayta siqish) — A/B solishtirish uchun.
-            if texHiRes, imageLongestSide(src) <= maxDim {
-                try? FileManager.default.removeItem(at: dst)
-                if (try? FileManager.default.copyItem(at: src, to: dst)) != nil {
-                    lock.lock(); copied += 1; lock.unlock()
-                    return
+            // autoreleasepool: dekodlangan bitmap (~11MB/kadr) har iteratsiyada
+            // DARHOL bo'shatilsin — aks holda GCD worker'larda yig'ilib (300 kadr ×
+            // 11MB ≈ 3.3GB spike) jetsam beradi.
+            autoreleasepool {
+                let idx = poses[i].index
+                let src = paths.imagesFolder.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
+                let dst = sceneDir.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
+                // Hi-res YOQ va kadr qopqoqdan KICHIK bo'lsa — qayta siqmasdan asl JPEG
+                // ni ko'chiramiz (detal yo'qolmasin).
+                if texHiRes, imageLongestSide(src) <= maxDim {
+                    try? FileManager.default.removeItem(at: dst)
+                    if (try? FileManager.default.copyItem(at: src, to: dst)) != nil {
+                        lock.lock(); copied += 1; lock.unlock()
+                        return
+                    }
                 }
-            }
-            if downscaleJPEG(from: src, to: dst, maxDim: maxDim) {
-                lock.lock(); downscaled += 1; lock.unlock()
-            } else {
-                try? FileManager.default.copyItem(at: src, to: dst)
+                if downscaleJPEG(from: src, to: dst, maxDim: maxDim) {
+                    lock.lock(); downscaled += 1; lock.unlock()
+                } else {
+                    try? FileManager.default.copyItem(at: src, to: dst)
+                }
             }
         }
         log("TEXSCENE views=\(poses.count)/\(withImage.count) hiRes=\(texHiRes) "
-            + "copied=\(copied) downscaled=\(downscaled) -> \(maxDim)px")
+            + "copied=\(copied) downscaled=\(downscaled) -> \(maxDim)px "
+            + "(byudjet: views≤\(budget.maxTexViews) dim≤\(budget.texImageMaxDim))")
 
         try writeCameras(paths: paths, poses: poses, sceneDir: sceneDir)
         writeExposureSidecars(poses: poses, sceneDir: sceneDir, log: log)

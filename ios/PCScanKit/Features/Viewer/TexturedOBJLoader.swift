@@ -85,11 +85,9 @@ enum TexturedOBJLoader {
 
         let posSource = SCNGeometrySource(vertices: outPos)
         let uvSource = SCNGeometrySource(textureCoordinates: outUV)
-        // Skan kamera yo'li — "ichki varaq" ni "tashqi varaq" dan ajratish uchun.
-        let cams = loadCameraPositions(objURL: objURL)
-
         var elements: [SCNGeometryElement] = []
         var sceneMaterials: [SCNMaterial] = []
+        let cams = loadCameraPositions(objURL: objURL)
         // Parcha qatlami: `unseen_vc` + `fillmat`. Ular mayda va ko'p (o'lchandi,
         // #26: 940 + 267 ta ajralgan dog'). Winding'ni to'g'rilash ularni ORQADAN
         // kesadi, lekin QIYA burchakda normal hali kameraga qaragan bo'lib qoladi
