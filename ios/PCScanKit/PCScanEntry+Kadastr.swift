@@ -44,12 +44,18 @@ extension PCScanEntry: PCScanFacade {
                     "fileSize": 0,
                 ])
             }
+            // KADASTR-LOCAL: X tugmasi olib tashlangani uchun bekor yo'li shu hook orqali
+            // (masalan kamera ruxsati rad etilsa) — Flutter modal'iga nil bilan qaytadi.
+            appState.captureCancelled = { finish(nil) }
+            // KADASTR-LOCAL: onboarding ekranini O'TKAZIB YUBORAMIZ — to'g'ridan skanerlash
+            // bosqichiga o'tamiz (ScanningView capture-only'da avto-start qiladi).
+            appState.beginScanning()
 
             let root = RootView()
                 .environmentObject(appState)
                 .preferredColorScheme(.dark)
             let host = UIHostingController(rootView: root)
-            let container = PCScanCaptureContainer(child: host, onClose: { finish(nil) })
+            let container = PCScanCaptureContainer(child: host)
             container.modalPresentationStyle = .fullScreen
             containerRef = container
             presenter.present(container, animated: true)
@@ -258,17 +264,15 @@ private func pcscanError(_ message: String) -> NSError {
     NSError(domain: "PCScanKit", code: -1, userInfo: [NSLocalizedDescriptionKey: message])
 }
 
-/// Capture-only modal konteyneri — `PCScanContainerViewController` ga o'xshash, lekin
-/// "Yopish" tugmasi `onClose` ni chaqiradi (Flutter'ga BEKOR signal + dismiss), shunchaki
-/// dismiss qilib qo'ymaydi (aks holda Flutter `startTexturedScan` future'i osilib qolardi).
+/// Capture-only modal konteyneri — PCScan RootView'ni to'liq ekranda hostlaydi.
+/// KADASTR-LOCAL: "X/Yopish" tugmasi OLIB TASHLANDI (AI Baholash talabi) — bekor yo'li
+/// endi `AppState.captureCancelled` orqali (kamera ruxsati rad etilsa Flutter'ga qaytadi).
 @available(iOS 17, *)
 final class PCScanCaptureContainer: UIViewController {
     private let child: UIViewController
-    private let onClose: () -> Void
 
-    init(child: UIViewController, onClose: @escaping () -> Void) {
+    init(child: UIViewController) {
         self.child = child
-        self.onClose = onClose
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -288,20 +292,5 @@ final class PCScanCaptureContainer: UIViewController {
             child.view.trailingAnchor.constraint(equalTo: view.trailingAnchor),
         ])
         child.didMove(toParent: self)
-
-        let close = UIButton(type: .system)
-        var cfg = UIButton.Configuration.filled()
-        cfg.image = UIImage(systemName: "xmark")
-        cfg.baseBackgroundColor = UIColor.black.withAlphaComponent(0.55)
-        cfg.baseForegroundColor = .white
-        cfg.cornerStyle = .capsule
-        close.configuration = cfg
-        close.addAction(UIAction { [weak self] _ in self?.onClose() }, for: .touchUpInside)
-        close.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(close)
-        NSLayoutConstraint.activate([
-            close.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor, constant: 12),
-            close.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 8),
-        ])
     }
 }

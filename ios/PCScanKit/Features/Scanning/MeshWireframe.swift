@@ -51,14 +51,15 @@ enum MeshWireframe {
         return geometry
     }
 
-    /// Kamera atrofidagi ko'k "qamrov pardasi" (80% opacity). Depth o'qiydi —
+    /// Kamera atrofidagi yashil "qamrov pardasi" (80% opacity). Depth o'qiydi —
     /// skan qilingan (occluder depth yozgan) joylarda to'siladi, faqat SKAN
-    /// QILINMAGAN yo'nalishlarda ko'k bo'lib ko'rinadi (Polycam qamrov ko'rsatkichi).
+    /// QILINMAGAN yo'nalishlarda yashil bo'lib ko'rinadi (Polycam qamrov ko'rsatkichi).
+    /// KADASTR-LOCAL: parda rangi ko'kdan yashilga o'zgartirildi (AI Baholash talabi).
     static func coverageSphere(radius: CGFloat = 8) -> SCNNode {
         let sphere = SCNSphere(radius: radius)
         sphere.segmentCount = 24
         let material = SCNMaterial()
-        material.diffuse.contents = UIColor(red: 0.15, green: 0.45, blue: 1.0, alpha: 1.0)
+        material.diffuse.contents = UIColor(red: 0.16, green: 0.80, blue: 0.42, alpha: 1.0)
         material.transparency = 0.8                 // 80% opacity
         material.isDoubleSided = true               // ichkaridan ko'rinsin
         material.lightingModel = .constant

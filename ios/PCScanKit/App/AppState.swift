@@ -38,6 +38,11 @@ final class AppState: ObservableObject {
     /// kabi mahalliy moslashtirish — upstream sync ustiga yozmasin.
     var captureOnlyCompletion: ((ScanRecord) -> Void)?
 
+    /// KADASTR-LOCAL: capture-only rejimda BEKOR yo'li (X tugmasi olib tashlangani
+    /// uchun). Masalan kamera ruxsati rad etilsa Flutter modal'iga `nil` bilan qaytadi.
+    /// `presentCapture` `{ finish(nil) }` ga bog'laydi.
+    var captureCancelled: (() -> Void)?
+
     /// Qayta ishlanayotgan mavjud skan papkasi (bo'lsa — yangi yozuv yaratilmaydi).
     private var reprocessingFolder: String?
 
