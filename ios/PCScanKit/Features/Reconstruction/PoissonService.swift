@@ -82,11 +82,11 @@ enum PoissonService {
         if effectiveDepth != depth {
             log?("POISSON depth \(depth)→\(effectiveDepth) (katta xona diag=\(String(format: "%.1f", diag))m)")
         }
-        log?("POISSON reconstructing (depth=\(effectiveDepth))…")
         #if targetEnvironment(simulator)
         // Native PoissonRecon faqat qurilmada (kutubxonalar simulyatorга linklanmaydi).
         log?("POISSON: native recon faqat qurilmada mavjud"); return nil
         #else
+        log?("POISSON reconstructing (depth=\(effectiveDepth))…")
         let rc = ptsPLY.path.withCString { ip in
             outPLY.path.withCString { op in pcscan_poisson(ip, op, effectiveDepth) }
         }
@@ -199,11 +199,11 @@ enum PoissonService {
     static func decimate(_ mesh: LiDARMeshData, targetTris: Int) -> LiDARMeshData {
         let indexCount = mesh.indices.count
         guard indexCount / 3 > targetTris, mesh.vertexCount > 0 else { return mesh }
-        let ratio = Float(targetTris * 3) / Float(indexCount)
         #if targetEnvironment(simulator)
         // meshoptimizer (pcscan_simplify) faqat qurilmada — simulyatorда decimation'siz.
         return mesh
         #else
+        let ratio = Float(targetTris * 3) / Float(indexCount)
         var out = [UInt32](repeating: 0, count: indexCount)
         let n = mesh.positions.withUnsafeBufferPointer { pp -> Int32 in
             mesh.indices.withUnsafeBufferPointer { ip in

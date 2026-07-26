@@ -31,6 +31,18 @@ final class AppState: ObservableObject {
     let permissions = PermissionsService()
     let library = ScanLibrary()
 
+    /// KADASTR-LOCAL (re-sync'da SAQLANADI): AI Baholash "capture-only" hook.
+    /// O'rnatilgan bo'lsa, xom skan saqlangach `scanningFinished` viewer'ga
+    /// O'TMASDAN shu closure'ni chaqiradi (Flutter modal'iga qaytadi).
+    /// `PCScanEntry+Kadastr.presentCapture` o'rnatadi. Qarang: PoissonService gate'lari
+    /// kabi mahalliy moslashtirish — upstream sync ustiga yozmasin.
+    var captureOnlyCompletion: ((ScanRecord) -> Void)?
+
+    /// KADASTR-LOCAL: capture-only rejimda BEKOR yo'li (X tugmasi olib tashlangani
+    /// uchun). Masalan kamera ruxsati rad etilsa Flutter modal'iga `nil` bilan qaytadi.
+    /// `presentCapture` `{ finish(nil) }` ga bog'laydi.
+    var captureCancelled: (() -> Void)?
+
     /// Qayta ishlanayotgan mavjud skan papkasi (bo'lsa — yangi yozuv yaratilmaydi).
     private var reprocessingFolder: String?
 
@@ -53,7 +65,13 @@ final class AppState: ObservableObject {
         // Xom skanni DARHOL ro'yxatga saqlaymiz — OG'IR qayta ishlashdan OLDIN.
         // Shunda qayta ishlash paytida ilova crash bo'lsa ham skan ro'yxatда
         // qoladi va keyin qayta ishlash mumkin (ma'lumot yo'qolmaydi).
-        library.save(artifacts: arts)
+        let saved = library.save(artifacts: arts)
+        // KADASTR-LOCAL: capture-only rejimda (AI Baholash) viewer'ga O'TMAYMIZ —
+        // xom skan saqlangach modal Flutter'ga qaytadi.
+        if let completion = captureOnlyCompletion {
+            completion(saved)
+            return
+        }
         // Avtomatik qayta ishlash YO'Q — foydalanuvchi "Natijani ishlash"
         // tugmasini bosgandan keyin boshlanadi (viewer'da xom ko'rinish ko'rsatiladi).
         phase = .viewer

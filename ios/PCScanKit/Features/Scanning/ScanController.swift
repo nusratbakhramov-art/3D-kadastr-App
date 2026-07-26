@@ -109,8 +109,8 @@ final class ScanController: NSObject, ObservableObject {
         arView.session.run(config)
         debugLog?.log("MESH+DEPTH enabled (sceneReconstruction=\(config.sceneReconstruction == .mesh), sceneDepth=\(config.frameSemantics.contains(.sceneDepth)))")
 
-        // Ko'k qamrov pardasi — kamerага ulanadi (u bilan harakatlanadi).
-        // Skan qilinmagan yo'nalishlarda ko'k, skan qilinganda occluder to'sadi.
+        // Yashil qamrov pardasi — kamerага ulanadi (u bilan harakatlanadi).
+        // Skan qilinmagan yo'nalishlarda yashil, skan qilinganda occluder to'sadi.
         if let pov = arView.pointOfView, pov.childNode(withName: "coverageSphere", recursively: false) == nil {
             pov.addChildNode(MeshWireframe.coverageSphere())
         }

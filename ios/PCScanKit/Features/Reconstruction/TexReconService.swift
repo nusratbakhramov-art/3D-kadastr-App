@@ -51,8 +51,57 @@ enum TexReconService {
         let camPositions = loadCameraPositions(paths: paths)
         let meshForTexrecon: LiDARMeshData
         var fillMesh: LiDARMeshData? = nil
-        if let tsdf = TSDFGeometry.build(paths: paths, log: { log.log($0) }) {
+        // Struktura tekisliklari (RoomPlan devor/pol/shift) — ko'rilmagan joyda
+        // devor TEKIS davom etsin.
+        //
+        // Kalit nomi "strukturaToldirish" EMAS: o'sha nom 5.4.0 liniyasida ishlatilgan
+        // va u yerda default O'CHIQ edi. Bundle id bir xil (com.pcscan.app) → eski
+        // `false` qiymati qurilmada SAQLANIB QOLADI va yangi kodni jimgina o'chirib
+        // qo'yadi (aynan shu bo'ldi: 14:44 dagi runda tekislik to'ldirish ishlamadi,
+        // chunki qurilmada strukturaToldirish=False yotardi). Yangi nom — toza holat.
+        let strukturaON = UserDefaults.standard.object(forKey: "strukturaFill") as? Bool ?? true
+        // Shisha muhri (deraza doim, eshik faqat yopiq bo'lsa) — LiDAR shishadan
+        // o'tib ketadi, muhrsiz u yerda yuza umuman chiqmaydi. Alohida tumbler:
+        // struktura to'ldirishdan MUSTAQIL (u to'g'rilik masalasi, bu — halollik).
+        let glassON = UserDefaults.standard.object(forKey: "glassSeal") as? Bool ?? true
+        // Ekran tekisligi (televizor) — qora yaltiroq ekran LiDARga qaytish bermaydi
+        // va o'sha teshikka ortdagi DEVOR yozilib qolardi (chetlar bo'rtib ko'rinardi).
+        let ekranON = UserDefaults.standard.object(forKey: "ekranPlane") as? Bool ?? true
+        let screens = ekranON ? StructurePlanes.objectPlanes(room: room) : []
+        // Ekran ortidagi devor bo'lagi kesiladi — ikki qavat yuza qolmasin.
+        let structure = strukturaON ? StructurePlanes.planes(room: room, screens: screens) : []
+        let openings = glassON ? StructurePlanes.openings(room: room) : []
+        // Ekran devordan OLDIN — devor inject qilingan voxel snap qidiruviga tushmasin.
+        let planes = screens + structure + openings
+        // Har doim log — "jimgina o'chiq" holat qaytarilmasin.
+        log.log("EKRAN on=\(ekranON) tekislik=\(screens.count) "
+                + "tv=\(room.objects.filter { $0.category == .television }.count) "
+                + "devorKesigi=\(structure.reduce(0) { $0 + $1.cutouts.count })")
+        log.log("STRUKTURA on=\(strukturaON) tekislik=\(structure.count) devor=\(room.walls.count)")
+        log.log("GLASS on=\(glassON) proyom=\(openings.count) muhrlangan=\(openings.filter { $0.seal }.count) "
+                + "(" + openings.map { $0.label }.joined(separator: ",") + ")")
+        if let tsdf = TSDFGeometry.build(paths: paths, planes: planes, log: { log.log($0) }) {
+            // DIAGNOSTIKA (UserDefaults "dumpMesh"): detsimatsiyadan OLDIN va KEYIN
+            // geometriyani diskka yozamiz. Tekshirilayotgan savol sof geometrik —
+            // eshik zonasidagi ignabargli uchburchaklar (67% maydon, sifat 0.21)
+            // SurfaceNets chiqishidami yoki qisqartirish hosil qiladimi. Texturing
+            // bosqichiga tegmaydi (450k bilan A/B aynan o'sha yerda crash bergan:
+            // geometriya 342186 tris'gacha yetgan, nativ texrecon esa sig'magan).
+            let dumpMesh = UserDefaults.standard.bool(forKey: "dumpMesh")
+            if dumpMesh {
+                let u = paths.root.appendingPathComponent("mesh_raw.ply")
+                try? writePLY(tsdf, to: u)
+                log.log("DUMP xom mesh -> mesh_raw.ply tris=\(tsdf.indices.count / 3)")
+            }
             var decimated = PoissonService.decimate(tsdf, targetTris: 180_000)
+            // Qisqartirish g'ijimlikni qaytaradi (o'lchandi: rough p90 0.044 -> 0.218),
+            // shuning uchun ishonch bo'yicha silliqlashni SHU YERDA takrorlaymiz.
+            decimated = TSDFGeometry.smoothLowConfidenceAfterDecimation(decimated,
+                                                                        log: { log.log($0) })
+            if dumpMesh {
+                try? writePLY(decimated, to: paths.root.appendingPathComponent("mesh_dec.ply"))
+                log.log("DUMP detsimatsiyadan keyin -> mesh_dec.ply tris=\(decimated.indices.count / 3)")
+            }
             // Devor ortiga chiqib ketgan geometriya kesiladi — teshik-to'ldirish
             // KEYIN ishlaydi (kesish hosil qilgan mayda teshiklarni ham yopadi).
             decimated = RoomClipper.clip(decimated, room: room, log: { log.log($0) })
@@ -62,6 +111,10 @@ enum TexReconService {
             // Ochiq chegara arra-tishlarini silliqlash (teshik-fill'dan OLDIN —
             // fill halqalari silliqlangan pozitsiyalarga mos bo'lsin).
             decimated = TSDFGeometry.smoothBoundary(decimated, log: { log.log($0) })
+            if dumpMesh {
+                try? writePLY(decimated, to: paths.root.appendingPathComponent("mesh_final.ply"))
+                log.log("DUMP yakuniy mesh -> mesh_final.ply tris=\(decimated.indices.count / 3)")
+            }
             meshForTexrecon = decimated
             fillMesh = TSDFGeometry.smallHoleFill(decimated, log: { log.log($0) })
             log.log("GEOMETRY=tsdf verts=\(decimated.vertexCount) tris=\(decimated.indices.count/3)")
@@ -125,7 +178,7 @@ enum TexReconService {
         //     yuza rangi bilan bo'yaymiz. FillColorizer'dan OLDIN — u atlas
         //     chegara ranglarini o'qiydi, bo'yalgan rangni ko'rsin.
         progress(0.85, "Ko'rinmas zonalar bo'yalmoqda…")
-        AtlasInpainter.run(objURL: objURL) { log.log($0) }
+        AtlasInpainter.run(objURL: objURL, planes: planes) { log.log($0) }
 
         // 4. MeshPrep zaxira ishlatilgan bo'lsa — teshiklarga atlas chegara rangi.
         // (Poisson yo'lida teshik yo'q — bu qadam o'tkaziladi.)
@@ -133,6 +186,14 @@ enum TexReconService {
             progress(0.9, "Teshiklar to'ldirilmoqda…")
             FillColorizer.appendFill(fill: fillMesh, objURL: objURL) { log.log($0) }
         }
+
+        // 5. O'tkirlashtirish (unsharp-mask) — yorug' tekis devorlar "sutdek"
+        //    chiqmasin. Faqat real tekstura atlaslari; unseen/fill silliqligicha.
+        progress(0.97, "O'tkirlashtirilmoqda…")
+        AtlasSharpen.run(objURL: objURL) { log.log($0) }
+        // Gutter to'ldirish — SHARPEN'dan KEYIN: o'tkirlash halo bermaslik uchun
+        // qora fonga tayanadi, dilatatsiya esa o'sha fonni yo'q qiladi.
+        AtlasDilate.run(objURL: objURL) { log.log($0) }
 
         progress(1, "Tayyor")
         return objURL
@@ -178,10 +239,40 @@ enum TexReconService {
 
     // MARK: - MVE sahnasi (5.0.0: tanlash + kichraytirish + sidecar'lar)
 
-    /// Texrecon uchun ko'rish soni qopqog'i: qamrov uchun ~150 kadr yetarli.
-    private static let maxTexViews = 150
+    /// Texrecon uchun ko'rish soni qopqog'i.
+    ///
+    /// 150 "qamrov uchun yetarli" degan TAXMIN edi — o'lchov uni RAD ETDI.
+    /// Skan 20260713-192242 (34 m² ofis, 17 stul + 5 stol + shisha to'siq,
+    /// 260 kadr): texrecon yuzalarning 41% iga tekstura bera olmagan, VA
+    /// o'sha teksturasiz yuzalarning 81% i O'LCHANGAN yuzadan 8sm ichida
+    /// (46% i 3sm ichida) — ya'ni ular uydirma emas, kamera KO'RGAN joy.
+    /// Sabab: `views=150/260` — kadrlarning 42% i texrecon'ga berilmagan.
+    /// To'la mebelli xonada har yuza 1-2 kadrdagina ko'rinadi; o'sha yagona
+    /// kadr tashlansa — yuza teksturasiz qoladi.
+    ///
+    /// UserDefaults "texMaxViews" bilan sozlanadi (0/yo'q -> default).
+    /// Narxi: texrecon vaqti va xotirasi kadr soniga proporsional.
+    private static var maxTexViews: Int {
+        let v = UserDefaults.standard.integer(forKey: "texMaxViews")
+        return v > 0 ? v : 300
+    }
     /// Data-costs uchun maksimal tomon (px).
-    private static let texImageMaxDim = 2048
+    ///
+    /// Yuqori-rezolyutsiya rejimi (UserDefaults "texHiRes", default YOQ):
+    ///   - qopqoq 4096 (kelajakda hi-res kadr kelsa saqlanadi);
+    ///   - kadr qopqoqdan KICHIK bo'lsa QAYTA SIQILMAYDI — asl JPEG ko'chiriladi.
+    ///     O'lchandi (frame_0163, 1920x1440): pipeline uni 0.85 da qayta siqib
+    ///     ~4.6% detal yeydi (fayl 482->244 KB). Asl saqlansa — o'sha detal qaytadi.
+    /// O'chiq bo'lsa — eski xatti-harakat (qopqoq 2048, doim qayta siqish).
+    ///
+    /// DIQQAT: ARKit kadri odatda 1920x1440 (`frame.camera.imageResolution`) —
+    /// qopqoqni 2048 dan oshirish O'ZI detal bermaydi, chunki manba 1920. Asosiy
+    /// yutuq — qayta-siqishni o'tkazib yuborish. Chinakam ko'proq detal faqat
+    /// SURATGA OLISH rezolyutsiyasini oshirish bilan (alohida, katta o'zgarish).
+    private static var texHiRes: Bool {
+        UserDefaults.standard.object(forKey: "texHiRes") as? Bool ?? false
+    }
+    private static var texImageMaxDim: Int { texHiRes ? 4096 : 2048 }
 
     /// Vaqtinchalik scene papkani quradi: tanlangan kadrlar (kichraytirilgan
     /// JPEG) + .cam + .depth + .exp. Qaytadi: papka URL.
@@ -209,22 +300,44 @@ enum TexReconService {
         }
 
         var downscaled = 0
+        var copied = 0
+        let maxDim = texImageMaxDim
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: poses.count) { i in
             let idx = poses[i].index
             let src = paths.imagesFolder.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
             let dst = sceneDir.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
-            if downscaleJPEG(from: src, to: dst, maxDim: texImageMaxDim) {
+            // Hi-res YOQ va kadr qopqoqdan KICHIK bo'lsa — qayta siqmasdan asl JPEG
+            // ni ko'chiramiz (detal yo'qolmasin). Tumbler o'chiq bo'lsa — eski
+            // xatti-harakat (doim qayta siqish) — A/B solishtirish uchun.
+            if texHiRes, imageLongestSide(src) <= maxDim {
+                try? FileManager.default.removeItem(at: dst)
+                if (try? FileManager.default.copyItem(at: src, to: dst)) != nil {
+                    lock.lock(); copied += 1; lock.unlock()
+                    return
+                }
+            }
+            if downscaleJPEG(from: src, to: dst, maxDim: maxDim) {
                 lock.lock(); downscaled += 1; lock.unlock()
             } else {
                 try? FileManager.default.copyItem(at: src, to: dst)
             }
         }
-        log("TEXSCENE views=\(poses.count)/\(withImage.count) downscaled=\(downscaled) -> \(texImageMaxDim)px")
+        log("TEXSCENE views=\(poses.count)/\(withImage.count) hiRes=\(texHiRes) "
+            + "copied=\(copied) downscaled=\(downscaled) -> \(maxDim)px")
 
         try writeCameras(paths: paths, poses: poses, sceneDir: sceneDir)
         writeExposureSidecars(poses: poses, sceneDir: sceneDir, log: log)
         return sceneDir
+    }
+
+    /// JPEG'ning eng uzun tomonini (px) — dekodlamasdan (faqat metadata).
+    private static func imageLongestSide(_ url: URL) -> Int {
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let w = props[kCGImagePropertyPixelWidth] as? Int,
+              let h = props[kCGImagePropertyPixelHeight] as? Int else { return .max }
+        return max(w, h)
     }
 
     /// JPEG'ni maxDim gacha kichraytirib yozadi (EXIF transformsiz).

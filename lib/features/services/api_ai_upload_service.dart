@@ -5,12 +5,39 @@
 /// keys. Those keys are echoed into the submit bundle.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' show MediaType;
 
 import '../../core/api_config.dart';
+
+/// MultipartRequest that reports cumulative bytes as its body streams out to the
+/// socket. `package:http` exposes no upload progress, so a large multipart looks
+/// "frozen" until it finishes — this makes the bar move live. Byte counts are a
+/// close approximation (OS socket buffering), good enough for a progress UI.
+class _ProgressMultipartRequest extends http.MultipartRequest {
+  _ProgressMultipartRequest(super.method, super.url, {this.onBytes});
+
+  final void Function(int bytesSent)? onBytes;
+
+  @override
+  http.ByteStream finalize() {
+    final byteStream = super.finalize();
+    final cb = onBytes;
+    if (cb == null) return byteStream;
+    var sent = 0;
+    final transformer = StreamTransformer<List<int>, List<int>>.fromHandlers(
+      handleData: (data, sink) {
+        sent += data.length;
+        cb(sent);
+        sink.add(data);
+      },
+    );
+    return http.ByteStream(byteStream.transform(transformer));
+  }
+}
 
 /// Extension → MIME, so the multipart part is tagged correctly (Flutter's
 /// MultipartFile.fromPath otherwise sends application/octet-stream, which the
@@ -98,10 +125,11 @@ class AiUploadService {
     required String token,
     String endpoint = '/ai-valuations/upload',
     Duration timeout = const Duration(seconds: 120),
+    void Function(int bytesSent)? onBytes,
   }) async {
     if (filePaths.isEmpty) return const [];
     final uri = Uri.parse('$_baseUrl$endpoint');
-    final req = http.MultipartRequest('POST', uri)
+    final req = _ProgressMultipartRequest('POST', uri, onBytes: onBytes)
       ..headers['Authorization'] = 'Bearer $token'
       ..fields['category'] = category.wire;
     for (final path in filePaths) {
@@ -150,7 +178,7 @@ class AiUploadService {
     final total = entries.length;
     final totalBytes = entries.fold<int>(0, (s, e) => s + e.sizeBytes);
     if (total == 0) return scanFiles;
-    var done = 0, bytesSent = 0;
+    var done = 0, bytesDone = 0; // to'liq tugagan partiyalar bo'yicha
     onProgress?.call(0, total, 0, totalBytes);
     for (var i = 0; i < entries.length; i += batchSize) {
       final end =
@@ -167,6 +195,15 @@ class AiUploadService {
           token: token,
           endpoint: endpoint,
           timeout: Duration(seconds: secs.clamp(60, 600)),
+          // Jonli bayt-progress: partiya yuklanayotganda bar uzluksiz harakatlanadi
+          // (multipart overhead'i bois batchBytes'dan oshib ketmasin deb cheklaymiz).
+          onBytes: (sentInBatch) {
+            if (onProgress == null) return;
+            final capped = sentInBatch > batchBytes ? batchBytes : sentInBatch;
+            final live = bytesDone + capped;
+            onProgress(done, total, live > totalBytes ? totalBytes : live,
+                totalBytes);
+          },
         );
       } catch (_) {
         keys = const []; // bu partiya yiqildi — o'tkazib yuboramiz, davom etamiz
@@ -182,9 +219,9 @@ class AiUploadService {
           }
         }
         done++;
-        bytesSent += e.sizeBytes;
       }
-      onProgress?.call(done, total, bytesSent, totalBytes);
+      bytesDone += batchBytes;
+      onProgress?.call(done, total, bytesDone, totalBytes);
     }
     if (frames.isNotEmpty) scanFiles['frames'] = frames;
     return scanFiles;

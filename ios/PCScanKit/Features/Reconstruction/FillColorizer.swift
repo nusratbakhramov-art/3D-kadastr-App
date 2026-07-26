@@ -1,5 +1,7 @@
 import Foundation
-import UIKit
+import CoreGraphics
+import ImageIO
+import UniformTypeIdentifiers
 import simd
 
 /// Teshik-to'ldirish (fill) meshiga rang berib, teksturali OBJ'ga qo'shadi.
@@ -8,6 +10,14 @@ import simd
 /// kichik teksturага "bake" qiladi — shu tufayli fill yamalar atrofga silliq
 /// aralashadi (per-vertex rang emas, sRGB tekstura yo'li → rang fazosi to'g'ri).
 enum FillColorizer {
+
+    /// Payvandlash chegarasi (m) — parda cho'qqisi mesh cho'qqisiga shu masofada
+    /// bo'lsa, YANGI cho'qqi yozilmaydi, mavjudi ishlatiladi (chok yo'qoladi).
+    private static let weldEps: Float = 0.006
+
+    private static func weldKey(_ p: SIMD3<Float>) -> SIMD3<Int32> {
+        SIMD3(Int32(floor(p.x / weldEps)), Int32(floor(p.y / weldEps)), Int32(floor(p.z / weldEps)))
+    }
 
     /// fill meshни room.obj (atlas) ga qo'shadi. Muvaffaqiyatsiz bo'lsa jim qaytadi.
     static func appendFill(fill: LiDARMeshData, objURL: URL, log: ((String) -> Void)? = nil) {
@@ -107,13 +117,59 @@ enum FillColorizer {
         guard (try? texData.write(to: fillPNG)) != nil else { return }
 
         // 6. OBJ'ga qo'shamiz — har uchburchakka 3 ta vt (o'z blok burchaklari).
+        //
+        // PAYVANDLASH: to'ldirish pardasining cho'qqilari mesh cho'qqilari bilan
+        // AYNAN ustma-ust tushadi (parda teshik halqasidan quriladi), lekin ilgari
+        // hammasi YANGI `v` bo'lib yozilardi — natijada parda topologik jihatdan
+        // ALOHIDA varaq bo'lib qolardi (o'lchandi, skan 20260713-192242: fillmat
+        // 10041 cho'qqi, asosiy mesh bilan umumiy cho'qqi 0, lekin 50% i 5mm
+        // ichida). Har teshik chetida chok + z-fighting chiqib, ko'z buni
+        // "parchalangan yuza" deb o'qirdi — ayniqsa mebelda, u yerda teshik ko'p.
+        // Endi mos keladigan cho'qqi topilsa — MAVJUD indeks ishlatiladi.
         guard let obj = try? String(contentsOf: objURL, encoding: .utf8) else { return }
         var vBase = 0, vtBase = 0
+        var objPos: [SIMD3<Float>] = []
         obj.enumerateLines { line, _ in
-            if line.hasPrefix("v ") { vBase += 1 } else if line.hasPrefix("vt ") { vtBase += 1 }
+            if line.hasPrefix("v ") {
+                vBase += 1
+                let p = line.dropFirst(2).split(separator: " ").compactMap { Float($0) }
+                objPos.append(p.count >= 3 ? SIMD3(p[0], p[1], p[2]) : SIMD3(repeating: .nan))
+            } else if line.hasPrefix("vt ") { vtBase += 1 }
+        }
+        // Pozitsiya bo'yicha fazoviy hash (katak = weldEps).
+        var hash = [SIMD3<Int32>: [Int]]()
+        for (i, p) in objPos.enumerated() where !p.x.isNaN {
+            hash[weldKey(p), default: []].append(i)
+        }
+        /// Mos cho'qqi indeksi (1-asosli) yoki nil.
+        func weld(_ p: SIMD3<Float>) -> Int? {
+            let k = weldKey(p)
+            var best: Int? = nil
+            var bestD = weldEps
+            for dx in -1...1 {
+                for dy in -1...1 {
+                    for dz in -1...1 {
+                        let n = SIMD3<Int32>(k.x + Int32(dx), k.y + Int32(dy), k.z + Int32(dz))
+                        for i in hash[n] ?? [] {
+                            let d = simd_distance(objPos[i], p)
+                            if d < bestD { bestD = d; best = i }
+                        }
+                    }
+                }
+            }
+            return best.map { $0 + 1 }
         }
         var out = "\nusemtl fillmat\n"
-        for p in positions { out += "v \(p.x) \(p.y) \(p.z)\n" }
+        var vIndex = [Int](repeating: 0, count: positions.count)   // 1-asosli OBJ indeks
+        var welded = 0, added = 0
+        for (i, p) in positions.enumerated() {
+            if let w = weld(p) { vIndex[i] = w; welded += 1 }
+            else {
+                added += 1
+                out += "v \(p.x) \(p.y) \(p.z)\n"
+                vIndex[i] = vBase + added
+            }
+        }
         let inset: Float = 1.5
         for t in 0..<triCount {
             let cx = t % grid, cy = t / grid
@@ -127,7 +183,8 @@ enum FillColorizer {
         }
         for (t, tri) in tris.enumerated() {
             let vt0 = vtBase + t * 3 + 1
-            out += "f \(tri.0+1+vBase)/\(vt0) \(tri.1+1+vBase)/\(vt0+1) \(tri.2+1+vBase)/\(vt0+2)\n"
+            // Payvandlangan indekslar (mavjud cho'qqi) yoki yangi qo'shilgani.
+            out += "f \(vIndex[tri.0])/\(vt0) \(vIndex[tri.1])/\(vt0+1) \(vIndex[tri.2])/\(vt0+2)\n"
         }
         guard let handle = try? FileHandle(forWritingTo: objURL) else { return }
         handle.seekToEndOfFile()
@@ -141,7 +198,8 @@ enum FillColorizer {
             mh.write(Data("\nnewmtl fillmat\nKa 1 1 1\nKd 1 1 1\nmap_Kd fillbake.png\n".utf8))
             try? mh.close()
         }
-        log?("FILLCOLOR regions=\(regionMembers.count) tris=\(tris.count) gradient")
+        log?("FILLCOLOR regions=\(regionMembers.count) tris=\(tris.count) "
+             + "payvand=\(welded) yangi=\(added)")
     }
 
     // MARK: - Yordamchilar
@@ -281,7 +339,13 @@ enum FillColorizer {
                                   bytesPerRow: texW * 4, space: cs,
                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue),
               let cg = ctx.makeImage() else { return nil }
-        return UIImage(cgImage: cg).pngData()
+        // PNG (UIKit'siz — fayl macOS'da ham sinaladi).
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(
+                data, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, cg, nil)
+        guard CGImageDestinationFinalize(dest) else { return nil }
+        return data as Data
     }
 }
 
@@ -291,7 +355,8 @@ private struct PixelBuffer {
     let bytes: [UInt8]
 
     init?(url: URL) {
-        guard let img = UIImage(contentsOfFile: url.path), let cg = img.cgImage else { return nil }
+        guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let cg = CGImageSourceCreateImageAtIndex(src, 0, nil) else { return nil }
         // Rang namunasi uchun kichraytiramiz (xotira: 4096² × 10 atlas OOM bo'ladi).
         let cap = 512
         let scale = min(1.0, Double(cap) / Double(max(cg.width, cg.height)))
