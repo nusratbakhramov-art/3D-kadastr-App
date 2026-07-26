@@ -7,6 +7,7 @@ library;
 
 import 'dart:ui' show Locale;
 
+import '../../../core/i18n/app_translations.dart';
 import '../api_cadastre_service.dart';
 import 'ai_scan_result.dart';
 
@@ -178,57 +179,46 @@ enum ValuationPurpose {
   static ValuationPurpose fromWire(String? w) => ValuationPurpose.values
       .firstWhere((p) => p.wire == w, orElse: () => ValuationPurpose.sale);
 
-  String get labelUz => switch (this) {
-    ValuationPurpose.sale => 'Sotish',
-    ValuationPurpose.mortgage => 'Ipoteka / kredit',
-    ValuationPurpose.insurance => "Sug'urta",
-    ValuationPurpose.court => 'Sud / nizo',
-    ValuationPurpose.tax => 'Soliq',
+  String label(Locale l) => switch (this) {
+    ValuationPurpose.sale => tr(
+        l,
+        'purpose.sale',
+        uz: 'Sotish uchun',
+        ru: 'Для продажи',
+        en: 'For sale',
+      ),
+    // Credit-only framing removed; now Bank / Mortgage / Leasing.
+    ValuationPurpose.mortgage => tr(
+        l,
+        'purpose.mortgage',
+        uz: 'Bank·Ipoteka·Lizing uchun',
+        ru: 'Для банка·ипотеки·лизинга',
+        en: 'For bank·mortgage·leasing',
+      ),
+    ValuationPurpose.insurance => tr(
+        l,
+        'purpose.insurance',
+        uz: 'Sug\'urtalash uchun',
+        ru: 'Для страхования',
+        en: 'For insurance',
+      ),
+    ValuationPurpose.court => tr(
+        l,
+        'purpose.court',
+        uz: 'Sud·Nizolar uchun',
+        ru: 'Для суда·споров',
+        en: 'For court·disputes',
+      ),
+    ValuationPurpose.tax => tr(
+        l,
+        'purpose.tax',
+        uz: 'Soliq buxgalteriyasi uchun',
+        ru: 'Для налогового учёта',
+        en: 'For tax accounting',
+      ),
   };
 
-  String get hintUz => switch (this) {
-    ValuationPurpose.sale => 'Bozor narxi asosida',
-    ValuationPurpose.mortgage => 'Bank garovi uchun',
-    ValuationPurpose.insurance => 'Qayta tiklash qiymati',
-    ValuationPurpose.court => '3 yondashuv teng',
-    ValuationPurpose.tax => 'Kadastr asosida',
-  };
-
-  String label(Locale l) => switch (l.languageCode) {
-    'ru' => switch (this) {
-      ValuationPurpose.sale => 'Продажа',
-      ValuationPurpose.mortgage => 'Ипотека / кредит',
-      ValuationPurpose.insurance => 'Страхование',
-      ValuationPurpose.court => 'Суд / спор',
-      ValuationPurpose.tax => 'Налог',
-    },
-    'en' => switch (this) {
-      ValuationPurpose.sale => 'Sale',
-      ValuationPurpose.mortgage => 'Mortgage / loan',
-      ValuationPurpose.insurance => 'Insurance',
-      ValuationPurpose.court => 'Court / dispute',
-      ValuationPurpose.tax => 'Tax',
-    },
-    _ => labelUz,
-  };
-
-  String hint(Locale l) => switch (l.languageCode) {
-    'ru' => switch (this) {
-      ValuationPurpose.sale => 'По рыночной цене',
-      ValuationPurpose.mortgage => 'Для банковского залога',
-      ValuationPurpose.insurance => 'Восстановительная стоимость',
-      ValuationPurpose.court => '3 подхода равны',
-      ValuationPurpose.tax => 'На основе кадастра',
-    },
-    'en' => switch (this) {
-      ValuationPurpose.sale => 'Based on market price',
-      ValuationPurpose.mortgage => 'For bank collateral',
-      ValuationPurpose.insurance => 'Replacement value',
-      ValuationPurpose.court => '3 approaches equal',
-      ValuationPurpose.tax => 'Cadastre-based',
-    },
-    _ => hintUz,
-  };
+  String hint(Locale l) => '';
 }
 
 /// One room in the optional breakdown. Mirrors backend `RoomInput`.

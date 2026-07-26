@@ -179,12 +179,21 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
 
   /// The rows to render: backend options when loaded, otherwise the built-in
   /// enum so the step works before the fetch finishes (and offline).
+  /// Credit-only purposes are no longer offered — drop any such option coming
+  /// from the backend so the list stays the five approved purposes.
+  static bool _isCreditWire(String wire) {
+    final w = wire.toLowerCase();
+    return w.contains('credit') || w.contains('kredit') || w == 'loan';
+  }
+
   List<({String wire, String label, String hint})> _purposeTiles(Locale l) {
     final opts = _options;
     if (opts != null) {
       final lang = l.languageCode;
       return [
-        for (final o in opts) (wire: o.wire, label: o.label(lang), hint: o.hint(lang)),
+        for (final o in opts)
+          if (!_isCreditWire(o.wire))
+            (wire: o.wire, label: o.label(lang), hint: o.hint(lang)),
       ];
     }
     return [
@@ -227,7 +236,9 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
                     children: [
                       for (final pt in _purposeTiles(l)) ...[
                         ChoiceTile(
-                          label: '${pt.label}  ·  ${pt.hint}',
+                          label: pt.hint.isEmpty
+                              ? pt.label
+                              : '${pt.label}  ·  ${pt.hint}',
                           selected: _purpose.wire == pt.wire,
                           onTap: () => setState(
                             () => _purpose = ValuationPurpose.fromWire(pt.wire),

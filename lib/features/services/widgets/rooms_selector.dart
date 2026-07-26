@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/ai_baholash_bundle.dart';
 
@@ -41,8 +42,18 @@ class RoomsSelector extends StatefulWidget {
 }
 
 class _RoomsSelectorState extends State<RoomsSelector> {
-  static final List<RoomKind> _standardKinds =
-      RoomKind.values.where((k) => k != RoomKind.other).toList();
+  // Turar (residential / living) vs No-turar (non-residential) grouping.
+  static const List<RoomKind> _livingKinds = [
+    RoomKind.living,
+    RoomKind.bedroom,
+    RoomKind.kitchen,
+    RoomKind.bathroom,
+    RoomKind.hallway,
+  ];
+  static const List<RoomKind> _nonLivingKinds = [
+    RoomKind.balcony,
+    RoomKind.storage,
+  ];
 
   final Map<AiRoom, TextEditingController> _counts = {};
   final Map<AiRoom, TextEditingController> _areas = {};
@@ -164,11 +175,28 @@ class _RoomsSelectorState extends State<RoomsSelector> {
         ],
         if (widget.title != null || widget.subtitle != null)
           const SizedBox(height: 12),
+        _GroupLabel(text: _RoomsSelectorStrings.livingGroup(widget.locale)),
+        const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final k in _standardKinds)
+            for (final k in _livingKinds)
+              _RoomChip(
+                label: k.label(widget.locale),
+                selected: selectedKinds.contains(k),
+                onTap: () => _toggleStandard(k),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _GroupLabel(text: _RoomsSelectorStrings.nonLivingGroup(widget.locale)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final k in _nonLivingKinds)
               _RoomChip(
                 label: k.label(widget.locale),
                 selected: selectedKinds.contains(k),
@@ -270,6 +298,27 @@ class _CustomNameInput extends StatelessWidget {
             visualDensity: VisualDensity.compact,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final color = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+    return Text(
+      text,
+      style: TextStyle(
+        fontFamily: 'MTSCompact',
+        fontWeight: FontWeight.w700,
+        fontSize: 12.5,
+        letterSpacing: 0.2,
+        color: color,
       ),
     );
   }
@@ -489,6 +538,22 @@ class _RoomsSelectorStrings {
         'en' => 'Other room',
         _ => 'Boshqa xona',
       };
+
+  static String livingGroup(Locale l) => tr(
+        l,
+        'rooms.group.living',
+        uz: 'Turar (yashash) xonalari',
+        ru: 'Жилые помещения',
+        en: 'Living rooms',
+      );
+
+  static String nonLivingGroup(Locale l) => tr(
+        l,
+        'rooms.group.non_living',
+        uz: 'No-turar (yordamchi) xonalari',
+        ru: 'Нежилые помещения',
+        en: 'Non-living rooms',
+      );
 
   static String customNameHint(Locale l) => switch (l.languageCode) {
         'ru' => 'Название комнаты (например: кабинет)',

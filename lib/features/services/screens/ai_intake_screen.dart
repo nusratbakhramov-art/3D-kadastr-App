@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../auth/widgets/auth_toast.dart';
@@ -53,6 +54,12 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   final List<_UploadItem> _photoItems = [];
   final List<_UploadItem> _kadastrItems = [];
   final List<_UploadItem> _passportItems = [];
+
+  // Selected owner-document type. Drives the passport card title. Local only —
+  // there is no backend field to carry it yet.
+  // TODO(backend): add an `owner_doc_type` field on the valuation job so the
+  // chosen document type reaches the report/appraiser.
+  int _docTypeIndex = 0;
 
   bool get _anyUploading =>
       _photoItems.any((i) => i.status == _UpStatus.uploading) ||
@@ -128,8 +135,23 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   static const int _minPhotos = 12;
   static const int _maxPhotos = 60;
 
-  // How many photos we require before "Hisoblash" unlocks.
-  int get _requiredPhotos => _minPhotos;
+  // How many photos we require before "Hisoblash" unlocks. Owner spec: 4 per
+  // room, never below the flat minimum of 12. Photos aren't segmented per room
+  // on the backend yet, so this only raises the total threshold.
+  int get _requiredPhotos {
+    final roomCount = widget.bundle.rooms.fold<int>(0, (s, r) => s + r.count);
+    return math.max(_minPhotos, roomCount * _photosPerRoom);
+  }
+
+  static const int _photosPerRoom = 4;
+
+  List<String> _docTypeOptions(Locale l) => [
+        _Strings.docTypeOwner(l),
+        _Strings.docTypeIdCard(l),
+        _Strings.docTypeDriver(l),
+        _Strings.docTypeLlc(l),
+        _Strings.docTypeOther(l),
+      ];
 
   // ── Required-fields gate ──────────────────────────────────────────────
   // Photos (min count), kadastr docs, and both floor numbers are mandatory.
@@ -138,6 +160,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
       !_anyUploading &&
       widget.bundle.imageKeys.length >= _requiredPhotos &&
       widget.bundle.kadastrKeys.isNotEmpty &&
+      widget.bundle.passportKeys.isNotEmpty &&
       widget.bundle.floor != null &&
       widget.bundle.totalFloors != null &&
       widget.bundle.floor! >= 1 &&
@@ -157,6 +180,9 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     final missing = <String>[];
     if (widget.bundle.kadastrKeys.isEmpty) {
       missing.add(_Strings.missingKadastr(l));
+    }
+    if (widget.bundle.passportKeys.isEmpty) {
+      missing.add(_Strings.missingPassport(l));
     }
     final f = widget.bundle.floor;
     final tf = widget.bundle.totalFloors;
@@ -489,6 +515,18 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                             _removeItem(_photoItems, it, _syncPhotoKeys),
                         onPreview: (it) => _openPreview(_photoItems, it),
                       ),
+                      const SizedBox(height: 10),
+                      _RoomPhotoGuide(
+                        rooms: b.rooms,
+                        perRoom: _photosPerRoom,
+                        exteriorLabel: _Strings.exteriorGroup(l),
+                        noteText: _Strings.photosPerRoomNote(
+                          l,
+                          _photosPerRoom,
+                          _requiredPhotos,
+                        ),
+                        locale: l,
+                      ),
                       const SizedBox(height: 12),
                       _UploadCard(
                         title: _Strings.kadastrDocs(l),
@@ -509,8 +547,15 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                         onPreview: (it) => _openPreview(_kadastrItems, it),
                       ),
                       const SizedBox(height: 12),
+                      _DocTypeSelector(
+                        label: _Strings.docTypeLabel(l),
+                        options: _docTypeOptions(l),
+                        selectedIndex: _docTypeIndex,
+                        onSelected: (i) => setState(() => _docTypeIndex = i),
+                      ),
+                      const SizedBox(height: 10),
                       _UploadCard(
-                        title: _Strings.passport(l),
+                        title: _docTypeOptions(l)[_docTypeIndex],
                         hint: _Strings.passportHint(l),
                         icon: Icons.badge_outlined,
                         emptyIcon: Icons.upload_file_outlined,
@@ -551,6 +596,187 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Per-room + exterior photo guide (placeholder icons) ───────────────
+// DRAFT (item 11): photos aren't segmented per room on the backend yet, so
+// this is a visual guide of where to shoot, not a per-room uploader.
+class _RoomPhotoGuide extends StatelessWidget {
+  const _RoomPhotoGuide({
+    required this.rooms,
+    required this.perRoom,
+    required this.exteriorLabel,
+    required this.noteText,
+    required this.locale,
+  });
+
+  final List<AiRoom> rooms;
+  final int perRoom;
+  final String exteriorLabel;
+  final String noteText;
+  final Locale locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+    final chipBg = isDark ? const Color(0xFF1F2426) : const Color(0xFFF7F8F9);
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+
+    final labels = <String>[
+      for (final r in rooms)
+        r.kind == RoomKind.other
+            ? ((r.name?.trim().isNotEmpty ?? false)
+                ? r.name!.trim()
+                : r.kind.label(locale))
+            : r.kind.label(locale),
+      exteriorLabel,
+    ];
+
+    Widget chip(String label, IconData icon) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: chipBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: AppColors.splashGreen),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '0/$perRoom',
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontSize: 12,
+                  color: muted,
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          noteText,
+          style: TextStyle(
+            fontFamily: 'MTSText',
+            fontSize: 12,
+            height: 1.3,
+            color: muted,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var i = 0; i < labels.length; i++)
+              chip(
+                labels[i],
+                i == labels.length - 1
+                    ? Icons.home_outlined
+                    : Icons.photo_camera_outlined,
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+// ── Owner-document type selector (single-select chips) ────────────────
+class _DocTypeSelector extends StatelessWidget {
+  const _DocTypeSelector({
+    required this.label,
+    required this.options,
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  final String label;
+  final List<String> options;
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+    final idleBg = isDark ? const Color(0xFF1F2426) : const Color(0xFFF1F2F4);
+    final idleText = isDark ? Colors.white : AppColors.textBlack;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            color: muted,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var i = 0; i < options.length; i++)
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  onSelected(i);
+                },
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: i == selectedIndex
+                        ? AppColors.splashGreen.withValues(alpha: 0.16)
+                        : idleBg,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: i == selectedIndex
+                          ? AppColors.splashGreen
+                          : border,
+                      width: i == selectedIndex ? 1.4 : 1,
+                    ),
+                  ),
+                  child: Text(
+                    options[i],
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13.5,
+                      color: i == selectedIndex
+                          ? AppColors.splashGreen
+                          : idleText,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -1700,17 +1926,88 @@ class _Strings {
     _ => 'Texpasport, plan (1-20). Maydon/yil aniqlanadi.',
   };
 
-  static String passport(Locale l) => switch (l.languageCode) {
-    'ru' => 'Паспорт / ID (необязательно)',
-    'en' => 'Passport / ID (optional)',
-    _ => 'Pasport / ID (ixtiyoriy)',
-  };
+  static String passport(Locale l) => tr(
+        l,
+        'ai.intake.owner_doc',
+        uz: 'Mulk egasi guvohnomasi',
+        ru: 'Свидетельство собственника',
+        en: 'Owner\'s certificate',
+      );
 
-  static String passportHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Данные владельца для отчёта.',
-    'en' => 'Owner\'s data for the report.',
-    _ => 'Hisobot uchun egasining ma\'lumoti.',
-  };
+  static String passportHint(Locale l) => tr(
+        l,
+        'ai.intake.owner_doc_hint',
+        uz: 'Majburiy. Hisobot uchun mulk egasi ma\'lumoti.',
+        ru: 'Обязательно. Данные собственника для отчёта.',
+        en: 'Required. Owner\'s data for the report.',
+      );
+
+  static String missingPassport(Locale l) => tr(
+        l,
+        'ai.intake.missing_owner_doc',
+        uz: 'mulk egasi guvohnomasi',
+        ru: 'свидетельство собственника',
+        en: 'owner\'s certificate',
+      );
+
+  // Selectable owner-document types (single-select). "other" reveals nothing
+  // extra — it just tags the upload.
+  static String docTypeOwner(Locale l) => passport(l);
+  static String docTypeIdCard(Locale l) => tr(
+        l,
+        'ai.intake.doc.id_card',
+        uz: 'Shaxs guvohnomasi',
+        ru: 'Удостоверение личности',
+        en: 'ID card',
+      );
+  static String docTypeDriver(Locale l) => tr(
+        l,
+        'ai.intake.doc.driver',
+        uz: 'Haydovchilik guvohnomasi',
+        ru: 'Водительское удостоверение',
+        en: 'Driver\'s licence',
+      );
+  static String docTypeLlc(Locale l) => tr(
+        l,
+        'ai.intake.doc.llc',
+        uz: 'MChJ guvohnomasi',
+        ru: 'Свидетельство ООО',
+        en: 'LLC certificate',
+      );
+  static String docTypeOther(Locale l) => tr(
+        l,
+        'ai.intake.doc.other',
+        uz: 'va boshqalar',
+        ru: 'и другие',
+        en: 'others',
+      );
+
+  static String docTypeLabel(Locale l) => tr(
+        l,
+        'ai.intake.doc_type_label',
+        uz: 'Hujjat turi',
+        ru: 'Тип документа',
+        en: 'Document type',
+      );
+
+  static String exteriorGroup(Locale l) => tr(
+        l,
+        'ai.intake.exterior_group',
+        uz: 'Tashqi ko\'rinish',
+        ru: 'Внешний вид',
+        en: 'Exterior',
+      );
+
+  static String photosPerRoomNote(Locale l, int perRoom, int total) => tr(
+        l,
+        'ai.intake.photos_per_room_note',
+        uz: 'Har bir xona uchun kamida $perRoom ta, jami kamida $total ta rasm. '
+            'Tashqi ko\'rinishni ham qo\'shing.',
+        ru: 'Минимум $perRoom фото на комнату, всего не менее $total. '
+            'Добавьте также внешний вид.',
+        en: 'At least $perRoom photos per room, $total in total. '
+            'Add the exterior too.',
+      );
 
   static String floor(Locale l) => switch (l.languageCode) {
     'ru' => 'Этажи',

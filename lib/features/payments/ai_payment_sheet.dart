@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../core/payment_deep_links.dart';
 import '../../theme/app_colors.dart';
 import '../../widgets/app_toast.dart';
@@ -466,11 +467,13 @@ class _S {
         _ => 'tez orada',
       };
 
-  static String pay(Locale l) => switch (l.languageCode) {
-        'ru' => 'Оплатить',
-        'en' => 'Pay',
-        _ => 'To\'lash',
-      };
+  static String pay(Locale l) => tr(
+        l,
+        'ai.payment.submit_cta',
+        uz: 'Ariza yuborish (xizmat pullik)',
+        ru: 'Отправить заявку (услуга платная)',
+        en: 'Submit application (paid service)',
+      );
 
   static String soum(Locale l) => switch (l.languageCode) {
         'ru' => 'сум',

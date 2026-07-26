@@ -211,7 +211,6 @@ class _BellButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final backgroundColor = isDark ? const Color(0xFF1A1F21) : Colors.white;
     final iconColor = isDark ? Colors.white : const Color(0xFF18181B);
     final dotBorderColor = isDark ? const Color(0xFF000702) : Colors.white;
 
@@ -224,16 +223,32 @@ class _BellButton extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
+            // Placeholder "3D-style" bell: gradient fill + soft drop shadow +
+            // filled glyph so it reads as a lit object rather than a flat line
+            // icon. TODO(design): replace with a real 3D-rendered bell asset.
             Container(
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: backgroundColor,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isDark
+                      ? const [Color(0xFF262C2F), Color(0xFF14181A)]
+                      : const [Colors.white, Color(0xFFEDEFF2)],
+                ),
                 shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
               alignment: Alignment.center,
               child: Icon(
-                Icons.notifications_none_rounded,
+                Icons.notifications_rounded,
                 size: 22,
                 color: iconColor,
               ),

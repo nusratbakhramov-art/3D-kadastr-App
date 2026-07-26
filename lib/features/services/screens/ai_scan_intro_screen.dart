@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/app_env.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -264,22 +265,27 @@ class _StepsCard extends StatelessWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 26,
-                    height: 26,
+                    width: 40,
+                    height: 40,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: AppColors.splashGreen.withValues(alpha: 0.14),
-                      shape: BoxShape.circle,
+                      color: AppColors.splashGreen.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      '${i + 1}',
-                      style: const TextStyle(
-                        fontFamily: 'MTSCompact',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: AppColors.splashGreen,
-                      ),
-                    ),
+                    child: (i < _S.stepAssets.length &&
+                            _S.stepAssets[i].isNotEmpty)
+                        ? Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Image.asset(
+                              _S.stepAssets[i],
+                              fit: BoxFit.contain,
+                            ),
+                          )
+                        : const Icon(
+                            Icons.payments_rounded,
+                            size: 22,
+                            color: AppColors.splashGreen,
+                          ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -393,26 +399,45 @@ class _S {
               'kamerani devor, pol va shiftga yo\'naltiring.',
       };
 
-  static List<String> steps(Locale l) => switch (l.languageCode) {
-        'ru' => const [
-            'Сканирование помещения',
-            'Просмотр 3D модели (mesh)',
-            'Обработка в USDZ',
-            'Ввод кадастрового номера',
-          ],
-        'en' => const [
-            'Scan the room',
-            'Preview the 3D mesh',
-            'Process into USDZ',
-            'Enter the cadastral number',
-          ],
-        _ => const [
-            'Xonani skanlash',
-            '3D model (mesh) ni ko\'rish',
-            'USDZ ga ishlash',
-            'Kadastr raqamini kiritish',
-          ],
-      };
+  // The 6-step "how it works" flow. Assets live in assets/images/howitworks/;
+  // step 5's source 403'd on download, so it has no asset and falls back to a
+  // built-in icon (see [_StepsCard]).
+  static List<String> steps(Locale l) => [
+        tr(l, 'howitworks.step1',
+            uz: 'Xonani skanerlash',
+            ru: 'Сканирование помещения',
+            en: 'Scan the room'),
+        tr(l, 'howitworks.step2',
+            uz: 'Joylashuvini belgilash',
+            ru: 'Указание местоположения',
+            en: 'Set the location'),
+        tr(l, 'howitworks.step3',
+            uz: 'Fotolarni yuklash',
+            ru: 'Загрузка фотографий',
+            en: 'Upload photos'),
+        tr(l, 'howitworks.step4',
+            uz: 'Xujjatlarni yuklash',
+            ru: 'Загрузка документов',
+            en: 'Upload documents'),
+        tr(l, 'howitworks.step5',
+            uz: 'To\'lov qilish',
+            ru: 'Оплата',
+            en: 'Make the payment'),
+        tr(l, 'howitworks.step6',
+            uz: 'Xujjatni olish',
+            ru: 'Получение документа',
+            en: 'Receive the document'),
+      ];
+
+  // Parallel to [steps]; empty string ⇒ no asset (fall back to a glyph).
+  static const List<String> stepAssets = [
+    'assets/images/howitworks/step1.jpg',
+    'assets/images/howitworks/step2.jpg',
+    'assets/images/howitworks/step3.jpg',
+    'assets/images/howitworks/step4.png',
+    '', // step5 (To'lov qilish) — download 403'd; uses a glyph fallback.
+    'assets/images/howitworks/step6.png',
+  ];
 
   static String startScan(Locale l) => switch (l.languageCode) {
         'ru' => 'Начать сканирование',

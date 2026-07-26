@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/i18n.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
@@ -1225,8 +1226,9 @@ class _PoiSummary extends StatefulWidget {
 }
 
 class _PoiSummaryState extends State<_PoiSummary> {
-  // Categories the user has expanded to reveal the named places.
-  final Set<String> _open = {};
+  // Auto-expanded by default: categories start open, and this set only tracks
+  // the ones the user has explicitly collapsed.
+  final Set<String> _collapsed = {};
   // Named places listed per category before a "+N ta" tail.
   static const int _maxPlaces = 8;
 
@@ -1270,12 +1272,12 @@ class _PoiSummaryState extends State<_PoiSummary> {
   ) {
     final kind = r.key;
     final list = r.value as List;
-    final isOpen = _open.contains(kind);
+    final isOpen = !_collapsed.contains(kind);
     return Column(
       children: [
         InkWell(
           onTap: () => setState(() {
-            isOpen ? _open.remove(kind) : _open.add(kind);
+            isOpen ? _collapsed.add(kind) : _collapsed.remove(kind);
           }),
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 11),
@@ -1293,16 +1295,7 @@ class _PoiSummaryState extends State<_PoiSummary> {
                     ),
                   ),
                 ),
-                Text(
-                  _countLabel(kind, list.length),
-                  style: TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    color: sub,
-                  ),
-                ),
-                const SizedBox(width: 6),
+                // "N ta" count suffix removed per product decision.
                 Icon(
                   isOpen ? Icons.expand_less : Icons.expand_more,
                   size: 18,
@@ -1392,17 +1385,6 @@ class _PoiSummaryState extends State<_PoiSummary> {
     if (d is! num) return '';
     if (d < 1000) return '${d.round()} m';
     return '${(d / 1000).toStringAsFixed(d < 10000 ? 1 : 0)} km';
-  }
-
-  // Common, high-density amenities (bus stops) are capped at "10+" — the exact
-  // count (e.g. 1230) is noise. Price-affecting / rarer ones show the real n.
-  String _countLabel(String kind, int n) {
-    const capped = {'bus_stop'};
-    final l = widget.locale;
-    if (capped.contains(kind) && n > 10) {
-      return '10+ ${_AiStatusStrings.unitPcs(l)}';
-    }
-    return '$n ${_AiStatusStrings.unitPcs(l)}';
   }
 
   String _labelFor(String kind) {
@@ -1659,11 +1641,13 @@ class _AiStatusStrings {
     _ => 'Nomsiz',
   };
 
-  static String usePaidService(Locale l) => switch (l.languageCode) {
-    'ru' => 'Воспользоваться платной услугой',
-    'en' => 'Use paid service',
-    _ => 'Pullik xizmatdan foydalanish',
-  };
+  static String usePaidService(Locale l) => tr(
+    l,
+    'ai.credentials.use_service',
+    uz: 'Foydalanish',
+    ru: 'Использовать',
+    en: 'Use',
+  );
 
   static String unitBln(Locale l) => switch (l.languageCode) {
     'ru' => 'млрд',
@@ -1683,11 +1667,6 @@ class _AiStatusStrings {
     _ => 'ming',
   };
 
-  static String unitPcs(Locale l) => switch (l.languageCode) {
-    'ru' => 'шт',
-    'en' => 'pcs',
-    _ => 'ta',
-  };
 
   static String poiSchools(Locale l) => switch (l.languageCode) {
     'ru' => 'Школы',

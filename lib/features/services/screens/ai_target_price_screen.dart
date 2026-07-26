@@ -11,6 +11,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../models/ai_baholash_bundle.dart';
@@ -324,14 +325,12 @@ class _S {
         'Enter the object\'s estimate (construction) cost',
       );
 
-  static String subheading(Locale l) => _pick(
+  static String subheading(Locale l) => tr(
         l,
-        'Ixtiyoriy. Smeta hujjatlaringiz bo\'lsa, xarajat (tannarx) yondashuvi '
-            'shu qiymat asosida hisoblanadi.',
-        'Необязательно. При наличии сметных документов затратный подход '
-            'рассчитывается по этой стоимости.',
-        'Optional. If you have estimate documents, the cost approach is computed '
-            'from this value.',
+        'ai.target_price.subheading',
+        uz: 'Yoki o\'z taklif summangizni yozing',
+        ru: 'Или укажите свою предлагаемую сумму',
+        en: 'Or enter your own proposed amount',
       );
 
   static String assessment(Locale l) => _pick(

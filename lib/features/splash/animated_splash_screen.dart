@@ -23,8 +23,8 @@ class AnimatedSplashScreen extends StatefulWidget {
 class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     with SingleTickerProviderStateMixin {
   static const int _frameCount = 36;
-  static const int _decodeWidth = 300; // retina (~128px ekran)
-  static const double _logoBox = 128;
+  static const int _decodeWidth = 420; // retina (~176px ekran)
+  static const double _logoBox = 176;
   static const double _textFontSize = 30;
   static const double _logoRiseFromY = 300; // pastdan shu balandlikda paydo
   static const double _logoEndOffsetX = -82; // REVEAL: chapga
@@ -287,7 +287,7 @@ class _BrandText extends StatelessWidget {
       '3D kadastr',
       style: TextStyle(
         fontFamily: 'MTSCompact',
-        fontWeight: FontWeight.w900,
+        fontWeight: FontWeight.w500,
         fontSize: _AnimatedSplashScreenState._textFontSize,
         color: Color(0xFF011606),
         letterSpacing: -0.5,

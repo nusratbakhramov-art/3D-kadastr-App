@@ -76,11 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         _ProfileStrings.scan(locale),
         () => _openScanPicker(context),
       ),
-      _RowSpec(
-        'assets/icons/menu-scan.svg',
-        _ProfileStrings.myScans(locale),
-        widget.onMyScansTap,
-      ),
+      // "Skanlarim" (My scans) entry removed per product decision.
       _RowSpec(
         'assets/icons/menu-ratings.svg',
         _ProfileStrings.ratings(locale),
@@ -434,12 +430,6 @@ class _ProfileStrings {
     ru: 'Сканирование недоступно на этом устройстве (нужен iOS 17+ и LiDAR)',
     en: 'Scanning is unavailable on this device (needs iOS 17+ and LiDAR)',
   );
-
-  static String myScans(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мои заявки',
-    'en' => 'My applications',
-    _ => 'Mening arizalarim',
-  };
 
   static String aboutApp(Locale l) => tr(
     l,
