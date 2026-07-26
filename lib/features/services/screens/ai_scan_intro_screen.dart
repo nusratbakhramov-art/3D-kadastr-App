@@ -435,7 +435,7 @@ class _S {
     'assets/images/howitworks/step2.jpg',
     'assets/images/howitworks/step3.jpg',
     'assets/images/howitworks/step4.png',
-    '', // step5 (To'lov qilish) — download 403'd; uses a glyph fallback.
+    'assets/images/howitworks/step5.png',
     'assets/images/howitworks/step6.png',
   ];
 
