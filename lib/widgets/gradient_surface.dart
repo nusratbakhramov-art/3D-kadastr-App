@@ -52,19 +52,21 @@ class GradientSurface extends StatelessWidget {
       decoration: BoxDecoration(
         borderRadius: r,
         boxShadow: [
-          // Colour-matched bloom: the surface looks like it emits its own hue.
-          // Scaled off `size` so a 28dp chip gets a chip-sized glow instead of
-          // a 56dp button's halo smeared under it.
+          // Soft neutral drop shadow — grounded BELOW the orb, pulled in with a
+          // negative spread so it doesn't smear into a halo around the edges.
           BoxShadow(
-            color: base.withValues(alpha: 0.45),
-            blurRadius: size * 0.32,
-            spreadRadius: -2,
-            offset: Offset(0, size * 0.107),
+            color: Colors.black.withValues(alpha: 0.26),
+            blurRadius: size * 0.16,
+            spreadRadius: -size * 0.06,
+            offset: Offset(0, size * 0.11),
           ),
+          // Faint hue tint just under the base, kept tight — a hint of grounding
+          // colour, not the wide glow it used to throw.
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.28),
-            blurRadius: size * 0.18,
-            offset: Offset(0, size * 0.054),
+            color: base.withValues(alpha: 0.18),
+            blurRadius: size * 0.14,
+            spreadRadius: -size * 0.11,
+            offset: Offset(0, size * 0.08),
           ),
         ],
       ),
@@ -85,35 +87,72 @@ class GradientSurface extends StatelessWidget {
                 ),
               ),
             ),
-            // 2. Glass sheen over the upper half only — the highlight that
-            //    sells it as a rounded object rather than a printed square.
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 0,
-              height: size * 0.5,
+            // 2. Lower-hemisphere shading — a little depth toward the base,
+            //    kept light so the sphere doesn't dissolve into a dark feed.
+            Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.white.withValues(alpha: 0.30),
+                      Colors.black.withValues(alpha: 0.0),
+                      Colors.black.withValues(alpha: 0.0),
+                      Colors.black.withValues(alpha: 0.14),
+                    ],
+                    stops: const [0.0, 0.6, 1.0],
+                  ),
+                ),
+              ),
+            ),
+            // 3. Broad glass sheen over the upper half.
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              height: size * 0.55,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.34),
                       Colors.white.withValues(alpha: 0.0),
                     ],
                   ),
                 ),
               ),
             ),
-            // 3. Hairline rim: catches light on top, darkens underneath. Stays
-            //    0.8 at every size — a hairline that scales stops being one.
+            // 4. Specular hotspot near the top — the bright wet-gloss highlight
+            //    that sells the 3D glass-orb look of the reference icons.
+            Positioned(
+              top: size * 0.06,
+              left: size * 0.2,
+              right: size * 0.2,
+              height: size * 0.42,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: const Alignment(0, -0.25),
+                    radius: 0.85,
+                    colors: [
+                      Colors.white.withValues(alpha: 0.80),
+                      Colors.white.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // 5. Rim: brighter now so the edge stays crisp against a dark
+            //    background instead of dissolving into it.
             Positioned.fill(
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: r,
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    width: 0.8,
+                    color: Colors.white.withValues(alpha: 0.32),
+                    width: 1.0,
                   ),
                 ),
               ),

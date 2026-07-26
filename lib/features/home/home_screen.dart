@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/haptics.dart';
@@ -17,7 +17,6 @@ import '../chat/screens/chat_screen.dart';
 import '../onboarding/onboarding_page_data.dart';
 import '../services/models/service_item.dart';
 import '../services/widgets/service_card.dart';
-import '../../widgets/gradient_surface.dart';
 import 'user_profile.dart';
 import 'widgets/home_header.dart';
 
@@ -56,10 +55,8 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _scroll = ScrollController();
   final SupportService _supportService = SupportService();
 
-  /// The FABs float over the feed, so at rest they cover whatever happens to be
-  /// under them — bottom padding only buys clearance at the *end* of the
-  /// scroll. Getting out of the way while the user is actually moving through
-  /// the content is the part that matters.
+  // The FABs auto-hide while the user scrolls down (reading through the feed)
+  // and come back on any upward move, when the scroll settles, or at the top.
   bool _fabsVisible = true;
   SupportInfo _supportInfo = const SupportInfo(
     phone: SupportService.fallbackPhone,
@@ -82,14 +79,22 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // The Call markaz block owns the very bottom of the feed, so the FABs step
+  // aside for that short stretch (not the whole tail) to avoid sitting on it.
+  static const double _bottomHideZone = 130;
+
   void _onScroll() {
     if (!_scroll.hasClients) return;
-    // Reverse == dragging content up (reading downward). Hide then; bring them
-    // back the moment the user scrolls up, which is when they're heading for
-    // the buttons anyway.
-    final show =
-        _scroll.position.userScrollDirection != ScrollDirection.reverse;
-    if (show != _fabsVisible) setState(() => _fabsVisible = show);
+    final pos = _scroll.position;
+    final nearBottom = pos.pixels >= pos.maxScrollExtent - _bottomHideZone;
+    // Reverse == dragging content up (reading downward) → hide. Otherwise show,
+    // except across the bottom stretch where the call block takes over. The
+    // pixels<=0 guard stops a top overscroll bounce from sticking them hidden.
+    final show = pos.pixels <= 0 ||
+        (!nearBottom && pos.userScrollDirection != ScrollDirection.reverse);
+    if (show != _fabsVisible) {
+      setState(() => _fabsVisible = show);
+    }
   }
 
   Future<void> _loadSupportInfo() async {
@@ -169,17 +174,14 @@ class _HomeScreenState extends State<HomeScreen> {
       // yashil (chap tomondagi qizil chat bilan juftlikda).
       floatingActionButton: _FabReveal(
         visible: _fabsVisible,
-        child: _GradientFab(
-          light: AppColors.callGreenLight,
-          base: AppColors.callGreen,
-          deep: AppColors.callGreenDeep,
+        child: _ImageFab(
+          asset: 'assets/icons/ai-phone-icon.png',
           onTap: hapticTap(_callSupport),
           tooltip: switch (widget.locale.languageCode) {
             'ru' => 'Позвонить',
             'en' => 'Call',
             _ => 'Qo\'ng\'iroq',
           },
-          child: const Icon(Icons.call_rounded, size: 26, color: Colors.white),
         ),
       ),
       body: Stack(
@@ -194,9 +196,9 @@ class _HomeScreenState extends State<HomeScreen> {
             child: SingleChildScrollView(
               controller: _scroll,
               clipBehavior: Clip.none,
-              // Bottom pad clears the call/chat FABs (56dp + 16dp inset), so
-              // the last card isn't sitting under them at rest.
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 88),
+              // Modest tail — the FABs step aside across the bottom stretch, so
+              // the block doesn't need a big gap to clear them.
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -237,6 +239,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     controller: _marketController,
                     onTap: _onListingTap,
                   ),
+                  const SizedBox(height: 16),
+                  // Support number — always in the feed. Rendering it only at
+                  // the bottom made the scroll extent jump as it popped in/out
+                  // (it grew the list, which flipped the at-bottom check off,
+                  // which removed it — an oscillation that read as a glitch).
+                  // The floating FABs step aside via _atBottom instead, so they
+                  // don't cover it down here.
+                  _CallCenterBlock(
+                    phone: _supportInfo.phone,
+                    locale: widget.locale,
+                    onTap: hapticTap(_callSupport),
+                  ),
                 ],
               ),
             ),
@@ -247,10 +261,8 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: 16,
             child: _FabReveal(
               visible: _fabsVisible,
-              child: _GradientFab(
-                light: AppColors.chatRedLight,
-                base: AppColors.declineRed,
-                deep: AppColors.chatRedDeep,
+              child: _ImageFab(
+                asset: 'assets/icons/ai-chat-icon.png',
                 onTap: hapticTap(
                   () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
@@ -263,18 +275,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   'en' => 'Assistant',
                   _ => 'Yordamchi',
                 },
-                // Agent/bot mark — stroke-based, so it needs an explicit tint.
-                // Sized a touch over the 24pt icon grid because a stroked glyph
-                // reads lighter than the solid phone it's paired with.
-                child: SvgPicture.asset(
-                  'assets/icons/chat-bot.svg',
-                  width: 26,
-                  height: 26,
-                  colorFilter: const ColorFilter.mode(
-                    Colors.white,
-                    BlendMode.srcIn,
-                  ),
-                ),
               ),
             ),
           ),
@@ -287,52 +287,63 @@ class _HomeScreenState extends State<HomeScreen> {
   static String _sectionTitle(Locale l) => tr(
     l,
     'home.section.top_models',
-    uz: 'Top modellar',
-    ru: 'Топ модели',
-    en: 'Top models',
+    uz: 'Tayyor qurilish loyihalari',
+    ru: 'Готовые строительные проекты',
+    en: 'Ready construction projects',
   );
 }
 
-/// Gradient-glass action button — the home call/chat pair.
-///
-/// Not a [FloatingActionButton]: that paints a single flat `backgroundColor`,
-/// and a solid 56dp swatch is exactly what made these read as cheap. The look
-/// itself lives in [GradientSurface], shared with the carousel chip these float
-/// over.
-class _GradientFab extends StatelessWidget {
-  const _GradientFab({
-    required this.light,
-    required this.base,
-    required this.deep,
+/// A floating action button whose whole face is a supplied PNG (the icon
+/// already carries its own colour/disc), with a soft drop shadow so it lifts
+/// off the content and a tap target matched to the 64pt gradient FABs it sits
+/// beside.
+class _ImageFab extends StatelessWidget {
+  const _ImageFab({
+    required this.asset,
     required this.onTap,
     required this.tooltip,
-    required this.child,
   });
 
-  final Color light;
-  final Color base;
-  final Color deep;
+  final String asset;
   final VoidCallback? onTap;
   final String tooltip;
-  final Widget child;
 
-  static const double _size = 56;
-  // Squircle, not a circle: at _size/2 these read as two plain dots, and the
-  // rounded-square is what made the reference mock feel like a lit object.
-  static const double _radius = 16;
+  static const double _size = 64;
 
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: GradientSurface(
-        light: light,
-        base: base,
-        deep: deep,
-        size: _size,
-        radius: _radius,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: child,
+        child: SizedBox(
+          width: _size,
+          height: _size,
+          child: Stack(
+            clipBehavior: Clip.none,
+            alignment: Alignment.center,
+            children: [
+              // Shape-accurate drop shadow — a blurred dark silhouette of the
+              // icon, offset down, so it lifts off the busy photos underneath.
+              Transform.translate(
+                offset: const Offset(0, 4),
+                child: ImageFiltered(
+                  imageFilter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
+                  child: Image.asset(
+                    asset,
+                    width: _size,
+                    height: _size,
+                    fit: BoxFit.contain,
+                    color: Colors.black.withValues(alpha: 0.55),
+                    colorBlendMode: BlendMode.srcIn,
+                  ),
+                ),
+              ),
+              Image.asset(asset, fit: BoxFit.contain),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -364,9 +375,11 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({
     required this.title,
     required this.locale,
+    this.subtitle,
     this.onSeeAll,
   });
   final String title;
+  final String? subtitle;
   final Locale locale;
   final VoidCallback? onSeeAll;
 
@@ -374,29 +387,50 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : AppColors.textBlack;
+    final subtitleColor = isDark ? Colors.white70 : AppColors.textBlack.withValues(alpha: 0.55);
     final linkColor = AppColors.splashGreen;
 
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
-          child: Text(
-            title,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: titleColor,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: titleColor,
+                ),
+              ),
+              if (subtitle != null && subtitle!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w400,
+                    color: subtitleColor,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
         if (onSeeAll != null)
           GestureDetector(
             onTap: hapticTap(onSeeAll),
-            child: Text(
-              _HomeScreenStrings.seeAll(locale),
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: linkColor,
+            child: Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                _HomeScreenStrings.seeAll(locale),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: linkColor,
+                ),
               ),
             ),
           ),
@@ -571,9 +605,9 @@ class _CardStrings {
   static String aiValuation(Locale l) => _pick(
     l,
     'home.card.ai_valuation',
-    'Ai baholash',
-    'Ai оценка',
-    'Ai valuation',
+    'Baholash Ai',
+    'Оценка Ai',
+    'Valuation Ai',
   );
 
   static String aiValuationSub(Locale l) => _pick(
@@ -587,9 +621,9 @@ class _CardStrings {
   static String calculator(Locale l) => _pick(
     l,
     'home.card.calculator',
-    'Ai Kalkulyator',
-    'Ai Калькулятор',
-    'Ai calculator',
+    'Calculator Ai',
+    'Калькулятор Ai',
+    'Calculator Ai',
   );
 
   static String calculatorSub(Locale l) => _pick(
@@ -606,4 +640,89 @@ class _HomeScreenStrings {
 
   static String seeAll(Locale l) =>
       tr(l, 'home.see_all', uz: 'Barchasi →', ru: 'Все →', en: 'See all →');
+}
+
+/// Bottom-of-feed "Call center" block. Revealed only when scrolled to the very
+/// bottom, reusing the same phone glyph as the bottom-right call FAB.
+class _CallCenterBlock extends StatelessWidget {
+  const _CallCenterBlock({
+    required this.phone,
+    required this.locale,
+    required this.onTap,
+  });
+
+  final String phone;
+  final Locale locale;
+  final VoidCallback? onTap;
+
+  // New key (not the old home.call_center) so the backend i18n override for
+  // that key — "Call markaz" — doesn't win over this "Aloqa markazi" default.
+  static String _label(Locale l) => tr(
+    l,
+    'home.contact_center',
+    uz: 'Aloqa markazi',
+    ru: 'Контакт-центр',
+    en: 'Contact center',
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white;
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: (isDark ? Colors.white : AppColors.callGreen)
+                .withValues(alpha: isDark ? 0.08 : 0.2),
+          ),
+        ),
+        // Horizontal: glossy green handset orb (same material as the home FABs)
+        // + "Aloqa markazi" / "24/7", left-aligned like a contact row.
+        child: Row(
+          children: [
+            Image.asset(
+              'assets/icons/ai-phone-icon.png',
+              width: 52,
+              height: 52,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(width: 14),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _label(locale),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.15,
+                    color: textColor,
+                  ),
+                ),
+                Text(
+                  '24/7',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    height: 1.15,
+                    color: textColor,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
