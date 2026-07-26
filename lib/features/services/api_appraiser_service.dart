@@ -75,6 +75,7 @@ class AppraiserCredential {
   const AppraiserCredential({
     required this.title,
     required this.imageUrl,
+    this.previewUrl = '',
     this.isPdf = false,
     this.category,
   });
@@ -83,6 +84,11 @@ class AppraiserCredential {
 
   /// Absolute, device-loadable URL ('' when no file is set yet).
   final String imageUrl;
+
+  /// Absolute URL of a displayable thumbnail: the image itself, or a PDF's
+  /// rendered first page. '' when the server hasn't produced one — the card
+  /// then falls back to the PDF icon.
+  final String previewUrl;
 
   /// A licence is often issued as a PDF. The server decides this (`kind`)
   /// rather than the app sniffing the URL, and it decides which viewer opens —
@@ -204,6 +210,7 @@ class AppraiserService {
           AppraiserCredential(
             title: (raw['title'] as String?) ?? '',
             imageUrl: _resolve((raw['image_url'] as String?) ?? ''),
+            previewUrl: _resolve((raw['preview_url'] as String?) ?? ''),
             isPdf: (raw['kind'] as String?) == 'pdf',
             category: raw['category'] is Map
                 ? CredentialCategory.fromJson(

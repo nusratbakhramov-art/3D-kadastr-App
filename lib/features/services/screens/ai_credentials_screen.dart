@@ -14,6 +14,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/remote_image.dart';
 import '../../market/widgets/fullscreen_gallery.dart';
@@ -143,15 +144,30 @@ class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
                           if (creds.isEmpty)
                             _EmptyNote(text: _S.empty(l), isDark: isDark)
                           else
-                            for (final c in creds) ...[
-                              _CredentialCard(
-                                credential: c,
-                                viewHint: _S.viewHint(l),
-                                isDark: isDark,
-                                onTap: () => _openDoc(creds, c),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
+                            // 2-column grid of appraiser ("Baholovchi") docs.
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                const gap = 10.0;
+                                final w =
+                                    (constraints.maxWidth - gap) / 2;
+                                return Wrap(
+                                  spacing: gap,
+                                  runSpacing: gap,
+                                  children: [
+                                    for (final c in creds)
+                                      SizedBox(
+                                        width: w,
+                                        child: _CredentialCard(
+                                          credential: c,
+                                          viewHint: _S.viewHint(l),
+                                          isDark: isDark,
+                                          onTap: () => _openDoc(creds, c),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
                         ],
                       );
                     },
@@ -258,9 +274,16 @@ class _CredentialCard extends StatelessWidget {
                 child: SizedBox(
                   width: 58,
                   height: 78,
-                  // A PDF has no thumbnail to fetch — RemoteImage would show a
-                  // broken placeholder.
-                  child: credential.isPdf
+                  // Images (and PDFs whose first page the server rendered) show
+                  // a real thumbnail; a PDF with no rendered preview falls back
+                  // to its icon rather than a broken image.
+                  child: credential.previewUrl.isNotEmpty
+                      ? RemoteImage(
+                          url: credential.previewUrl,
+                          fit: BoxFit.cover,
+                          memCacheWidth: 240,
+                        )
+                      : credential.isPdf
                       ? ColoredBox(
                           color: AppColors.declineRed.withValues(alpha: 0.12),
                           child: const Center(
@@ -364,11 +387,13 @@ class _S {
     _ => 'Ko\'rish uchun bosing',
   };
 
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Воспользоваться платной услугой',
-    'en' => 'Use paid service',
-    _ => 'Pullik xizmatdan foydalanish',
-  };
+  static String continueLabel(Locale l) => tr(
+    l,
+    'ai.credentials.use_service',
+    uz: 'Foydalanish',
+    ru: 'Использовать',
+    en: 'Use',
+  );
 
   static String empty(Locale l) => switch (l.languageCode) {
     'ru' => 'Документы пока недоступны',

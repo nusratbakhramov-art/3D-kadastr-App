@@ -347,9 +347,16 @@ class _CredentialRow extends StatelessWidget {
               child: SizedBox(
                 width: 36,
                 height: 47,
-                // A PDF has no thumbnail to fetch — RemoteImage would just show
-                // a broken placeholder. Show what it is instead.
-                child: credential.isPdf
+                // Images (and PDFs whose first page the server rendered) show a
+                // real thumbnail; a PDF with no rendered preview falls back to
+                // its icon rather than a broken image.
+                child: credential.previewUrl.isNotEmpty
+                    ? RemoteImage(
+                        url: credential.previewUrl,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 150,
+                      )
+                    : credential.isPdf
                     ? ColoredBox(
                         color: AppColors.declineRed.withValues(alpha: 0.12),
                         child: const Center(
