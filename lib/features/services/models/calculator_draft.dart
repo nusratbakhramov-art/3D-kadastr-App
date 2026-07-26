@@ -45,9 +45,9 @@ enum CalculatorCategory {
     ),
     CalculatorCategory.kadastr => _pick(
       l,
-      uz: 'Kadastr hujjatlari',
-      ru: 'Кадастровые документы',
-      en: 'Cadastre documents',
+      uz: 'Qurilish buxgalteriyasi',
+      ru: 'Строительная бухгалтерия',
+      en: 'Construction accounting',
     ),
     CalculatorCategory.kadastr3d => _pick(
       l,
@@ -90,9 +90,9 @@ enum CalculatorCategory {
     ),
     CalculatorCategory.kadastr => _pick(
       l,
-      uz: "Pasport va yig'ma jild",
-      ru: 'Паспорт и кадастровое дело',
-      en: 'Passport & file',
+      uz: 'Buxgalteriya va hisob xizmatlari',
+      ru: 'Бухгалтерия и учёт',
+      en: 'Accounting & bookkeeping',
     ),
     CalculatorCategory.kadastr3d => _pick(
       l,
