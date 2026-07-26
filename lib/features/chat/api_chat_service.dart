@@ -33,6 +33,31 @@ class ChatStreamEvent {
   final int? conversationId;
 }
 
+/// Suhbat boshidagi "tez savol" taklifi — backend (`GET /chat/suggestions`)
+/// boshqaradi (ilgari ilovada qattiq kodlangan edi). Har biri uch tilda.
+class ChatSuggestion {
+  const ChatSuggestion({required this.id, required this.uz, this.ru, this.en});
+
+  final int id;
+  final String uz;
+  final String? ru;
+  final String? en;
+
+  factory ChatSuggestion.fromJson(Map<String, dynamic> j) => ChatSuggestion(
+    id: (j['id'] as num?)?.toInt() ?? 0,
+    uz: (j['uz'] as String?)?.trim() ?? '',
+    ru: (j['ru'] as String?)?.trim(),
+    en: (j['en'] as String?)?.trim(),
+  );
+
+  /// Joriy til matni; tarjima bo'lmasa uz'ga qaytadi (backend fallback bilan bir xil).
+  String text(String lang) => switch (lang) {
+    'ru' => (ru != null && ru!.isNotEmpty) ? ru! : uz,
+    'en' => (en != null && en!.isNotEmpty) ? en! : uz,
+    _ => uz,
+  };
+}
+
 class ChatApiService {
   ChatApiService({http.Client? client, String? baseUrl})
     : _client = client ?? AuthHttpClient(),
@@ -40,6 +65,27 @@ class ChatApiService {
 
   final http.Client _client;
   final String _baseUrl;
+
+  /// Faol boshlang'ich takliflar. Xatolik/bo'sh javobda `[]` qaytadi — chaqiruvchi
+  /// o'shanda ilovadagi zaxira ro'yxatga tushadi.
+  Future<List<ChatSuggestion>> fetchSuggestions() async {
+    try {
+      final uri = Uri.parse('$_baseUrl/chat/suggestions');
+      final res = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 10));
+      if (res.statusCode != 200) return const [];
+      final data = jsonDecode(res.body);
+      if (data is! List) return const [];
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(ChatSuggestion.fromJson)
+          .where((s) => s.uz.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
 
   /// Foydalanuvchi xabarini yuboradi va javobni token-token oqim qiladi.
   Stream<ChatStreamEvent> streamReply({

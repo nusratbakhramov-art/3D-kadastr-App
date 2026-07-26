@@ -31,6 +31,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _sending = false;
   double _lastInset = 0;
 
+  /// Backend'dan olingan boshlang'ich takliflar. null/bo'sh bo'lsa (yuklanmaguncha
+  /// yoki xatoda) `_S.suggestions` zaxira ro'yxati ishlatiladi.
+  List<ChatSuggestion>? _remoteSuggestions;
+
   /// Held so the reply can actually be cancelled. An `await for` loop can only
   /// break when the *next* event arrives, which is useless for a stop button —
   /// a stalled stream would ignore it.
@@ -44,6 +48,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _loadSuggestions();
+  }
+
+  /// Boshlang'ich takliflarni backend'dan oladi (adminka boshqaradi). Xatoda
+  /// jimgina zaxira ro'yxatga tushamiz — ekran baribir ishlaydi.
+  Future<void> _loadSuggestions() async {
+    final list = await _api.fetchSuggestions();
+    if (!mounted || list.isEmpty) return;
+    setState(() => _remoteSuggestions = list);
   }
 
   @override
@@ -272,6 +285,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     onPick: _send,
                     topInset: 12,
                     bottomInset: inputH,
+                    suggestions:
+                        (_remoteSuggestions != null &&
+                            _remoteSuggestions!.isNotEmpty)
+                        ? _remoteSuggestions!
+                              .map((s) => s.text(_lang))
+                              .toList()
+                        : _S.suggestions(_lang),
                   )
                 : ListView.builder(
                     controller: _scroll,
@@ -872,11 +892,15 @@ class _EmptyState extends StatelessWidget {
     required this.onPick,
     required this.topInset,
     required this.bottomInset,
+    required this.suggestions,
   });
 
   final String lang;
   final bool isDark;
   final ValueChanged<String> onPick;
+
+  /// Ko'rsatiladigan taklif matnlari (backend'dan yoki zaxira ro'yxat).
+  final List<String> suggestions;
 
   /// The header and the floating input overlay this list, so it pads itself
   /// clear of both.
@@ -888,7 +912,6 @@ class _EmptyState extends StatelessWidget {
     final strong = isDark ? Colors.white : AppColors.textBlack;
     final muted = strong.withValues(alpha: 0.32);
     final divider = strong.withValues(alpha: 0.08);
-    final suggestions = _S.suggestions(lang);
 
     return ValueListenableBuilder<UserProfile?>(
       valueListenable: userProfileNotifier,
