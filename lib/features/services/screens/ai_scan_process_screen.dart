@@ -126,6 +126,10 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
           scanFiles = await svc.uploadBundle(
             entries: files.map((f) => f.entry).toList(growable: false),
             token: token,
+            // Har faylni ALOHIDA so'rovda yuboramiz (glb, keyin usdz): bittasi
+            // timeout/yiqilsa ikkinchisi saqlanadi (ayniqsa asosiy GLB), progress
+            // ham har fayldan keyin qo'shimcha yangilanadi.
+            batchSize: 1,
             onProgress: (done, total, sent, totalBytes) {
               if (!mounted) return;
               setState(() {
