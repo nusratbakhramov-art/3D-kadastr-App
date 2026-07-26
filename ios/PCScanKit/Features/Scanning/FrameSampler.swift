@@ -43,25 +43,11 @@ final class FrameSampler {
     private let maxTickTranslation: Float = 0.16
     private let maxTickRotation: Float = 0.22
 
-    /// Encode-backlog cheklovi (jetsam OOM'ni oldini oladi — scan-paytidagi crash sababi).
-    /// Serial encodeQueue JPEG+LZFSE bilan ulgurmasa, HAR RGB blok ARKit pixelBuffer'ini
-    /// (~4MB) ushlab qoladi; cheksiz backlog 600 kadr × ~4MB ≈ 2.4GB pinned bufer berardi.
-    /// Semaphore bir vaqtda faqat `maxInFlightFrames` kadrni encode'ga qo'yadi; slot bo'sh
-    /// bo'lmasa kadr TASHLANADI (qurilma ko'targancha ishlaydi, crash bermaydi).
-    private let encodeSem: DispatchSemaphore
-    /// Zich depth-kesh yoqilganmi (kam xotirali qurilmada o'chadi — encode-queue yukini kamaytiradi).
-    private let denseAllowed: Bool
-    private var memoryDropped = 0
-
     init(session: ARSession, outputFolder: URL, depthFolder: URL? = nil, denseFolder: URL? = nil) {
         self.session = session
         self.outputFolder = outputFolder
         self.depthFolder = depthFolder
         self.denseFolder = denseFolder
-        // Qurilma xotirasiga moslash: backlog qopqog'i + zich-kesh ruxsati.
-        let caps = MemoryBudget.current()
-        self.encodeSem = DispatchSemaphore(value: caps.maxInFlightFrames)
-        self.denseAllowed = caps.denseEnabled
     }
 
     func start() {
@@ -121,15 +107,6 @@ final class FrameSampler {
         }
         lastSavedTransform = transform
 
-        // Backlog cheklovi: bir vaqtda maxInFlightFrames dan ortiq pixelBuffer ushlanmasin
-        // (jetsam OOM). Slot bo'sh bo'lmasa (encode ulgurmayapti) — bu RGB kadrni TASHLAymiz.
-        // Zich depth-kesh alohida davom etadi; kadr tushishi faqat teksturaga (biroz)
-        // ta'sir qiladi, crash o'rniga.
-        guard encodeSem.wait(timeout: .now()) == .success else {
-            memoryDropped += 1
-            return
-        }
-
         // Pixel buffer'ni CIImage sifatida ushlab, fon oqimida yozamiz.
         let pixelBuffer = frame.capturedImage
         let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
@@ -166,9 +143,7 @@ final class FrameSampler {
         }
         poses.append(pose)
 
-        encodeQueue.async { [ciContext, outputFolder, encodeSem] in
-            // Slotni bo'shatamiz — pixelBuffer'ni ushlab turgan ciImage endi kerak emas.
-            defer { encodeSem.signal() }
+        encodeQueue.async { [ciContext, outputFolder] in
             let url = outputFolder.appendingPathComponent(String(format: "frame_%04d.jpg", index))
             let colorSpace = CGColorSpaceCreateDeviceRGB()
             let options: [CIImageRepresentationOption: Any] = [
@@ -182,9 +157,7 @@ final class FrameSampler {
 
     /// Zich depth-kesh: joriy kadr depth'ini (siqib) saqlaydi — pozasi bilan.
     private func saveDense(frame: ARFrame) {
-        // Kam xotirali qurilmada zich-kesh o'chadi (encode-queue yukini kamaytiradi —
-        // RGB encode backlog'i tezroq bo'shab, kadr tushishi kamayadi).
-        guard denseAllowed, let denseFolder, denseCount < maxDenseFrames,
+        guard let denseFolder, denseCount < maxDenseFrames,
               let sceneDepth = frame.sceneDepth,
               let packed = Self.packDepth(sceneDepth) else { return }
         let index = denseCount

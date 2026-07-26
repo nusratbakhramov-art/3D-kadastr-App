@@ -92,7 +92,6 @@
 		DF963073C9CE0722E075E6BF /* MLAtlasEnhancer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1DA2AA13EC320BEC96F3643 /* MLAtlasEnhancer.swift */; };
 		E0F4A76749B88FD5837EDED3 /* ExposureNormalizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70074C15D094023ED6548F05 /* ExposureNormalizer.swift */; };
 		E24551EFB79403174BAC7930 /* XAtlasBridge.mm in Sources */ = {isa = PBXBuildFile; fileRef = 6DF1BE198401ABDF945C563E /* XAtlasBridge.mm */; };
-		E3AC59B8C04CEA7DD634E104 /* MemoryBudget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D3D4CD3B8321B91702527A0 /* MemoryBudget.swift */; };
 		E5561857166B8C546437B610 /* CategoryDisplay.swift in Sources */ = {isa = PBXBuildFile; fileRef = B01F87D863E1682186B4D40A /* CategoryDisplay.swift */; };
 		E7932F76DF7A531D2BD84C7E /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A262A4AAFA39C9A9953A8AF /* AppState.swift */; };
 		E90BF6A8A76F6B453D309045 /* PCScanGLBExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB3D029D6DF6F9B08FA636C9 /* PCScanGLBExport.swift */; };
@@ -167,7 +166,6 @@
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		36CD660FE0802C12140CE601 /* ProcessingView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ProcessingView.swift; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
-		3D3D4CD3B8321B91702527A0 /* MemoryBudget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MemoryBudget.swift; sourceTree = "<group>"; };
 		3FED68B2BDF85D66BA153F06 /* AtlasInpainter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AtlasInpainter.swift; sourceTree = "<group>"; };
 		42391AAC64B042C08D4022D4 /* FreeSpaceCarver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FreeSpaceCarver.swift; sourceTree = "<group>"; };
 		444BE3C1AE8D7698A38F3673 /* AutoProcessRunner.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AutoProcessRunner.swift; sourceTree = "<group>"; };
@@ -443,7 +441,6 @@
 				8CAC9D8F756FF71EAAB7A6BF /* ScanLibrary.swift */,
 				D4C6D7359306BC32B2D3DEF5 /* ScanRecord.swift */,
 				04950435273E417DE018C0D9 /* StorageService.swift */,
-				3D3D4CD3B8321B91702527A0 /* MemoryBudget.swift */,
 				895054D49B0D65EB8F0DAC06 /* DeviceCapability.swift */,
 				179E4E584814546B2893FF16 /* ScanRecord.swift */,
 			);
@@ -934,7 +931,6 @@
 				DAFB7B33DC088B54C144BE7C /* AtlasDilate.swift in Sources */,
 				3ED7C020E003971FBABF9D36 /* AtlasSharpen.swift in Sources */,
 				01A7272BBC7CC21460EDC13D /* StructurePlanes.swift in Sources */,
-				E3AC59B8C04CEA7DD634E104 /* MemoryBudget.swift in Sources */,
 				C22BD9CAE4D3E612DE3EAC6C /* PCScanFacade.swift in Sources */,
 				7D2D1335FB09ADF86AC0338D /* PCScanEntry+Kadastr.swift in Sources */,
 				E90BF6A8A76F6B453D309045 /* PCScanGLBExport.swift in Sources */,

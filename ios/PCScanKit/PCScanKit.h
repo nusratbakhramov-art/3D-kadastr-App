@@ -11,8 +11,3 @@ FOUNDATION_EXPORT const unsigned char PCScanKitVersionString[];
 #import <PCScanKit/pcscan_tex.h>
 #import <PCScanKit/pcscan_poisson.h>
 #import <PCScanKit/pcscan_simplify.h>
-
-// os_proc_available_memory() — qurilma-adaptiv xotira byudjeti (MemoryBudget.swift).
-// App tarafidagi bridging-header'ning kit-ekvivalenti: framework Swift'i bu system
-// funksiyani umbrella orqali ko'radi (bridging-header framework'da ishlamaydi).
-#import <os/proc.h>

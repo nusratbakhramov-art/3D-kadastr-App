@@ -146,15 +146,6 @@ enum TexReconService {
         //    kadrlar 2048px gacha KICHRAYTIRILADI va 150 tadan ortiq bo'lsa
         //    pozalar bo'ylab tekis tanlanadi. .cam/.depth/.exp normalizatsiya-
         //    langan — kichraytirish ta'sir qilmaydi.
-        // Native texrecon ~350MB fixed + ko'rinishlar oladi. Qurilmada shuncha xotira
-        // qolmasa (juda band) — native'ni ISHLATMAYMIZ, throw qilamiz: ReconstructionViewModel
-        // YENGIL fallback'ga (runFusion / FusionEngine — rangli mesh, native texrecon YO'Q,
-        // ancha kam xotira) o'tadi. Crash o'rniga past-sifat lekin ISHLAYDIGAN natija.
-        guard MemoryBudget.current().canRunNativeTexrecon else {
-            log.log("TEXRECON LOW-MEMORY: native o'tkazib yuborildi -> yengil fallback")
-            throw TexError.cppFailed(-98)
-        }
-
         progress(0.12, "Kadrlar tayyorlanmoqda…")
         let sceneDir = try writeScene(paths: paths, log: { log.log($0) })
         defer { try? FileManager.default.removeItem(at: sceneDir) }
@@ -296,18 +287,12 @@ enum TexReconService {
             FileManager.default.fileExists(
                 atPath: paths.imagesFolder.appendingPathComponent(String(format: "frame_%04d.jpg", pose.index)).path)
         }
-        // Ko'rinish soni va kadr o'lchami QURILMA XOTIRASIGA moslashadi (native
-        // texrecon peak'i ≈ views·dim² — ASOSIY jetsam OOM manbai). Byudjet UserDefaults
-        // qiymatini CHEGARALAydi (foydalanuvchi ko'proq so'rasa ham, qurilma ko'targancha).
-        let budget = MemoryBudget.current()
-        let effViews = min(maxTexViews, budget.maxTexViews)
-        let maxDim = min(texImageMaxDim, budget.texImageMaxDim)
         var poses = withImage
-        if withImage.count > effViews {
-            let step = Float(withImage.count) / Float(effViews)
+        if withImage.count > maxTexViews {
+            let step = Float(withImage.count) / Float(maxTexViews)
             var sel: [KeyframePose] = []
             var acc: Float = 0
-            while Int(acc) < withImage.count && sel.count < effViews {
+            while Int(acc) < withImage.count && sel.count < maxTexViews {
                 sel.append(withImage[Int(acc)])
                 acc += step
             }
@@ -316,34 +301,30 @@ enum TexReconService {
 
         var downscaled = 0
         var copied = 0
+        let maxDim = texImageMaxDim
         let lock = NSLock()
         DispatchQueue.concurrentPerform(iterations: poses.count) { i in
-            // autoreleasepool: dekodlangan bitmap (~11MB/kadr) har iteratsiyada
-            // DARHOL bo'shatilsin — aks holda GCD worker'larda yig'ilib (300 kadr ×
-            // 11MB ≈ 3.3GB spike) jetsam beradi.
-            autoreleasepool {
-                let idx = poses[i].index
-                let src = paths.imagesFolder.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
-                let dst = sceneDir.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
-                // Hi-res YOQ va kadr qopqoqdan KICHIK bo'lsa — qayta siqmasdan asl JPEG
-                // ni ko'chiramiz (detal yo'qolmasin).
-                if texHiRes, imageLongestSide(src) <= maxDim {
-                    try? FileManager.default.removeItem(at: dst)
-                    if (try? FileManager.default.copyItem(at: src, to: dst)) != nil {
-                        lock.lock(); copied += 1; lock.unlock()
-                        return
-                    }
+            let idx = poses[i].index
+            let src = paths.imagesFolder.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
+            let dst = sceneDir.appendingPathComponent(String(format: "frame_%04d.jpg", idx))
+            // Hi-res YOQ va kadr qopqoqdan KICHIK bo'lsa — qayta siqmasdan asl JPEG
+            // ni ko'chiramiz (detal yo'qolmasin). Tumbler o'chiq bo'lsa — eski
+            // xatti-harakat (doim qayta siqish) — A/B solishtirish uchun.
+            if texHiRes, imageLongestSide(src) <= maxDim {
+                try? FileManager.default.removeItem(at: dst)
+                if (try? FileManager.default.copyItem(at: src, to: dst)) != nil {
+                    lock.lock(); copied += 1; lock.unlock()
+                    return
                 }
-                if downscaleJPEG(from: src, to: dst, maxDim: maxDim) {
-                    lock.lock(); downscaled += 1; lock.unlock()
-                } else {
-                    try? FileManager.default.copyItem(at: src, to: dst)
-                }
+            }
+            if downscaleJPEG(from: src, to: dst, maxDim: maxDim) {
+                lock.lock(); downscaled += 1; lock.unlock()
+            } else {
+                try? FileManager.default.copyItem(at: src, to: dst)
             }
         }
         log("TEXSCENE views=\(poses.count)/\(withImage.count) hiRes=\(texHiRes) "
-            + "copied=\(copied) downscaled=\(downscaled) -> \(maxDim)px "
-            + "(byudjet: views≤\(budget.maxTexViews) dim≤\(budget.texImageMaxDim))")
+            + "copied=\(copied) downscaled=\(downscaled) -> \(maxDim)px")
 
         try writeCameras(paths: paths, poses: poses, sceneDir: sceneDir)
         writeExposureSidecars(poses: poses, sceneDir: sceneDir, log: log)

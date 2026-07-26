@@ -78,11 +78,7 @@ enum PoissonService {
         // kamaytiriladi, shuning uchun katta xonada depth 8 deyarli bir xil natija
         // beradi, lekin ~2.6× kam xotira (143MB vs 378MB). Kichik xona depth 9 qoladi.
         let diag = simd_length(maxB - minB)
-        // Chuqurlik ikki chegaraning kichigi: (1) bbox diagonali (katta xona -> 8),
-        // (2) QURILMA XOTIRASI (octree d9≈378MB, d8≈143MB, d7≈54MB — jetsam OOM'ni
-        // oldini olish uchun kam xotirada pastroq depth).
-        let diagDepth: Int32 = diag > 9.0 ? min(depth, 8) : depth
-        let effectiveDepth: Int32 = min(diagDepth, MemoryBudget.current().poissonDepth)
+        let effectiveDepth: Int32 = diag > 9.0 ? min(depth, 8) : depth
         if effectiveDepth != depth {
             log?("POISSON depth \(depth)→\(effectiveDepth) (katta xona diag=\(String(format: "%.1f", diag))m)")
         }

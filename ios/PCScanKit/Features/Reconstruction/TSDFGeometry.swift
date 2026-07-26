@@ -553,16 +553,13 @@ enum TSDFGeometry {
         maxs += SIMD3(repeating: 0.12)
 
         // ===== 2. Voxel o'lchami (xotira qopqog'i ostida eng mayda) =====
-        // Voxel qopqog'i qurilma xotirasiga MOSLASHADI (jetsam OOM'ni oldini olish):
-        // kam xotirali qurilma yirikroq voxel oladi (kamroq detal, lekin crash yo'q).
-        let voxelCap = min(maxVoxels, MemoryBudget.current().maxVoxels)
         var vox = voxelStart
         var dims = SIMD3<Int>(0, 0, 0)
         while true {
             dims = SIMD3(Int(ceil((maxs.x - mins.x) / vox)),
                          Int(ceil((maxs.y - mins.y) / vox)),
                          Int(ceil((maxs.z - mins.z) / vox)))
-            if dims.x * dims.y * dims.z <= voxelCap { break }
+            if dims.x * dims.y * dims.z <= maxVoxels { break }
             vox *= 1.15
         }
         let total = dims.x * dims.y * dims.z
