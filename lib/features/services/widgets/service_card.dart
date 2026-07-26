@@ -4,14 +4,56 @@ import 'package:flutter/services.dart';
 import '../../../widgets/pressable_scale.dart';
 import '../models/service_item.dart';
 
-class ServiceCard extends StatelessWidget {
+class ServiceCard extends StatefulWidget {
   const ServiceCard({super.key, required this.item, required this.onTap});
 
   final ServiceItem item;
   final VoidCallback onTap;
 
   @override
+  State<ServiceCard> createState() => _ServiceCardState();
+}
+
+class _ServiceCardState extends State<ServiceCard>
+    with SingleTickerProviderStateMixin {
+  // Subtle press-bounce on the card's logo: dip in, overshoot, settle. We let it
+  // finish before navigating so the tap feels acknowledged (a beat, not a lag).
+  late final AnimationController _bounce = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 300),
+  );
+  late final Animation<double> _logoScale = TweenSequence<double>([
+    TweenSequenceItem(
+      tween: Tween(begin: 1.0, end: 0.84).chain(CurveTween(curve: Curves.easeOut)),
+      weight: 38,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 0.84, end: 1.06).chain(CurveTween(curve: Curves.easeOut)),
+      weight: 34,
+    ),
+    TweenSequenceItem(
+      tween: Tween(begin: 1.06, end: 1.0).chain(CurveTween(curve: Curves.easeIn)),
+      weight: 28,
+    ),
+  ]).animate(_bounce);
+
+  @override
+  void dispose() {
+    _bounce.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleTap() async {
+    if (_bounce.isAnimating) return; // ignore double-taps mid-bounce
+    HapticFeedback.selectionClick();
+    await _bounce.forward(from: 0);
+    if (!mounted) return;
+    widget.onTap();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     final isWide = item.layout == ServiceLayout.wide;
     final radius = BorderRadius.circular(24);
 
@@ -28,10 +70,7 @@ class ServiceCard extends StatelessWidget {
         elevation: 10,
         shadowColor: item.accent.withValues(alpha: 0.30),
         child: InkWell(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            onTap();
-          },
+          onTap: _handleTap,
           child: Stack(
             children: [
               // Accent glow — anchored to the SAME corner as the 3D image
@@ -75,11 +114,14 @@ class ServiceCard extends StatelessWidget {
               Positioned(
                 right: isWide ? -4 : -8,
                 bottom: isWide ? -6 : -12,
-                child: Image.asset(
-                  item.asset,
-                  height: isWide ? 188 : 142,
-                  fit: BoxFit.fitHeight,
-                  filterQuality: FilterQuality.medium,
+                child: ScaleTransition(
+                  scale: _logoScale,
+                  child: Image.asset(
+                    item.asset,
+                    height: isWide ? 188 : 142,
+                    fit: BoxFit.fitHeight,
+                    filterQuality: FilterQuality.medium,
+                  ),
                 ),
               ),
               Padding(
