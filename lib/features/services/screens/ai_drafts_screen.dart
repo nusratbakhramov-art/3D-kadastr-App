@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../../widgets/app_toast.dart';
@@ -374,96 +375,32 @@ class _Message extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'Мои заявки',
-        'en' => 'My applications',
-        _ => 'Mening arizalarim',
-      };
+  static String title(Locale l) => tr(l, 'services.ai.drafts.title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Незавершённые черновики — продолжите',
-        'en' => 'Unfinished drafts — continue',
-        _ => 'Tugallanmagan arizalar — davom eting',
-      };
+  static String subtitle(Locale l) => tr(l, 'services.ai.drafts.subtitle');
 
-  static String empty(Locale l) => switch (l.languageCode) {
-        'ru' => 'Пока нет черновиков заявок',
-        'en' => 'No draft applications yet',
-        _ => 'Hozircha draft ariza yo\'q',
-      };
+  static String empty(Locale l) => tr(l, 'services.ai.drafts.empty');
 
-  static String signIn(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сначала войдите в систему',
-        'en' => 'Please sign in first',
-        _ => 'Avval tizimga kiring',
-      };
+  static String signIn(Locale l) => tr(l, 'services.ai.common.sign_in_first');
 
-  static String refresh(Locale l) => switch (l.languageCode) {
-        'ru' => 'Обновить',
-        'en' => 'Refresh',
-        _ => 'Yangilash',
-      };
+  static String refresh(Locale l) => tr(l, 'services.ai.drafts.refresh');
 
-  static String resume(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
+  static String resume(Locale l) => tr(l, 'services.ai.common.continue');
 
-  static String application(Locale l) => switch (l.languageCode) {
-        'ru' => 'Заявка',
-        'en' => 'Application',
-        _ => 'Ariza',
-      };
+  static String application(Locale l) => tr(l, 'services.ai.drafts.application');
 
-  static String draftBadge(Locale l) => switch (l.languageCode) {
-        'ru' => 'ЧЕРНОВИК',
-        'en' => 'DRAFT',
-        _ => 'DRAFT',
-      };
+  static String draftBadge(Locale l) => tr(l, 'services.ai.drafts.draft_badge');
 
   static String stepLabel(Locale l, String? step) {
     final name = switch (step) {
-      'cadastre' => switch (l.languageCode) {
-          'ru' => 'Кадастр',
-          'en' => 'Cadastre',
-          _ => 'Kadastr'
-        },
-      'client' => switch (l.languageCode) {
-          'ru' => 'Данные клиента',
-          'en' => 'Client',
-          _ => 'Mijoz'
-        },
-      'location' => switch (l.languageCode) {
-          'ru' => 'Расположение',
-          'en' => 'Location',
-          _ => 'Joylashuv'
-        },
-      'purpose' => switch (l.languageCode) {
-          'ru' => 'Цель',
-          'en' => 'Purpose',
-          _ => 'Maqsad'
-        },
-      'intake' => switch (l.languageCode) {
-          'ru' => 'Документы',
-          'en' => 'Documents',
-          _ => 'Hujjatlar'
-        },
-      'payment' => switch (l.languageCode) {
-          'ru' => 'Оплата',
-          'en' => 'Payment',
-          _ => 'To\'lov'
-        },
-      _ => switch (l.languageCode) {
-          'ru' => 'Начало',
-          'en' => 'Start',
-          _ => 'Boshlanish'
-        },
+      'cadastre' => tr(l, 'services.ai.drafts.step.cadastre'),
+      'client' => tr(l, 'services.ai.drafts.step.client'),
+      'location' => tr(l, 'services.ai.drafts.step.location'),
+      'purpose' => tr(l, 'services.ai.drafts.step.purpose'),
+      'intake' => tr(l, 'services.ai.drafts.step.intake'),
+      'payment' => tr(l, 'services.ai.drafts.step.payment'),
+      _ => tr(l, 'services.ai.drafts.step.start'),
     };
-    return switch (l.languageCode) {
-      'ru' => 'Шаг: $name',
-      'en' => 'Step: $name',
-      _ => 'Qadam: $name',
-    };
+    return '${tr(l, 'services.ai.drafts.step_prefix')}: $name';
   }
 }

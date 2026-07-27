@@ -13,6 +13,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -196,8 +197,8 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: _PickerStrings.title(l),
-                subtitle: _PickerStrings.subtitle(l),
+                title: tr(l, 'services.location.picker.title'),
+                subtitle: tr(l, 'services.location.picker.subtitle'),
               ),
             ),
             const SizedBox(height: 12),
@@ -262,7 +263,7 @@ class _LocationPickerScreenState extends State<LocationPickerScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: ListingCtaButton(
-                label: _PickerStrings.confirmAddress(l),
+                label: tr(l, 'services.location.picker.confirm_address'),
                 enabled: !_resolving,
                 onTap: _confirm,
               ),
@@ -337,7 +338,7 @@ class _SearchInput extends StatelessWidget {
       decoration: InputDecoration(
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        hintText: _PickerStrings.searchHint(locale),
+        hintText: tr(locale, 'services.location.picker.search_hint'),
         hintStyle: TextStyle(fontFamily: 'MTSText', fontSize: 15, color: hint),
         filled: true,
         fillColor: fill,
@@ -515,8 +516,9 @@ class _AddressBanner extends StatelessWidget {
               children: [
                 Text(
                   resolving
-                      ? _PickerStrings.resolving(locale)
-                      : (addressText ?? _PickerStrings.addressNotFound(locale)),
+                      ? tr(locale, 'services.location.picker.resolving')
+                      : (addressText ??
+                          tr(locale, 'services.location.picker.address_not_found')),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -551,44 +553,4 @@ class _AddressBanner extends StatelessWidget {
       ),
     );
   }
-}
-
-class _PickerStrings {
-  const _PickerStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'Выберите адрес',
-        'en' => 'Pick an address',
-        _ => 'Manzilni tanlang',
-      };
-
-  static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Перетащите пин в нужное место',
-        'en' => 'Drag the pin to the desired spot',
-        _ => 'Pinni kerakli joyga suring',
-      };
-
-  static String searchHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Поиск адреса, улицы или объекта',
-        'en' => 'Search address, street or place',
-        _ => 'Manzil, ko\'cha yoki obyekt qidirish',
-      };
-
-  static String resolving(Locale l) => switch (l.languageCode) {
-        'ru' => 'Определяется…',
-        'en' => 'Resolving…',
-        _ => 'Aniqlanmoqda…',
-      };
-
-  static String addressNotFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'Адрес не найден',
-        'en' => 'Address not found',
-        _ => 'Manzil topilmadi',
-      };
-
-  static String confirmAddress(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подтвердить адрес',
-        'en' => 'Confirm address',
-        _ => 'Manzilni tasdiqlash',
-      };
 }

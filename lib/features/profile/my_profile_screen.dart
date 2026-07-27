@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/haptics.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_avatar.dart';
@@ -300,17 +301,9 @@ class _MyProfileScreenState extends State<MyProfileScreen>
     if (g == null) return null;
     switch (g) {
       case Gender.male:
-        return switch (l.languageCode) {
-          'ru' => 'Мужской',
-          'en' => 'Male',
-          _ => 'Erkak',
-        };
+        return tr(l, 'profile.gender.male');
       case Gender.female:
-        return switch (l.languageCode) {
-          'ru' => 'Женский',
-          'en' => 'Female',
-          _ => 'Ayol',
-        };
+        return tr(l, 'profile.gender.female');
     }
   }
 }
@@ -629,69 +622,18 @@ class _LockedField extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мой профиль',
-    'en' => 'My profile',
-    _ => 'Mening profilim',
-  };
-  static String edit(Locale l) => switch (l.languageCode) {
-    'ru' => 'Изменить',
-    'en' => 'Edit',
-    _ => 'Tahrirlash',
-  };
-  static String save(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сохранить',
-    'en' => 'Save',
-    _ => 'Saqlash',
-  };
-  static String fullName(Locale l) => switch (l.languageCode) {
-    'ru' => 'Имя и фамилия',
-    'en' => 'Full name',
-    _ => 'F.I.O.',
-  };
-  static String phone(Locale l) => switch (l.languageCode) {
-    'ru' => 'Телефон',
-    'en' => 'Phone',
-    _ => 'Telefon',
-  };
-  static String dob(Locale l) => switch (l.languageCode) {
-    'ru' => 'Дата рождения',
-    'en' => 'Date of birth',
-    _ => 'Tug‘ilgan sana',
-  };
-  static String gender(Locale l) => switch (l.languageCode) {
-    'ru' => 'Пол',
-    'en' => 'Gender',
-    _ => 'Jinsi',
-  };
-  static String empty(Locale l) => switch (l.languageCode) {
-    'ru' => '—',
-    'en' => '—',
-    _ => '—',
-  };
-  static String saved(Locale l) => switch (l.languageCode) {
-    'ru' => 'Профиль сохранён',
-    'en' => 'Profile saved',
-    _ => 'Profil saqlandi',
-  };
-  static String errorEmptyName(Locale l) => switch (l.languageCode) {
-    'ru' => 'Имя не может быть пустым',
-    'en' => 'Name cannot be empty',
-    _ => 'Ism bo‘sh bo‘lishi mumkin emas',
-  };
-  static String errorIncomplete(Locale l) => switch (l.languageCode) {
-    'ru' => 'Заполните все поля',
-    'en' => 'Please fill in all fields',
-    _ => 'Barcha maydonlarni to‘ldiring',
-  };
-  static String errorUnauthenticated(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сессия истекла, войдите снова',
-    'en' => 'Session expired, please sign in again',
-    _ => 'Sessiya tugagan, qayta kirib oling',
-  };
-  static String errorNetwork(Locale l) => switch (l.languageCode) {
-    'ru' => 'Ошибка сети',
-    'en' => 'Network error',
-    _ => 'Tarmoq xatosi',
-  };
+  static String title(Locale l) => tr(l, 'profile.my_profile');
+  static String edit(Locale l) => tr(l, 'profile.edit');
+  static String save(Locale l) => tr(l, 'profile.save');
+  static String fullName(Locale l) => tr(l, 'profile.full_name');
+  static String phone(Locale l) => tr(l, 'profile.phone');
+  static String dob(Locale l) => tr(l, 'profile.dob');
+  static String gender(Locale l) => tr(l, 'profile.gender');
+  static String empty(Locale l) => tr(l, 'profile.empty');
+  static String saved(Locale l) => tr(l, 'profile.saved');
+  static String errorEmptyName(Locale l) => tr(l, 'profile.error_empty_name');
+  static String errorIncomplete(Locale l) => tr(l, 'profile.error_incomplete');
+  static String errorUnauthenticated(Locale l) =>
+      tr(l, 'profile.error_unauthenticated');
+  static String errorNetwork(Locale l) => tr(l, 'profile.error_network');
 }

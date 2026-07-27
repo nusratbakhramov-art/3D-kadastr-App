@@ -123,9 +123,6 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                   tr(
                     Localizations.localeOf(context),
                     'common.no_internet_title',
-                    uz: 'Internetga ulanish yo\'q',
-                    ru: 'Нет подключения к интернету',
-                    en: 'No internet connection',
                   ),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
@@ -139,9 +136,6 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                   tr(
                     Localizations.localeOf(context),
                     'common.no_internet_message',
-                    uz: 'Internet ulanishini tekshirib, qayta urinib ko\'ring',
-                    ru: 'Проверьте подключение и попробуйте снова',
-                    en: 'Check your connection and try again',
                   ),
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -183,13 +177,7 @@ class _NoInternetSheetState extends State<NoInternetSheet>
                     minimumSize: const Size.fromHeight(44),
                   ),
                   child: Text(
-                    tr(
-                      Localizations.localeOf(context),
-                      'common.close',
-                      uz: 'Yopish',
-                      ru: 'Закрыть',
-                      en: 'Close',
-                    ),
+                    tr(Localizations.localeOf(context), 'common.close'),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w600,

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/haptics.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
@@ -351,13 +352,13 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       // Arxitektura/Dizayn TZ — kalkulyator xizmatlari, "Kalkulyator" chipi
       // ostida ko'rsatamiz (serviceLabel kartada turini ko'rsatadi).
       serviceId: 'calc',
-      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'arch'),
+      serviceLabel: tr(Locale(lang), 'applications.service.arch'),
       statusGroup: group,
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
-      addressLabel: _ApplicationsStrings.address(lang),
+      addressLabel: tr(Locale(lang), 'applications.address'),
       addressValue: (o.address ?? o.cadastreNumber ?? '—'),
-      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateLabel: tr(Locale(lang), 'applications.application_date'),
       dateValue: _formatDateTime(o.updatedAt),
       // Detail ekran arizani backend sxemasi bo'yicha to'liq ko'rsatadi
       // (barcha to'ldirilgan maydonlar, bo'limga ajratilgan). `raw` — list
@@ -365,12 +366,12 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       formKey: 'arxitektura_tz',
       formPayload: o.raw,
       detailRows: [
-        (_ApplicationsStrings.address(lang), o.address ?? '—'),
+        (tr(Locale(lang), 'applications.address'), o.address ?? '—'),
         if (o.cadastreNumber != null)
-          (_ApplicationsStrings.cadastreNumber(lang), o.cadastreNumber!),
-        (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(o.createdAt)),
-        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(o.updatedAt)),
+          (tr(Locale(lang), 'applications.cadastre_number'), o.cadastreNumber!),
+        (tr(Locale(lang), 'applications.status'), _groupLabel(group)),
+        (tr(Locale(lang), 'applications.application_date'), _formatDateTime(o.createdAt)),
+        (tr(Locale(lang), 'applications.updated_at'), _formatDateTime(o.updatedAt)),
       ],
       timeline: _basicTimeline(group, o.createdAt),
     );
@@ -383,22 +384,22 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       id: 'design_${o.id}',
       orderNo: o.id,
       serviceId: 'calc',
-      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'design'),
+      serviceLabel: tr(Locale(lang), 'applications.service.design'),
       statusGroup: group,
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
-      addressLabel: _ApplicationsStrings.address(lang),
+      addressLabel: tr(Locale(lang), 'applications.address'),
       addressValue: o.address ?? '—',
-      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateLabel: tr(Locale(lang), 'applications.application_date'),
       dateValue: _formatDateTime(o.updatedAt),
       formKey: 'dizayn_tz',
       formPayload: o.raw,
       detailRows: [
         if (o.address != null)
-          (_ApplicationsStrings.address(lang), o.address!),
-        (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(o.createdAt)),
-        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(o.updatedAt)),
+          (tr(Locale(lang), 'applications.address'), o.address!),
+        (tr(Locale(lang), 'applications.status'), _groupLabel(group)),
+        (tr(Locale(lang), 'applications.application_date'), _formatDateTime(o.createdAt)),
+        (tr(Locale(lang), 'applications.updated_at'), _formatDateTime(o.updatedAt)),
       ],
       timeline: _basicTimeline(group, o.createdAt),
     );
@@ -414,7 +415,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       orderNo: j.id,
       aiJobId: j.id,
       serviceId: 'ai_eval',
-      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'ai_eval'),
+      serviceLabel: tr(Locale(lang), 'applications.service.ai_eval'),
       statusGroup: group,
       isDraft: isDraft,
       resumeJobId: isDraft ? j.id : null,
@@ -428,25 +429,25 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
       addressLabel: hasValue
-          ? _ApplicationsStrings.estimatedValue(lang)
-          : _ApplicationsStrings.cadastreNumber(lang),
+          ? tr(Locale(lang), 'applications.estimated_value')
+          : tr(Locale(lang), 'applications.cadastre_number'),
       addressValue: hasValue
           ? _formatUzs(j.estimatedValue!)
           : (j.cadastreNumber ?? '—'),
-      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateLabel: tr(Locale(lang), 'applications.application_date'),
       dateValue: _formatDateTime(j.updatedAt),
       typeLabel: hasValue && j.cadastreNumber != null
-          ? _ApplicationsStrings.cadastre(lang)
+          ? tr(Locale(lang), 'applications.cadastre')
           : null,
       typeValue: hasValue ? j.cadastreNumber : null,
       detailRows: [
         if (j.cadastreNumber != null)
-          (_ApplicationsStrings.cadastreNumber(lang), j.cadastreNumber!),
+          (tr(Locale(lang), 'applications.cadastre_number'), j.cadastreNumber!),
         if (hasValue)
-          (_ApplicationsStrings.estimatedValue(lang), _formatUzs(j.estimatedValue!)),
-        (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(j.createdAt)),
-        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(j.updatedAt)),
+          (tr(Locale(lang), 'applications.estimated_value'), _formatUzs(j.estimatedValue!)),
+        (tr(Locale(lang), 'applications.status'), _groupLabel(group)),
+        (tr(Locale(lang), 'applications.application_date'), _formatDateTime(j.createdAt)),
+        (tr(Locale(lang), 'applications.updated_at'), _formatDateTime(j.updatedAt)),
       ],
       // A draft was NOT submitted — show a single "Qoralama" step, not the
       // accepted → sent-to-system timeline of a real application.
@@ -469,22 +470,22 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       id: 'calc_${o.id}',
       orderNo: o.id,
       serviceId: 'calc',
-      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'calc'),
+      serviceLabel: tr(Locale(lang), 'applications.service.calc'),
       statusGroup: group,
       createdAt: o.createdAt,
       updatedAt: o.updatedAt,
-      addressLabel: _ApplicationsStrings.type(lang),
+      addressLabel: tr(Locale(lang), 'applications.type'),
       addressValue: o.categoryTitle,
-      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateLabel: tr(Locale(lang), 'applications.application_date'),
       dateValue: _formatDateTime(o.updatedAt),
-      typeLabel: _ApplicationsStrings.price(lang),
+      typeLabel: tr(Locale(lang), 'applications.price'),
       typeValue: _formatUzs(o.totalUzs),
       detailRows: [
-        (_ApplicationsStrings.type(lang), o.categoryTitle),
-        (_ApplicationsStrings.price(lang), _formatUzs(o.totalUzs)),
-        (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(o.createdAt)),
-        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(o.updatedAt)),
+        (tr(Locale(lang), 'applications.type'), o.categoryTitle),
+        (tr(Locale(lang), 'applications.price'), _formatUzs(o.totalUzs)),
+        (tr(Locale(lang), 'applications.status'), _groupLabel(group)),
+        (tr(Locale(lang), 'applications.application_date'), _formatDateTime(o.createdAt)),
+        (tr(Locale(lang), 'applications.updated_at'), _formatDateTime(o.updatedAt)),
       ],
       timeline: _basicTimeline(group, o.createdAt),
     );
@@ -501,7 +502,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       id: 'kad3d_${j.id}',
       orderNo: j.id,
       serviceId: 'kad_3d',
-      serviceLabel: _ApplicationsStrings.serviceLabel(lang, 'kad_3d'),
+      serviceLabel: tr(Locale(lang), 'applications.service.kad_3d'),
       statusGroup: group,
       k3dJobId: j.id,
       k3dReportJobId: delivered && j.hasReport ? j.id : null,
@@ -509,22 +510,22 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       k3dModelExt: j.modelExt,
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
-      addressLabel: _ApplicationsStrings.cadastreNumber(lang),
+      addressLabel: tr(Locale(lang), 'applications.cadastre_number'),
       addressValue: j.cadastreNumber ?? '—',
-      dateLabel: _ApplicationsStrings.applicationDate(lang),
+      dateLabel: tr(Locale(lang), 'applications.application_date'),
       dateValue: _formatDateTime(j.updatedAt),
       typeLabel: objectType != null
-          ? _ApplicationsStrings.objectType(lang)
+          ? tr(Locale(lang), 'applications.object_type')
           : null,
       typeValue: objectType,
       detailRows: [
         if (j.cadastreNumber != null)
-          (_ApplicationsStrings.cadastreNumber(lang), j.cadastreNumber!),
+          (tr(Locale(lang), 'applications.cadastre_number'), j.cadastreNumber!),
         if (objectType != null)
-          (_ApplicationsStrings.objectType(lang), objectType),
-        (_ApplicationsStrings.status(lang), _groupLabel(group)),
-        (_ApplicationsStrings.applicationDate(lang), _formatDateTime(j.createdAt)),
-        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(j.updatedAt)),
+          (tr(Locale(lang), 'applications.object_type'), objectType),
+        (tr(Locale(lang), 'applications.status'), _groupLabel(group)),
+        (tr(Locale(lang), 'applications.application_date'), _formatDateTime(j.createdAt)),
+        (tr(Locale(lang), 'applications.updated_at'), _formatDateTime(j.updatedAt)),
       ],
       timeline: _basicTimeline(group, j.createdAt),
     );
@@ -544,10 +545,10 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static String? _objectTypeLabel(String? wire) {
     final lang = localeNotifier.value.languageCode;
     return switch (wire) {
-      'residential' => _ApplicationsStrings.residential(lang),
-      'non_residential' => _ApplicationsStrings.nonResidential(lang),
-      'warehouse' => _ApplicationsStrings.warehouse(lang),
-      'industrial' => _ApplicationsStrings.industrial(lang),
+      'residential' => tr(Locale(lang), 'applications.object.residential'),
+      'non_residential' => tr(Locale(lang), 'applications.object.non_residential'),
+      'warehouse' => tr(Locale(lang), 'applications.object.warehouse'),
+      'industrial' => tr(Locale(lang), 'applications.object.industrial'),
       _ => null,
     };
   }
@@ -555,11 +556,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static String _groupLabel(ApplicationStatusGroup g) {
     final lang = localeNotifier.value.languageCode;
     return switch (g) {
-      ApplicationStatusGroup.sent => _ApplicationsStrings.submitted(lang),
-      ApplicationStatusGroup.received => _ApplicationsStrings.received(lang),
-      ApplicationStatusGroup.inProgress => _ApplicationsStrings.inProgress(lang),
-      ApplicationStatusGroup.completed => _ApplicationsStrings.ready(lang),
-      ApplicationStatusGroup.cancelled => _ApplicationsStrings.cancelled(lang),
+      ApplicationStatusGroup.sent => tr(Locale(lang), 'applications.submitted'),
+      ApplicationStatusGroup.received => tr(Locale(lang), 'applications.received'),
+      ApplicationStatusGroup.inProgress => tr(Locale(lang), 'applications.in_progress'),
+      ApplicationStatusGroup.completed => tr(Locale(lang), 'applications.ready'),
+      ApplicationStatusGroup.cancelled => tr(Locale(lang), 'applications.cancelled'),
     };
   }
 
@@ -638,34 +639,34 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
     final lang = localeNotifier.value.languageCode;
     final group = _photogrammetryStatusToGroup(j.status);
     final photoCountValue =
-        '${j.photoCount} ${_ApplicationsStrings.pcsUnit(lang)}';
+        '${j.photoCount} ${tr(Locale(lang), 'applications.unit.pcs')}';
     return ApplicationItem(
       id: 'photo_${j.id}',
       orderNo: j.id,
       serviceId: 'kad_3d',
-      serviceLabel: _ApplicationsStrings.serviceLabel(lang, '3d_scan'),
+      serviceLabel: tr(Locale(lang), 'applications.service.3d_scan'),
       statusGroup: group,
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
-      addressLabel: _ApplicationsStrings.photoCount(lang),
+      addressLabel: tr(Locale(lang), 'applications.photo_count'),
       addressValue: photoCountValue,
-      dateLabel: _ApplicationsStrings.submitted(lang),
+      dateLabel: tr(Locale(lang), 'applications.submitted'),
       dateValue: _formatDateTime(j.updatedAt),
       typeLabel: j.isCompleted
-          ? _ApplicationsStrings.model3d(lang)
+          ? tr(Locale(lang), 'applications.model_3d')
           : (j.status == 'failed'
-              ? _ApplicationsStrings.error(lang)
-              : _ApplicationsStrings.status(lang)),
+              ? tr(Locale(lang), 'applications.error')
+              : tr(Locale(lang), 'applications.status')),
       typeValue: j.isCompleted
-          ? _ApplicationsStrings.ready(lang)
+          ? tr(Locale(lang), 'applications.ready')
           : (j.errorMessage ?? _photogrammetryStatusLabel(j.status)),
       detailRows: [
-        (_ApplicationsStrings.photoCount(lang), photoCountValue),
-        (_ApplicationsStrings.status(lang), _photogrammetryStatusLabel(j.status)),
+        (tr(Locale(lang), 'applications.photo_count'), photoCountValue),
+        (tr(Locale(lang), 'applications.status'), _photogrammetryStatusLabel(j.status)),
         if (j.errorMessage != null)
-          (_ApplicationsStrings.error(lang), j.errorMessage!),
-        (_ApplicationsStrings.submitted(lang), _formatDateTime(j.createdAt)),
-        (_ApplicationsStrings.updatedAt(lang), _formatDateTime(j.updatedAt)),
+          (tr(Locale(lang), 'applications.error'), j.errorMessage!),
+        (tr(Locale(lang), 'applications.submitted'), _formatDateTime(j.createdAt)),
+        (tr(Locale(lang), 'applications.updated_at'), _formatDateTime(j.updatedAt)),
       ],
       // Completed photogrammetry jobs have a downloadable 3D model.
       hasDeliverable: j.isCompleted,
@@ -684,11 +685,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
   static String _photogrammetryStatusLabel(String status) {
     final lang = localeNotifier.value.languageCode;
     return switch (status) {
-      'pending' => _ApplicationsStrings.queued(lang),
-      'processing' => _ApplicationsStrings.processing(lang),
-      'completed' => _ApplicationsStrings.ready(lang),
-      'failed' => _ApplicationsStrings.error(lang),
-      'cancelled' => _ApplicationsStrings.cancelled(lang),
+      'pending' => tr(Locale(lang), 'applications.queued'),
+      'processing' => tr(Locale(lang), 'applications.processing'),
+      'completed' => tr(Locale(lang), 'applications.ready'),
+      'failed' => tr(Locale(lang), 'applications.error'),
+      'cancelled' => tr(Locale(lang), 'applications.cancelled'),
       _ => status,
     };
   }
@@ -701,7 +702,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       if (i > 0 && (s.length - i) % 3 == 0) buf.write(' ');
       buf.write(s[i]);
     }
-    return '${buf.toString()} ${_ApplicationsStrings.soumUnit(lang)}';
+    return '${buf.toString()} ${tr(Locale(lang), 'applications.unit.soum')}';
   }
 
 
@@ -917,7 +918,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                           if (widget.lockedServiceId != null)
                             AppHeaderBack(
                               title: widget.titleOverride ??
-                                  _ApplicationsStrings.title(locale),
+                                  tr(locale, 'applications.title'),
                             )
                           else ...[
                             _Title(locale: locale),
@@ -1311,7 +1312,7 @@ class _EmptyState extends StatelessWidget {
     if (!filtered) {
       return Center(
         child: Text(
-          _ApplicationsStrings.empty(locale),
+          tr(locale, 'applications.empty'),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w500,
@@ -1331,7 +1332,7 @@ class _EmptyState extends StatelessWidget {
                 size: 34, color: ColorTokens.secondaryText(context)),
             const SizedBox(height: 10),
             Text(
-              _ApplicationsStrings.noResults(lang),
+              tr(Locale(lang), 'applications.no_results'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -1345,7 +1346,7 @@ class _EmptyState extends StatelessWidget {
               TextButton(
                 onPressed: hapticTap(onReset),
                 child: Text(
-                  _ApplicationsStrings.reset(lang),
+                  tr(Locale(lang), 'applications.reset'),
                   style: const TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -1382,7 +1383,7 @@ class _ErrorState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              _ApplicationsStrings.loadFailed(locale),
+              tr(locale, 'applications.load_failed'),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -1415,7 +1416,7 @@ class _Title extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      _ApplicationsStrings.title(locale),
+      tr(locale, 'applications.title'),
       style: TextStyle(
         fontFamily: 'MTSCompact',
         fontWeight: FontWeight.w700,
@@ -1445,7 +1446,7 @@ class _ServiceChips extends StatelessWidget {
           .map(
             (chip) => MarketCategory(
               id: chip.id,
-              label: _ApplicationsStrings.serviceChip(locale, chip.id),
+              label: tr(locale, 'applications.chip.${chip.id}'),
             ),
           )
           .toList(growable: false),
@@ -1514,7 +1515,7 @@ class _SearchFilterBar extends StatelessWidget {
                     decoration: InputDecoration(
                       isCollapsed: true,
                       border: InputBorder.none,
-                      hintText: _ApplicationsStrings.searchHint(lang),
+                      hintText: tr(Locale(lang), 'applications.search_hint'),
                       hintStyle: TextStyle(
                         fontFamily: 'MTSText',
                         fontSize: 15,
@@ -1647,7 +1648,7 @@ class _ActiveFilters extends StatelessWidget {
               alignment: Alignment.center,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Text(
-                _ApplicationsStrings.reset(lang),
+                tr(Locale(lang), 'applications.reset'),
                 style: TextStyle(
                   fontFamily: 'MTSText',
                   fontSize: 13,
@@ -1718,8 +1719,8 @@ String _fullDate(DateTime d) =>
 
 String _dateRangeLabel(String lang, DateTime? from, DateTime? to) {
   if (from != null && to != null) return '${_shortDate(from)} – ${_shortDate(to)}';
-  if (from != null) return '${_ApplicationsStrings.from(lang)} ${_shortDate(from)}';
-  if (to != null) return '${_ApplicationsStrings.to(lang)} ${_shortDate(to)}';
+  if (from != null) return '${tr(Locale(lang), 'applications.from')} ${_shortDate(from)}';
+  if (to != null) return '${tr(Locale(lang), 'applications.to')} ${_shortDate(to)}';
   return '';
 }
 
@@ -1816,7 +1817,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     TextButton(
                       onPressed: hapticTap(() => Navigator.of(ctx).pop()),
                       child: Text(
-                        _ApplicationsStrings.cancelBtn(lang),
+                        tr(Locale(lang), 'applications.cancel'),
                         style: TextStyle(
                           fontFamily: 'MTSText',
                           fontSize: 15,
@@ -1826,7 +1827,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     ),
                     Expanded(
                       child: Text(
-                        _ApplicationsStrings.selectDate(lang),
+                        tr(Locale(lang), 'applications.select_date'),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
@@ -1839,7 +1840,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     TextButton(
                       onPressed: hapticTap(() => Navigator.of(ctx).pop(temp)),
                       child: Text(
-                        _ApplicationsStrings.done(lang),
+                        tr(Locale(lang), 'applications.done'),
                         style: const TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w800,
@@ -1905,7 +1906,7 @@ class _FilterSheetState extends State<_FilterSheet> {
           ),
           const SizedBox(height: 16),
           Text(
-            _ApplicationsStrings.filters(lang),
+            tr(Locale(lang), 'applications.filters'),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w900,
@@ -1916,7 +1917,7 @@ class _FilterSheetState extends State<_FilterSheet> {
           const SizedBox(height: 18),
 
           // Holat
-          _SheetLabel(text: _ApplicationsStrings.status(lang)),
+          _SheetLabel(text: tr(Locale(lang), 'applications.status')),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
@@ -1935,24 +1936,24 @@ class _FilterSheetState extends State<_FilterSheet> {
           const SizedBox(height: 22),
 
           // Sana oralig'i
-          _SheetLabel(text: _ApplicationsStrings.dateRange(lang)),
+          _SheetLabel(text: tr(Locale(lang), 'applications.date_range')),
           const SizedBox(height: 10),
           Row(
             children: [
               Expanded(
                 child: _DateField(
-                  label: _ApplicationsStrings.from(lang),
+                  label: tr(Locale(lang), 'applications.from'),
                   value: _from == null ? null : _fullDate(_from!),
-                  placeholder: _ApplicationsStrings.anyDate(lang),
+                  placeholder: tr(Locale(lang), 'applications.any_date'),
                   onTap: () => _pick(isFrom: true),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: _DateField(
-                  label: _ApplicationsStrings.to(lang),
+                  label: tr(Locale(lang), 'applications.to'),
                   value: _to == null ? null : _fullDate(_to!),
-                  placeholder: _ApplicationsStrings.anyDate(lang),
+                  placeholder: tr(Locale(lang), 'applications.any_date'),
                   onTap: () => _pick(isFrom: false),
                 ),
               ),
@@ -1977,7 +1978,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     ),
                   ),
                   child: Text(
-                    _ApplicationsStrings.reset(lang),
+                    tr(Locale(lang), 'applications.reset'),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -2001,7 +2002,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     ),
                   ),
                   child: Text(
-                    _ApplicationsStrings.apply(lang),
+                    tr(Locale(lang), 'applications.apply'),
                     style: const TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -2149,341 +2150,6 @@ class _DateField extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ApplicationsStrings {
-  const _ApplicationsStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Заявки',
-    'en' => 'Applications',
-    _ => 'Arizalar',
-  };
-
-  static String empty(Locale l) => switch (l.languageCode) {
-    'ru' => 'Заявки не найдены',
-    'en' => 'No applications found',
-    _ => 'Arizalar topilmadi',
-  };
-
-  static String loadFailed(Locale l) => switch (l.languageCode) {
-    'ru' => 'Не удалось загрузить',
-    'en' => 'Failed to load',
-    _ => 'Yuklab boʻlmadi',
-  };
-
-  static String serviceChip(Locale l, String id) => switch (id) {
-    'all' => switch (l.languageCode) {
-      'ru' => 'Все',
-      'en' => 'All',
-      _ => 'Barchasi',
-    },
-    'kad_3d' => switch (l.languageCode) {
-      'ru' => '3D кадастр',
-      'en' => '3D cadastre',
-      _ => '3D Kadastr',
-    },
-    'ai_eval' => switch (l.languageCode) {
-      'ru' => 'AI оценка',
-      'en' => 'AI valuation',
-      _ => 'AI Baholash',
-    },
-    'calc' => switch (l.languageCode) {
-      'ru' => 'Калькулятор',
-      'en' => 'Calculator',
-      _ => 'Kalkulyator',
-    },
-    _ => id,
-  };
-
-  // ---------------------------------------------------------------------------
-  // Static mapper helpers (no BuildContext available → take a language code).
-  // These mirror the switch (l.languageCode) style above. Uzbek = default.
-  // ---------------------------------------------------------------------------
-
-  static String serviceLabel(String lang, String serviceId) =>
-      switch (serviceId) {
-        'arch' => switch (lang) {
-          'ru' => 'Архитектура',
-          'en' => 'Architecture',
-          _ => 'Arxitektura',
-        },
-        'design' => switch (lang) {
-          'ru' => 'Дизайн',
-          'en' => 'Design',
-          _ => 'Dizayn',
-        },
-        'ai_eval' => switch (lang) {
-          'ru' => 'AI оценка',
-          'en' => 'AI valuation',
-          _ => 'AI Baholash',
-        },
-        'calc' => switch (lang) {
-          'ru' => 'Калькулятор',
-          'en' => 'Calculator',
-          _ => 'Kalkulyator',
-        },
-        'kad_3d' => switch (lang) {
-          'ru' => '3D кадастр',
-          'en' => '3D cadastre',
-          _ => '3D Kadastr',
-        },
-        // photogrammetry reuses 'kad_3d' serviceId but has its own label
-        '3d_scan' => switch (lang) {
-          'ru' => '3D скан',
-          'en' => '3D scan',
-          _ => '3D Skan',
-        },
-        _ => serviceId,
-      };
-
-  static String address(String lang) => switch (lang) {
-    'ru' => 'Адрес',
-    'en' => 'Address',
-    _ => 'Manzil',
-  };
-
-  static String estimatedValue(String lang) => switch (lang) {
-    'ru' => 'Примерная стоимость',
-    'en' => 'Estimated value',
-    _ => 'Taxminiy qiymat',
-  };
-
-  static String cadastreNumber(String lang) => switch (lang) {
-    'ru' => 'Кадастровый номер',
-    'en' => 'Cadastre number',
-    _ => 'Kadastr raqami',
-  };
-
-  static String cadastre(String lang) => switch (lang) {
-    'ru' => 'Кадастр',
-    'en' => 'Cadastre',
-    _ => 'Kadastr',
-  };
-
-  static String type(String lang) => switch (lang) {
-    'ru' => 'Тип',
-    'en' => 'Type',
-    _ => 'Turi',
-  };
-
-  static String photoCount(String lang) => switch (lang) {
-    'ru' => 'Кол-во фото',
-    'en' => 'Photo count',
-    _ => 'Foto soni',
-  };
-
-  static String applicationDate(String lang) => switch (lang) {
-    'ru' => 'Дата заявки',
-    'en' => 'Application date',
-    _ => 'Ariza sanasi',
-  };
-
-  static String updatedAt(String lang) => switch (lang) {
-    'ru' => 'Обновлено',
-    'en' => 'Updated',
-    _ => 'Yangilangan',
-  };
-
-  static String submitted(String lang) => switch (lang) {
-    'ru' => 'Отправлено',
-    'en' => 'Submitted',
-    _ => 'Yuborilgan',
-  };
-
-  static String received(String lang) => switch (lang) {
-    'ru' => 'Принято',
-    'en' => 'Received',
-    _ => 'Qabul qilindi',
-  };
-
-  static String status(String lang) => switch (lang) {
-    'ru' => 'Статус',
-    'en' => 'Status',
-    _ => 'Holat',
-  };
-
-  static String searchHint(String lang) => switch (lang) {
-    'ru' => 'Поиск (№, адрес)',
-    'en' => 'Search (#, address)',
-    _ => 'Qidirish (№, manzil)',
-  };
-
-  static String filters(String lang) => switch (lang) {
-    'ru' => 'Фильтры',
-    'en' => 'Filters',
-    _ => 'Filtrlar',
-  };
-
-  static String dateRange(String lang) => switch (lang) {
-    'ru' => 'Диапазон дат',
-    'en' => 'Date range',
-    _ => 'Sana oralig\'i',
-  };
-
-  static String from(String lang) => switch (lang) {
-    'ru' => 'С',
-    'en' => 'From',
-    _ => 'Dan',
-  };
-
-  static String to(String lang) => switch (lang) {
-    'ru' => 'По',
-    'en' => 'To',
-    _ => 'Gacha',
-  };
-
-  static String anyDate(String lang) => switch (lang) {
-    'ru' => 'Любая',
-    'en' => 'Any',
-    _ => 'Har qanday',
-  };
-
-  static String apply(String lang) => switch (lang) {
-    'ru' => 'Применить',
-    'en' => 'Apply',
-    _ => 'Qo\'llash',
-  };
-
-  static String selectDate(String lang) => switch (lang) {
-    'ru' => 'Выберите дату',
-    'en' => 'Select date',
-    _ => 'Sanani tanlang',
-  };
-
-  static String done(String lang) => switch (lang) {
-    'ru' => 'Готово',
-    'en' => 'Done',
-    _ => 'Tayyor',
-  };
-
-  static String cancelBtn(String lang) => switch (lang) {
-    'ru' => 'Отмена',
-    'en' => 'Cancel',
-    _ => 'Bekor qilish',
-  };
-
-  static String reset(String lang) => switch (lang) {
-    'ru' => 'Сбросить',
-    'en' => 'Reset',
-    _ => 'Tozalash',
-  };
-
-  static String noResults(String lang) => switch (lang) {
-    'ru' => 'Ничего не найдено',
-    'en' => 'Nothing found',
-    _ => 'Hech narsa topilmadi',
-  };
-
-  static String price(String lang) => switch (lang) {
-    'ru' => 'Цена',
-    'en' => 'Price',
-    _ => 'Narx',
-  };
-
-  static String objectType(String lang) => switch (lang) {
-    'ru' => 'Тип объекта',
-    'en' => 'Object type',
-    _ => 'Obyekt turi',
-  };
-
-  static String model3d(String lang) => switch (lang) {
-    'ru' => '3D модель',
-    'en' => '3D model',
-    _ => '3D model',
-  };
-
-  static String error(String lang) => switch (lang) {
-    'ru' => 'Ошибка',
-    'en' => 'Error',
-    _ => 'Xato',
-  };
-
-  static String inProgress(String lang) => switch (lang) {
-    'ru' => 'В процессе',
-    'en' => 'In progress',
-    _ => 'Jarayonda',
-  };
-
-  static String ready(String lang) => switch (lang) {
-    'ru' => 'Готово',
-    'en' => 'Ready',
-    _ => 'Tayyor',
-  };
-
-  static String cancelled(String lang) => switch (lang) {
-    'ru' => 'Отменено',
-    'en' => 'Cancelled',
-    _ => 'Bekor qilingan',
-  };
-
-  static String residential(String lang) => switch (lang) {
-    'ru' => 'Жилое',
-    'en' => 'Residential',
-    _ => 'Turar joy',
-  };
-
-  static String nonResidential(String lang) => switch (lang) {
-    'ru' => 'Нежилое',
-    'en' => 'Non-residential',
-    _ => 'Noturar joy',
-  };
-
-  static String warehouse(String lang) => switch (lang) {
-    'ru' => 'Склад',
-    'en' => 'Warehouse',
-    _ => 'Ombor',
-  };
-
-  static String industrial(String lang) => switch (lang) {
-    'ru' => 'Промышленное',
-    'en' => 'Industrial',
-    _ => 'Sanoat',
-  };
-
-  static String queued(String lang) => switch (lang) {
-    'ru' => 'В очереди',
-    'en' => 'Queued',
-    _ => 'Navbatda',
-  };
-
-  static String processing(String lang) => switch (lang) {
-    'ru' => 'Обрабатывается',
-    'en' => 'Processing',
-    _ => 'Ishlamoqda',
-  };
-
-  static String viewResult(String lang) => switch (lang) {
-    'ru' => 'Посмотреть результат',
-    'en' => 'View result',
-    _ => 'Natijani ko‘rish',
-  };
-
-  static String draft(String lang) => switch (lang) {
-    'ru' => 'Черновик',
-    'en' => 'Draft',
-    _ => 'Qoralama',
-  };
-
-  static String resume(String lang) => switch (lang) {
-    'ru' => 'Продолжить',
-    'en' => 'Continue',
-    _ => 'Davom etish',
-  };
-
-  /// Currency-unit suffix word only ("so'm" / "сум" / "soum").
-  static String soumUnit(String lang) => switch (lang) {
-    'ru' => 'сум',
-    'en' => 'soum',
-    _ => 'so\'m',
-  };
-
-  /// Quantity-unit suffix word only ("ta" / "шт" / "pcs").
-  static String pcsUnit(String lang) => switch (lang) {
-    'ru' => 'шт',
-    'en' => 'pcs',
-    _ => 'ta',
-  };
 }
 
 /// Kartaning pastki yashil tugmasi — "Natijani ko'rish" (completed) yoki
@@ -2662,13 +2328,13 @@ class _ApplicationCard extends StatelessWidget {
               if (item.isDraft) ...[
                 const SizedBox(height: 14),
                 _CardActionButton(
-                  label: _ApplicationsStrings.resume(lang),
+                  label: tr(Locale(lang), 'applications.resume'),
                   onTap: onResume ?? onTap,
                 ),
               ] else if (showResultButton) ...[
                 const SizedBox(height: 14),
                 _CardActionButton(
-                  label: _ApplicationsStrings.viewResult(lang),
+                  label: tr(Locale(lang), 'applications.view_result'),
                   onTap: onTap,
                 ),
               ],
@@ -2781,7 +2447,7 @@ class _StatusStyle {
 
   /// DRAFT (tugallanmagan) ariza badge'i — "Qoralama", amber.
   static _StatusStyle draft(String lang) => _StatusStyle(
-        label: _ApplicationsStrings.draft(lang),
+        label: tr(Locale(lang), 'applications.draft'),
         bgColor: const Color(0xFFFBEFD6),
         fgColor: const Color(0xFFC98A00),
         iconAsset: 'assets/icons/application-pending.svg',
@@ -2790,31 +2456,31 @@ class _StatusStyle {
   static _StatusStyle fromGroup(ApplicationStatusGroup group, String lang) =>
       switch (group) {
         ApplicationStatusGroup.sent => _StatusStyle(
-          label: _ApplicationsStrings.submitted(lang),
+          label: tr(Locale(lang), 'applications.submitted'),
           bgColor: const Color(0xFFE2ECFD),
           fgColor: const Color(0xFF2B7FFF),
           iconAsset: 'assets/icons/application-pending.svg',
         ),
         ApplicationStatusGroup.received => _StatusStyle(
-          label: _ApplicationsStrings.received(lang),
+          label: tr(Locale(lang), 'applications.received'),
           bgColor: const Color(0xFFFBEFD6),
           fgColor: const Color(0xFFC98A00),
           iconAsset: 'assets/icons/application-pending.svg',
         ),
         ApplicationStatusGroup.inProgress => _StatusStyle(
-          label: _ApplicationsStrings.inProgress(lang),
+          label: tr(Locale(lang), 'applications.in_progress'),
           bgColor: const Color(0xFFFCEDE3),
           fgColor: const Color(0xFFF27523),
           iconAsset: 'assets/icons/application-pending.svg',
         ),
         ApplicationStatusGroup.completed => _StatusStyle(
-          label: _ApplicationsStrings.ready(lang),
+          label: tr(Locale(lang), 'applications.ready'),
           bgColor: const Color(0xFFD5F3E0),
           fgColor: const Color(0xFF00B447),
           iconAsset: 'assets/icons/application-ready.svg',
         ),
         ApplicationStatusGroup.cancelled => _StatusStyle(
-          label: _ApplicationsStrings.cancelled(lang),
+          label: tr(Locale(lang), 'applications.cancelled'),
           bgColor: const Color(0xFFF8E1E1),
           fgColor: const Color(0xFFEF4444),
           iconAsset: 'assets/icons/application-cancelled.svg',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../models/architecture_order_draft.dart';
@@ -58,7 +59,7 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
       MaterialPageRoute<void>(
         builder: (ctx) => OnlineCalculatorResultScreen(
           result: result,
-          placeOrderLabel: _Strings.placeTzOrder(locale),
+          placeOrderLabel: tr(locale, 'services.calc.submit_order'),
           onPlaceOrder: () {
             final draft = _draftFromCalculator(selected, area);
             // Kalkulyatorda hisoblangan narxni saqlaymiz — adminka "Итого".
@@ -129,8 +130,8 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: _Strings.title(locale),
-                        subtitle: _Strings.subtitle(locale),
+                        title: tr(locale, 'services.calc.arxitektura.title'),
+                        subtitle: tr(locale, 'services.calc.arxitektura.subtitle'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -139,7 +140,7 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
                           CalculatorSectionLabel(
-                            text: _Strings.chooseObject(locale),
+                            text: tr(locale, 'services.calc.choose_object'),
                           ),
                           const SizedBox(height: 12),
                           for (final t in ArxitekturaObject.values) ...[
@@ -153,8 +154,8 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
                           ],
                           const SizedBox(height: 14),
                           CalculatorField(
-                            label: _Strings.areaLabel(locale),
-                            placeholder: _Strings.areaPlaceholder(locale),
+                            label: tr(locale, 'services.calc.arxitektura.area_label'),
+                            placeholder: tr(locale, 'services.calc.enter_area'),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -164,7 +165,7 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _Strings.calculate(locale),
+                        label: tr(locale, 'services.calc.calculate'),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -178,58 +179,6 @@ class _ArxitekturaFormScreenState extends State<ArxitekturaFormScreen> {
       ),
     );
   }
-}
-
-class _Strings {
-  const _Strings._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String title(Locale l) => _pick(
-        l,
-        'Arxitektura va qurilish',
-        'Архитектура и строительство',
-        'Architecture & construction',
-      );
-
-  static String subtitle(Locale l) => _pick(
-        l,
-        'Loyiha narxini hisoblang',
-        'Рассчитайте стоимость проекта',
-        'Calculate project cost',
-      );
-
-  static String chooseObject(Locale l) => _pick(
-        l,
-        "Ob'ekt turini tanlang",
-        'Выберите тип объекта',
-        'Choose object type',
-      );
-
-  static String areaLabel(Locale l) => _pick(
-        l,
-        'Qurilish hajmi',
-        'Объём строительства',
-        'Construction volume',
-      );
-
-  static String areaPlaceholder(Locale l) => _pick(
-        l,
-        'Maydonni kiriting',
-        'Введите площадь',
-        'Enter area',
-      );
-
-  static String calculate(Locale l) =>
-      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
-
-  static String placeTzOrder(Locale l) => _pick(
-        l,
-        'Ariza topshirish',
-        'Подать заявку',
-        'Submit application',
-      );
 }
 
 class _ObjectTile extends StatelessWidget {

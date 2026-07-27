@@ -177,11 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
         child: _ImageFab(
           asset: 'assets/icons/ai-phone-icon.png',
           onTap: hapticTap(_callSupport),
-          tooltip: switch (widget.locale.languageCode) {
-            'ru' => 'Позвонить',
-            'en' => 'Call',
-            _ => 'Qo\'ng\'iroq',
-          },
+          tooltip: tr(widget.locale, 'home.fab.call'),
         ),
       ),
       body: Stack(
@@ -270,11 +266,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                tooltip: switch (widget.locale.languageCode) {
-                  'ru' => 'Помощник',
-                  'en' => 'Assistant',
-                  _ => 'Yordamchi',
-                },
+                tooltip: tr(widget.locale, 'home.fab.assistant'),
               ),
             ),
           ),
@@ -284,13 +276,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // Keyed so the panel can reword it; "home.see_all" beside it already is.
-  static String _sectionTitle(Locale l) => tr(
-    l,
-    'home.section.top_models',
-    uz: 'Tayyor qurilish loyihalari',
-    ru: 'Готовые строительные проекты',
-    en: 'Ready construction projects',
-  );
+  static String _sectionTitle(Locale l) => tr(l, 'home.section.top_models');
 }
 
 /// A floating action button whose whole face is a supplied PNG (the icon
@@ -586,66 +572,23 @@ class _CardsGrid extends StatelessWidget {
 class _CardStrings {
   const _CardStrings._();
 
-  static String _pick(Locale l, String key, String uz, String ru, String en) =>
-      tr(l, key, uz: uz, ru: ru, en: en);
+  static String kadastr3d(Locale l) => tr(l, 'home.card.kadastr3d');
 
-  static String kadastr3d(Locale l) => _pick(
-    l,
-    'home.card.kadastr3d',
-    '3D kadastr',
-    '3D кадастр',
-    '3D cadastre',
-  );
+  static String kadastr3dSub(Locale l) => tr(l, 'home.card.kadastr3d_sub');
 
-  static String kadastr3dSub(Locale l) => _pick(
-    l,
-    'home.card.kadastr3d_sub',
-    'Xizmatlar narxini hisoblang va ariza qoldiring.',
-    'Рассчитайте стоимость услуг и оставьте заявку.',
-    'Calculate service prices and submit an application.',
-  );
+  static String aiValuation(Locale l) => tr(l, 'home.card.ai_valuation');
 
-  // Fallbacks track what the admin panel already serves. They only surface
-  // before the i18n bundle lands (first launch, offline), and drifting from
-  // the panel means the old wording flashes on exactly those launches.
-  static String aiValuation(Locale l) => _pick(
-    l,
-    'home.card.ai_valuation',
-    'Baholash Ai',
-    'Оценка Ai',
-    'Valuation Ai',
-  );
+  static String aiValuationSub(Locale l) => tr(l, 'home.card.ai_valuation_sub');
 
-  static String aiValuationSub(Locale l) => _pick(
-    l,
-    'home.card.ai_valuation_sub',
-    'Sun\'iy intellekt yordamida ko\'chmas mulk qiymatini aniqlash.',
-    'Оценка стоимости недвижимости с помощью ИИ.',
-    'Real estate valuation powered by AI.',
-  );
+  static String calculator(Locale l) => tr(l, 'home.card.calculator');
 
-  static String calculator(Locale l) => _pick(
-    l,
-    'home.card.calculator',
-    'Calculator Ai',
-    'Калькулятор Ai',
-    'Calculator Ai',
-  );
-
-  static String calculatorSub(Locale l) => _pick(
-    l,
-    'home.card.calculator_sub',
-    'Arxitektura, dizayn, qurilish narxlarini hisoblash.',
-    'Расчёт стоимости архитектуры, дизайна и строительства.',
-    'Calculate architecture, design and construction costs.',
-  );
+  static String calculatorSub(Locale l) => tr(l, 'home.card.calculator_sub');
 }
 
 class _HomeScreenStrings {
   const _HomeScreenStrings._();
 
-  static String seeAll(Locale l) =>
-      tr(l, 'home.see_all', uz: 'Barchasi →', ru: 'Все →', en: 'See all →');
+  static String seeAll(Locale l) => tr(l, 'home.see_all');
 }
 
 /// Bottom-of-feed "Call center" block. Revealed only when scrolled to the very
@@ -663,37 +606,22 @@ class _CallCenterBlock extends StatelessWidget {
 
   // New key (not the old home.call_center) so the backend i18n override for
   // that key — "Call markaz" — doesn't win over this "Aloqa markazi" default.
-  static String _label(Locale l) => tr(
-    l,
-    'home.contact_center',
-    uz: 'Aloqa markazi',
-    ru: 'Контакт-центр',
-    en: 'Contact center',
-  );
+  static String _label(Locale l) => tr(l, 'home.contact_center');
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final surface = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.white;
     final textColor = isDark ? Colors.white : AppColors.textBlack;
 
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: (isDark ? Colors.white : AppColors.callGreen)
-                .withValues(alpha: isDark ? 0.08 : 0.2),
-          ),
-        ),
-        // Horizontal: glossy green handset orb (same material as the home FABs)
-        // + "Aloqa markazi" / "24/7", left-aligned like a contact row.
+        // No card bg/border — the green orb + "Aloqa markazi / 24/7" sit
+        // centred directly on the feed background.
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Image.asset(
               'assets/icons/ai-phone-icon.png',
@@ -716,7 +644,7 @@ class _CallCenterBlock extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  '24/7',
+                  tr(locale, 'home.contact_center.hours'),
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

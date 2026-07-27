@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -60,9 +61,9 @@ class _MyListingsScreenState extends State<MyListingsScreen>
                       const SizedBox(height: 16),
                       if (items.isEmpty)
                         _EmptyState(
-                          title: _S.emptyTitle(locale),
-                          message: _S.emptyMessage(locale),
-                          ctaLabel: _S.create(locale),
+                          title: tr(locale, 'listings.empty_title'),
+                          message: tr(locale, 'listings.empty_message'),
+                          ctaLabel: tr(locale, 'listings.create'),
                         )
                       else
                         for (var i = 0; i < items.length; i++) ...[
@@ -100,7 +101,7 @@ class _Header extends StatelessWidget {
       children: [
         Expanded(
           child: Text(
-            _S.title(locale),
+            tr(locale, 'listings.title'),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
@@ -123,7 +124,7 @@ class _Header extends StatelessWidget {
                   const Icon(Icons.add_rounded, color: Colors.white, size: 18),
                   const SizedBox(width: 4),
                   Text(
-                    _S.create(locale),
+                    tr(locale, 'listings.create'),
                     style: const TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -298,15 +299,15 @@ class _StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final (text, color) = switch (status) {
       ListingStatus.moderation => (
-        _S.statusModeration(locale),
+        tr(locale, 'listings.status.moderation'),
         const Color(0xFFF59E0B),
       ),
       ListingStatus.approved => (
-        _S.statusApproved(locale),
+        tr(locale, 'listings.status.approved'),
         const Color(0xFF10B981),
       ),
       ListingStatus.rejected => (
-        _S.statusRejected(locale),
+        tr(locale, 'listings.status.rejected'),
         const Color(0xFFEF4444),
       ),
     };
@@ -509,44 +510,4 @@ class _EmptyState extends StatelessWidget {
       ),
     );
   }
-}
-
-class _S {
-  const _S._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мои объявления',
-    'en' => 'My listings',
-    _ => 'Mening e‘lonlarim',
-  };
-  static String create(Locale l) => switch (l.languageCode) {
-    'ru' => 'Создать',
-    'en' => 'Create',
-    _ => 'Yangi',
-  };
-  static String statusModeration(Locale l) => switch (l.languageCode) {
-    'ru' => 'На модерации',
-    'en' => 'In moderation',
-    _ => 'Moderatsiyada',
-  };
-  static String statusApproved(Locale l) => switch (l.languageCode) {
-    'ru' => 'Одобрено',
-    'en' => 'Approved',
-    _ => 'Tasdiqlangan',
-  };
-  static String statusRejected(Locale l) => switch (l.languageCode) {
-    'ru' => 'Отклонено',
-    'en' => 'Rejected',
-    _ => 'Rad etilgan',
-  };
-  static String emptyTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Объявлений пока нет',
-    'en' => 'No listings yet',
-    _ => 'Hali e‘lon yo‘q',
-  };
-  static String emptyMessage(Locale l) => switch (l.languageCode) {
-    'ru' => 'Создайте первое 3D объявление на основе ваших сканов.',
-    'en' => 'Create your first 3D listing from your scans.',
-    _ => 'Skanlaringiz asosida birinchi 3D e‘lonni yarating.',
-  };
 }

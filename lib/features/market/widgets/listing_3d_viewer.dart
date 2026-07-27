@@ -165,7 +165,7 @@ class _ErrorState extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
-          '${tr(localeNotifier.value, 'market.viewer.load_error', uz: '3D modelni yuklab bo‘lmadi', ru: 'Не удалось загрузить 3D-модель', en: 'Could not load the 3D model')}:\n$error',
+          '${tr(localeNotifier.value, 'market.viewer.load_error')}:\n$error',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'MTSCompact',

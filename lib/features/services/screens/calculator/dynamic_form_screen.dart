@@ -634,11 +634,7 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
         return '300000000';
     }
     if (f.key == 'customer_name') {
-      return switch (l.languageCode) {
-        'ru' => 'Иван Иванов',
-        'en' => 'John Smith',
-        _ => 'Asliddin Hamrayev',
-      };
+      return tr(l, 'services.calc.dynamic.customer_name_hint');
     }
     return '';
   }
@@ -682,46 +678,14 @@ class _DynamicFormScreenState extends State<DynamicFormScreen> {
       : const Color(0xFF6C7278);
 
   // ── i18n ──────────────────────────────────────────────────────────────
-  String _continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Продолжить',
-    'en' => 'Continue',
-    _ => 'Davom etish',
-  };
-  String _submitLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Отправить',
-    'en' => 'Submit',
-    _ => 'Yuborish',
-  };
-  String _req(Locale l) => switch (l.languageCode) {
-    'ru' => 'обязательно',
-    'en' => 'required',
-    _ => 'majburiy',
-  };
-  String _phoneErr(Locale l) => switch (l.languageCode) {
-    'ru' => 'Телефон — введите корректный номер, напр. +998 90 123 45 67',
-    'en' => 'Phone — enter a valid number, e.g. +998 90 123 45 67',
-    _ => 'Telefon — to\'g\'ri raqam kiriting, masalan +998 90 123 45 67',
-  };
-  String _emailErr(Locale l) => switch (l.languageCode) {
-    'ru' => 'Email — введите корректный адрес',
-    'en' => 'Email — enter a valid address',
-    _ => 'Email — to\'g\'ri manzil kiriting',
-  };
-  String _tinErr(Locale l) => switch (l.languageCode) {
-    'ru' => 'СТИР/ИНН — 9 или 14 цифр',
-    'en' => 'TIN — 9 or 14 digits',
-    _ => 'STIR/INN — 9 yoki 14 raqam',
-  };
-  String _sent(Locale l) => switch (l.languageCode) {
-    'ru' => 'Заявка отправлена',
-    'en' => 'Order submitted',
-    _ => 'Ariza yuborildi',
-  };
-  String _loginFirst(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сначала войдите в систему',
-    'en' => 'Please sign in first',
-    _ => 'Avval tizimga kiring',
-  };
+  String _continueLabel(Locale l) => tr(l, 'services.calc.dynamic.continue');
+  String _submitLabel(Locale l) => tr(l, 'services.calc.dynamic.submit');
+  String _req(Locale l) => tr(l, 'services.calc.dynamic.required');
+  String _phoneErr(Locale l) => tr(l, 'services.calc.dynamic.phone_error');
+  String _emailErr(Locale l) => tr(l, 'services.calc.dynamic.email_error');
+  String _tinErr(Locale l) => tr(l, 'services.calc.dynamic.tin_error');
+  String _sent(Locale l) => tr(l, 'services.calc.dynamic.sent');
+  String _loginFirst(Locale l) => tr(l, 'services.calc.dynamic.login_first');
 }
 
 class _ToggleRow extends StatelessWidget {
@@ -912,15 +876,8 @@ class _RoomsField extends StatelessWidget {
     );
   }
 
-  String _nameHint(Locale l) =>
-      tr(l, 'common.room_name_short', uz: 'Xona', ru: 'Помещение', en: 'Room');
-  String _addRoom(Locale l) => tr(
-    l,
-    'dynamic_form.add_room',
-    uz: 'Xona qo\'shish',
-    ru: 'Добавить помещение',
-    en: 'Add room',
-  );
+  String _nameHint(Locale l) => tr(l, 'common.room_name_short');
+  String _addRoom(Locale l) => tr(l, 'dynamic_form.add_room');
 }
 
 /// Login'dagi telefon formatini (faqat O'zbekiston: `+998` prefiks +

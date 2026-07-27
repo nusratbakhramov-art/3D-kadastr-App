@@ -16,6 +16,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../auth/widgets/login_required_sheet.dart';
@@ -252,9 +253,10 @@ CalculatorResult _withContact(
       note: r.note,
       lines: [
         ...r.lines,
-        CalculatorLine(_S.customer(l), a.name),
-        CalculatorLine(_S.phone(l), a.fullPhone),
-        if (a.address.isNotEmpty) CalculatorLine(_S.address(l), a.address),
+        CalculatorLine(tr(l, 'services.kadastr.submit.customer'), a.name),
+        CalculatorLine(tr(l, 'services.kadastr.phone'), a.fullPhone),
+        if (a.address.isNotEmpty)
+          CalculatorLine(tr(l, 'services.kadastr.address'), a.address),
       ],
     );
 
@@ -299,7 +301,9 @@ class KadastrSubmitSuccessScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                     Text(
-                      ok ? _S.doneTitle(l) : _S.failTitle(l),
+                      ok
+                          ? tr(l, 'services.kadastr.submit.done_title')
+                          : tr(l, 'services.kadastr.submit.fail_title'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'MTSCompact',
@@ -310,7 +314,10 @@ class KadastrSubmitSuccessScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 10),
                     Text(
-                      ok ? _S.doneBody(l, created) : _S.failBody(l),
+                      ok
+                          ? tr(l, 'services.kadastr.submit.done_body')
+                              .replaceAll(r'$n', '$created')
+                          : tr(l, 'services.kadastr.submit.fail_body'),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'MTSText',
@@ -323,7 +330,7 @@ class KadastrSubmitSuccessScreen extends StatelessWidget {
                     SizedBox(
                       width: double.infinity,
                       child: ListingCtaButton(
-                        label: _S.finish(l),
+                        label: tr(l, 'services.kadastr.submit.finish'),
                         enabled: true,
                         onTap: () =>
                             Navigator.of(context).popUntil((r) => r.isFirst),
@@ -340,37 +347,3 @@ class KadastrSubmitSuccessScreen extends StatelessWidget {
   }
 }
 
-class _S {
-  const _S._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String doneTitle(Locale l) => _pick(l, 'Tayyor!', 'Готово!', 'Done!');
-
-  static String doneBody(Locale l, int n) => _pick(
-        l,
-        "$n ta ariza yuborildi. Operatorimiz tez orada bog'lanadi.",
-        '$n заявок отправлено. Оператор скоро свяжется.',
-        '$n applications submitted. Our operator will contact you soon.',
-      );
-
-  static String failTitle(Locale l) =>
-      _pick(l, 'Xatolik', 'Ошибка', 'Error');
-
-  static String failBody(Locale l) => _pick(
-        l,
-        "Ariza yuborilmadi. Iltimos, keyinroq qayta urinib ko'ring.",
-        'Заявку не удалось отправить. Попробуйте позже.',
-        'Could not submit. Please try again later.',
-      );
-
-  static String finish(Locale l) => _pick(l, 'Yopish', 'Закрыть', 'Close');
-
-  static String customer(Locale l) =>
-      _pick(l, 'Buyurtmachi', 'Заказчик', 'Customer');
-
-  static String phone(Locale l) => _pick(l, 'Telefon', 'Телефон', 'Phone');
-
-  static String address(Locale l) => _pick(l, 'Manzil', 'Адрес', 'Address');
-}

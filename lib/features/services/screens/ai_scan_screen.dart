@@ -471,224 +471,77 @@ class _PreviewButton extends StatelessWidget {
 }
 
 /// Locale-aware strings for the AI valuation scan screen.
-/// Keeps the inline `switch (locale.languageCode)` pattern used elsewhere
-/// in the app (see `home_cta.dart`).
+/// Backed by the shared translation bundle via `tr(locale, key)`.
 class _AiScanStrings {
-  static String _t(
-    Locale locale,
-    String key,
-    String uz,
-    String ru,
-    String en,
-  ) => tr(locale, key, uz: uz, ru: ru, en: en);
+  static String _t(Locale locale, String key) => tr(locale, key);
 
-  static String appBarTitle(Locale locale) => _t(
-    locale,
-    'scan.ai.app_bar_title',
-    'AI Baholash',
-    'AI Оценка',
-    'AI Valuation',
-  );
-  static String appBarSubtitle(Locale locale) => _t(
-    locale,
-    'scan.ai.app_bar_subtitle',
-    'Ko\'chmas mulk qiymatini aniqlash',
-    'Определение стоимости недвижимости',
-    'Determine property value',
-  );
-  static String heading(Locale locale) => _t(
-    locale,
-    'scan.ai.heading',
-    'Obyektni skan qiling',
-    'Сканируйте объект',
-    'Scan the object',
-  );
-  static String subheading(Locale locale) => _t(
-    locale,
-    'scan.ai.subheading',
-    'RoomPlan LiDAR orqali skan qiling',
-    'Сканируйте через RoomPlan LiDAR',
-    'Scan via RoomPlan LiDAR',
-  );
-  static String cameraIdle(Locale locale) => _t(
-    locale,
-    'scan.ai.camera_idle',
-    'LiDAR kamerani ishga tushiring',
-    'Запустите LiDAR-камеру',
-    'Start LiDAR camera',
-  );
-  static String cameraScanning(Locale locale) => _t(
-    locale,
-    'scan.ai.camera_scanning',
-    'Skanerlanmoqda...',
-    'Сканирование...',
-    'Scanning...',
-  );
-  static String cameraDone(Locale locale) => _t(
-    locale,
-    'scan.ai.camera_done',
-    'Skan tayyor',
-    'Скан готов',
-    'Scan ready',
-  );
+  static String appBarTitle(Locale locale) =>
+      _t(locale, 'scan.ai.app_bar_title');
+  static String appBarSubtitle(Locale locale) =>
+      _t(locale, 'scan.ai.app_bar_subtitle');
+  static String heading(Locale locale) => _t(locale, 'scan.ai.heading');
+  static String subheading(Locale locale) => _t(locale, 'scan.ai.subheading');
+  static String cameraIdle(Locale locale) =>
+      _t(locale, 'scan.ai.camera_idle');
+  static String cameraScanning(Locale locale) =>
+      _t(locale, 'scan.ai.camera_scanning');
+  static String cameraDone(Locale locale) =>
+      _t(locale, 'scan.ai.camera_done');
   static List<String> tips(Locale locale) => [
-    _t(
-      locale,
-      'scan.ai.tip_move_slowly',
-      'Qurilmani sekin harakatlantiring',
-      'Двигайте устройство медленно',
-      'Move the device slowly',
-    ),
-    _t(
-      locale,
-      'scan.ai.tip_cover_room',
-      'Xonani to\'liq qamrab oling',
-      'Охватите всю комнату',
-      'Cover the entire room',
-    ),
-    _t(
-      locale,
-      'scan.ai.tip_light',
-      'Yorug\'lik yetarli bo\'lishi kerak',
-      'Освещение должно быть достаточным',
-      'Sufficient lighting is required',
-    ),
+    _t(locale, 'scan.ai.tip_move_slowly'),
+    _t(locale, 'scan.ai.tip_cover_room'),
+    _t(locale, 'scan.ai.tip_light'),
   ];
-  static String ctaStart(Locale locale) => _t(
-    locale,
-    'scan.ai.cta_start',
-    'Scan boshlash',
-    'Начать сканирование',
-    'Start scan',
-  );
-  static String ctaContinue(Locale locale) =>
-      _t(locale, 'common.continue', 'Davom etish', 'Продолжить', 'Continue');
-  static String ctaSkip(Locale locale) => _t(
-    locale,
-    'scan.ai.cta_skip',
-    'O\'tkazib yuborish',
-    'Пропустить и продолжить',
-    'Skip and continue',
-  );
-  static String preview3dModel(Locale locale) => _t(
-    locale,
-    'scan.ai.preview_3d_model',
-    '3D modelni ko\'rish',
-    'Просмотр 3D-модели',
-    'View 3D model',
-  );
+  static String ctaStart(Locale locale) => _t(locale, 'scan.ai.cta_start');
+  static String ctaContinue(Locale locale) => _t(locale, 'common.continue');
+  static String ctaSkip(Locale locale) => _t(locale, 'scan.ai.cta_skip');
+  static String preview3dModel(Locale locale) =>
+      _t(locale, 'scan.ai.preview_3d_model');
 
   static String unsupportedDevice(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' =>
-          'На этом устройстве нет RoomPlan. Требуется iPhone Pro или iPad Pro '
-              '(iOS 16+ и LiDAR-сенсор).',
-        'en' =>
-          'This device does not support RoomPlan. iPhone Pro or iPad Pro is '
-              'required (iOS 16+ with a LiDAR sensor).',
-        _ =>
-          'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
-              '(iOS 16+ va LiDAR sensori).',
-      };
+      _t(locale, 'services.scan.ai.unsupported_device');
 
-  static String scanError(Locale locale) => _t(
-    locale,
-    'scan.ai.scan_error',
-    'Skan xatosi',
-    'Ошибка сканирования',
-    'Scan error',
-  );
+  static String scanError(Locale locale) => _t(locale, 'scan.ai.scan_error');
 
-  static String previewError(Locale locale) => _t(
-    locale,
-    'scan.ai.preview_error',
-    'Ko\'rsatish xatosi',
-    'Ошибка просмотра',
-    'Preview error',
-  );
+  static String previewError(Locale locale) =>
+      _t(locale, 'scan.ai.preview_error');
 
   static String savedScanSuccess(Locale locale, int id) =>
-      switch (locale.languageCode) {
-        'ru' => 'Скан сохранён (#$id) — Профиль → Мои сканы',
-        'en' => 'Scan saved (#$id) — Profile → My scans',
-        _ => 'Skan saqlandi (#$id) — Profil → Mening skanlarim',
-      };
+      _t(locale, 'services.scan.ai.saved_scan_success')
+          .replaceAll(r'$id', '$id');
 
   static String savedModelSuccess(Locale locale, String sizeMb) =>
-      switch (locale.languageCode) {
-        'ru' => '3D-модель готова — сохранена на iPhone ($sizeMb MB)',
-        'en' => '3D model is ready — saved on iPhone ($sizeMb MB)',
-        _ => '3D model tayyor — iPhone\'da saqlandi ($sizeMb MB)',
-      };
+      _t(locale, 'services.scan.ai.saved_model_success')
+          .replaceAll(r'$sizeMb', sizeMb);
 
   static String loginRequiredForScan(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Сначала войдите в аккаунт для сканирования',
-        'en' => 'Please sign in first to scan',
-        _ => 'Skan uchun avval tizimga kiring',
-      };
+      _t(locale, 'services.scan.ai.login_required_for_scan');
 
   static String providerUploadSuccess(
     Locale locale,
     String providerLabel,
     String etaLabel,
-  ) => switch (locale.languageCode) {
-    'ru' =>
-      'Фото отправлены в $providerLabel. 3D-модель будет готова через '
-          '$etaLabel — отслеживайте статус в разделе "Заявки".',
-    'en' =>
-      'Photos were sent to $providerLabel. The 3D model will be ready in '
-          '$etaLabel — track it in Applications.',
-    _ =>
-      'Foto\'lar $providerLabel\'ga yuborildi. 3D model $etaLabel\'da tayyor — '
-          'Arizalar bo\'limidan kuzating.',
-  };
+  ) => _t(locale, 'services.scan.ai.provider_upload_success')
+      .replaceAll(r'$providerLabel', providerLabel)
+      .replaceAll(r'$etaLabel', etaLabel);
 
   static String providerSheetTitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Выберите способ создания 3D-модели',
-        'en' => 'Choose how to create the 3D model',
-        _ => '3D model yaratish usulini tanlang',
-      };
+      _t(locale, 'services.scan.ai.provider_sheet_title');
 
-  static String providerSheetSubtitle(
-    Locale locale,
-  ) => switch (locale.languageCode) {
-    'ru' =>
-      'Каким способом обработать фото и данные сканирования для 3D-модели?',
-    'en' => 'How should the photos and scan data be processed into a 3D model?',
-    _ => 'Foto va skan ma\'lumotlari qaysi usulda 3D modelga aylantirilsin?',
-  };
+  static String providerSheetSubtitle(Locale locale) =>
+      _t(locale, 'services.scan.ai.provider_sheet_subtitle');
 
   static String providerCaptureSubtitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Модель создаётся прямо на iPhone. Интернет не требуется.',
-        'en' =>
-          'The model is created directly on the iPhone. No internet required.',
-        _ => 'Model iPhone\'ning o\'zida tayyorlanadi. Internet kerak emas.',
-      };
+      _t(locale, 'services.scan.ai.provider_capture_subtitle');
 
   static String providerPolycamSubtitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Обработка через онлайн-сервис, результат высокого качества.',
-        'en' =>
-          'Processed through an online service with high-quality results.',
-        _ => 'Onlayn xizmat orqali tayyorlanadi, natija sifati yuqori.',
-      };
+      _t(locale, 'services.scan.ai.provider_polycam_subtitle');
 
   static String providerAwsSubtitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Обработка на нашем сервере: быстрее и экономичнее.',
-        'en' => 'Processed on our server: faster and more cost-efficient.',
-        _ => 'Bizning serverda tezroq va tejamkorroq qayta ishlanadi.',
-      };
+      _t(locale, 'services.scan.ai.provider_aws_subtitle');
 
   static String providerKiriSubtitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Подходит даже для фотографий среднего качества.',
-        'en' => 'Works well even with lower-quality photos.',
-        _ => 'Sifat pastroq bo\'lgan suratlarda ham yaxshi natija beradi.',
-      };
+      _t(locale, 'services.scan.ai.provider_kiri_subtitle');
 
   static String providerCapture(Locale locale) => 'iPhone Object Capture';
   static String providerPolycam(Locale locale) => 'Polycam';
@@ -696,132 +549,60 @@ class _AiScanStrings {
   static String providerKiri(Locale locale) => 'Kiri Engine 3DGS';
 
   static String providerEtaCapture(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => '3-5 минут',
-        'en' => '3-5 minutes',
-        _ => '3-5 daqiqa',
-      };
+      _t(locale, 'services.scan.ai.provider_eta_capture');
 
   static String providerEtaPolycam(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => '30-60 минут',
-        'en' => '30-60 minutes',
-        _ => '30-60 daqiqa',
-      };
+      _t(locale, 'services.scan.ai.provider_eta_polycam');
 
-  static String providerEtaAws(Locale locale) => switch (locale.languageCode) {
-    'ru' => '15-30 минут',
-    'en' => '15-30 minutes',
-    _ => '15-30 daqiqa',
-  };
+  static String providerEtaAws(Locale locale) =>
+      _t(locale, 'services.scan.ai.provider_eta_aws');
 
-  static String providerEtaKiri(Locale locale) => switch (locale.languageCode) {
-    'ru' => '5-20 минут',
-    'en' => '5-20 minutes',
-    _ => '5-20 daqiqa',
-  };
+  static String providerEtaKiri(Locale locale) =>
+      _t(locale, 'services.scan.ai.provider_eta_kiri');
 
   static String qualitySheetTitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Выберите качество обработки',
-        'en' => 'Choose processing quality',
-        _ => 'Model sifati darajasini tanlang',
-      };
+      _t(locale, 'services.scan.ai.quality_sheet_title');
 
   static String qualitySheetSubtitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Баланс между скоростью и качеством результата',
-        'en' => 'Balance between speed and output quality',
-        _ => 'Tezlik va natija sifati o\'rtasidagi muvozanat',
-      };
+      _t(locale, 'services.scan.ai.quality_sheet_subtitle');
 
   static String qualityDraftTitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Быстро',
-        'en' => 'Fast',
-        _ => 'Tez',
-      };
+      _t(locale, 'services.scan.ai.quality_draft_title');
 
   static String qualityDraftSubtitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Быстрый результат, базовое качество',
-        'en' => 'Fast result with basic quality',
-        _ => 'Tez natija, o\'rtacha sifat',
-      };
+      _t(locale, 'services.scan.ai.quality_draft_subtitle');
 
-  static String qualityDraftEta(Locale locale) => switch (locale.languageCode) {
-    'ru' => '~10 минут',
-    'en' => '~10 minutes',
-    _ => '~10 daqiqa',
-  };
+  static String qualityDraftEta(Locale locale) =>
+      _t(locale, 'services.scan.ai.quality_draft_eta');
 
   static String qualityDraftValue(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => '60% качества',
-        'en' => '60% quality',
-        _ => '60% sifat',
-      };
+      _t(locale, 'services.scan.ai.quality_draft_value');
 
   static String qualityBalancedTitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Стандарт',
-        'en' => 'Standard',
-        _ => 'Standart',
-      };
+      _t(locale, 'services.scan.ai.quality_balanced_title');
 
   static String qualityBalancedSubtitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Рекомендуемый баланс скорости и качества',
-        'en' => 'Recommended balance of speed and quality',
-        _ => 'Tezlik va sifatning tavsiya etilgan muvozanati',
-      };
+      _t(locale, 'services.scan.ai.quality_balanced_subtitle');
 
   static String qualityBalancedEta(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => '~25-40 минут',
-        'en' => '~25-40 minutes',
-        _ => '~25-40 daqiqa',
-      };
+      _t(locale, 'services.scan.ai.quality_balanced_eta');
 
   static String qualityBalancedValue(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => '80% качества',
-        'en' => '80% quality',
-        _ => '80% sifat',
-      };
+      _t(locale, 'services.scan.ai.quality_balanced_value');
 
-  static String qualityMaxTitle(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Максимум',
-    'en' => 'Maximum',
-    _ => 'Maksimal',
-  };
+  static String qualityMaxTitle(Locale locale) =>
+      _t(locale, 'services.scan.ai.quality_max_title');
 
   static String qualityMaxSubtitle(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Высокая детализация с использованием глубины LiDAR',
-        'en' => 'High-detail result using LiDAR depth',
-        _ => 'Yuqori aniqlikdagi natija, LiDAR chuqurlik ma\'lumotlari bilan',
-      };
+      _t(locale, 'services.scan.ai.quality_max_subtitle');
 
-  static String qualityMaxEta(Locale locale) => switch (locale.languageCode) {
-    'ru' => '~90-150 минут',
-    'en' => '~90-150 minutes',
-    _ => '~90-150 daqiqa',
-  };
+  static String qualityMaxEta(Locale locale) =>
+      _t(locale, 'services.scan.ai.quality_max_eta');
 
-  static String qualityMaxValue(Locale locale) => switch (locale.languageCode) {
-    'ru' => '95-100% качества',
-    'en' => '95-100% quality',
-    _ => '95-100% sifat',
-  };
+  static String qualityMaxValue(Locale locale) =>
+      _t(locale, 'services.scan.ai.quality_max_value');
 
-  static String recommended(Locale locale) => _t(
-    locale,
-    'common.recommended',
-    'Tavsiya',
-    'Рекомендация',
-    'Recommended',
-  );
+  static String recommended(Locale locale) => _t(locale, 'common.recommended');
 }
 
 /// 3D pipeline tanlash uchun bottom sheet — Polycam / AWS GPU / Kiri.

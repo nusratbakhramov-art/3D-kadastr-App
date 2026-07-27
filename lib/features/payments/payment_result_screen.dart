@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import 'payment_checkout_service.dart';
 
@@ -212,49 +213,13 @@ class _PaymentResultScreenState extends State<PaymentResultScreen> {
 class _S {
   const _S._();
 
-  static String checking(Locale l) => switch (l.languageCode) {
-        'ru' => 'Проверяем оплату…',
-        'en' => 'Checking payment…',
-        _ => 'To\'lov tekshirilmoqda…',
-      };
-  static String checkingBody(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подтверждаем статус оплаты, это займёт пару секунд.',
-        'en' => 'Confirming the payment status, this takes a few seconds.',
-        _ => 'To\'lov holati tasdiqlanmoqda, bir necha soniya.',
-      };
-  static String success(Locale l) => switch (l.languageCode) {
-        'ru' => 'Оплата прошла успешно',
-        'en' => 'Payment successful',
-        _ => 'To\'lov muvaffaqiyatli',
-      };
-  static String successBody(Locale l) => switch (l.languageCode) {
-        'ru' => 'Спасибо! Заявка оплачена и принята в обработку.',
-        'en' => 'Thank you! Your application is paid and being processed.',
-        _ => 'Rahmat! Ariza to\'landi va qayta ishlashga qabul qilindi.',
-      };
-  static String pending(Locale l) => switch (l.languageCode) {
-        'ru' => 'Оплата обрабатывается',
-        'en' => 'Payment is processing',
-        _ => 'To\'lov qayta ishlanmoqda',
-      };
-  static String pendingBody(Locale l) => switch (l.languageCode) {
-        'ru' => 'Это может занять минуту. Статус появится в «Заявках».',
-        'en' => 'This may take a minute. Status will appear in “Applications”.',
-        _ => 'Bu bir daqiqa olishi mumkin. Holat «Arizalar»da ko\'rinadi.',
-      };
-  static String failed(Locale l) => switch (l.languageCode) {
-        'ru' => 'Оплата не завершена',
-        'en' => 'Payment not completed',
-        _ => 'To\'lov yakunlanmadi',
-      };
-  static String failedBody(Locale l) => switch (l.languageCode) {
-        'ru' => 'Оплата отменена или не прошла. Попробуйте ещё раз.',
-        'en' => 'The payment was cancelled or failed. Please try again.',
-        _ => 'To\'lov bekor qilindi yoki o\'tmadi. Qayta urinib ko\'ring.',
-      };
-  static String done(Locale l) => switch (l.languageCode) {
-        'ru' => 'Готово',
-        'en' => 'Done',
-        _ => 'Tayyor',
-      };
+  static String checking(Locale l) => tr(l, 'payments.result.checking');
+  static String checkingBody(Locale l) => tr(l, 'payments.result.checking_body');
+  static String success(Locale l) => tr(l, 'payments.result.success');
+  static String successBody(Locale l) => tr(l, 'payments.result.success_body');
+  static String pending(Locale l) => tr(l, 'payments.result.pending');
+  static String pendingBody(Locale l) => tr(l, 'payments.result.pending_body');
+  static String failed(Locale l) => tr(l, 'payments.result.failed');
+  static String failedBody(Locale l) => tr(l, 'payments.result.failed_body');
+  static String done(Locale l) => tr(l, 'payments.result.done');
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../widgets/auth_scaffold.dart';
 import '../widgets/phone_input_field.dart';
@@ -60,7 +61,7 @@ class _PhoneStepState extends State<PhoneStep> {
         : AppColors.textBlack.withValues(alpha: 0.65);
 
     return AuthScaffold(
-      title: _PhoneStepStrings.title(locale),
+      title: tr(locale, 'auth.phone.title'),
       iconAsset: 'assets/images/auth/login.png',
       onSkip: widget.onSkip,
       body: SingleChildScrollView(
@@ -68,7 +69,7 @@ class _PhoneStepState extends State<PhoneStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _PhoneStepStrings.phoneLabel(locale),
+              tr(locale, 'auth.phone.number_label'),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -77,33 +78,11 @@ class _PhoneStepState extends State<PhoneStep> {
         ),
       ),
       bottom: PrimaryCta(
-        label: _PhoneStepStrings.continueLabel(locale),
+        label: tr(locale, 'auth.continue'),
         enabled: _phone.isValid,
         loading: widget.loading,
         onPressed: _submit,
       ),
     );
   }
-}
-
-class _PhoneStepStrings {
-  const _PhoneStepStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Войдите в приложение',
-    'en' => 'Sign in to app',
-    _ => 'Ilovaga kiring',
-  };
-
-  static String phoneLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Ваш номер',
-    'en' => 'Your phone number',
-    _ => 'Sizning raqamingiz',
-  };
-
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Продолжить',
-    'en' => 'Continue',
-    _ => 'Davom etish',
-  };
 }

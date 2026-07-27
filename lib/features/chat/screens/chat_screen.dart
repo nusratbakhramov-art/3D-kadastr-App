@@ -6,6 +6,7 @@ import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../home/user_profile.dart';
 import '../api_chat_service.dart';
@@ -32,7 +33,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   double _lastInset = 0;
 
   /// Backend'dan olingan boshlang'ich takliflar. null/bo'sh bo'lsa (yuklanmaguncha
-  /// yoki xatoda) `_S.suggestions` zaxira ro'yxati ishlatiladi.
+  /// yoki xatoda) `_defaultSuggestions` zaxira ro'yxati ishlatiladi.
   List<String>? _remoteSuggestions;
 
   /// Held so the reply can actually be cancelled. An `await for` loop can only
@@ -43,6 +44,13 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _stopped = false;
 
   String get _lang => widget.locale.languageCode;
+
+  /// Zaxira boshlang'ich takliflar — backend ro'yxati bo'sh/yuklanmagan holatda.
+  List<String> get _defaultSuggestions => [
+        tr(widget.locale, 'chat.suggestion_1'),
+        tr(widget.locale, 'chat.suggestion_2'),
+        tr(widget.locale, 'chat.suggestion_3'),
+      ];
 
   @override
   void initState() {
@@ -141,14 +149,16 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               case 'error':
                 setState(() {
                   final sep = assistant.content.isEmpty ? '' : '\n\n';
-                  assistant.content +=
-                      sep + (ev.content ?? _S.errorGeneric(_lang));
+                  assistant.content += sep +
+                      (ev.content ?? tr(widget.locale, 'chat.error_generic'));
                 });
             }
           },
           onError: (Object _) {
             if (mounted && assistant.content.isEmpty) {
-              setState(() => assistant.content = _S.errorConnect(_lang));
+              setState(
+                () => assistant.content = tr(widget.locale, 'chat.error_connect'),
+              );
             }
             if (!done.isCompleted) done.complete();
           },
@@ -245,7 +255,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         ),
         title: Row(
           children: [
-            Text(_S.title(_lang)),
+            Text(tr(widget.locale, 'chat.title')),
             const SizedBox(width: 8),
             // Live dot — the assistant is reachable.
             Container(
@@ -266,7 +276,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           if (_messages.isNotEmpty)
             IconButton(
               onPressed: hapticTap(_newChat),
-              tooltip: _S.newChat(_lang),
+              tooltip: tr(widget.locale, 'chat.new_chat'),
               icon: const Icon(Icons.edit_square, size: 20),
             ),
         ],
@@ -289,7 +299,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         (_remoteSuggestions != null &&
                             _remoteSuggestions!.isNotEmpty)
                         ? _remoteSuggestions!
-                        : _S.suggestions(_lang),
+                        : _defaultSuggestions,
                   )
                 : ListView.builder(
                     controller: _scroll,
@@ -322,7 +332,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
               controller: _input,
               isDark: isDark,
               sending: _sending,
-              hint: _S.hint(_lang),
+              hint: tr(widget.locale, 'chat.hint'),
               onSend: _send,
               onStop: _stop,
             ),
@@ -628,7 +638,7 @@ class _ThinkingRowState extends State<_ThinkingRow>
             // srcIn paints the gradient through the glyphs, so the child's own
             // colour just has to be opaque.
             child: Text(
-              _S.thinking(widget.lang),
+              tr(Locale(widget.lang), 'chat.thinking'),
               style: const TextStyle(
                 fontFamily: 'MTSText',
                 fontSize: 13,
@@ -919,7 +929,7 @@ class _EmptyState extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(20, topInset + 20, 20, bottomInset + 16),
           children: [
             Text(
-              _S.kicker(lang),
+              tr(Locale(lang), 'chat.kicker'),
               style: const TextStyle(
                 fontFamily: 'MTSCompact',
                 fontSize: 10.5,
@@ -933,11 +943,11 @@ class _EmptyState extends StatelessWidget {
               TextSpan(
                 children: [
                   TextSpan(
-                    text: '${_S.greetLead(lang, name)}\n',
+                    text: '${_greetLead(lang, name)}\n',
                     style: TextStyle(color: strong),
                   ),
                   TextSpan(
-                    text: _S.greetAsk(lang),
+                    text: tr(Locale(lang), 'chat.greet_ask'),
                     style: TextStyle(color: muted),
                   ),
                 ],
@@ -1002,67 +1012,13 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// uz / ru / en matnlar.
-class _S {
-  const _S._();
-
-  static String _p(String l, String uz, String ru, String en) =>
-      switch (l) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String title(String l) => _p(l, 'Yordamchi', 'Помощник', 'Assistant');
-
-  static String hint(String l) => _p(l, 'Savolingizni yozing...',
-      'Введите вопрос...', 'Type your question...');
-
-  static String kicker(String l) => '3D KADASTR AI';
-
-  static String thinking(String l) =>
-      _p(l, "O'ylayapman…", 'Думаю…', 'Thinking…');
-
-  static String newChat(String l) =>
-      _p(l, 'Yangi suhbat', 'Новый чат', 'New chat');
-
-  /// "Salom, Ilxomjon." — falls back to a plain greeting for guests, and for
-  /// anyone whose profile hasn't loaded yet.
-  static String greetLead(String l, String? name) {
-    if (name == null || name.isEmpty) {
-      return _p(l, 'Salom!', 'Здравствуйте!', 'Hello!');
-    }
-    return _p(l, 'Salom, $name.', 'Здравствуйте, $name.', 'Hello, $name.');
+/// "Salom, Ilxomjon." — falls back to a plain greeting for guests, and for
+/// anyone whose profile hasn't loaded yet. The `$name` placeholder is kept in
+/// the backend value and substituted here.
+String _greetLead(String lang, String? name) {
+  final locale = Locale(lang);
+  if (name == null || name.isEmpty) {
+    return tr(locale, 'chat.greeting_guest');
   }
-
-  static String greetAsk(String l) => _p(
-        l,
-        'Nima bilan yordam beray?',
-        'Чем могу помочь?',
-        'How can I help?',
-      );
-
-  static String errorConnect(String l) => _p(
-        l,
-        "Serverga ulanib bo'lmadi. WiFi va server ishlayotganini tekshiring.",
-        'Не удалось подключиться к серверу. Проверьте WiFi и сервер.',
-        'Could not connect to the server. Check WiFi and the server.',
-      );
-
-  static String errorGeneric(String l) =>
-      _p(l, 'Xatolik yuz berdi.', 'Произошла ошибка.', 'An error occurred.');
-
-  static List<String> suggestions(String l) => switch (l) {
-        'ru' => const [
-            'Сколько стоит дизайн-проект?',
-            'За сколько дней готов кадастровый паспорт?',
-            'Какие у вас услуги?',
-          ],
-        'en' => const [
-            'How much is a design project?',
-            'How long does a cadastre passport take?',
-            'What services do you offer?',
-          ],
-        _ => const [
-            'Dizayn loyiha narxi qancha?',
-            'Kadastr pasporti necha kunda tayyor?',
-            'Qanday xizmatlar bor?',
-          ],
-      };
+  return tr(locale, 'chat.greeting').replaceFirst(r'$name', name);
 }

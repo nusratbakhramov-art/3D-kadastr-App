@@ -369,64 +369,24 @@ class _UnsupportedCard extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI Оценка',
-        'en' => 'AI Valuation',
-        _ => 'AI Baholash',
-      };
+  static String title(Locale l) => tr(l, 'services.ai.common.brand_title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Шаг 1 — 3D скан помещения',
-        'en' => 'Step 1 — 3D room scan',
-        _ => '1-qadam — xonaning 3D skani',
-      };
+  static String subtitle(Locale l) => tr(l, 'services.ai.scan_intro.subtitle');
 
-  static String heading(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сначала отсканируйте помещение',
-        'en' => 'First, scan the room',
-        _ => 'Avval xonani skanlang',
-      };
+  static String heading(Locale l) => tr(l, 'services.ai.scan_intro.heading');
 
-  static String body(Locale l) => switch (l.languageCode) {
-        'ru' =>
-          'Для точной оценки нужен 3D скан. Медленно обойдите помещение, '
-              'направляя камеру на стены, пол и потолок.',
-        'en' =>
-          'An accurate valuation needs a 3D scan. Walk slowly around the '
-              'room, pointing the camera at walls, floor and ceiling.',
-        _ =>
-          'Aniq baholash uchun 3D skan kerak. Xonani sekin aylanib chiqing, '
-              'kamerani devor, pol va shiftga yo\'naltiring.',
-      };
+  static String body(Locale l) => tr(l, 'services.ai.scan_intro.body');
 
   // The 6-step "how it works" flow. Assets live in assets/images/howitworks/;
   // step 5's source 403'd on download, so it has no asset and falls back to a
   // built-in icon (see [_StepsCard]).
   static List<String> steps(Locale l) => [
-        tr(l, 'howitworks.step1',
-            uz: 'Xonani skanerlash',
-            ru: 'Сканирование помещения',
-            en: 'Scan the room'),
-        tr(l, 'howitworks.step2',
-            uz: 'Joylashuvini belgilash',
-            ru: 'Указание местоположения',
-            en: 'Set the location'),
-        tr(l, 'howitworks.step3',
-            uz: 'Fotolarni yuklash',
-            ru: 'Загрузка фотографий',
-            en: 'Upload photos'),
-        tr(l, 'howitworks.step4',
-            uz: 'Xujjatlarni yuklash',
-            ru: 'Загрузка документов',
-            en: 'Upload documents'),
-        tr(l, 'howitworks.step5',
-            uz: 'To\'lov qilish',
-            ru: 'Оплата',
-            en: 'Make the payment'),
-        tr(l, 'howitworks.step6',
-            uz: 'Xujjatni olish',
-            ru: 'Получение документа',
-            en: 'Receive the document'),
+        tr(l, 'howitworks.step1'),
+        tr(l, 'howitworks.step2'),
+        tr(l, 'howitworks.step3'),
+        tr(l, 'howitworks.step4'),
+        tr(l, 'howitworks.step5'),
+        tr(l, 'howitworks.step6'),
       ];
 
   // Parallel to [steps]; empty string ⇒ no asset (fall back to a glyph).
@@ -439,51 +399,21 @@ class _S {
     'assets/images/howitworks/step6.png',
   ];
 
-  static String startScan(Locale l) => switch (l.languageCode) {
-        'ru' => 'Начать сканирование',
-        'en' => 'Start scanning',
-        _ => 'Skanlashni boshlash',
-      };
+  static String startScan(Locale l) => tr(l, 'services.ai.scan_intro.start_scan');
 
-  static String skipScanDev(Locale l) => switch (l.languageCode) {
-        'ru' => 'Пропустить скан (DEV)',
-        'en' => 'Skip scan (DEV)',
-        _ => 'Skanni o\'tkazib yuborish (DEV)',
-      };
+  static String skipScanDev(Locale l) =>
+      tr(l, 'services.ai.scan_intro.skip_scan_dev');
 
-  static String checking(Locale l) => switch (l.languageCode) {
-        'ru' => 'Проверка устройства…',
-        'en' => 'Checking device…',
-        _ => 'Qurilma tekshirilmoqda…',
-      };
+  static String checking(Locale l) => tr(l, 'services.ai.scan_intro.checking');
 
-  static String unsupportedTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Устройство не поддерживает скан',
-        'en' => 'Device does not support scanning',
-        _ => 'Qurilma skanni qo\'llamaydi',
-      };
+  static String unsupportedTitle(Locale l) =>
+      tr(l, 'services.ai.scan_intro.unsupported_title');
 
-  static String unsupportedBody(Locale l) => switch (l.languageCode) {
-        'ru' =>
-          '3D скан требует LiDAR — iPhone Pro или iPad Pro. На этом устройстве '
-              'продолжить нельзя.',
-        'en' =>
-          '3D scanning needs LiDAR — iPhone Pro or iPad Pro. You can\'t '
-              'continue on this device.',
-        _ =>
-          '3D skan LiDAR talab qiladi — iPhone Pro yoki iPad Pro. Bu qurilmada '
-              'davom etib bo\'lmaydi.',
-      };
+  static String unsupportedBody(Locale l) =>
+      tr(l, 'services.ai.scan_intro.unsupported_body');
 
-  static String scanError(Locale l) => switch (l.languageCode) {
-        'ru' => 'Ошибка сканирования',
-        'en' => 'Scan error',
-        _ => 'Skan xatosi',
-      };
+  static String scanError(Locale l) => tr(l, 'services.ai.scan_intro.scan_error');
 
-  static String scanNotSaved(Locale l) => switch (l.languageCode) {
-        'ru' => 'Скан не сохранён, попробуйте снова',
-        'en' => 'Scan not saved, please try again',
-        _ => 'Skan saqlanmadi, qayta urinib ko\'ring',
-      };
+  static String scanNotSaved(Locale l) =>
+      tr(l, 'services.ai.scan_intro.scan_not_saved');
 }

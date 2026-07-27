@@ -173,12 +173,7 @@ class _MainShellState extends State<MainShell> {
   Future<void> _openRatings() async {
     // "Baholashlarim" — Arizalar ro'yxati AI Baholash xizmatiga qulflangan
     // (bottom-nav Arizalar tabidagi haqiqiy `/ai-valuations` ma'lumotlari).
-    final l = widget.locale;
-    final title = switch (l.languageCode) {
-      'ru' => 'Мои оценки',
-      'en' => 'My valuations',
-      _ => 'Baholashlarim',
-    };
+    final title = tr(widget.locale, 'shell.menu.ratings');
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ApplicationsScreen(
@@ -193,12 +188,7 @@ class _MainShellState extends State<MainShell> {
     // "Mening arizalarim" — Arizalar ro'yxati Kalkulyator xizmatiga qulflangan
     // (Kalkulyator/Arxitektura/Dizayn buyurtmalari). Avval faqat tugallanmagan
     // draftlar ko'rsatilardi, shuning uchun ro'yxat doim bo'sh chiqardi.
-    final l = widget.locale;
-    final title = switch (l.languageCode) {
-      'ru' => 'Мои заявки',
-      'en' => 'My applications',
-      _ => 'Mening arizalarim',
-    };
+    final title = tr(widget.locale, 'shell.menu.scans');
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ApplicationsScreen(
@@ -334,15 +324,11 @@ class _ShellStrings {
 
   // Keyed through tr() so the admin panel can rename the tabs. A bare switch
   // means a code change and a store release to reword one label.
-  static String _home(Locale l) =>
-      tr(l, 'nav.home', uz: 'Asosiy', ru: 'Главная', en: 'Home');
+  static String _home(Locale l) => tr(l, 'nav.home');
 
-  static String _market(Locale l) =>
-      tr(l, 'nav.market', uz: 'Market', ru: 'Маркет', en: 'Market');
+  static String _market(Locale l) => tr(l, 'nav.market');
 
-  static String _applications(Locale l) =>
-      tr(l, 'nav.applications', uz: 'Arizalar', ru: 'Заявки', en: 'Applications');
+  static String _applications(Locale l) => tr(l, 'nav.applications');
 
-  static String _profile(Locale l) =>
-      tr(l, 'nav.profile', uz: 'Profil', ru: 'Профиль', en: 'Profile');
+  static String _profile(Locale l) => tr(l, 'nav.profile');
 }

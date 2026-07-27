@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/i18n.dart';
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/smeta_api_service.dart';
@@ -64,25 +65,13 @@ class _SmetaEditorScreenState extends State<SmetaEditorScreen> {
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(switch (locale.languageCode) {
-          'ru' => 'Новый раздел',
-          'en' => 'New section',
-          _ => 'Yangi bo\'lim',
-        }),
+        title: Text(tr(locale, 'services.smeta.new_section')),
         content: TextField(
           controller: ctrl,
           autofocus: true,
           decoration: InputDecoration(
-            labelText: switch (locale.languageCode) {
-              'ru' => 'Название раздела',
-              'en' => 'Section name',
-              _ => "Bo'lim nomi",
-            },
-            hintText: switch (locale.languageCode) {
-              'ru' => 'Например: Земляные работы',
-              'en' => 'E.g. Earthworks',
-              _ => 'Masalan: Yer ishlari',
-            },
+            labelText: tr(locale, 'services.smeta.section_name'),
+            hintText: tr(locale, 'services.smeta.section_name_hint'),
             border: const OutlineInputBorder(),
           ),
           onSubmitted: (v) => Navigator.of(ctx).pop(v),
@@ -136,11 +125,9 @@ class _SmetaEditorScreenState extends State<SmetaEditorScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(switch (Localizations.localeOf(context).languageCode) {
-            'ru' => 'Ошибка: $e',
-            'en' => 'Error: $e',
-            _ => 'Xatolik: $e',
-          }),
+          content: Text(
+            '${tr(Localizations.localeOf(context), 'services.smeta.error')}: $e',
+          ),
         ),
       );
     } finally {
@@ -168,17 +155,8 @@ class _SmetaEditorScreenState extends State<SmetaEditorScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: switch (locale.languageCode) {
-                          'ru' => 'Составление сметы',
-                          'en' => 'Prepare estimate',
-                          _ => 'Smeta tayyorlash',
-                        },
-                        subtitle: switch (locale.languageCode) {
-                          'ru' => 'Профессиональная смета на базе ABC-UZ',
-                          'en' =>
-                            'Professional estimate report based on ABC-UZ',
-                          _ => 'ABC-UZ asosida professional smeta hisoboti',
-                        },
+                        title: tr(locale, 'services.smeta.editor_title'),
+                        subtitle: tr(locale, 'services.smeta.editor_subtitle'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -186,40 +164,19 @@ class _SmetaEditorScreenState extends State<SmetaEditorScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                         children: [
-                          _Label(switch (locale.languageCode) {
-                            'ru' => 'Название объекта',
-                            'en' => 'Object name',
-                            _ => 'Obyekt nomi',
-                          }),
+                          _Label(tr(locale, 'services.smeta.object_name')),
                           _Field(
                             controller: _objectName,
-                            hint: switch (locale.languageCode) {
-                              'ru' => 'Например: Индивидуальный жилой дом',
-                              'en' => 'For example: Single-family residence',
-                              _ => 'Masalan: Yakka tartibdagi turar-joy',
-                            },
+                            hint: tr(locale, 'services.smeta.object_name_hint'),
                           ),
                           const SizedBox(height: 12),
-                          _Label(switch (locale.languageCode) {
-                            'ru' => 'Название сметы',
-                            'en' => 'Estimate name',
-                            _ => 'Smeta nomi',
-                          }),
+                          _Label(tr(locale, 'services.smeta.estimate_name')),
                           _Field(
                             controller: _estimateName,
-                            hint: switch (locale.languageCode) {
-                              'ru' => 'Например: Земляные и бетонные работы',
-                              'en' =>
-                                'For example: Earthworks and concrete works',
-                              _ => 'Masalan: Yer va beton ishlari',
-                            },
+                            hint: tr(locale, 'services.smeta.estimate_name_hint'),
                           ),
                           const SizedBox(height: 12),
-                          _Label(switch (locale.languageCode) {
-                            'ru' => 'Код района',
-                            'en' => 'District code',
-                            _ => 'Rayon kodi',
-                          }),
+                          _Label(tr(locale, 'services.smeta.district_code')),
                           _Field(
                             controller: _district,
                             hint: '1',
@@ -230,20 +187,14 @@ class _SmetaEditorScreenState extends State<SmetaEditorScreen> {
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Expanded(
-                                child: _Label(switch (locale.languageCode) {
-                                  'ru' => 'Разделы и позиции',
-                                  'en' => 'Sections and line items',
-                                  _ => 'Bo\'limlar va smeta pozitsiyalari',
-                                }),
+                                child: _Label(
+                                  tr(locale, 'services.smeta.sections_and_items'),
+                                ),
                               ),
                               TextButton.icon(
                                 onPressed: _addSection,
                                 icon: const Icon(Icons.add, size: 18),
-                                label: Text(switch (locale.languageCode) {
-                                  'ru' => 'Раздел',
-                                  'en' => 'Section',
-                                  _ => 'Bo\'lim',
-                                }),
+                                label: Text(tr(locale, 'services.smeta.section')),
                               ),
                             ],
                           ),
@@ -266,19 +217,8 @@ class _SmetaEditorScreenState extends State<SmetaEditorScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
                         label: _submitting
-                            ? switch (locale.languageCode) {
-                                'ru' => 'Отправка...',
-                                'en' => 'Submitting...',
-                                _ => 'Yuborilmoqda...',
-                              }
-                            : switch (locale.languageCode) {
-                                'ru' =>
-                                  'Рассчитать (${_draft.itemCount} позиций)',
-                                'en' =>
-                                  'Calculate estimate (${_draft.itemCount} items)',
-                                _ =>
-                                  'Smetani hisoblash (${_draft.itemCount} pozitsiya)',
-                              },
+                            ? tr(locale, 'services.smeta.submitting')
+                            : '${tr(locale, 'services.smeta.calculate_prefix')} (${_draft.itemCount} ${tr(locale, 'services.smeta.items_unit')})',
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -402,11 +342,7 @@ class _SectionCard extends StatelessWidget {
               IconButton(
                 icon: const Icon(Icons.delete_outline, size: 20),
                 onPressed: onRemoveSection,
-                tooltip: switch (locale.languageCode) {
-                  'ru' => 'Удалить раздел',
-                  'en' => 'Delete section',
-                  _ => 'Bo\'limni o\'chirish',
-                },
+                tooltip: tr(locale, 'services.smeta.delete_section'),
                 color: mutedColor,
               ),
             ],
@@ -416,11 +352,7 @@ class _SectionCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                switch (locale.languageCode) {
-                  'ru' => 'Позиции отсутствуют',
-                  'en' => 'No items yet',
-                  _ => 'Pozitsiya yo\'q',
-                },
+                tr(locale, 'services.smeta.no_items'),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontSize: 12,
@@ -441,11 +373,7 @@ class _SectionCard extends StatelessWidget {
             child: TextButton.icon(
               onPressed: onAddItem,
               icon: const Icon(Icons.add, size: 16),
-              label: Text(switch (locale.languageCode) {
-                'ru' => 'Позиция',
-                'en' => 'Item',
-                _ => 'Pozitsiya',
-              }),
+              label: Text(tr(locale, 'services.smeta.item')),
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 minimumSize: const Size(0, 36),
@@ -552,11 +480,7 @@ class _EmptySections extends StatelessWidget {
           Icon(Icons.add_chart, size: 28, color: muted),
           const SizedBox(height: 8),
           Text(
-            switch (locale.languageCode) {
-              'ru' => 'Нажмите "Раздел", чтобы начать',
-              'en' => 'Tap "Section" to get started',
-              _ => 'Boshlash uchun "Bo\'lim" tugmasini bosing',
-            },
+            tr(locale, 'services.smeta.tap_section_to_start'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSCompact',

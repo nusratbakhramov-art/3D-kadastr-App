@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
@@ -96,9 +97,5 @@ class NotificationDetailScreen extends StatelessWidget {
     );
   }
 
-  String _title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Уведомление',
-    'en' => 'Notification',
-    _ => 'Bildirishnoma',
-  };
+  String _title(Locale l) => tr(l, 'notifications.detail_title');
 }

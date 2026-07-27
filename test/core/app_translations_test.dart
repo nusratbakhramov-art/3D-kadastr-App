@@ -7,17 +7,9 @@ void main() {
     appTranslationsNotifier.value = AppTranslations.empty;
   });
 
-  test('tr falls back to inline defaults when there is no bundle', () {
-    expect(
-      tr(
-        const Locale('ru'),
-        'common.cancel',
-        uz: 'Bekor qilish',
-        ru: 'Отмена',
-        en: 'Cancel',
-      ),
-      'Отмена',
-    );
+  test('tr returns the key itself when there is no bundle', () {
+    // No inline fallback: an absent key surfaces raw so gaps are visible.
+    expect(tr(const Locale('ru'), 'common.cancel'), 'common.cancel');
   });
 
   test('tr prefers backend override for the active language', () {
@@ -29,19 +21,10 @@ void main() {
       },
     );
 
-    expect(
-      tr(
-        const Locale('ru'),
-        'common.cancel',
-        uz: 'Bekor qilish',
-        ru: 'Отмена',
-        en: 'Cancel',
-      ),
-      'Отменить',
-    );
+    expect(tr(const Locale('ru'), 'common.cancel'), 'Отменить');
   });
 
-  test('tr keeps inline default when backend bundle misses the key', () {
+  test('tr returns the key when the bundle misses it', () {
     appTranslationsNotifier.value = const AppTranslations(
       version: 7,
       byLang: {
@@ -49,15 +32,19 @@ void main() {
       },
     );
 
-    expect(
-      tr(
-        const Locale('en'),
-        'common.cancel',
-        uz: 'Bekor qilish',
-        ru: 'Отмена',
-        en: 'Cancel',
-      ),
-      'Cancel',
+    expect(tr(const Locale('en'), 'common.cancel'), 'common.cancel');
+  });
+
+  test('uz is the default language for non-ru/en locales', () {
+    appTranslationsNotifier.value = const AppTranslations(
+      version: 1,
+      byLang: {
+        'uz': {'common.cancel': 'Bekor qilish'},
+      },
     );
+
+    expect(tr(const Locale('uz'), 'common.cancel'), 'Bekor qilish');
+    // Unknown language code falls through to uz.
+    expect(tr(const Locale('kk'), 'common.cancel'), 'Bekor qilish');
   });
 }

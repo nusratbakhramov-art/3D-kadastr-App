@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
@@ -223,63 +224,21 @@ class _ViewModelButton extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI Оценка',
-        'en' => 'AI Valuation',
-        _ => 'AI Baholash',
-      };
+  static String title(Locale l) => tr(l, 'services.ai.common.brand_title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => '3D скан — продолжение заявки',
-        'en' => '3D scan — resume application',
-        _ => '3D skan — arizani davom ettirish',
-      };
+  static String subtitle(Locale l) => tr(l, 'services.ai.scan_resume.subtitle');
 
-  static String heading(Locale l) => switch (l.languageCode) {
-        'ru' => '3D модель отсканирована',
-        'en' => '3D model scanned',
-        _ => '3D model skanlangan',
-      };
+  static String heading(Locale l) => tr(l, 'services.ai.scan_resume.heading');
 
-  static String body(Locale l) => switch (l.languageCode) {
-        'ru' =>
-          'Текстурированная 3D модель сохранена в заявке. Посмотрите её или '
-              'продолжайте заполнение с сохранённого шага.',
-        'en' =>
-          'The textured 3D model is saved in this application. Preview it or '
-              'continue from your saved step.',
-        _ =>
-          'Teksturali 3D model arizada saqlangan. Uni ko\'rib chiqing yoki '
-              'saqlangan qadamdan davom eting.',
-      };
+  static String body(Locale l) => tr(l, 'services.ai.scan_resume.body');
 
-  static String viewModel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Посмотреть 3D модель',
-        'en' => 'View 3D model',
-        _ => '3D modelni ko\'rish',
-      };
+  static String viewModel(Locale l) => tr(l, 'services.ai.common.view_3d_model');
 
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Назад',
-        'en' => 'Back',
-        _ => 'Ortga qaytish',
-      };
+  static String continueLabel(Locale l) => tr(l, 'services.ai.scan_resume.back');
 
-  static String notFound(Locale l) => switch (l.languageCode) {
-        'ru' => '3D модель не найдена',
-        'en' => '3D model not found',
-        _ => '3D model topilmadi',
-      };
+  static String notFound(Locale l) => tr(l, 'services.ai.scan_resume.not_found');
 
-  static String failed(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось загрузить модель',
-        'en' => 'Could not load the model',
-        _ => 'Modelni yuklab bo\'lmadi',
-      };
+  static String failed(Locale l) => tr(l, 'services.ai.scan_resume.failed');
 
-  static String signIn(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сначала войдите в систему',
-        'en' => 'Please sign in first',
-        _ => 'Avval tizimga kiring',
-      };
+  static String signIn(Locale l) => tr(l, 'services.ai.common.sign_in_first');
 }

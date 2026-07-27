@@ -7,6 +7,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/calculator_pricing_store.dart';
@@ -66,7 +67,7 @@ class KadastrEstimateScreen extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: _S.appBar(l),
+                        title: tr(l, 'services.kadastr.estimate.appbar'),
                         subtitle: '${_fmtArea(areaM2)} m²',
                       ),
                     ),
@@ -75,7 +76,7 @@ class KadastrEstimateScreen extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
                         children: [
                           Text(
-                            _S.totalLabel(l),
+                            tr(l, 'services.kadastr.total_label'),
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w600,
@@ -87,7 +88,7 @@ class KadastrEstimateScreen extends StatelessWidget {
                           _TotalCard(total: total, locale: l),
                           const SizedBox(height: 18),
                           Text(
-                            _S.breakdown(l),
+                            tr(l, 'services.kadastr.selected_services'),
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
@@ -102,7 +103,9 @@ class KadastrEstimateScreen extends StatelessWidget {
                           ],
                           const SizedBox(height: 4),
                           Text(
-                            hasQuote ? _S.footnoteQuote(l) : _S.footnote(l),
+                            hasQuote
+                                ? tr(l, 'services.kadastr.estimate.footnote_quote')
+                                : tr(l, 'services.kadastr.estimate.footnote'),
                             style: TextStyle(
                               fontFamily: 'MTSText',
                               fontSize: 12,
@@ -116,7 +119,7 @@ class KadastrEstimateScreen extends StatelessWidget {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _S.backHome(l),
+                        label: tr(l, 'services.kadastr.estimate.back_home'),
                         onTap: () =>
                             Navigator.of(context).popUntil((r) => r.isFirst),
                       ),
@@ -167,7 +170,7 @@ class _TotalCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            _S.approxNote(locale),
+            tr(locale, 'services.kadastr.estimate.approx_note'),
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 13,
@@ -263,42 +266,3 @@ class _ServiceRow extends StatelessWidget {
 String _fmtArea(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
-class _S {
-  const _S._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String appBar(Locale l) =>
-      _pick(l, 'Taxminiy hisob', 'Примерный расчёт', 'Estimate');
-
-  static String totalLabel(Locale l) =>
-      _pick(l, 'Taxminiy jami', 'Примерно итого', 'Estimated total');
-
-  static String approxNote(Locale l) => _pick(
-        l,
-        'QQS bilan · taxminiy narx',
-        'С НДС · примерная цена',
-        'incl. VAT · approximate',
-      );
-
-  static String breakdown(Locale l) =>
-      _pick(l, 'Tanlangan xizmatlar', 'Выбранные услуги', 'Selected services');
-
-  static String footnote(Locale l) => _pick(
-        l,
-        '* Narxlar taxminiy. Aniq narx ariza qoldirilgandan keyin belgilanadi.',
-        '* Цены примерные. Точная цена определяется после заявки.',
-        '* Prices are approximate. The exact price is set after you apply.',
-      );
-
-  static String footnoteQuote(Locale l) => _pick(
-        l,
-        '* Narxlar taxminiy. Yuridik xizmat narxi kelishuv asosida. Aniq narx ariza qoldirilgandan keyin belgilanadi.',
-        '* Цены примерные. Юридические услуги — по договорённости. Точная цена определяется после заявки.',
-        '* Prices are approximate. Legal services are by agreement. The exact price is set after you apply.',
-      );
-
-  static String backHome(Locale l) =>
-      _pick(l, 'Asosiyga qaytish', 'На главную', 'Back to home');
-}

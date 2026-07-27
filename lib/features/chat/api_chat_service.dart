@@ -87,7 +87,7 @@ class ChatApiService {
     if (res.statusCode != 200) {
       final body = await res.stream.bytesToString();
       String detail =
-          '${tr(locale, 'chat.server_error', uz: 'Server xatosi', ru: 'Ошибка сервера', en: 'Server error')} (${res.statusCode})';
+          '${tr(locale, 'chat.server_error')} (${res.statusCode})';
       try {
         final j = jsonDecode(body);
         if (j is Map && j['detail'] != null) detail = j['detail'].toString();
@@ -120,14 +120,7 @@ class ChatApiService {
           yield ChatStreamEvent.delta(d['content'] as String? ?? '');
         case 'error':
           yield ChatStreamEvent.error(
-            d['message'] as String? ??
-                tr(
-                  locale,
-                  'common.error',
-                  uz: 'Xatolik',
-                  ru: 'Ошибка',
-                  en: 'Error',
-                ),
+            d['message'] as String? ?? tr(locale, 'common.error'),
           );
         case 'done':
           yield ChatStreamEvent.done();

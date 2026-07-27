@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../data/calculator_pricing_store.dart';
 import '../models/calculator_pricing.dart';
@@ -265,9 +266,6 @@ class _DetailField extends StatelessWidget {
 class _ColorPaletteStrings {
   const _ColorPaletteStrings._();
 
-  static String detailHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Дополнительная деталь или предпочтение',
-        'en' => 'Additional detail or preference',
-        _ => 'Qo\'shimcha tafsilot yoki afzallik',
-      };
+  static String detailHint(Locale l) =>
+      tr(l, 'services.widget.color_palette.detail_hint');
 }

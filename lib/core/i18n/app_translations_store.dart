@@ -2,6 +2,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,11 +14,29 @@ class AppTranslationsStore {
   static final AppTranslationsStore instance = AppTranslationsStore._();
 
   static const String _cacheKey = 'app_translations_v1';
+  static const String _seedAsset = 'assets/i18n/bundle.json';
   static const Duration _timeout = Duration(seconds: 12);
 
   Future<void> loadCachedThenRefresh({http.Client? client}) async {
     await _loadCache();
+    // No prior backend cache on this device (fresh install / offline first run):
+    // fall back to the bundled seed so the UI is never raw keys before the
+    // first successful network fetch.
+    if (appTranslationsNotifier.value.isEmpty) {
+      await _loadSeed();
+    }
     await refresh(client: client);
+  }
+
+  Future<void> _loadSeed() async {
+    try {
+      final raw = await rootBundle.loadString(_seedAsset);
+      appTranslationsNotifier.value = AppTranslations.fromJson(
+        jsonDecode(raw) as Map<String, dynamic>,
+      );
+    } catch (_) {
+      // Seed missing or malformed. Keep defaults (empty).
+    }
   }
 
   Future<void> _loadCache() async {

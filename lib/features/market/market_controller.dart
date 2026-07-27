@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/i18n/app_translations.dart';
 import 'api_market_repository.dart';
 import 'api_marketplace_service.dart';
 import 'market_repository.dart';
@@ -25,7 +27,7 @@ class MarketController extends ChangeNotifier {
     _categories = [
       MarketCategory(
         id: kMarketCategoryAll,
-        label: _MarketControllerStrings.all(_localeCode),
+        label: tr(Locale(_localeCode), 'market.controller.all'),
       ),
     ];
   }
@@ -85,13 +87,13 @@ class MarketController extends ChangeNotifier {
         _categories = [
           MarketCategory(
             id: kMarketCategoryAll,
-            label: _MarketControllerStrings.all(_localeCode),
+            label: tr(Locale(_localeCode), 'market.controller.all'),
           ),
           // Always show Non-residential chip; skip if API already returns it
           if (!apiSlugs.contains('nonresidential'))
             MarketCategory(
               id: 'nonresidential',
-              label: _MarketControllerStrings.nonResidential(_localeCode),
+              label: tr(Locale(_localeCode), 'market.controller.non_residential'),
             ),
           ...remote.map((c) => MarketCategory(id: c.slug, label: c.name)),
         ];
@@ -185,7 +187,7 @@ class MarketController extends ChangeNotifier {
     } catch (e) {
       if (_disposed || token != _requestToken) return;
       _isLoadingMore = false;
-      _error = _MarketControllerStrings.loadMoreError(_localeCode);
+      _error = tr(Locale(_localeCode), 'market.controller.load_more_error');
       _lastErrorObject = e;
       _notify();
     }
@@ -223,7 +225,7 @@ class MarketController extends ChangeNotifier {
     } catch (e) {
       if (_disposed || token != _requestToken) return;
       _status = MarketStatus.error;
-      _error = _MarketControllerStrings.loadError(_localeCode);
+      _error = tr(Locale(_localeCode), 'market.controller.load_error');
       _lastErrorObject = e;
       _notify();
     }
@@ -262,32 +264,4 @@ MarketController sharedMarketController({String? locale}) {
   );
   _sharedLocale = locale;
   return _shared!;
-}
-
-class _MarketControllerStrings {
-  const _MarketControllerStrings._();
-
-  static String all(String localeCode) => switch (localeCode) {
-    'ru' => 'Все',
-    'en' => 'All',
-    _ => 'Barchasi',
-  };
-
-  static String nonResidential(String localeCode) => switch (localeCode) {
-    'ru' => 'Нежилое',
-    'en' => 'Non-residential',
-    _ => "No'turar",
-  };
-
-  static String loadMoreError(String localeCode) => switch (localeCode) {
-    'ru' => 'Ошибка при подгрузке.',
-    'en' => 'Failed to load more.',
-    _ => 'Yana yuklashda xatolik.',
-  };
-
-  static String loadError(String localeCode) => switch (localeCode) {
-    'ru' => 'Не удалось загрузить данные.',
-    'en' => 'Could not load data.',
-    _ => 'Ma\'lumotlarni yuklab bo\'lmadi.',
-  };
 }

@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../widgets/service_app_bar.dart';
@@ -69,14 +70,15 @@ class _KadastrAreaScreenState extends State<KadastrAreaScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                  child: ServiceAppBar(title: _S.appBar(l)),
+                  child: ServiceAppBar(
+                      title: tr(l, 'services.kadastr.area.appbar')),
                 ),
                 Expanded(
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                     children: [
                       Text(
-                        _S.subheading(l),
+                        tr(l, 'services.kadastr.area.subheading'),
                         style: TextStyle(
                           fontFamily: 'MTSText',
                           fontSize: 13.5,
@@ -86,8 +88,8 @@ class _KadastrAreaScreenState extends State<KadastrAreaScreen> {
                       ),
                       const SizedBox(height: 20),
                       CalculatorField(
-                        label: _S.areaLabel(l),
-                        placeholder: _S.areaHint(l),
+                        label: tr(l, 'services.kadastr.area.label'),
+                        placeholder: tr(l, 'services.kadastr.area.hint'),
                         controller: _areaCtrl,
                         suffix: 'm²',
                       ),
@@ -97,7 +99,7 @@ class _KadastrAreaScreenState extends State<KadastrAreaScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
-                    label: _S.next(l),
+                    label: tr(l, 'services.kadastr.continue'),
                     enabled: _area != null,
                     onTap: _next,
                   ),
@@ -111,36 +113,3 @@ class _KadastrAreaScreenState extends State<KadastrAreaScreen> {
   }
 }
 
-class _S {
-  const _S._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String appBar(Locale l) => _pick(
-        l,
-        'Onlayn kalkulyator',
-        'Онлайн калькулятор',
-        'Online calculator',
-      );
-
-  static String subheading(Locale l) => _pick(
-        l,
-        "Ko'chmas mulk maydonini kiriting — keyin kerakli xizmatlarni tanlaysiz.",
-        'Введите площадь недвижимости — затем выберите нужные услуги.',
-        'Enter the property area — then choose the services you need.',
-      );
-
-  static String areaLabel(Locale l) => _pick(
-        l,
-        "Ko'chmas mulk maydoni",
-        'Площадь недвижимости',
-        'Property area',
-      );
-
-  static String areaHint(Locale l) =>
-      _pick(l, 'Maydonni kiriting', 'Введите площадь', 'Enter the area');
-
-  static String next(Locale l) =>
-      _pick(l, 'Davom etish', 'Продолжить', 'Continue');
-}

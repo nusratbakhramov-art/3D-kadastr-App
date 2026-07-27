@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../auth/widgets/auth_toast.dart';
@@ -132,12 +133,13 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   int get _requiredPhotos => _minPhotos;
 
   // ── Required-fields gate ──────────────────────────────────────────────
-  // Photos (min count), kadastr docs, and both floor numbers are mandatory.
-  // Passport and rooms stay optional.
+  // Photos (min count), kadastr docs, the owner certificate, and both floor
+  // numbers are mandatory. Rooms stay optional.
   bool get _ready =>
       !_anyUploading &&
       widget.bundle.imageKeys.length >= _requiredPhotos &&
       widget.bundle.kadastrKeys.isNotEmpty &&
+      widget.bundle.passportKeys.isNotEmpty &&
       widget.bundle.floor != null &&
       widget.bundle.totalFloors != null &&
       widget.bundle.floor! >= 1 &&
@@ -157,6 +159,9 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     final missing = <String>[];
     if (widget.bundle.kadastrKeys.isEmpty) {
       missing.add(_Strings.missingKadastr(l));
+    }
+    if (widget.bundle.passportKeys.isEmpty) {
+      missing.add(_Strings.missingPassport(l));
     }
     final f = widget.bundle.floor;
     final tf = widget.bundle.totalFloors;
@@ -218,7 +223,7 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     sync: _syncKadastrKeys,
   );
 
-  // ── Passport (file_picker, optional) ────────────────────────────────
+  // ── Owner certificate (file_picker, required) ───────────────────────
   Future<void> _addPassport() => _pickDocs(
     category: UploadCategory.passport,
     items: _passportItems,
@@ -474,6 +479,8 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                       _UploadCard(
                         title: _Strings.objectPhotos(l),
                         hint: _Strings.objectPhotosHint(l),
+                        bullets: _Strings.objectPhotosBullets(l),
+                        requiredMark: true,
                         icon: Icons.photo_camera_outlined,
                         emptyIcon: Icons.add_photo_alternate_outlined,
                         actionLabel: _Strings.addPhotosCta(l),
@@ -610,10 +617,16 @@ class _UploadCard extends StatelessWidget {
     required this.onRetry,
     required this.onRemove,
     required this.onPreview,
+    this.bullets,
+    this.requiredMark = false,
   });
 
   final String title;
   final String hint;
+  // When set, the subtitle renders as bullet lines instead of [hint]; the first
+  // line gets a red "required" mark if [requiredMark] is true.
+  final List<String>? bullets;
+  final bool requiredMark;
   final IconData icon;
   final IconData emptyIcon;
   final String actionLabel;
@@ -692,15 +705,22 @@ class _UploadCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      hint,
-                      style: TextStyle(
-                        fontFamily: 'MTSCompact',
-                        fontSize: 12,
-                        height: 1.3,
+                    if (bullets != null)
+                      _BulletHint(
+                        lines: bullets!,
+                        requiredMark: requiredMark,
                         color: muted,
+                      )
+                    else
+                      Text(
+                        hint,
+                        style: TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontSize: 12,
+                          height: 1.3,
+                          color: muted,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -737,6 +757,75 @@ class _UploadCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+// Bulleted subtitle for an upload card. The first line can carry a red
+// "required" mark (the photos card uses it for the min-count rule).
+class _BulletHint extends StatelessWidget {
+  const _BulletHint({
+    required this.lines,
+    required this.color,
+    this.requiredMark = false,
+  });
+
+  final List<String> lines;
+  final Color color;
+  final bool requiredMark;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = TextStyle(
+      fontFamily: 'MTSCompact',
+      fontSize: 12,
+      height: 1.35,
+      color: color,
+    );
+    // The first bullet is the primary rule (min photo count), so it reads a
+    // notch larger and heavier than the rest — sitting between the 15px card
+    // title above and the 12px secondary bullets below.
+    final firstStyle = style.copyWith(
+      fontSize: 13.5,
+      fontWeight: FontWeight.w600,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (int i = 0; i < lines.length; i++)
+          Padding(
+            padding: EdgeInsets.only(top: i == 0 ? 0 : 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('•  ', style: i == 0 ? firstStyle : style),
+                Expanded(
+                  child: (requiredMark && i == 0)
+                      ? Text.rich(
+                          TextSpan(
+                            style: firstStyle,
+                            children: [
+                              TextSpan(text: lines[i]),
+                              const WidgetSpan(
+                                alignment: PlaceholderAlignment.middle,
+                                child: Padding(
+                                  padding: EdgeInsets.only(left: 5),
+                                  child: Icon(
+                                    Icons.error,
+                                    size: 14,
+                                    color: Color(0xFFE5484D),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Text(lines[i], style: i == 0 ? firstStyle : style),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
@@ -1292,7 +1381,9 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
     for (final r in widget.rooms) {
       _counts[r] = TextEditingController(text: '${r.count}');
     }
-    _customOpen = widget.rooms.any((r) => r.kind == RoomKind.other);
+    // Suggested rooms are also kind=other, so don't auto-open the free-text
+    // input just because an `other` room exists; the user opens it via "Boshqa".
+    _customOpen = false;
   }
 
   @override
@@ -1320,6 +1411,32 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
         _counts.remove(existing)?.dispose();
       } else {
         final room = AiRoom(kind: k, count: 1);
+        widget.rooms.add(room);
+        _counts[room] = TextEditingController(text: '1');
+      }
+    });
+    widget.onChanged?.call();
+  }
+
+  // Suggested rooms are stored as custom (kind=other) rooms keyed by their
+  // localized name, so the backend never sees an unknown RoomKind.
+  bool _suggestedSelected(String name) => widget.rooms.any(
+    (r) => r.kind == RoomKind.other && r.name?.trim() == name,
+  );
+
+  void _toggleSuggested(String name) {
+    HapticFeedback.selectionClick();
+    final matches = widget.rooms
+        .where((r) => r.kind == RoomKind.other && r.name?.trim() == name)
+        .toList();
+    setState(() {
+      if (matches.isNotEmpty) {
+        for (final r in matches) {
+          widget.rooms.remove(r);
+          _counts.remove(r)?.dispose();
+        }
+      } else {
+        final room = AiRoom(kind: RoomKind.other, name: name, count: 1);
         widget.rooms.add(room);
         _counts[room] = TextEditingController(text: '1');
       }
@@ -1366,7 +1483,6 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
     final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
 
     final selectedKinds = widget.rooms.map((r) => r.kind).toSet();
-    final hasCustom = widget.rooms.any((r) => r.kind == RoomKind.other);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1400,10 +1516,17 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
                 selected: selectedKinds.contains(k),
                 onTap: () => _toggleStandard(k),
               ),
-            // "Boshqa" opens a custom-name input instead of adding a fixed row.
+            // Extra suggested rooms (residential + commercial) as custom rooms.
+            for (final name in _Strings.suggestedRooms(l))
+              _RoomChip(
+                label: name,
+                selected: _suggestedSelected(name),
+                onTap: () => _toggleSuggested(name),
+              ),
+            // "Boshqa" opens a custom-name input for anything not listed above.
             _RoomChip(
               label: RoomKind.other.label(l),
-              selected: _customOpen || hasCustom,
+              selected: _customOpen,
               onTap: () => setState(() => _customOpen = !_customOpen),
             ),
           ],
@@ -1473,11 +1596,7 @@ class _CustomNameInput extends StatelessWidget {
                 color: textColor,
               ),
               decoration: InputDecoration(
-                hintText: switch (locale.languageCode) {
-                  'ru' => 'Название комнаты (например: Кабинет)',
-                  'en' => 'Room name (e.g. Office)',
-                  _ => 'Xona nomi (masalan: Ish xonasi)',
-                },
+                hintText: tr(locale, 'services.ai.intake.custom_room_hint'),
                 isDense: true,
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -1652,216 +1771,129 @@ class _RoomCountRow extends StatelessWidget {
 class _Strings {
   const _Strings._();
 
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Документы и фото',
-    'en' => 'Documents and photos',
-    _ => 'Hujjat va rasmlar',
-  };
+  static String appBarTitle(Locale l) =>
+      tr(l, 'services.ai.intake.app_bar_title');
 
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Необходимые данные для оценки',
-    'en' => 'Data required for valuation',
-    _ => 'Baholash uchun zarur ma\'lumotlar',
-  };
+  static String appBarSubtitle(Locale l) =>
+      tr(l, 'services.ai.intake.app_bar_subtitle');
 
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Продолжить',
-    'en' => 'Continue',
-    _ => 'Davom etish',
-  };
+  static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
 
-  static String objectPhotos(Locale l) => switch (l.languageCode) {
-    'ru' => 'Фото объекта',
-    'en' => 'Object photos',
-    _ => 'Obyekt rasmlari',
-  };
+  static String objectPhotos(Locale l) =>
+      tr(l, 'services.ai.intake.object_photos');
 
-  static String objectPhotosHint(Locale l) => switch (l.languageCode) {
-    'ru' =>
-      'Минимум 4 фото на комнату, всего не менее 12. Обязательно добавьте '
-          'внешний вид: входную дверь, вход и наружные стены.',
-    'en' =>
-      'At least 4 photos per room, minimum 12 in total. Be sure to add the '
-          'exterior too: the entrance door, the outside entry and external walls.',
-    _ =>
-      'Har bir xona uchun kamida 4 ta, jami kamida 12 ta rasm. Tashqi '
-          'ko\'rinishni ham qo\'shing: kirish eshigi, tashqi kirish va tashqi devorlar.',
-  };
+  static String objectPhotosHint(Locale l) =>
+      tr(l, 'services.ai.intake.object_photos_hint');
 
-  static String kadastrDocs(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастровые документы',
-    'en' => 'Cadastre documents',
-    _ => 'Kadastr hujjatlari',
-  };
+  static List<String> objectPhotosBullets(Locale l) => [
+    tr(l, 'services.ai.intake.object_photos_bullet1'),
+    tr(l, 'services.ai.intake.object_photos_bullet2'),
+  ];
 
-  static String kadastrDocsHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Техпаспорт, план (1-20). Определяются площадь/год.',
-    'en' => 'Tech passport, plan (1-20). Area/year are determined.',
-    _ => 'Texpasport, plan (1-20). Maydon/yil aniqlanadi.',
-  };
+  static String kadastrDocs(Locale l) => tr(l, 'services.ai.intake.kadastr_docs');
 
-  static String passport(Locale l) => switch (l.languageCode) {
-    'ru' => 'Паспорт / ID (необязательно)',
-    'en' => 'Passport / ID (optional)',
-    _ => 'Pasport / ID (ixtiyoriy)',
-  };
+  static String kadastrDocsHint(Locale l) =>
+      tr(l, 'services.ai.intake.kadastr_docs_hint');
 
-  static String passportHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Данные владельца для отчёта.',
-    'en' => 'Owner\'s data for the report.',
-    _ => 'Hisobot uchun egasining ma\'lumoti.',
-  };
+  static String passport(Locale l) => tr(l, 'services.ai.intake.passport');
 
-  static String floor(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этажи',
-    'en' => 'Floors',
-    _ => 'Qavatlar',
-  };
+  static String passportHint(Locale l) =>
+      tr(l, 'services.ai.intake.passport_hint');
 
-  static String floorDescription(Locale l) => switch (l.languageCode) {
-    'ru' => 'На каком этаже ваша квартира и сколько всего этажей в доме?',
-    'en' => 'Which floor is your home on, and how many floors are in the building?',
-    _ => 'Uyingiz nechinchi qavatda va bino necha qavatli?',
-  };
+  static String missingPassport(Locale l) =>
+      tr(l, 'services.ai.intake.missing_passport');
 
-  static String objectFloor(Locale l) => switch (l.languageCode) {
-    'ru' => 'Ваш этаж',
-    'en' => 'Your floor',
-    _ => 'Sizning qavatingiz',
-  };
+  static String floor(Locale l) => tr(l, 'services.ai.intake.floor');
 
-  static String objectFloorHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'напр. 2',
-    'en' => 'e.g. 2',
-    _ => 'masalan, 2',
-  };
+  static String floorDescription(Locale l) =>
+      tr(l, 'services.ai.intake.floor_description');
 
-  static String totalFloors(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этажей в доме',
-    'en' => 'Floors in the building',
-    _ => 'Binodagi qavatlar',
-  };
+  static String objectFloor(Locale l) =>
+      tr(l, 'services.ai.intake.object_floor');
 
-  static String totalFloorsHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'напр. 4',
-    'en' => 'e.g. 4',
-    _ => 'masalan, 4',
-  };
+  static String objectFloorHint(Locale l) =>
+      tr(l, 'services.ai.intake.object_floor_hint');
 
-  static String roomsOptional(Locale l) => switch (l.languageCode) {
-    'ru' => 'Комнаты (необязательно)',
-    'en' => 'Rooms (optional)',
-    _ => 'Xonalar (ixtiyoriy)',
-  };
+  static String totalFloors(Locale l) =>
+      tr(l, 'services.ai.intake.total_floors');
 
-  static String roomsHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Выберите типы комнат, укажите количество',
-    'en' => 'Select room types, enter the count',
-    _ => 'Xona turlarini tanlang, sonini kiriting',
-  };
+  static String totalFloorsHint(Locale l) =>
+      tr(l, 'services.ai.intake.total_floors_hint');
 
-  static String file(Locale l) => switch (l.languageCode) {
-    'ru' => 'файл',
-    'en' => 'file',
-    _ => 'fayl',
-  };
+  static String roomsOptional(Locale l) =>
+      tr(l, 'services.ai.intake.rooms_optional');
 
-  static String uploaded(Locale l) => switch (l.languageCode) {
-    'ru' => 'Загружено',
-    'en' => 'Uploaded',
-    _ => 'Yuklangan',
-  };
+  static String roomsHint(Locale l) => tr(l, 'services.ai.intake.rooms_hint');
 
-  static String maxPhotos(Locale l, int n) => switch (l.languageCode) {
-    'ru' => 'Не более $n фото',
-    'en' => 'Up to $n photos',
-    _ => 'Ko\'pi bilan $n ta rasm',
-  };
+  // Extra suggested rooms beyond the 8 standard RoomKind chips. These are added
+  // as custom (kind=other + name) rooms so the strict backend RoomKind enum is
+  // never sent an unknown value. Covers both residential and commercial spaces.
+  static List<String> suggestedRooms(Locale l) => [
+    tr(l, 'services.ai.intake.suggested_room.dining'),
+    tr(l, 'services.ai.intake.suggested_room.kids'),
+    tr(l, 'services.ai.intake.suggested_room.study'),
+    tr(l, 'services.ai.intake.suggested_room.dressing'),
+    tr(l, 'services.ai.intake.suggested_room.toilet'),
+    tr(l, 'services.ai.intake.suggested_room.terrace'),
+    tr(l, 'services.ai.intake.suggested_room.basement'),
+    tr(l, 'services.ai.intake.suggested_room.garage'),
+    tr(l, 'services.ai.intake.suggested_room.laundry'),
+    tr(l, 'services.ai.intake.suggested_room.office'),
+    tr(l, 'services.ai.intake.suggested_room.meeting'),
+    tr(l, 'services.ai.intake.suggested_room.retail'),
+    tr(l, 'services.ai.intake.suggested_room.workshop'),
+    tr(l, 'services.ai.intake.suggested_room.warehouse'),
+  ];
 
-  static String maxFiles(Locale l, int n) => switch (l.languageCode) {
-    'ru' => 'Не более $n файлов',
-    'en' => 'Up to $n files',
-    _ => 'Ko\'pi bilan $n ta fayl',
-  };
+  static String file(Locale l) => tr(l, 'services.ai.intake.file');
 
-  static String authRequired(Locale l) => switch (l.languageCode) {
-    'ru' => 'Требуется авторизация',
-    'en' => 'Authorization required',
-    _ => 'Avtorizatsiya kerak',
-  };
+  static String uploaded(Locale l) => tr(l, 'services.ai.intake.uploaded');
 
-  static String uploadingFiles(Locale l) => switch (l.languageCode) {
-    'ru' => 'Файлы загружаются…',
-    'en' => 'Uploading files…',
-    _ => 'Fayllar yuklanmoqda…',
-  };
+  static String maxPhotos(Locale l, int n) =>
+      tr(l, 'services.ai.intake.max_photos').replaceAll(r'$n', '$n');
 
-  static String uploadFailed(Locale l) => switch (l.languageCode) {
-    'ru' => 'Не загрузилось — нажмите, чтобы повторить',
-    'en' => 'Upload failed — tap to retry',
-    _ => 'Yuklanmadi — qayta urinish uchun bosing',
-  };
+  static String maxFiles(Locale l, int n) =>
+      tr(l, 'services.ai.intake.max_files').replaceAll(r'$n', '$n');
 
-  static String uploadRejected(Locale l) => switch (l.languageCode) {
-    'ru' => 'Файл отклонён (тип/размер) — нажмите для повтора',
-    'en' => 'File rejected (type/size) — tap to retry',
-    _ => 'Fayl rad etildi (tur/hajm) — qayta bosing',
-  };
+  static String authRequired(Locale l) =>
+      tr(l, 'services.ai.intake.auth_required');
 
-  static String addPhotosCta(Locale l) => switch (l.languageCode) {
-    'ru' => 'Добавить фото',
-    'en' => 'Add photos',
-    _ => 'Rasm qo\'shish',
-  };
+  static String uploadingFiles(Locale l) =>
+      tr(l, 'services.ai.intake.uploading_files');
 
-  static String addDocsCta(Locale l) => switch (l.languageCode) {
-    'ru' => 'Добавить документ',
-    'en' => 'Add document',
-    _ => 'Hujjat qo\'shish',
-  };
+  static String uploadFailed(Locale l) =>
+      tr(l, 'services.ai.intake.upload_failed');
 
-  static String addFilesCta(Locale l) => switch (l.languageCode) {
-    'ru' => 'Добавить файл',
-    'en' => 'Add file',
-    _ => 'Fayl qo\'shish',
-  };
+  static String uploadRejected(Locale l) =>
+      tr(l, 'services.ai.intake.upload_rejected');
+
+  static String addPhotosCta(Locale l) =>
+      tr(l, 'services.ai.intake.add_photos_cta');
+
+  static String addDocsCta(Locale l) =>
+      tr(l, 'services.ai.intake.add_docs_cta');
+
+  static String addFilesCta(Locale l) =>
+      tr(l, 'services.ai.intake.add_files_cta');
 
   // "Need at least N photos (M added)" — shown while below the minimum.
   static String minPhotosNeeded(Locale l, int need, int have) =>
-      switch (l.languageCode) {
-        'ru' => 'Нужно не менее $need фото (добавлено $have)',
-        'en' => 'At least $need photos required ($have added)',
-        _ => 'Kamida $need ta rasm kerak ($have ta qo\'shildi)',
-      };
+      tr(l, 'services.ai.intake.min_photos_needed')
+          .replaceAll(r'$need', '$need')
+          .replaceAll(r'$have', '$have');
 
-  static String missingKadastr(Locale l) => switch (l.languageCode) {
-    'ru' => 'кадастровый документ',
-    'en' => 'cadastre document',
-    _ => 'kadastr hujjati',
-  };
+  static String missingKadastr(Locale l) =>
+      tr(l, 'services.ai.intake.missing_kadastr');
 
-  static String missingFloor(Locale l) => switch (l.languageCode) {
-    'ru' => 'этаж',
-    'en' => 'floor',
-    _ => 'qavat',
-  };
+  static String missingFloor(Locale l) =>
+      tr(l, 'services.ai.intake.missing_floor');
 
-  static String floorExceeds(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этаж не может быть больше общего числа этажей',
-    'en' => 'The floor cannot exceed the total number of floors',
-    _ => 'Qavat binodagi jami qavatlardan katta bo\'lmasligi kerak',
-  };
+  static String floorExceeds(Locale l) =>
+      tr(l, 'services.ai.intake.floor_exceeds');
 
-  static String floorMax(Locale l, int max) => switch (l.languageCode) {
-    'ru' => 'Всего этажей не может превышать $max',
-    'en' => 'Total floors cannot exceed $max',
-    _ => 'Jami qavatlar $max dan oshmasligi kerak',
-  };
+  static String floorMax(Locale l, int max) =>
+      tr(l, 'services.ai.intake.floor_max').replaceAll(r'$max', '$max');
 
   static String requiredSuffix(Locale l, String items) =>
-      switch (l.languageCode) {
-        'ru' => '$items — обязательно',
-        'en' => '$items required',
-        _ => '$items majburiy',
-      };
+      tr(l, 'services.ai.intake.required_suffix').replaceAll(r'$items', items);
 }

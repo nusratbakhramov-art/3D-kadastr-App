@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import 'support_service.dart';
 
@@ -40,7 +41,9 @@ class _SupportSheet extends StatelessWidget {
     } else {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(_S.launchFailed(locale))));
+      ).showSnackBar(
+        SnackBar(content: Text(tr(locale, 'support.launch_failed'))),
+      );
     }
   }
 
@@ -67,7 +70,7 @@ class _SupportSheet extends StatelessWidget {
     final rows = <Widget>[
       _SupportRow(
         icon: Icons.call_rounded,
-        label: _S.call(locale),
+        label: tr(locale, 'support.call'),
         value: info.phone,
         onTap: () => _launch(context, Uri(scheme: 'tel', path: info.phone)),
       ),
@@ -81,14 +84,14 @@ class _SupportSheet extends StatelessWidget {
       if (email != null && email.isNotEmpty)
         _SupportRow(
           icon: Icons.mail_outline_rounded,
-          label: _S.email(locale),
+          label: tr(locale, 'support.email'),
           value: email,
           onTap: () => _launch(context, Uri(scheme: 'mailto', path: email)),
         ),
       if (hours != null && hours.isNotEmpty)
         _SupportRow(
           icon: Icons.schedule_rounded,
-          label: _S.hours(locale),
+          label: tr(locale, 'support.hours'),
           value: hours,
         ),
     ];
@@ -121,7 +124,7 @@ class _SupportSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4),
             child: Text(
-              _S.title(locale),
+              tr(locale, 'support.title'),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -228,36 +231,3 @@ class _SupportRow extends StatelessWidget {
   }
 }
 
-class _S {
-  const _S._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Центр поддержки',
-    'en' => 'Support center',
-    _ => 'Yordam markazi',
-  };
-
-  static String call(Locale l) => switch (l.languageCode) {
-    'ru' => 'Позвонить',
-    'en' => 'Call',
-    _ => 'Qo\'ng\'iroq qilish',
-  };
-
-  static String email(Locale l) => switch (l.languageCode) {
-    'ru' => 'Эл. почта',
-    'en' => 'Email',
-    _ => 'Email',
-  };
-
-  static String hours(Locale l) => switch (l.languageCode) {
-    'ru' => 'Часы работы',
-    'en' => 'Working hours',
-    _ => 'Ish vaqti',
-  };
-
-  static String launchFailed(Locale l) => switch (l.languageCode) {
-    'ru' => 'Не удалось открыть',
-    'en' => 'Could not open',
-    _ => 'Ochib bo\'lmadi',
-  };
-}

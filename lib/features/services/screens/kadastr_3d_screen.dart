@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/i18n.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
@@ -100,11 +101,10 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
       if (!mounted || reqId != _lookupRequestId) return;
       setState(() {
         _status = _LoadStatus.error;
-        _errorMsg = switch (Localizations.localeOf(context).languageCode) {
-          'ru' => 'Сначала войдите в систему',
-          'en' => 'Please sign in first',
-          _ => 'Avval tizimga kiring',
-        };
+        _errorMsg = tr(
+          Localizations.localeOf(context),
+          'services.k3d.sign_in_first',
+        );
       });
       return;
     }
@@ -126,8 +126,10 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
         setState(() {
           _status = _LoadStatus.error;
           _info = null;
-          _errorMsg =
-              _Strings.notFound(Localizations.localeOf(context));
+          _errorMsg = tr(
+            Localizations.localeOf(context),
+            'services.k3d.not_found',
+          );
         });
         return;
       }
@@ -146,8 +148,10 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
       if (!mounted || reqId != _lookupRequestId) return;
       setState(() {
         _status = _LoadStatus.error;
-        _errorMsg = _Strings.networkError(
-            Localizations.localeOf(context), '$e');
+        _errorMsg = tr(
+          Localizations.localeOf(context),
+          'services.k3d.network_error',
+        ).replaceAll(r'$e', '$e');
       });
       await NetworkErrorHandler.maybeShow(context, e, onRetry: _runLookup);
     }
@@ -190,8 +194,8 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: _Strings.appBarTitle(l),
-                        subtitle: _Strings.appBarSubtitle(l),
+                        title: tr(l, 'services.k3d.appbar.title'),
+                        subtitle: tr(l, 'services.k3d.lookup.subtitle'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -203,7 +207,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
-                          _SectionLabel(_Strings.cadastreNumber(l),
+                          _SectionLabel(tr(l, 'services.k3d.cadastre_number'),
                               color: labelColor),
                           const SizedBox(height: 10),
                           _CadastreInput(
@@ -217,7 +221,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                               _cadastreController.text.length <
                                   _fullMaskLength) ...[
                             const SizedBox(height: 16),
-                            _SectionLabel(_Strings.recentSearches(l),
+                            _SectionLabel(tr(l, 'services.k3d.recent_searches'),
                                 color: labelColor),
                             const SizedBox(height: 10),
                             _RecentChips(
@@ -251,7 +255,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                                           height: 1, color: dividerColor),
                                       const SizedBox(height: 18),
                                       _SectionLabel(
-                                        _Strings.propertyInfo(l),
+                                        tr(l, 'services.k3d.property_info'),
                                         color: labelColor,
                                       ),
                                       const SizedBox(height: 10),
@@ -261,7 +265,8 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                                         )
                                       else if (_status == _LoadStatus.error)
                                         _LookupErrorCard(
-                                          message: _errorMsg ?? _Strings.error(l),
+                                          message: _errorMsg ??
+                                              tr(l, 'services.k3d.error'),
                                           onRetry: _runLookup,
                                           isDark: isDark,
                                         )
@@ -282,7 +287,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _Strings.ctaContinue(l),
+                        label: tr(l, 'services.k3d.continue'),
                         enabled: _status == _LoadStatus.loaded,
                         onTap: _continue,
                       ),
@@ -526,7 +531,7 @@ class _HelperLine extends StatelessWidget {
               fontWeight: FontWeight.w600,
             ),
           ),
-          TextSpan(text: _Strings.autoFetchSuffix(l)),
+          TextSpan(text: tr(l, 'services.k3d.auto_fetch_suffix')),
         ],
       ),
     );
@@ -627,22 +632,22 @@ class _PropertyInfoCard extends StatelessWidget {
     String fmtUzs(double? v) {
       if (v == null) return '—';
       if (v >= 1e9) {
-        return '${(v / 1e9).toStringAsFixed(2)} ${_Strings.billion(l)}';
+        return '${(v / 1e9).toStringAsFixed(2)} ${tr(l, 'services.k3d.billion')}';
       }
       if (v >= 1e6) {
-        return '${(v / 1e6).toStringAsFixed(1)} ${_Strings.million(l)}';
+        return '${(v / 1e6).toStringAsFixed(1)} ${tr(l, 'services.k3d.million')}';
       }
       return _formatDecimal(v);
     }
 
     return [
-      (_Strings.address(l), info.address ?? '—'),
+      (tr(l, 'services.k3d.address'), info.address ?? '—'),
       if (info.objectTypeHint != null)
-        (_Strings.objectType(l), info.objectTypeHint!),
-      (_Strings.area(l), fmtNum(info.totalArea, 'm²')),
+        (tr(l, 'services.k3d.object_type'), info.objectTypeHint!),
+      (tr(l, 'services.k3d.area'), fmtNum(info.totalArea, 'm²')),
       if (info.livingArea != null)
-        (_Strings.livingArea(l), fmtNum(info.livingArea, 'm²')),
-      (_Strings.cadastreValue(l), fmtUzs(info.cadastreValue)),
+        (tr(l, 'services.k3d.living_area'), fmtNum(info.livingArea, 'm²')),
+      (tr(l, 'services.k3d.cadastre_value'), fmtUzs(info.cadastreValue)),
     ];
   }
 
@@ -751,7 +756,7 @@ class _LookupErrorCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _Strings.lookupFailed(locale),
+                  tr(locale, 'services.k3d.lookup_failed'),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -794,114 +799,3 @@ class _LookupErrorCard extends StatelessWidget {
   }
 }
 
-class _Strings {
-  const _Strings._();
-
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => '3D кадастр',
-        'en' => '3D cadastre',
-        _ => '3D kadastr',
-      };
-
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Для жилых зданий',
-        'en' => 'For residential buildings',
-        _ => 'Turar-joy binolari uchun',
-      };
-
-  static String cadastreNumber(Locale l) => switch (l.languageCode) {
-        'ru' => 'Кадастровый номер',
-        'en' => 'Cadastre number',
-        _ => 'Kadastr raqami',
-      };
-
-  static String recentSearches(Locale l) => switch (l.languageCode) {
-        'ru' => 'Последние поиски',
-        'en' => 'Recent searches',
-        _ => 'Oxirgi qidiruvlar',
-      };
-
-  static String propertyInfo(Locale l) => switch (l.languageCode) {
-        'ru' => 'Данные о доме',
-        'en' => 'Property info',
-        _ => 'Uy ma\'lumotlari',
-      };
-
-  static String ctaContinue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
-
-  static String notFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'По этому кадастровому номеру данные не найдены',
-        'en' => 'No data found for this cadastre number',
-        _ => 'Bu kadastr raqami bo\'yicha ma\'lumot topilmadi',
-      };
-
-  static String networkError(Locale l, String e) => switch (l.languageCode) {
-        'ru' => 'Ошибка сети: $e',
-        'en' => 'Network error: $e',
-        _ => 'Tarmoq xatosi: $e',
-      };
-
-  static String error(Locale l) => switch (l.languageCode) {
-        'ru' => 'Ошибка',
-        'en' => 'Error',
-        _ => 'Xato',
-      };
-
-  static String lookupFailed(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось получить данные',
-        'en' => 'Could not fetch data',
-        _ => 'Ma\'lumot olib bo\'lmadi',
-      };
-
-  static String autoFetchSuffix(Locale l) => switch (l.languageCode) {
-        'ru' => ' получается автоматически',
-        'en' => ' is fetched automatically',
-        _ => ' dan avtomatlik olinadi',
-      };
-
-  static String address(Locale l) => switch (l.languageCode) {
-        'ru' => 'Адрес',
-        'en' => 'Address',
-        _ => 'Manzil',
-      };
-
-  static String objectType(Locale l) => switch (l.languageCode) {
-        'ru' => 'Тип',
-        'en' => 'Type',
-        _ => 'Turi',
-      };
-
-  static String area(Locale l) => switch (l.languageCode) {
-        'ru' => 'Площадь',
-        'en' => 'Area',
-        _ => 'Maydon',
-      };
-
-  static String livingArea(Locale l) => switch (l.languageCode) {
-        'ru' => 'Жилая площадь',
-        'en' => 'Living area',
-        _ => 'Yashash maydoni',
-      };
-
-  static String cadastreValue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Кадастровая стоимость',
-        'en' => 'Cadastre value',
-        _ => 'Kadastr qiymati',
-      };
-
-  static String billion(Locale l) => switch (l.languageCode) {
-        'ru' => 'млрд',
-        'en' => 'bln',
-        _ => 'mlrd',
-      };
-
-  static String million(Locale l) => switch (l.languageCode) {
-        'ru' => 'млн',
-        'en' => 'mln',
-        _ => 'mln',
-      };
-}

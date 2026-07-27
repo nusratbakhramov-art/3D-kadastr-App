@@ -1019,11 +1019,7 @@ class _ApproachesCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  switch (locale.languageCode) {
-                    'ru' => 'Подход',
-                    'en' => 'Approach',
-                    _ => 'Yondashuv',
-                  },
+                  _AiStatusStrings.approachHeader(locale),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontSize: 11,
@@ -1032,11 +1028,7 @@ class _ApproachesCard extends StatelessWidget {
                 ),
               ),
               Text(
-                switch (locale.languageCode) {
-                  'ru' => 'Значение · Вес',
-                  'en' => 'Value · Weight',
-                  _ => 'Qiymat · Og\'irlik',
-                },
+                _AiStatusStrings.valueWeightHeader(locale),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontSize: 11,
@@ -1226,9 +1218,6 @@ class _PoiSummary extends StatefulWidget {
 }
 
 class _PoiSummaryState extends State<_PoiSummary> {
-  // Auto-expanded by default: categories start open, and this set only tracks
-  // the ones the user has explicitly collapsed.
-  final Set<String> _collapsed = {};
   // Named places listed per category before a "+N ta" tail.
   static const int _maxPlaces = 8;
 
@@ -1272,40 +1261,30 @@ class _PoiSummaryState extends State<_PoiSummary> {
   ) {
     final kind = r.key;
     final list = r.value as List;
-    final isOpen = !_collapsed.contains(kind);
     return Column(
       children: [
-        InkWell(
-          onTap: () => setState(() {
-            isOpen ? _collapsed.add(kind) : _collapsed.remove(kind);
-          }),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 11),
-            child: Row(
-              children: [
-                Icon(_iconFor(kind), color: AppColors.splashGreen, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _labelFor(kind),
-                    style: TextStyle(
-                      fontFamily: 'MTSText',
-                      fontSize: 13,
-                      color: text,
-                    ),
+        // Collapse control hidden for now — categories stay expanded, and the
+        // label carries a trailing colon (e.g. "Bog'lar:", "Maktablar:").
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          child: Row(
+            children: [
+              Icon(_iconFor(kind), color: AppColors.splashGreen, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  '${_labelFor(kind)}:',
+                  style: TextStyle(
+                    fontFamily: 'MTSText',
+                    fontSize: 13,
+                    color: text,
                   ),
                 ),
-                // "N ta" count suffix removed per product decision.
-                Icon(
-                  isOpen ? Icons.expand_less : Icons.expand_more,
-                  size: 18,
-                  color: sub,
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-        if (isOpen) _places(list, sub, text),
+        _places(list, sub, text),
         if (divider) Divider(height: 1, thickness: 1, color: dividerColor),
       ],
     );
@@ -1436,283 +1415,137 @@ class _PoiSummaryState extends State<_PoiSummary> {
 class _AiStatusStrings {
   const _AiStatusStrings._();
 
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'AI оценка',
-    'en' => 'AI valuation',
-    _ => 'AI Baholash',
-  };
+  static String appBarTitle(Locale l) =>
+      tr(l, 'services.scan.status.app_bar_title');
 
-  static String submittingSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Запрос отправляется...',
-    'en' => 'Submitting the request...',
-    _ => 'So\'rov yuborilmoqda...',
-  };
+  static String submittingSubtitle(Locale l) =>
+      tr(l, 'services.scan.status.submitting_subtitle');
 
-  static String submitting(Locale l) => switch (l.languageCode) {
-    'ru' => 'Отправка...',
-    'en' => 'Submitting...',
-    _ => 'Yuborilmoqda...',
-  };
+  static String submitting(Locale l) =>
+      tr(l, 'services.scan.status.submitting');
 
-  static String notSubmitted(Locale l) => switch (l.languageCode) {
-    'ru' => 'Не отправлено',
-    'en' => 'Not submitted',
-    _ => 'Yuborilmadi',
-  };
+  static String notSubmitted(Locale l) =>
+      tr(l, 'services.scan.status.not_submitted');
 
-  static String fetchingStatus(Locale l) => switch (l.languageCode) {
-    'ru' => 'Получение статуса...',
-    'en' => 'Fetching status...',
-    _ => 'Holat olinmoqda...',
-  };
+  static String fetchingStatus(Locale l) =>
+      tr(l, 'services.scan.status.fetching_status');
 
-  static String errorSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Ошибка',
-    'en' => 'Error',
-    _ => 'Xatolik',
-  };
+  static String errorSubtitle(Locale l) =>
+      tr(l, 'services.scan.status.error_subtitle');
 
-  static String unknownError(Locale l) => switch (l.languageCode) {
-    'ru' => 'Неизвестная ошибка',
-    'en' => 'Unknown error',
-    _ => 'Noma\'lum xatolik',
-  };
+  static String unknownError(Locale l) =>
+      tr(l, 'services.scan.status.unknown_error');
 
-  static String calculating(Locale l) => switch (l.languageCode) {
-    'ru' => 'Расчёт...',
-    'en' => 'Calculating...',
-    _ => 'Hisoblanmoqda...',
-  };
+  static String calculating(Locale l) =>
+      tr(l, 'services.scan.status.calculating');
 
-  static String errLogin(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сначала войдите в систему',
-    'en' => 'Please sign in first',
-    _ => 'Avval tizimga kiring',
-  };
+  static String errLogin(Locale l) =>
+      tr(l, 'services.scan.status.err_login');
 
-  static String invalidData(Locale l) => switch (l.languageCode) {
-    'ru' => 'Проверьте введённые данные и попробуйте снова',
-    'en' => 'Please check the entered data and try again',
-    _ => 'Kiritilgan ma\'lumotlarni tekshirib, qayta urinib ko\'ring',
-  };
+  static String invalidData(Locale l) =>
+      tr(l, 'services.scan.status.invalid_data');
 
-  static String stepReceived(Locale l) => switch (l.languageCode) {
-    'ru' => 'Запрос принят',
-    'en' => 'Request received',
-    _ => 'So\'rov qabul qilindi',
-  };
+  static String stepReceived(Locale l) =>
+      tr(l, 'services.scan.status.step_received');
 
-  static String stepGathering(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сбор данных',
-    'en' => 'Collecting data',
-    _ => 'Ma\'lumotlar yig\'ilmoqda',
-  };
+  static String stepGathering(Locale l) =>
+      tr(l, 'services.scan.status.step_gathering');
 
   static String gatheringDetails(Locale l, int listings, int pois) =>
-      switch (l.languageCode) {
-        'ru' => '$listings объявл. · $pois ближних объектов',
-        'en' => '$listings listings · $pois nearby objects',
-        _ => '$listings ta e\'lon · $pois ta yaqin obyekt',
-      };
+      tr(l, 'services.scan.status.gathering_details')
+          .replaceAll(r'$listings', '$listings')
+          .replaceAll(r'$pois', '$pois');
 
-  static String stepPricing(Locale l) => switch (l.languageCode) {
-    'ru' => 'AI рассчитывает цену',
-    'en' => 'AI is calculating the price',
-    _ => 'AI narx hisoblanmoqda',
-  };
+  static String stepPricing(Locale l) =>
+      tr(l, 'services.scan.status.step_pricing');
 
-  static String durationHint(Locale l) => switch (l.languageCode) {
-    'ru' =>
-      'Это может занять от 30 секунд до 2 минут.\n'
-          'Мы уведомим вас по завершении.',
-    'en' =>
-      'This may take 30 seconds to 2 minutes.\n'
-          'We\'ll notify you when it\'s done.',
-    _ =>
-      'Bu jarayon 30 sekund - 2 daqiqa olishi mumkin.\n'
-          'Tugagandan keyin xabar yuboramiz.',
-  };
+  static String durationHint(Locale l) =>
+      tr(l, 'services.scan.status.duration_hint');
 
-  static String resultTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Результат AI оценки',
-    'en' => 'AI valuation result',
-    _ => 'AI Baholash natijasi',
-  };
+  static String resultTitle(Locale l) =>
+      tr(l, 'services.scan.status.result_title');
 
-  static String estimatedValue(Locale l) => switch (l.languageCode) {
-    'ru' => 'Примерная стоимость',
-    'en' => 'Estimated value',
-    _ => 'Taxminiy qiymat',
-  };
+  static String estimatedValue(Locale l) =>
+      tr(l, 'services.scan.status.estimated_value');
 
-  static String soum(Locale l) => switch (l.languageCode) {
-    'ru' => 'сум',
-    'en' => 'soum',
-    _ => 'so\'m',
-  };
+  static String soum(Locale l) => tr(l, 'services.scan.status.soum');
 
-  static String confidenceLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Достоверность: ',
-    'en' => 'Confidence: ',
-    _ => 'Ishonchlilik: ',
-  };
+  static String confidenceLabel(Locale l) =>
+      tr(l, 'services.scan.status.confidence_label');
 
-  static String confHigh(Locale l) => switch (l.languageCode) {
-    'ru' => 'Высокая',
-    'en' => 'High',
-    _ => 'Yuqori',
-  };
+  static String confHigh(Locale l) =>
+      tr(l, 'services.scan.status.conf_high');
 
-  static String confMedium(Locale l) => switch (l.languageCode) {
-    'ru' => 'Средняя',
-    'en' => 'Medium',
-    _ => 'O\'rtacha',
-  };
+  static String confMedium(Locale l) =>
+      tr(l, 'services.scan.status.conf_medium');
 
-  static String confLow(Locale l) => switch (l.languageCode) {
-    'ru' => 'Низкая',
-    'en' => 'Low',
-    _ => 'Past',
-  };
+  static String confLow(Locale l) => tr(l, 'services.scan.status.conf_low');
 
-  static String approachesTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Подходы к оценке',
-    'en' => 'Valuation approaches',
-    _ => 'Baholash yondashuvlari',
-  };
+  static String approachesTitle(Locale l) =>
+      tr(l, 'services.scan.status.approaches_title');
 
-  static String approachCost(Locale l) => switch (l.languageCode) {
-    'ru' => 'Затраты (восстановление)',
-    'en' => 'Cost (replacement)',
-    _ => 'Xarajat (qayta tiklash)',
-  };
+  static String approachCost(Locale l) =>
+      tr(l, 'services.scan.status.approach_cost');
 
-  static String costNotApplied(Locale l) => switch (l.languageCode) {
-    'ru' => 'смета не введена',
-    'en' => 'no estimate provided',
-    _ => 'smeta kiritilmagan',
-  };
+  static String costNotApplied(Locale l) =>
+      tr(l, 'services.scan.status.cost_not_applied');
 
-  static String approachIncome(Locale l) => switch (l.languageCode) {
-    'ru' => 'Доход (аренда)',
-    'en' => 'Income (rent)',
-    _ => 'Daromad (ijara)',
-  };
+  static String approachIncome(Locale l) =>
+      tr(l, 'services.scan.status.approach_income');
 
-  static String approachComparison(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сравнение (рынок)',
-    'en' => 'Comparison (market)',
-    _ => 'Qiyoslash (bozor)',
-  };
+  static String approachComparison(Locale l) =>
+      tr(l, 'services.scan.status.approach_comparison');
 
-  static String comparablesTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сравниваемые объявления',
-    'en' => 'Compared listings',
-    _ => 'Solishtirilgan e\'lonlar',
-  };
+  static String comparablesTitle(Locale l) =>
+      tr(l, 'services.scan.status.comparables_title');
 
-  static String moreListings(Locale l, int n) => switch (l.languageCode) {
-    'ru' => 'Ещё $n объявлений',
-    'en' => '$n more listings',
-    _ => 'Yana $n ta e\'lon',
-  };
+  static String moreListings(Locale l, int n) =>
+      tr(l, 'services.scan.status.more_listings').replaceAll(r'$n', '$n');
 
-  static String poisTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Объекты поблизости',
-    'en' => 'Nearby objects',
-    _ => 'Yaqin atrofdagi obyektlar',
-  };
+  static String poisTitle(Locale l) =>
+      tr(l, 'services.scan.status.pois_title');
 
-  static String poisSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Инфраструктура в радиусе 1–2 км',
-    'en' => 'Infrastructure found within a 1–2 km radius',
-    _ => '1–2 km radiusda topilgan infratuzilma',
-  };
+  static String poisSubtitle(Locale l) =>
+      tr(l, 'services.scan.status.pois_subtitle');
 
-  static String morePlaces(Locale l, int n) => switch (l.languageCode) {
-    'ru' => 'Ещё $n',
-    'en' => '$n more',
-    _ => 'Yana $n ta',
-  };
+  static String morePlaces(Locale l, int n) =>
+      tr(l, 'services.scan.status.more_places').replaceAll(r'$n', '$n');
 
-  static String unnamed(Locale l) => switch (l.languageCode) {
-    'ru' => 'Без названия',
-    'en' => 'Unnamed',
-    _ => 'Nomsiz',
-  };
+  static String unnamed(Locale l) => tr(l, 'services.scan.status.unnamed');
 
-  static String usePaidService(Locale l) => tr(
-    l,
-    'ai.credentials.use_service',
-    uz: 'Foydalanish',
-    ru: 'Использовать',
-    en: 'Use',
-  );
+  static String usePaidService(Locale l) => tr(l, 'ai.credentials.use_service');
 
-  static String unitBln(Locale l) => switch (l.languageCode) {
-    'ru' => 'млрд',
-    'en' => 'bln',
-    _ => 'mlrd',
-  };
+  static String unitBln(Locale l) => tr(l, 'services.scan.status.unit_bln');
 
-  static String unitMln(Locale l) => switch (l.languageCode) {
-    'ru' => 'млн',
-    'en' => 'mln',
-    _ => 'mln',
-  };
+  static String unitMln(Locale l) => tr(l, 'services.scan.status.unit_mln');
 
-  static String unitK(Locale l) => switch (l.languageCode) {
-    'ru' => 'тыс',
-    'en' => 'k',
-    _ => 'ming',
-  };
+  static String unitK(Locale l) => tr(l, 'services.scan.status.unit_k');
 
+  static String poiSchools(Locale l) =>
+      tr(l, 'services.scan.status.poi_schools');
 
-  static String poiSchools(Locale l) => switch (l.languageCode) {
-    'ru' => 'Школы',
-    'en' => 'Schools',
-    _ => 'Maktablar',
-  };
+  static String poiKindergartens(Locale l) =>
+      tr(l, 'services.scan.status.poi_kindergartens');
 
-  static String poiKindergartens(Locale l) => switch (l.languageCode) {
-    'ru' => 'Детские сады',
-    'en' => 'Kindergartens',
-    _ => 'Bog\'chalar',
-  };
+  static String poiMetro(Locale l) => tr(l, 'services.scan.status.poi_metro');
 
-  static String poiMetro(Locale l) => switch (l.languageCode) {
-    'ru' => 'Станции метро',
-    'en' => 'Metro stations',
-    _ => 'Metro bekatlari',
-  };
+  static String poiParks(Locale l) => tr(l, 'services.scan.status.poi_parks');
 
-  static String poiParks(Locale l) => switch (l.languageCode) {
-    'ru' => 'Парки',
-    'en' => 'Parks',
-    _ => 'Bog\'lar',
-  };
+  static String poiHospitals(Locale l) =>
+      tr(l, 'services.scan.status.poi_hospitals');
 
-  static String poiHospitals(Locale l) => switch (l.languageCode) {
-    'ru' => 'Больницы',
-    'en' => 'Hospitals',
-    _ => 'Shifoxonalar',
-  };
+  static String poiClinics(Locale l) =>
+      tr(l, 'services.scan.status.poi_clinics');
 
-  static String poiClinics(Locale l) => switch (l.languageCode) {
-    'ru' => 'Поликлиники',
-    'en' => 'Clinics',
-    _ => 'Poliklinikalar',
-  };
+  static String poiSupermarkets(Locale l) =>
+      tr(l, 'services.scan.status.poi_supermarkets');
 
-  static String poiSupermarkets(Locale l) => switch (l.languageCode) {
-    'ru' => 'Супермаркеты',
-    'en' => 'Supermarkets',
-    _ => 'Supermarketlar',
-  };
+  static String poiBusStops(Locale l) =>
+      tr(l, 'services.scan.status.poi_bus_stops');
 
-  static String poiBusStops(Locale l) => switch (l.languageCode) {
-    'ru' => 'Автобусные остановки',
-    'en' => 'Bus stops',
-    _ => 'Avtobus bekatlari',
-  };
+  static String approachHeader(Locale l) =>
+      tr(l, 'services.scan.status.approach_header');
+
+  static String valueWeightHeader(Locale l) =>
+      tr(l, 'services.scan.status.value_weight_header');
 }

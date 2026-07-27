@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 
 class DobField extends StatelessWidget {
@@ -52,7 +53,7 @@ class DobField extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          _DobFieldStrings.sheetTitle(locale),
+                          tr(locale, 'auth.dob.sheet_title'),
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: textColor,
@@ -107,7 +108,7 @@ class DobField extends StatelessWidget {
                       ),
                       onPressed: () => Navigator.of(ctx).pop(tempPicked),
                       child: Text(
-                        _DobFieldStrings.confirm(locale),
+                        tr(locale, 'auth.dob.confirm'),
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -183,18 +184,8 @@ class DobField extends StatelessWidget {
 class _DobFieldStrings {
   const _DobFieldStrings._();
 
-  static String sheetTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Дата рождения',
-    'en' => 'Date of birth',
-    _ => 'Tug‘ilgan sana',
-  };
-
-  static String confirm(Locale l) => switch (l.languageCode) {
-    'ru' => 'Подтвердить',
-    'en' => 'Confirm',
-    _ => 'Tasdiqlash',
-  };
-
+  // Non-linguistic date-format mask (day/month/year abbreviations). Kept as a
+  // locale switch rather than a translation key — see i18n migration notes.
   static String placeholder(Locale l) => switch (l.languageCode) {
     'ru' => 'дд.мм.гггг',
     'en' => 'dd.mm.yyyy',

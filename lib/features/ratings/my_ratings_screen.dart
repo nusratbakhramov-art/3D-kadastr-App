@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
 import '../../core/i18n.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
@@ -70,7 +71,7 @@ class _MyRatingsScreenState extends State<MyRatingsScreen>
                           0.4,
                           curve: Curves.easeOutCubic,
                         ),
-                        child: AppHeaderBack(title: _S.title(locale)),
+                        child: AppHeaderBack(title: tr(locale, 'ratings.title')),
                       ),
                       const SizedBox(height: 16),
                       if (_loading)
@@ -79,8 +80,8 @@ class _MyRatingsScreenState extends State<MyRatingsScreen>
                         _ErrorState(onRetry: _load)
                       else if (items.isEmpty)
                         _EmptyState(
-                          title: _S.emptyTitle(locale),
-                          message: _S.emptyMessage(locale),
+                          title: tr(locale, 'ratings.empty_title'),
+                          message: tr(locale, 'ratings.empty_message'),
                         )
                       else
                         for (var i = 0; i < items.length; i++) ...[
@@ -178,7 +179,7 @@ class _ValuationCard extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _S.finalValue(locale),
+                          tr(locale, 'ratings.final_value'),
                           style: TextStyle(
                             fontFamily: 'MTSCompact',
                             fontWeight: FontWeight.w500,
@@ -225,7 +226,7 @@ class _ComponentsRow extends StatelessWidget {
       children: [
         Expanded(
           child: _ComponentChip(
-            label: _S.abc(locale),
+            label: tr(locale, 'ratings.abc'),
             value: formatSum(item.abcValue),
             tint: const Color(0xFF6B7280),
           ),
@@ -233,7 +234,7 @@ class _ComponentsRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _ComponentChip(
-            label: _S.market(locale),
+            label: tr(locale, 'ratings.market'),
             value: formatSum(item.marketValue),
             tint: const Color(0xFF3B82F6),
           ),
@@ -241,7 +242,7 @@ class _ComponentsRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: _ComponentChip(
-            label: _S.income(locale),
+            label: tr(locale, 'ratings.income'),
             value: item.incomeValue != null
                 ? formatSum(item.incomeValue!)
                 : '—',
@@ -341,7 +342,7 @@ class _ConfidenceChip extends StatelessWidget {
           Icon(Icons.auto_graph_rounded, size: 14, color: tier),
           const SizedBox(width: 4),
           Text(
-            '${_S.confidence(locale)} $pct%',
+            '${tr(locale, 'ratings.confidence')} $pct%',
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
@@ -440,47 +441,3 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
-class _S {
-  const _S._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мои оценки',
-    'en' => 'My valuations',
-    _ => 'Baholashlarim',
-  };
-  static String finalValue(Locale l) => switch (l.languageCode) {
-    'ru' => 'Итоговая оценка',
-    'en' => 'Final valuation',
-    _ => 'Yakuniy baho',
-  };
-  static String abc(Locale l) => switch (l.languageCode) {
-    'ru' => 'ABC индекс',
-    'en' => 'ABC index',
-    _ => 'ABC indeks',
-  };
-  static String market(Locale l) => switch (l.languageCode) {
-    'ru' => 'Рынок',
-    'en' => 'Market',
-    _ => 'Bozor',
-  };
-  static String income(Locale l) => switch (l.languageCode) {
-    'ru' => 'Доходность',
-    'en' => 'Income',
-    _ => 'Daromadlilik',
-  };
-  static String confidence(Locale l) => switch (l.languageCode) {
-    'ru' => 'Точность',
-    'en' => 'Confidence',
-    _ => 'Ishonch',
-  };
-  static String emptyTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Оценок пока нет',
-    'en' => 'No valuations yet',
-    _ => 'Hali baholashlar yo‘q',
-  };
-  static String emptyMessage(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сделайте 3D-сканирование объекта, чтобы получить AI-оценку.',
-    'en' => 'Run a 3D scan to get an AI valuation.',
-    _ => 'AI bahoni olish uchun obyektni 3D skan qiling.',
-  };
-}

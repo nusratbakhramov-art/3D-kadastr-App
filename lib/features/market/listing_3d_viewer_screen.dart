@@ -54,13 +54,7 @@ class _Listing3DViewerScreenState extends State<Listing3DViewerScreen> {
     if (id == null) {
       setState(() {
         _loading = false;
-        _error = tr(
-          locale,
-          'market.viewer.model_id_not_found',
-          uz: 'Model ID topilmadi',
-          ru: 'ID модели не найден',
-          en: 'Model ID not found',
-        );
+        _error = tr(locale, 'market.viewer.model_id_not_found');
       });
       return;
     }
@@ -70,13 +64,7 @@ class _Listing3DViewerScreenState extends State<Listing3DViewerScreen> {
     if (glb == null) {
       setState(() {
         _loading = false;
-        _error = tr(
-          locale,
-          'market.viewer.glb_not_found',
-          uz: '3D ko‘rinish uchun GLB format topilmadi',
-          ru: 'Для 3D-просмотра не найден формат GLB',
-          en: 'GLB format for 3D view was not found',
-        );
+        _error = tr(locale, 'market.viewer.glb_not_found');
       });
       return;
     }
@@ -86,13 +74,7 @@ class _Listing3DViewerScreenState extends State<Listing3DViewerScreen> {
       if (session.token == null) {
         setState(() {
           _loading = false;
-          _error = tr(
-            locale,
-            'market.viewer.login_required',
-            uz: '3D modelni ko‘rish uchun tizimga kiring',
-            ru: 'Войдите, чтобы просмотреть 3D-модель',
-            en: 'Sign in to view the 3D model',
-          );
+          _error = tr(locale, 'market.viewer.login_required');
         });
         return;
       }

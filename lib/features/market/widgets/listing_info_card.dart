@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 
 class ListingInfoCard extends StatelessWidget {
@@ -41,7 +42,7 @@ class ListingInfoCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                _ListingInfoStrings.free(locale),
+                tr(locale, 'market.listing.free'),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
@@ -103,14 +104,4 @@ class ListingInfoCard extends StatelessWidget {
     }
     return buf.toString();
   }
-}
-
-class _ListingInfoStrings {
-  const _ListingInfoStrings._();
-
-  static String free(Locale l) => switch (l.languageCode) {
-    'ru' => 'Бесплатно',
-    'en' => 'Free',
-    _ => 'Bepul',
-  };
 }

@@ -50,13 +50,7 @@ class ListingFormatsCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            tr(
-              Localizations.localeOf(context),
-              'market.formats.title',
-              uz: 'Yuklab olish formatlari',
-              ru: 'Форматы',
-              en: 'Formats',
-            ),
+            tr(Localizations.localeOf(context), 'market.formats.title'),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,

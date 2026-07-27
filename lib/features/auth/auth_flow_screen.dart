@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../core/network_error_handler.dart';
 import '../../widgets/app_toast.dart';
 import '../home/user_profile.dart' as home;
@@ -83,11 +84,10 @@ class _AuthFlowScreenState extends State<AuthFlowScreen> {
       ),
     );
     if (!mounted) return;
-    AppToast.success(context, switch (localeNotifier.value.languageCode) {
-      'ru' => 'Введённый код подтверждения верный!',
-      'en' => 'The verification code you entered is correct!',
-      _ => "Siz kiritgan tasdiqlash kodi to'g'ri kiritildi!",
-    });
+    AppToast.success(
+      context,
+      tr(localeNotifier.value, 'auth.verify.success_toast'),
+    );
     if (result.isNewUser) {
       setState(() => _step = _AuthStep.profile);
     } else {

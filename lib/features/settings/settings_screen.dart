@@ -295,7 +295,7 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
         AppMenuRow(
           icon: Icons.delete_outline_rounded,
-          label: _deleteAccountLabel(locale),
+          label: _S.deleteAccount(locale),
           destructive: true,
           onTap: () => _confirmDeleteAccount(context, locale),
         ),
@@ -376,23 +376,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
-  String _deleteAccountLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Удалить аккаунт',
-    'en' => 'Delete account',
-    _ => "Hisobni o'chirish",
-  };
-
   // Hisobni o'chirish (App Store 5.1.1(v)). Backend hisobni deaktivatsiya qilib
   // barcha sessiyalarni bekor qiladi; muvaffaqiyatda login ekraniga qaytamiz.
   Future<void> _confirmDeleteAccount(
     BuildContext context,
     Locale locale,
   ) async {
-    String t(String ru, String en, String uz) => switch (locale.languageCode) {
-      'ru' => ru,
-      'en' => en,
-      _ => uz,
-    };
     final confirmed = await showModalBottomSheet<bool>(
       context: context,
       backgroundColor: ColorTokens.cardBg(context),
@@ -409,31 +398,14 @@ class _SettingsScreenState extends State<SettingsScreen>
           .timeout(const Duration(seconds: 15));
       if (!context.mounted) return;
       if (res.statusCode == 200) {
-        AppToast.success(
-          context,
-          t('Аккаунт удалён', 'Account deleted', "Hisob o'chirildi"),
-        );
+        AppToast.success(context, _S.deleteSuccess(locale));
         (widget.onAccountDeleted ?? widget.onLogoutConfirmed)?.call();
       } else {
-        AppToast.error(
-          context,
-          t(
-            'Не удалось удалить аккаунт',
-            'Could not delete account',
-            "Hisobni o'chirib bo'lmadi",
-          ),
-        );
+        AppToast.error(context, _S.deleteError(locale));
       }
     } catch (_) {
       if (context.mounted) {
-        AppToast.error(
-          context,
-          t(
-            'Не удалось удалить аккаунт',
-            'Could not delete account',
-            "Hisobni o'chirib bo'lmadi",
-          ),
-        );
+        AppToast.error(context, _S.deleteError(locale));
       }
     }
   }
@@ -535,12 +507,6 @@ class _DeleteAccountSheet extends StatelessWidget {
 
   final Locale locale;
 
-  String _t(String ru, String en, String uz) => switch (locale.languageCode) {
-    'ru' => ru,
-    'en' => en,
-    _ => uz,
-  };
-
   @override
   Widget build(BuildContext context) {
     return SafeArea(
@@ -578,11 +544,7 @@ class _DeleteAccountSheet extends StatelessWidget {
             ),
             const SizedBox(height: 14),
             Text(
-              _t(
-                'Удалить аккаунт?',
-                'Delete account?',
-                "Hisobni o'chirasizmi?",
-              ),
+              _S.deleteAccountTitle(locale),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -593,11 +555,7 @@ class _DeleteAccountSheet extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              _t(
-                'Ваш аккаунт и связанные данные будут удалены. Это действие необратимо.',
-                'Your account and associated data will be deleted. This action cannot be undone.',
-                "Hisobingiz va unga bog'liq ma'lumotlar o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.",
-              ),
+              _S.deleteAccountBody(locale),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'MTSText',
@@ -611,7 +569,7 @@ class _DeleteAccountSheet extends StatelessWidget {
               children: [
                 Expanded(
                   child: _SheetButton(
-                    label: _t('Отмена', 'Cancel', 'Bekor qilish'),
+                    label: _S.cancel(locale),
                     onTap: () => Navigator.pop(context, false),
                     background: ColorTokens.iconBg(context),
                     foreground: ColorTokens.primaryText(context),
@@ -620,7 +578,7 @@ class _DeleteAccountSheet extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: _SheetButton(
-                    label: _t('Удалить', 'Delete', "O'chirish"),
+                    label: _S.deleteConfirm(locale),
                     onTap: () => Navigator.pop(context, true),
                     background: const Color(0xFFE5484D),
                     foreground: Colors.white,
@@ -756,11 +714,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
         if (mounted) {
           Navigator.pop(context);
           final locale = localeNotifier.value;
-          AppToast.success(context, switch (locale.languageCode) {
-            'ru' => 'Номер телефона обновлён',
-            'en' => 'Phone number updated',
-            _ => 'Telefon raqam yangilandi',
-          });
+          AppToast.success(context, _S.phoneUpdated(locale));
         }
       } else {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
@@ -813,11 +767,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              switch (locale.languageCode) {
-                'ru' => 'Изменить номер телефона',
-                'en' => 'Change phone number',
-                _ => 'Telefon raqamni o\'zgartirish',
-              },
+              _S.phoneTitle(locale),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -847,11 +797,7 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
                 keyboardType: TextInputType.number,
                 maxLength: 6,
                 decoration: InputDecoration(
-                  hintText: switch (locale.languageCode) {
-                    'ru' => 'OTP код',
-                    'en' => 'OTP code',
-                    _ => 'OTP kodi',
-                  },
+                  hintText: _S.otpHint(locale),
                   counterText: '',
                   filled: true,
                   fillColor: ColorTokens.iconBg(context),
@@ -887,11 +833,9 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : Text(
-                      switch (localeNotifier.value.languageCode) {
-                        'ru' => _otpSent ? 'Подтвердить' : 'Отправить OTP',
-                        'en' => _otpSent ? 'Confirm' : 'Send OTP',
-                        _ => _otpSent ? 'Tasdiqlash' : 'OTP yuborish',
-                      },
+                      _otpSent
+                          ? _S.phoneConfirm(localeNotifier.value)
+                          : _S.sendOtp(localeNotifier.value),
                       style: const TextStyle(
                         fontFamily: 'MTSCompact',
                         fontWeight: FontWeight.w700,
@@ -911,145 +855,18 @@ class _ChangePhoneSheetState extends State<_ChangePhoneSheet> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class _LegalFallback {
-  static ({String title, String content}) get(String type, String lang) {
-    if (type == 'terms') return _terms[lang] ?? _terms['uz']!;
-    return _privacy[lang] ?? _privacy['uz']!;
+  static ({String title, String content}) get(String type, Locale l) {
+    if (type == 'terms') {
+      return (
+        title: tr(l, 'settings.legal.terms_title'),
+        content: tr(l, 'settings.legal.terms_body'),
+      );
+    }
+    return (
+      title: tr(l, 'settings.legal.privacy_title'),
+      content: tr(l, 'settings.legal.privacy_body'),
+    );
   }
-
-  static const _terms = {
-    'uz': (
-      title: 'Foydalanish shartlari',
-      content:
-          '1. Umumiy qoidalar\n\n'
-          'Ushbu shartlar 3D Kadastr ilovasidan foydalanish qoidalarini belgilaydi. '
-          'Ilovadan foydalanib, siz ushbu shartlarga roziligingizni bildirasiz.\n\n'
-          '2. Xizmat tavsifi\n\n'
-          '3D Kadastr — ko\'chmas mulk obyektlarini 3D skanerlash, baholash va '
-          'kadastr ma\'lumotlarini boshqarish uchun mo\'ljallangan platforma.\n\n'
-          '3. Foydalanuvchi majburiyatlari\n\n'
-          'Foydalanuvchi haqiqiy ma\'lumotlar kiritishi, hisobni uchinchi shaxslarga '
-          'bermasligi va qonuniy maqsadlarda foydalanishi shart.\n\n'
-          '4. Intellektual mulk\n\n'
-          'Ilova va uning barcha tarkibi 3D Kadastr kompaniyasiga tegishli bo\'lib, '
-          'mualliflik huquqi bilan himoyalangan.\n\n'
-          '5. Javobgarlikni cheklash\n\n'
-          'Kompaniya texnik nosozliklar, uchinchi tomon xizmatlari yoki foydalanuvchi '
-          'xatolaridan yuzaga keladigan zararlar uchun javobgar emas.\n\n'
-          '6. O\'zgartirishlar\n\n'
-          'Kompaniya ushbu shartlarni oldindan ogohlantirmay o\'zgartirish huquqini '
-          'o\'zida saqlab qoladi. Yangilangan shartlar ilovada e\'lon qilinadi.\n\n'
-          '7. Bog\'lanish\n\nsupport@3dkadastr.uz',
-    ),
-    'ru': (
-      title: 'Условия использования',
-      content:
-          '1. Общие положения\n\n'
-          'Настоящие условия регулируют использование приложения 3D Kadastr. '
-          'Используя приложение, вы принимаете данные условия.\n\n'
-          '2. Описание сервиса\n\n'
-          '3D Kadastr — платформа для 3D-сканирования объектов недвижимости, '
-          'оценки стоимости и управления кадастровыми данными.\n\n'
-          '3. Обязанности пользователя\n\n'
-          'Пользователь обязан предоставлять достоверные данные, не передавать '
-          'учётную запись третьим лицам и использовать сервис в законных целях.\n\n'
-          '4. Интеллектуальная собственность\n\n'
-          'Приложение и весь его контент принадлежат компании 3D Kadastr и '
-          'защищены авторским правом.\n\n'
-          '5. Ограничение ответственности\n\n'
-          'Компания не несёт ответственности за ущерб, возникший вследствие '
-          'технических сбоев, сервисов третьих сторон или действий пользователя.\n\n'
-          '6. Изменения\n\n'
-          'Компания оставляет за собой право изменять настоящие условия. '
-          'Актуальная версия публикуется в приложении.\n\n'
-          '7. Контакты\n\nsupport@3dkadastr.uz',
-    ),
-    'en': (
-      title: 'Terms of Use',
-      content:
-          '1. General Terms\n\n'
-          'These terms govern your use of the 3D Kadastr application. '
-          'By using the app, you agree to these terms.\n\n'
-          '2. Service Description\n\n'
-          '3D Kadastr is a platform for 3D scanning of real estate objects, '
-          'property valuation, and cadastral data management.\n\n'
-          '3. User Obligations\n\n'
-          'Users must provide accurate information, not share accounts with '
-          'third parties, and use the service for lawful purposes only.\n\n'
-          '4. Intellectual Property\n\n'
-          'The app and all its content belong to 3D Kadastr company and are '
-          'protected by copyright.\n\n'
-          '5. Limitation of Liability\n\n'
-          'The company is not liable for damages arising from technical failures, '
-          'third-party services, or user errors.\n\n'
-          '6. Changes\n\n'
-          'The company reserves the right to modify these terms. '
-          'Updated terms will be published in the app.\n\n'
-          '7. Contact\n\nsupport@3dkadastr.uz',
-    ),
-  };
-
-  static const _privacy = {
-    'uz': (
-      title: 'Maxfiylik siyosati',
-      content:
-          '1. To\'planadigan ma\'lumotlar\n\n'
-          'Biz quyidagi ma\'lumotlarni to\'playmiz: telefon raqami, to\'liq ism, '
-          'elektron pochta (ixtiyoriy), skanerlangan obyekt rasmlari va '
-          'joylashuv ma\'lumotlari.\n\n'
-          '2. Ma\'lumotlardan foydalanish\n\n'
-          'Ma\'lumotlar faqat xizmat ko\'rsatish, baholash natijalari tayyorlash '
-          'va bildirishnomalar yuborish uchun ishlatiladi.\n\n'
-          '3. Ma\'lumotlarni saqlash\n\n'
-          'Barcha ma\'lumotlar shifrlangan holda O\'zbekistondagi serverlarimizda '
-          'saqlanadi. Uchinchi shaxslarga sotilmaydi.\n\n'
-          '4. Foydalanuvchi huquqlari\n\n'
-          'Siz o\'z ma\'lumotlaringizga kirish, o\'zgartirish yoki o\'chirish huquqiga '
-          'egasiz. Buning uchun support@3dkadastr.uz manziliga murojaat qiling.\n\n'
-          '5. Kuzatish va analitika\n\n'
-          'Ilova faqat texnik ishlash uchun zarur bo\'lgan minimal analitikadan '
-          'foydalanadi.\n\n'
-          '6. Aloqa\n\nprivacy@3dkadastr.uz',
-    ),
-    'ru': (
-      title: 'Политика конфиденциальности',
-      content:
-          '1. Собираемые данные\n\n'
-          'Мы собираем: номер телефона, полное имя, email (необязательно), '
-          'изображения сканируемых объектов и данные о местоположении.\n\n'
-          '2. Использование данных\n\n'
-          'Данные используются исключительно для предоставления услуг, '
-          'подготовки результатов оценки и отправки уведомлений.\n\n'
-          '3. Хранение данных\n\n'
-          'Все данные хранятся в зашифрованном виде на наших серверах '
-          'в Узбекистане и не продаются третьим лицам.\n\n'
-          '4. Права пользователя\n\n'
-          'Вы вправе получить доступ к своим данным, изменить или удалить их. '
-          'Обратитесь по адресу support@3dkadastr.uz.\n\n'
-          '5. Аналитика\n\n'
-          'Приложение использует минимальную аналитику, необходимую для '
-          'технического функционирования.\n\n'
-          '6. Контакты\n\nprivacy@3dkadastr.uz',
-    ),
-    'en': (
-      title: 'Privacy Policy',
-      content:
-          '1. Data We Collect\n\n'
-          'We collect: phone number, full name, email (optional), '
-          'scanned object images, and location data.\n\n'
-          '2. How We Use Data\n\n'
-          'Data is used solely for providing services, preparing valuation '
-          'results, and sending notifications.\n\n'
-          '3. Data Storage\n\n'
-          'All data is stored encrypted on our servers in Uzbekistan and '
-          'is not sold to third parties.\n\n'
-          '4. Your Rights\n\n'
-          'You have the right to access, modify, or delete your data. '
-          'Contact support@3dkadastr.uz.\n\n'
-          '5. Analytics\n\n'
-          'The app uses minimal analytics required for technical operation.\n\n'
-          '6. Contact\n\nprivacy@3dkadastr.uz',
-    ),
-  };
 }
 
 class _LegalCache {
@@ -1120,10 +937,7 @@ class _LegalContentSheetState extends State<_LegalContentSheet> {
       // fall through to static fallback
     }
     // API unavailable — show static fallback content
-    final fallback = _LegalFallback.get(
-      widget.type,
-      widget.locale.languageCode,
-    );
+    final fallback = _LegalFallback.get(widget.type, widget.locale);
     if (mounted)
       setState(() {
         _title = fallback.title;
@@ -1375,110 +1189,50 @@ class _OptionSheet<T> extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String _t(Locale l, String key, String uz, String ru, String en) =>
-      tr(l, key, uz: uz, ru: ru, en: en);
+  static String _t(Locale l, String key) => tr(l, key);
 
-  static String title(Locale l) =>
-      _t(l, 'settings.title', 'Sozlamalar', 'Настройки', 'Settings');
-  static String account(Locale l) =>
-      _t(l, 'settings.account', 'Hisob', 'Аккаунт', 'Account');
-  static String privacy(Locale l) =>
-      _t(l, 'settings.privacy', 'Maxfiylik', 'Конфиденциальность', 'Privacy');
-  static String other(Locale l) =>
-      _t(l, 'settings.other', 'Boshqa', 'Прочее', 'Other');
-  static String language(Locale l) =>
-      _t(l, 'settings.language', 'Til', 'Язык', 'Language');
-  static String theme(Locale l) =>
-      _t(l, 'settings.theme', 'Mavzu', 'Тема', 'Theme');
-  static String notifications(Locale l) => _t(
-    l,
-    'settings.notifications',
-    'Bildirishnomalar',
-    'Уведомления',
-    'Notifications',
-  );
-  // static String biometric(Locale l) => switch (l.languageCode) {
-  //   'ru' => 'Биометрический вход',
-  //   'en' => 'Biometric login',
-  //   _ => 'Biometrik kirish',
-  // };
-  static String changePhone(Locale l) => _t(
-    l,
-    'settings.change_phone',
-    'Telefon raqamni o‘zgartirish',
-    'Сменить номер',
-    'Change phone',
-  );
-  static String terms(Locale l) => _t(
-    l,
-    'settings.terms',
-    'Foydalanish shartlari',
-    'Условия использования',
-    'Terms of use',
-  );
-  static String privacyPolicy(Locale l) => _t(
-    l,
-    'settings.privacy_policy',
-    'Maxfiylik siyosati',
-    'Политика конфиденциальности',
-    'Privacy policy',
-  );
-  static String payments(Locale l) =>
-      _t(l, 'settings.payments', "To'lovlarim", 'Мои платежи', 'My payments');
-  static String paymentsLoginMsg(Locale l) => _t(
-    l,
-    'settings.payments_login_msg',
-    "To'lovlar tarixini ko'rish uchun tizimga kiring.",
-    'Войдите, чтобы посмотреть историю платежей.',
-    'Log in to view your payment history.',
-  );
-  static String rateApp(Locale l) => _t(
-    l,
-    'settings.rate_app',
-    'Ilovani baholash',
-    'Оценить приложение',
-    'Rate the app',
-  );
-  static String version(Locale l) =>
-      _t(l, 'settings.version', 'Versiya', 'Версия', 'Version');
-  static String logout(Locale l) =>
-      _t(l, 'settings.logout', 'Chiqish', 'Выйти', 'Log out');
-  static String logoutTitle(Locale l) => _t(
-    l,
-    'settings.logout_title',
-    'Chiqishni xohlaysizmi?',
-    'Выйти из аккаунта?',
-    'Log out?',
-  );
-  static String logoutMessage(Locale l) => _t(
-    l,
-    'settings.logout_message',
-    'Istalgan vaqtda qayta kirishingiz mumkin.',
-    'Вы можете снова войти в любое время.',
-    'You can sign in again anytime.',
-  );
-  static String cancel(Locale l) =>
-      _t(l, 'common.cancel', 'Bekor qilish', 'Отмена', 'Cancel');
+  static String title(Locale l) => _t(l, 'settings.title');
+  static String account(Locale l) => _t(l, 'settings.account');
+  static String privacy(Locale l) => _t(l, 'settings.privacy');
+  static String other(Locale l) => _t(l, 'settings.other');
+  static String language(Locale l) => _t(l, 'settings.language');
+  static String theme(Locale l) => _t(l, 'settings.theme');
+  static String notifications(Locale l) => _t(l, 'settings.notifications');
+  static String changePhone(Locale l) => _t(l, 'settings.change_phone');
+  static String terms(Locale l) => _t(l, 'settings.terms');
+  static String privacyPolicy(Locale l) => _t(l, 'settings.privacy_policy');
+  static String payments(Locale l) => _t(l, 'settings.payments');
+  static String paymentsLoginMsg(Locale l) =>
+      _t(l, 'settings.payments_login_msg');
+  static String rateApp(Locale l) => _t(l, 'settings.rate_app');
+  static String version(Locale l) => _t(l, 'settings.version');
+  static String logout(Locale l) => _t(l, 'settings.logout');
+  static String logoutTitle(Locale l) => _t(l, 'settings.logout_title');
+  static String logoutMessage(Locale l) => _t(l, 'settings.logout_message');
+  static String cancel(Locale l) => _t(l, 'common.cancel');
 
-  static String languageName(Locale l) =>
-      _t(l, 'settings.language_name', 'O‘zbekcha', 'Русский', 'English');
+  static String deleteAccount(Locale l) => _t(l, 'settings.delete_account');
+  static String deleteSuccess(Locale l) =>
+      _t(l, 'settings.dialog.delete_success');
+  static String deleteError(Locale l) => _t(l, 'settings.dialog.delete_error');
+  static String deleteAccountTitle(Locale l) =>
+      _t(l, 'settings.dialog.delete_account_title');
+  static String deleteAccountBody(Locale l) =>
+      _t(l, 'settings.dialog.delete_account_body');
+  static String deleteConfirm(Locale l) =>
+      _t(l, 'settings.dialog.delete_confirm');
+
+  static String phoneTitle(Locale l) => _t(l, 'settings.phone.title');
+  static String otpHint(Locale l) => _t(l, 'settings.phone.otp_hint');
+  static String phoneUpdated(Locale l) => _t(l, 'settings.phone.updated');
+  static String phoneConfirm(Locale l) => _t(l, 'settings.phone.confirm');
+  static String sendOtp(Locale l) => _t(l, 'settings.phone.send_otp');
+
+  static String languageName(Locale l) => _t(l, 'settings.language_name');
   static String themeName(Locale l, ThemeMode mode) => switch (mode) {
-    ThemeMode.system => switch (l.languageCode) {
-      'ru' => 'Системная',
-      'en' => 'System',
-      _ => 'Tizim',
-    },
-    ThemeMode.light => switch (l.languageCode) {
-      'ru' => 'Светлая',
-      'en' => 'Light',
-      _ => 'Yorug‘',
-    },
-    ThemeMode.dark => switch (l.languageCode) {
-      'ru' => 'Тёмная',
-      'en' => 'Dark',
-      _ => 'Tungi',
-    },
+    ThemeMode.system => _t(l, 'settings.theme_name.system'),
+    ThemeMode.light => _t(l, 'settings.theme_name.light'),
+    ThemeMode.dark => _t(l, 'settings.theme_name.dark'),
   };
-  static String savedToast(Locale l) =>
-      _t(l, 'common.saved', 'Saqlandi', 'Сохранено', 'Saved');
+  static String savedToast(Locale l) => _t(l, 'common.saved');
 }

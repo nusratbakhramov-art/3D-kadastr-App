@@ -4,19 +4,9 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
-
-String _pick(Locale l, {required String uz, required String ru, required String en}) {
-  switch (l.languageCode) {
-    case 'ru':
-      return ru;
-    case 'en':
-      return en;
-    default:
-      return uz;
-  }
-}
 
 class ArxitekturaTzSuccessScreen extends StatelessWidget {
   const ArxitekturaTzSuccessScreen({super.key, required this.orderId});
@@ -33,30 +23,11 @@ class ArxitekturaTzSuccessScreen extends StatelessWidget {
         : const Color(0xFF6B7280);
     final locale = Localizations.localeOf(context);
 
-    final title = _pick(
-      locale,
-      uz: 'Buyurtma qabul qilindi',
-      ru: 'Заявка принята',
-      en: 'Order received',
-    );
-    final body = _pick(
-      locale,
-      uz: 'Buyurtma raqami: #$orderId\n\n'
-          'Mutaxassislarimiz tez orada siz bilan bog\'lanib, '
-          'narx va shartlarni tasdiqlaydi.',
-      ru: 'Номер заявки: #$orderId\n\n'
-          'Наши специалисты свяжутся с вами в ближайшее время '
-          'и подтвердят стоимость и условия.',
-      en: 'Order number: #$orderId\n\n'
-          'Our specialists will contact you shortly to confirm '
-          'the price and terms.',
-    );
-    final buttonLabel = _pick(
-      locale,
-      uz: 'Asosiy ekranga',
-      ru: 'На главный экран',
-      en: 'To home',
-    );
+    final title = tr(locale, 'services.tz.success.title');
+    final body =
+        '${tr(locale, 'services.tz.success.order_number_label')} #$orderId\n\n'
+        '${tr(locale, 'services.tz.success.body')}';
+    final buttonLabel = tr(locale, 'services.tz.success.button');
 
     return Scaffold(
       backgroundColor: bg,

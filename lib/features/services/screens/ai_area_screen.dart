@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../ai_draft_saver.dart';
@@ -306,38 +307,17 @@ class _DecimalInputFormatter extends TextInputFormatter {
 class _S {
   const _S._();
 
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+  static String appBar(Locale l) => tr(l, 'services.ai.area.app_bar');
 
-  static String appBar(Locale l) =>
-      _pick(l, 'AI Baholash', 'AI оценка', 'AI valuation');
+  static String appBarSub(Locale l) => tr(l, 'services.ai.area.app_bar_sub');
 
-  static String appBarSub(Locale l) =>
-      _pick(l, 'Obyekt maydoni', 'Площадь объекта', 'Object area');
+  static String heading(Locale l) => tr(l, 'services.ai.area.heading');
 
-  static String heading(Locale l) => _pick(
-        l,
-        'Obyekt maydoni qancha?',
-        'Какая площадь объекта?',
-        "What is the object's area?",
-      );
+  static String subheading(Locale l) => tr(l, 'services.ai.area.subheading');
 
-  static String subheading(Locale l) => _pick(
-        l,
-        'Bino / uy umumiy maydonini m² da kiriting.',
-        'Укажите общую площадь здания / дома в м².',
-        'Enter the total building / house area in m².',
-      );
+  static String areaUnit(Locale l) => tr(l, 'services.ai.area.unit');
 
-  static String areaUnit(Locale l) => _pick(l, 'm²', 'м²', 'm²');
+  static String areaHint(Locale l) => tr(l, 'services.ai.area.hint');
 
-  static String areaHint(Locale l) => _pick(
-        l,
-        'Bu maydon baholashda ishlatiladi.',
-        'Эта площадь используется в оценке.',
-        'This area is used in the valuation.',
-      );
-
-  static String continueLabel(Locale l) =>
-      _pick(l, 'Davom etish', 'Продолжить', 'Continue');
+  static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
 }

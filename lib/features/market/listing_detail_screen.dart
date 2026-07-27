@@ -162,11 +162,10 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
     }
     final id = _listing.backendId;
     if (id == null) {
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'ID модели не найден',
-        'en' => 'Model ID not found',
-        _ => 'Model ID topilmadi',
-      });
+      AppToast.error(
+        context,
+        tr(localeNotifier.value, 'market.viewer.model_id_not_found'),
+      );
       return;
     }
     // Gate: mehmon foydalanuvchi → toza login drawer (xom 401/toast emas).
@@ -209,18 +208,16 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
         sharePositionOrigin: origin,
       );
       if (!mounted) return;
-      AppToast.success(context, switch (localeNotifier.value.languageCode) {
-        'ru' => '$filename готов',
-        'en' => '$filename ready',
-        _ => '$filename tayyor',
-      });
+      AppToast.success(
+        context,
+        '$filename ${tr(localeNotifier.value, 'market.listing.file_ready')}',
+      );
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка при загрузке: $e',
-        'en' => 'Download error: $e',
-        _ => 'Yuklab olishda xatolik: $e',
-      });
+      AppToast.error(
+        context,
+        '${tr(localeNotifier.value, 'market.listing.download_error')}: $e',
+      );
     } finally {
       if (mounted) setState(() => _downloadingFileId = null);
     }
@@ -332,41 +329,16 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
   }
 }
 
-String _buyLabel(Locale l) =>
-    tr(l, 'market.listing.buy', uz: 'Sotib olish', ru: 'Купить', en: 'Buy');
+String _buyLabel(Locale l) => tr(l, 'market.listing.buy');
 
-String _ownedLabel(Locale l) => tr(
-  l,
-  'market.listing.owned',
-  uz: 'Sotib olingan',
-  ru: 'Куплено',
-  en: 'Purchased',
-);
+String _ownedLabel(Locale l) => tr(l, 'market.listing.owned');
 
 // Guest-gate xabarlari — login drawer (`ensureLoggedIn`) ichida ko'rsatiladi.
-String _loginMsgBuy(Locale l) => tr(
-  l,
-  'market.listing.login_buy',
-  uz: 'Bu modelni sotib olish uchun tizimga kiring.',
-  ru: 'Войдите, чтобы купить эту модель.',
-  en: 'Sign in to purchase this model.',
-);
+String _loginMsgBuy(Locale l) => tr(l, 'market.listing.login_buy');
 
-String _loginMsgDownload(Locale l) => tr(
-  l,
-  'market.listing.login_download',
-  uz: 'Yuklab olish uchun tizimga kiring.',
-  ru: 'Войдите, чтобы скачать файл.',
-  en: 'Sign in to download.',
-);
+String _loginMsgDownload(Locale l) => tr(l, 'market.listing.login_download');
 
-String _loginMsgView(Locale l) => tr(
-  l,
-  'market.listing.login_view',
-  uz: '3D modelni ochish uchun tizimga kiring.',
-  ru: 'Войдите, чтобы открыть 3D-модель.',
-  en: 'Sign in to open the 3D model.',
-);
+String _loginMsgView(Locale l) => tr(l, 'market.listing.login_view');
 
 class _OwnedBadge extends StatelessWidget {
   const _OwnedBadge({required this.label});
@@ -433,13 +405,7 @@ class _View3DButton extends StatelessWidget {
               Icon(Icons.view_in_ar_rounded, size: 22, color: fg),
               const SizedBox(width: 10),
               Text(
-                tr(
-                  locale,
-                  'market.listing.view_3d_model',
-                  uz: '3D modelni ko‘rish',
-                  ru: 'Посмотреть 3D-модель',
-                  en: 'View 3D model',
-                ),
+                tr(locale, 'market.listing.view_3d_model'),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,

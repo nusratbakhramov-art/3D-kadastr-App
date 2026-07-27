@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../auth/widgets/login_required_sheet.dart';
@@ -51,8 +52,8 @@ class _YuridikScreenState extends State<YuridikScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: _Strings.title(locale),
-                        subtitle: _Strings.subtitle(locale),
+                        title: tr(locale, 'services.calc.yuridik.title'),
+                        subtitle: tr(locale, 'services.calc.yuridik.subtitle'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -65,7 +66,7 @@ class _YuridikScreenState extends State<YuridikScreen> {
                             padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                             children: [
                               Text(
-                                _Strings.note(locale),
+                                tr(locale, 'services.calc.yuridik.note'),
                                 style: TextStyle(
                                   fontFamily: 'MTSText',
                                   fontSize: 13,
@@ -111,104 +112,36 @@ class _YuridikItem {
 
   static List<_YuridikItem> all(Locale l, CalculatorPricing pricing) => [
         _YuridikItem(
-          title: _pick(l, 'Yuridik maslahat', 'Юридическая консультация',
-              'Legal consultation'),
-          description: _pick(
-            l,
-            "Bir savol yoki holat bo'yicha bir martalik maslahat",
-            'Разовая консультация по вопросу или ситуации',
-            'One-time consultation on a question or matter',
-          ),
+          title: tr(l, 'services.calc.yuridik.maslahat.title'),
+          description: tr(l, 'services.calc.yuridik.maslahat.desc'),
           price: pricing.yuridikValue('yuridik.maslahat', l),
         ),
         _YuridikItem(
-          title: _pick(
-              l, 'Hujjat tayyorlash', 'Подготовка документов', 'Document preparation'),
-          description: _pick(
-            l,
-            "Shartnoma, ariza, da'vo, javob va boshqa hujjatlar",
-            'Договор, заявление, иск, ответ и другие документы',
-            'Contract, application, claim, response and other documents',
-          ),
+          title: tr(l, 'services.calc.yuridik.hujjat.title'),
+          description: tr(l, 'services.calc.yuridik.hujjat.desc'),
           price: pricing.yuridikValue('yuridik.hujjat', l),
         ),
         _YuridikItem(
-          title: _pick(
-            l,
-            'Sudda himoya (yuridik vakillik)',
-            'Защита в суде (юридическое представительство)',
-            'Court representation',
-          ),
-          description: _pick(
-            l,
-            "Fuqarolik, iqtisodiy, jinoyat ishlari bo'yicha",
-            'По гражданским, экономическим, уголовным делам',
-            'For civil, economic, criminal cases',
-          ),
+          title: tr(l, 'services.calc.yuridik.sud.title'),
+          description: tr(l, 'services.calc.yuridik.sud.desc'),
           price: pricing.yuridikValue('yuridik.sud', l),
         ),
         _YuridikItem(
-          title: _pick(
-            l,
-            'Korxonalar uchun autsorsing',
-            'Аутсорсинг для предприятий',
-            'Outsourcing for businesses',
-          ),
-          description: _pick(
-            l,
-            'Doimiy yuridik kuzatuv (oy uchun)',
-            'Постоянное юридическое сопровождение (за месяц)',
-            'Continuous legal support (per month)',
-          ),
+          title: tr(l, 'services.calc.yuridik.autsorsing.title'),
+          description: tr(l, 'services.calc.yuridik.autsorsing.desc'),
           price: pricing.yuridikValue('yuridik.autsorsing', l),
         ),
         _YuridikItem(
-          title: _pick(
-              l, "Ro'yxatdan o'tkazish", 'Регистрация', 'Registration'),
-          description: _pick(
-            l,
-            "MChJ ochish, lisenziya olish va boshqalar",
-            'Открытие ООО, получение лицензии и др.',
-            'LLC formation, licensing and more',
-          ),
+          title: tr(l, 'services.calc.yuridik.royxat.title'),
+          description: tr(l, 'services.calc.yuridik.royxat.desc'),
           price: pricing.yuridikValue('yuridik.royxat', l),
         ),
         _YuridikItem(
-          title: _pick(
-            l,
-            'Qarz undirish va ijro ishlari',
-            'Взыскание долгов',
-            'Debt collection',
-          ),
-          description: _pick(
-            l,
-            'Debitor qarzlarni qaytarish — ish hajmidan',
-            'Возврат дебиторской задолженности — от объёма работ',
-            'Recovery of receivables — based on workload',
-          ),
+          title: tr(l, 'services.calc.yuridik.qarz.title'),
+          description: tr(l, 'services.calc.yuridik.qarz.desc'),
           price: pricing.yuridikValue('yuridik.qarz', l),
         ),
       ];
-}
-
-String _pick(Locale l, String uz, String ru, String en) =>
-    switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-class _Strings {
-  const _Strings._();
-
-  static String title(Locale l) =>
-      _pick(l, 'Yuridik xizmat', 'Юридические услуги', 'Legal services');
-
-  static String subtitle(Locale l) =>
-      _pick(l, 'Xizmatlar va narxlari', 'Услуги и цены', 'Services & prices');
-
-  static String note(Locale l) => _pick(
-        l,
-        "Quyidagi xizmatlar uchun aniq narx murojaat asosida belgilanadi.",
-        'Точная цена для следующих услуг определяется при обращении.',
-        'Exact price for the following services is determined on request.',
-      );
 }
 
 class _ServiceCard extends StatelessWidget {
@@ -382,8 +315,7 @@ class _YuridikApplyScreenState extends State<_YuridikApplyScreen> {
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
                         title: item.title,
-                        subtitle: _pick(locale, 'Ariza topshirish',
-                            'Оставить заявку', 'Apply'),
+                        subtitle: tr(locale, 'services.calc.yuridik.apply_subtitle'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -412,7 +344,7 @@ class _YuridikApplyScreenState extends State<_YuridikApplyScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    _pick(locale, 'Narxi', 'Цена', 'Price'),
+                                    tr(locale, 'services.calc.yuridik.price'),
                                     style: TextStyle(
                                       fontFamily: 'MTSText',
                                       fontSize: 13.5,
@@ -434,8 +366,7 @@ class _YuridikApplyScreenState extends State<_YuridikApplyScreen> {
                           ),
                           const SizedBox(height: 18),
                           Text(
-                            _pick(locale, "Qo'shimcha izoh",
-                                'Дополнительный комментарий', 'Additional note'),
+                            tr(locale, 'services.calc.yuridik.additional_note'),
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
@@ -450,33 +381,36 @@ class _YuridikApplyScreenState extends State<_YuridikApplyScreen> {
                             maxLines: 6,
                             style: TextStyle(color: titleColor, fontSize: 14),
                             decoration: InputDecoration(
-                              hintText: _pick(
-                                locale,
-                                "Holatingizni qisqacha yozing (ixtiyoriy)",
-                                'Кратко опишите ситуацию (необязательно)',
-                                'Briefly describe your case (optional)',
-                              ),
+                              hintText: tr(locale, 'services.calc.yuridik.note_hint'),
                               hintStyle:
                                   TextStyle(color: subColor, fontSize: 13.5),
                               filled: true,
-                              fillColor: isDark
-                                  ? const Color(0xFF1F2426)
-                                  : const Color(0xFFF3F4F6),
-                              border: OutlineInputBorder(
+                              // Light fill was ~the same grey as the page, with
+                              // no border — the field vanished. White fill + a
+                              // hairline border so it reads as an input.
+                              fillColor:
+                                  isDark ? const Color(0xFF1F2426) : Colors.white,
+                              enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide.none,
+                                borderSide: BorderSide(
+                                  color: isDark
+                                      ? const Color(0xFF2C3133)
+                                      : const Color(0xFFE3E5E8),
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: const BorderSide(
+                                  color: AppColors.splashGreen,
+                                  width: 1.4,
+                                ),
                               ),
                               contentPadding: const EdgeInsets.all(14),
                             ),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            _pick(
-                              locale,
-                              "Mutaxassislarimiz siz bilan bog'lanib, narx va shartlarni tasdiqlaydi.",
-                              'Наши специалисты свяжутся с вами и подтвердят цену и условия.',
-                              'Our specialists will contact you to confirm price and terms.',
-                            ),
+                            tr(locale, 'services.calc.yuridik.contact_note'),
                             style: TextStyle(
                               fontFamily: 'MTSText',
                               fontSize: 12.5,
@@ -491,10 +425,8 @@ class _YuridikApplyScreenState extends State<_YuridikApplyScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                       child: ListingCtaButton(
                         label: _submitting
-                            ? _pick(locale, 'Yuborilmoqda...', 'Отправка...',
-                                'Submitting...')
-                            : _pick(locale, 'Ariza topshirish',
-                                'Оставить заявку', 'Submit application'),
+                            ? tr(locale, 'services.calc.submitting')
+                            : tr(locale, 'services.calc.yuridik.submit'),
                         enabled: !_submitting,
                         onTap: _submit,
                       ),

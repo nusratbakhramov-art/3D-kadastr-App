@@ -36,9 +36,6 @@ class ServicePlaceholderScreen extends StatelessWidget {
           tr(
             Localizations.localeOf(context),
             'service.placeholder.coming_soon',
-            uz: 'Bu xizmat tez orada ishga tushadi',
-            ru: 'Скоро',
-            en: 'Coming soon',
           ),
           style: TextStyle(
             fontFamily: 'MTSText',

@@ -40,23 +40,18 @@ class AppTranslations {
 final ValueNotifier<AppTranslations> appTranslationsNotifier =
     ValueNotifier<AppTranslations>(AppTranslations.empty);
 
-String tr(
-  Locale locale,
-  String key, {
-  required String uz,
-  required String ru,
-  required String en,
-}) {
+/// Resolves a UI string from the active translation bundle (backend-driven,
+/// with a bundled seed asset as the offline base — see [AppTranslationsStore]).
+///
+/// There is intentionally NO inline fallback text: if [key] is absent from the
+/// bundle, the key itself is returned. That makes any string not yet backed by
+/// the bundle instantly visible in the UI (and greppable), instead of silently
+/// masking a gap with baked-in text.
+String tr(Locale locale, String key) {
   final lang = switch (locale.languageCode) {
     'ru' => 'ru',
     'en' => 'en',
     _ => 'uz',
   };
-  final override = appTranslationsNotifier.value.lookup(lang, key);
-  if (override != null) return override;
-  return switch (lang) {
-    'ru' => ru,
-    'en' => en,
-    _ => uz,
-  };
+  return appTranslationsNotifier.value.lookup(lang, key) ?? key;
 }

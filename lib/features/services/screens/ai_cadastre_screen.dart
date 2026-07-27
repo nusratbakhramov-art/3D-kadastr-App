@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
@@ -442,11 +443,7 @@ class _ScanModelBar extends StatelessWidget {
     final l = Localizations.localeOf(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final fg = isDark ? Colors.white : AppColors.textBlack;
-    final label = switch (l.languageCode) {
-      'ru' => 'Посмотреть 3D модель',
-      'en' => 'View 3D model',
-      _ => '3D modelni ko\'rish',
-    };
+    final label = tr(l, 'services.ai.common.view_3d_model');
     return Material(
       color: AppColors.splashGreen.withValues(alpha: 0.12),
       borderRadius: BorderRadius.circular(14),
@@ -995,129 +992,55 @@ class _LookupErrorCard extends StatelessWidget {
 class _CadastreStrings {
   const _CadastreStrings._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'AI Оценка',
-    'en' => 'AI Valuation',
-    _ => 'AI Baholash',
-  };
+  static String title(Locale l) => tr(l, 'services.ai.common.brand_title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Определение стоимости недвижимости',
-    'en' => 'Determine the property value',
-    _ => 'Koʻchmas mulk qiymatini aniqlash',
-  };
+  static String subtitle(Locale l) => tr(l, 'services.ai.cadastre.subtitle');
 
-  static String cadastreNumber(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастровый номер',
-    'en' => 'Cadastral number',
-    _ => 'Kadastr raqami',
-  };
+  static String cadastreNumber(Locale l) =>
+      tr(l, 'services.ai.cadastre.cadastre_number');
 
-  static String recentSearches(Locale l) => switch (l.languageCode) {
-    'ru' => 'Последние поиски',
-    'en' => 'Recent searches',
-    _ => 'Oxirgi qidiruvlar',
-  };
+  static String recentSearches(Locale l) =>
+      tr(l, 'services.ai.cadastre.recent_searches');
 
-  static String propertyInfo(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сведения о доме',
-    'en' => 'Property details',
-    _ => 'Uy maʼlumotlari',
-  };
+  static String propertyInfo(Locale l) =>
+      tr(l, 'services.ai.cadastre.property_info');
 
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Продолжить',
-    'en' => 'Continue',
-    _ => 'Davom etish',
-  };
+  static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
 
-  static String skip(Locale l) => switch (l.languageCode) {
-    'ru' => 'Пропустить (без кадастра)',
-    'en' => 'Skip (without cadastre)',
-    _ => "O'tkazib yuborish (kadastrsiz)",
-  };
+  static String skip(Locale l) => tr(l, 'services.ai.cadastre.skip');
 
-  static String helperSuffix(Locale l) => switch (l.languageCode) {
-    'ru' => ' получается автоматически',
-    'en' => ' is fetched automatically',
-    _ => ' dan avtomatlik olinadi',
-  };
+  static String helperSuffix(Locale l) =>
+      tr(l, 'services.ai.cadastre.helper_suffix');
 
-  static String signInFirst(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сначала войдите в систему',
-    'en' => 'Please sign in first',
-    _ => 'Avval tizimga kiring',
-  };
+  static String signInFirst(Locale l) =>
+      tr(l, 'services.ai.common.sign_in_first');
 
-  static String notFound(Locale l) => switch (l.languageCode) {
-    'ru' => 'По этому кадастровому номеру данные не найдены',
-    'en' => 'No data found for this cadastral number',
-    _ => "Bu kadastr raqami boʻyicha maʼlumot topilmadi",
-  };
+  static String notFound(Locale l) => tr(l, 'services.ai.cadastre.not_found');
 
-  static String networkError(Locale l, String err) => switch (l.languageCode) {
-    'ru' => 'Ошибка сети: $err',
-    'en' => 'Network error: $err',
-    _ => 'Tarmoq xatosi: $err',
-  };
+  static String networkError(Locale l, String err) =>
+      '${tr(l, 'services.ai.cadastre.network_error')}: $err';
 
-  static String genericError(Locale l) => switch (l.languageCode) {
-    'ru' => 'Ошибка',
-    'en' => 'Error',
-    _ => 'Xato',
-  };
+  static String genericError(Locale l) =>
+      tr(l, 'services.ai.cadastre.generic_error');
 
-  static String lookupFailed(Locale l) => switch (l.languageCode) {
-    'ru' => 'Не удалось получить данные',
-    'en' => 'Could not fetch data',
-    _ => "Maʼlumot olib boʻlmadi",
-  };
+  static String lookupFailed(Locale l) =>
+      tr(l, 'services.ai.cadastre.lookup_failed');
 
-  static String retry(Locale l) => switch (l.languageCode) {
-    'ru' => 'Повторить',
-    'en' => 'Try again',
-    _ => 'Qayta urinish',
-  };
+  static String retry(Locale l) => tr(l, 'services.ai.cadastre.retry');
 
-  static String address(Locale l) => switch (l.languageCode) {
-    'ru' => 'Адрес',
-    'en' => 'Address',
-    _ => 'Manzil',
-  };
+  static String address(Locale l) => tr(l, 'services.ai.cadastre.address');
 
-  static String type(Locale l) => switch (l.languageCode) {
-    'ru' => 'Тип',
-    'en' => 'Type',
-    _ => 'Turi',
-  };
+  static String type(Locale l) => tr(l, 'services.ai.cadastre.type');
 
-  static String area(Locale l) => switch (l.languageCode) {
-    'ru' => 'Площадь',
-    'en' => 'Area',
-    _ => 'Maydon',
-  };
+  static String area(Locale l) => tr(l, 'services.ai.cadastre.area');
 
-  static String livingArea(Locale l) => switch (l.languageCode) {
-    'ru' => 'Жилая площадь',
-    'en' => 'Living area',
-    _ => 'Yashash maydoni',
-  };
+  static String livingArea(Locale l) =>
+      tr(l, 'services.ai.cadastre.living_area');
 
-  static String cadastreValue(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастровая стоимость',
-    'en' => 'Cadastral value',
-    _ => 'Kadastr qiymati',
-  };
+  static String cadastreValue(Locale l) =>
+      tr(l, 'services.ai.cadastre.cadastre_value');
 
-  static String billion(Locale l) => switch (l.languageCode) {
-    'ru' => 'млрд',
-    'en' => 'bn',
-    _ => 'mlrd',
-  };
+  static String billion(Locale l) => tr(l, 'services.ai.cadastre.billion');
 
-  static String million(Locale l) => switch (l.languageCode) {
-    'ru' => 'млн',
-    'en' => 'mln',
-    _ => 'mln',
-  };
+  static String million(Locale l) => tr(l, 'services.ai.cadastre.million');
 }

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../core/network_error_handler.dart';
 import '../../theme/app_colors.dart';
 import '../settings/settings_state.dart';
@@ -279,7 +280,7 @@ class _StickyHeader extends StatelessWidget {
         listenable: controller,
         builder: (context, _) {
           return MarketHeader(
-            title: _MarketScreenStrings.title(locale),
+            title: tr(locale, 'market.screen.title'),
             onFilterTap: onFilterTap,
             filterActiveCount: controller.filters.activeCount,
           );
@@ -299,6 +300,8 @@ class _ChipsRow extends StatelessWidget {
     return ListenableBuilder(
       listenable: controller,
       builder: (context, _) {
+        // Labels are already localized by the controller: static chips via
+        // tr('market.controller.*'), remote chips via the backend-provided name.
         return CategoryChips(
           categories: controller.categories,
           selectedId: controller.categoryId,
@@ -342,9 +345,9 @@ class _BodySliver extends StatelessWidget {
             hasScrollBody: false,
             child: MarketEmptyState(
               icon: Icons.wifi_off_rounded,
-              title: _MarketScreenStrings.errorTitle(locale),
-              subtitle: c.error ?? _MarketScreenStrings.errorSubtitle(locale),
-              actionLabel: _MarketScreenStrings.retry(locale),
+              title: tr(locale, 'market.screen.error_title'),
+              subtitle: c.error ?? tr(locale, 'market.screen.error_subtitle'),
+              actionLabel: tr(locale, 'market.screen.retry'),
               onAction: () => unawaited(c.retry()),
             ),
           );
@@ -359,10 +362,10 @@ class _BodySliver extends StatelessWidget {
             hasScrollBody: false,
             child: MarketEmptyState(
               icon: Icons.search_off_rounded,
-              title: _MarketScreenStrings.emptyTitle(locale),
-              subtitle: _MarketScreenStrings.emptySubtitle(locale),
+              title: tr(locale, 'market.screen.empty_title'),
+              subtitle: tr(locale, 'market.screen.empty_subtitle'),
               actionLabel: filtered
-                  ? _MarketScreenStrings.clearFilters(locale)
+                  ? tr(locale, 'market.screen.clear_filters')
                   : null,
               onAction: filtered ? onResetAll : null,
             ),
@@ -426,7 +429,7 @@ class _TailSliver extends StatelessWidget {
               child: TextButton(
                 onPressed: () => unawaited(c.loadMore()),
                 child: Text(
-                  _MarketScreenStrings.retry(Localizations.localeOf(context)),
+                  tr(Localizations.localeOf(context), 'market.screen.retry'),
                 ),
               ),
             ),
@@ -492,52 +495,6 @@ class _StickyHeaderDelegate extends SliverPersistentHeaderDelegate {
   @override
   bool shouldRebuild(covariant _StickyHeaderDelegate old) =>
       height != old.height || child != old.child || scrolled != old.scrolled;
-}
-
-class _MarketScreenStrings {
-  const _MarketScreenStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Маркет',
-    'en' => 'Market',
-    _ => 'Market',
-  };
-
-  static String errorTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Произошла ошибка',
-    'en' => 'Something went wrong',
-    _ => 'Xatolik yuz berdi',
-  };
-
-  static String errorSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Попробуйте ещё раз.',
-    'en' => 'Please try again.',
-    _ => 'Qayta urinib ko\'ring.',
-  };
-
-  static String retry(Locale l) => switch (l.languageCode) {
-    'ru' => 'Повторить',
-    'en' => 'Retry',
-    _ => 'Qayta urinish',
-  };
-
-  static String emptyTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Ничего не найдено',
-    'en' => 'Nothing found',
-    _ => 'Hech narsa topilmadi',
-  };
-
-  static String emptySubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Попробуйте другой поиск или фильтры.',
-    'en' => 'Try a different query or filters.',
-    _ => 'Boshqa qidiruv yoki filtrlarni sinab ko\'ring.',
-  };
-
-  static String clearFilters(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сбросить фильтры',
-    'en' => 'Clear filters',
-    _ => 'Filtrlarni tozalash',
-  };
 }
 
 class _ScrollToTopButton extends StatelessWidget {

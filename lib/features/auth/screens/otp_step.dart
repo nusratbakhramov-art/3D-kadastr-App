@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../auth_service.dart';
@@ -101,7 +102,7 @@ class _OtpStepState extends State<OtpStep> {
       setState(() => _boxState = OtpBoxState.neutral);
       AuthToasts.show(
         context,
-        message: _OtpStepStrings.resent(locale),
+        message: tr(locale, 'auth.otp.resent'),
         variant: AuthToastVariant.success,
       );
     } on AuthException catch (e) {
@@ -138,7 +139,7 @@ class _OtpStepState extends State<OtpStep> {
         : AppColors.textBlack.withValues(alpha: 0.65);
     final complete = _otp.value.length == widget.otpLength;
     return AuthScaffold(
-      title: _OtpStepStrings.title(locale),
+      title: tr(locale, 'auth.otp.title'),
       iconAsset: 'assets/images/auth/msg.png',
       onBack: widget.onEdit,
       onSkip: widget.onSkip,
@@ -147,7 +148,7 @@ class _OtpStepState extends State<OtpStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _OtpStepStrings.subtitle(locale),
+              tr(locale, 'auth.otp.subtitle'),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 12),
@@ -171,41 +172,13 @@ class _OtpStepState extends State<OtpStep> {
         ),
       ),
       bottom: PrimaryCta(
-        label: _OtpStepStrings.continueLabel(locale),
+        label: tr(locale, 'auth.continue'),
         enabled: complete,
         loading: _loading,
         onPressed: _verify,
       ),
     );
   }
-}
-
-class _OtpStepStrings {
-  const _OtpStepStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Код подтверждения',
-    'en' => 'Verification code',
-    _ => 'Tasdiqlash kodi',
-  };
-
-  static String subtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Введите код, отправленный на ваш номер',
-    'en' => 'Enter the code sent to your phone number',
-    _ => 'Raqamingizga yuborilgan kodni kiriting',
-  };
-
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Продолжить',
-    'en' => 'Continue',
-    _ => 'Davom etish',
-  };
-
-  static String resent(Locale l) => switch (l.languageCode) {
-    'ru' => 'Код отправлен повторно',
-    'en' => 'Code resent',
-    _ => 'Kod qayta yuborildi',
-  };
 }
 
 class _PhonePill extends StatelessWidget {

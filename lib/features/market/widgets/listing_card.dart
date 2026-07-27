@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/remote_image.dart';
 import '../models/market_listing.dart';
@@ -84,7 +85,7 @@ class ListingCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
-                              _ListingCardStrings.free(locale),
+                              tr(locale, 'market.listing.free'),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w700,
@@ -257,7 +258,7 @@ class _BatafsilButton extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
-                _ListingCardStrings.details(locale),
+                tr(locale, 'market.card.details'),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
@@ -289,20 +290,4 @@ class _ListingImage extends StatelessWidget {
   Widget build(BuildContext context) {
     return RemoteImage(url: url, memCacheWidth: 480);
   }
-}
-
-class _ListingCardStrings {
-  const _ListingCardStrings._();
-
-  static String free(Locale l) => switch (l.languageCode) {
-    'ru' => 'Бесплатно',
-    'en' => 'Free',
-    _ => 'Bepul',
-  };
-
-  static String details(Locale l) => switch (l.languageCode) {
-    'ru' => 'Подробнее',
-    'en' => 'Details',
-    _ => 'Batafsil',
-  };
 }

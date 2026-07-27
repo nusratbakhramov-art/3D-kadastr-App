@@ -4,17 +4,19 @@
 library;
 
 import 'dart:convert';
+import 'dart:ui' show Locale;
 
 import 'package:flutter/foundation.dart' show SynchronousFuture;
 import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
+import '../../core/i18n/app_translations.dart';
 
 /// The service line a document is filed under — a section header on screen.
 class CredentialCategory {
   const CredentialCategory({
     required this.slug,
-    required this.nameUz,
+    this.nameUz = '',
     this.nameRu,
     this.nameEn,
     this.sortOrder = 0,
@@ -37,18 +39,22 @@ class CredentialCategory {
   /// where the app knows about categories and the server doesn't. Dropping
   /// those documents renders an empty screen while the payload is full of
   /// them; filing them here at least shows the user what they came for.
-  static const CredentialCategory other = CredentialCategory(
-    slug: '',
-    nameUz: 'Boshqa hujjatlar',
-    nameRu: 'Другие документы',
-    nameEn: 'Other documents',
-  );
+  static const CredentialCategory other = CredentialCategory(slug: '');
 
-  String name(String lang) => switch (lang) {
-    'ru' => (nameRu?.isNotEmpty ?? false) ? nameRu! : nameUz,
-    'en' => (nameEn?.isNotEmpty ?? false) ? nameEn! : nameUz,
-    _ => nameUz,
-  };
+  String name(String lang) {
+    // The `other` sentinel carries no admin-provided names — its label is
+    // backend-driven via the translation bundle.
+    if (nameUz.isEmpty &&
+        (nameRu?.isEmpty ?? true) &&
+        (nameEn?.isEmpty ?? true)) {
+      return tr(Locale(lang), 'services.data.credential.other');
+    }
+    return switch (lang) {
+      'ru' => (nameRu?.isNotEmpty ?? false) ? nameRu! : nameUz,
+      'en' => (nameEn?.isNotEmpty ?? false) ? nameEn! : nameUz,
+      _ => nameUz,
+    };
+  }
 
   factory CredentialCategory.fromJson(Map<String, dynamic> j) =>
       CredentialCategory(

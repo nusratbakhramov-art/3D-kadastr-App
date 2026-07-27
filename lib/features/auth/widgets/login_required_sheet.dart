@@ -12,6 +12,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../auth_flow_screen.dart';
 import '../auth_storage.dart';
@@ -111,7 +112,7 @@ class _LoginRequiredSheet extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              title ?? _LoginRequiredStrings.title(l),
+              title ?? tr(l, 'auth.login_required.title'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -122,7 +123,7 @@ class _LoginRequiredSheet extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              message ?? _LoginRequiredStrings.message(l),
+              message ?? tr(l, 'auth.login_required.message'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -135,7 +136,7 @@ class _LoginRequiredSheet extends StatelessWidget {
             // Primary + secondary as a matched pair: same height/radius, the
             // brand green filled and a quiet tonal "cancel" beneath it.
             _SheetButton(
-              label: _LoginRequiredStrings.signIn(l),
+              label: tr(l, 'auth.login_required.sign_in'),
               filled: true,
               isDark: isDark,
               onTap: () {
@@ -145,7 +146,7 @@ class _LoginRequiredSheet extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             _SheetButton(
-              label: _LoginRequiredStrings.cancel(l),
+              label: tr(l, 'auth.login_required.cancel'),
               filled: false,
               isDark: isDark,
               onTap: () => Navigator.of(context).pop(false),
@@ -210,32 +211,4 @@ class _SheetButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LoginRequiredStrings {
-  const _LoginRequiredStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'Требуется вход',
-        'en' => 'Sign in required',
-        _ => 'Tizimga kirish kerak',
-      };
-
-  static String message(Locale l) => switch (l.languageCode) {
-        'ru' => 'Чтобы воспользоваться этой услугой, сначала войдите в систему.',
-        'en' => 'Please sign in first to use this service.',
-        _ => 'Bu xizmatdan foydalanish uchun avval tizimga kiring.',
-      };
-
-  static String signIn(Locale l) => switch (l.languageCode) {
-        'ru' => 'Войти',
-        'en' => 'Sign in',
-        _ => 'Kirish',
-      };
-
-  static String cancel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отмена',
-        'en' => 'Cancel',
-        _ => 'Bekor qilish',
-      };
 }

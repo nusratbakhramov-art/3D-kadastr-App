@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 import '../../../../core/haptics.dart';
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../data/smeta_api_service.dart';
 import '../../models/smeta_draft.dart';
@@ -62,7 +63,10 @@ class _SmetaResultScreenState extends State<SmetaResultScreen> {
       _timer?.cancel();
       if (mounted) {
         setState(() {
-          _error = _Strings.timedOut(Localizations.localeOf(context));
+          _error = tr(
+            Localizations.localeOf(context),
+            'services.smeta.result.timed_out',
+          );
         });
       }
       return;
@@ -108,11 +112,9 @@ class _SmetaResultScreenState extends State<SmetaResultScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: _Strings.appBar(locale),
-                subtitle: _Strings.jobSubtitle(
-                  locale,
-                  '${widget.jobId.substring(0, 8)}…',
-                ),
+                title: tr(locale, 'services.smeta.result.appbar'),
+                subtitle:
+                    '${tr(locale, 'services.smeta.result.job')} ${widget.jobId.substring(0, 8)}…',
               ),
             ),
             const SizedBox(height: 8),
@@ -139,76 +141,11 @@ class _SmetaResultScreenState extends State<SmetaResultScreen> {
   }
 }
 
-class _Strings {
-  const _Strings._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String appBar(Locale l) =>
-      _pick(l, 'Smeta natijasi', 'Результат сметы', 'Estimate result');
-
-  static String jobSubtitle(Locale l, String id) =>
-      _pick(l, 'Vazifa $id', 'Задача $id', 'Job $id');
-
-  static String timedOut(Locale l) => _pick(
-        l,
-        "Vaqt tugadi (5 daqiqa). Driver ishlamayotgan bo'lishi mumkin.",
-        'Время истекло (5 минут). Возможно, драйвер не работает.',
-        'Timed out (5 minutes). The driver may be down.',
-      );
-
-  static String inFlightLabel(Locale l, String state) => switch (state) {
-        'queued' => _pick(l, 'Navbatda kutilmoqda…', 'В очереди…', 'Queued…'),
-        'running' =>
-          _pick(l, 'ABC hisoblamoqda…', 'ABC рассчитывает…', 'ABC is calculating…'),
-        _ => _pick(l, 'Holat: $state', 'Статус: $state', 'Status: $state'),
-      };
-
-  static String inFlightHint(Locale l) => _pick(
-        l,
-        'Bu odatda 1–3 daqiqa davom etadi.',
-        'Обычно это занимает 1–3 минуты.',
-        'This usually takes 1–3 minutes.',
-      );
-
-  static String positions(Locale l) =>
-      _pick(l, 'Pozitsiyalar', 'Позиции', 'Positions');
-
-  static String vedomost(Locale l) => _pick(
-        l,
-        "Vedomost (Form N5/N6)",
-        'Ведомость (Форма N5/N6)',
-        'Statement (Form N5/N6)',
-      );
-
-  static String otherFiles(Locale l) =>
-      _pick(l, 'Boshqa fayllar', 'Другие файлы', 'Other files');
-
-  static String smetaReady(Locale l) =>
-      _pick(l, 'Smeta tayyor', 'Смета готова', 'Estimate ready');
-
-  static String smetaNoResult(Locale l) => _pick(
-        l,
-        'Hisob tugadi, lekin natija topilmadi',
-        'Расчёт завершён, но результат не найден',
-        'Calculation finished, but no result found',
-      );
-
-  static String openExternal(Locale l) => _pick(
-        l,
-        'Tashqi brauzerda ochish',
-        'Открыть во внешнем браузере',
-        'Open in external browser',
-      );
-
-  static String openFile(Locale l, String name) => _pick(
-        l,
-        "$name ko'rish",
-        'Открыть $name',
-        'View $name',
-      );
-}
+String _inFlightLabel(Locale l, String state) => switch (state) {
+      'queued' => tr(l, 'services.smeta.result.queued'),
+      'running' => tr(l, 'services.smeta.result.running'),
+      _ => '${tr(l, 'services.smeta.result.status')}: $state',
+    };
 
 // ─── in-flight ────────────────────────────────────────────────────────
 
@@ -229,7 +166,7 @@ class _InFlightView extends StatelessWidget {
           const SizedBox(width: 48, height: 48, child: CircularProgressIndicator()),
           const SizedBox(height: 20),
           Text(
-            _Strings.inFlightLabel(locale, state),
+            _inFlightLabel(locale, state),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontSize: 15,
@@ -239,7 +176,7 @@ class _InFlightView extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            _Strings.inFlightHint(locale),
+            tr(locale, 'services.smeta.result.in_flight_hint'),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontSize: 13,
@@ -305,13 +242,13 @@ class _ResultView extends StatelessWidget {
         _StatusBanner(snap: snap, hasExports: exports.isNotEmpty),
         const SizedBox(height: 16),
         if (records.isNotEmpty) ...[
-          _SectionLabel(_Strings.positions(locale)),
+          _SectionLabel(tr(locale, 'services.smeta.result.positions')),
           for (final r in records.whereType<Map<String, dynamic>>())
             _RecordCard(record: r),
         ],
         if (primary != null) ...[
           const SizedBox(height: 20),
-          _SectionLabel(_Strings.vedomost(locale)),
+          _SectionLabel(tr(locale, 'services.smeta.result.vedomost')),
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: hapticTap(() {
@@ -326,7 +263,10 @@ class _ResultView extends StatelessWidget {
               );
             }),
             icon: const Icon(Icons.description_outlined),
-            label: Text(_Strings.openFile(locale, primary)),
+            label: Text(
+              tr(locale, 'services.smeta.result.open_file')
+                  .replaceFirst('{name}', primary),
+            ),
           ),
           const SizedBox(height: 8),
           OutlinedButton.icon(
@@ -335,12 +275,12 @@ class _ResultView extends StatelessWidget {
               mode: LaunchMode.externalApplication,
             )),
             icon: const Icon(Icons.open_in_new),
-            label: Text(_Strings.openExternal(locale)),
+            label: Text(tr(locale, 'services.smeta.result.open_external')),
           ),
         ],
         if (exports.length > 1) ...[
           const SizedBox(height: 12),
-          _SectionLabel(_Strings.otherFiles(locale)),
+          _SectionLabel(tr(locale, 'services.smeta.result.other_files')),
           for (final f in exports.where((x) => x != primary))
             _SmallExportButton(
               filename: f,
@@ -363,8 +303,8 @@ class _StatusBanner extends StatelessWidget {
     final ok = hasExports || (snap.result?.values.any((v) => v != null) ?? false);
     final color = ok ? AppColors.splashGreen : Colors.orange;
     final label = ok
-        ? _Strings.smetaReady(locale)
-        : _Strings.smetaNoResult(locale);
+        ? tr(locale, 'services.smeta.result.ready')
+        : tr(locale, 'services.smeta.result.no_result');
 
     return Container(
       padding: const EdgeInsets.all(16),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
 import '../../core/i18n.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -385,24 +386,13 @@ String _fmtDate(DateTime d) =>
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'Мои платежи',
-        'en' => 'My payments',
-        _ => "To'lovlarim",
-      };
+  static String title(Locale l) => tr(l, 'payments.my.title');
 
-  static String empty(Locale l) => switch (l.languageCode) {
-        'ru' => 'Платежей пока нет',
-        'en' => 'No payments yet',
-        _ => "Hozircha to'lovlar yo'q",
-      };
+  static String empty(Locale l) => tr(l, 'payments.my.empty');
 
-  static String errorTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось загрузить',
-        'en' => 'Could not load',
-        _ => "Yuklab bo'lmadi",
-      };
+  static String errorTitle(Locale l) => tr(l, 'payments.my.load_failed');
 
+  // Bare currency unit glued to the amount — locale-neutral, kept inline.
   static String currency(Locale l) => switch (l.languageCode) {
         'ru' => 'сум',
         'en' => 'UZS',
@@ -410,73 +400,25 @@ class _S {
       };
 
   static String filterLabel(Locale l, String? value) => switch (value) {
-        null => switch (l.languageCode) {
-            'ru' => 'Все',
-            'en' => 'All',
-            _ => 'Barchasi',
-          },
+        null => tr(l, 'payments.filter.all'),
         _ => statusLabel(l, value),
       };
 
   static String statusLabel(Locale l, String status) => switch (status) {
-        'completed' => switch (l.languageCode) {
-            'ru' => 'Оплачено',
-            'en' => 'Paid',
-            _ => "To'langan",
-          },
-        'pending' => switch (l.languageCode) {
-            'ru' => 'Ожидание',
-            'en' => 'Pending',
-            _ => 'Kutilmoqda',
-          },
-        'processing' => switch (l.languageCode) {
-            'ru' => 'В обработке',
-            'en' => 'Processing',
-            _ => 'Jarayonda',
-          },
-        'failed' => switch (l.languageCode) {
-            'ru' => 'Ошибка',
-            'en' => 'Failed',
-            _ => 'Muvaffaqiyatsiz',
-          },
-        'cancelled' => switch (l.languageCode) {
-            'ru' => 'Отменено',
-            'en' => 'Cancelled',
-            _ => 'Bekor qilingan',
-          },
-        'refunded' => switch (l.languageCode) {
-            'ru' => 'Возврат',
-            'en' => 'Refunded',
-            _ => 'Qaytarilgan',
-          },
+        'completed' => tr(l, 'payments.record.status.completed'),
+        'pending' => tr(l, 'payments.record.status.pending'),
+        'processing' => tr(l, 'payments.record.status.processing'),
+        'failed' => tr(l, 'payments.record.status.failed'),
+        'cancelled' => tr(l, 'payments.record.status.cancelled'),
+        'refunded' => tr(l, 'payments.record.status.refunded'),
         _ => status,
       };
 
   static String typeLabel(Locale l, String type) => switch (type) {
-        'ai_valuation' => switch (l.languageCode) {
-            'ru' => 'AI-оценка',
-            'en' => 'AI valuation',
-            _ => 'AI baholash',
-          },
-        'marketplace_purchase' => switch (l.languageCode) {
-            'ru' => '3D-модель',
-            'en' => '3D model',
-            _ => '3D model',
-          },
-        'subscription' => switch (l.languageCode) {
-            'ru' => 'Подписка',
-            'en' => 'Subscription',
-            _ => 'Obuna',
-          },
-        'virtual_property_view' => switch (l.languageCode) {
-            'ru' => 'Виртуальный объект',
-            'en' => 'Virtual property',
-            _ => 'Virtual mulk',
-          },
-        _ => switch (l.languageCode) {
-            'ru' => 'Платёж',
-            'en' => 'Payment',
-            _ => "To'lov",
-          },
+        'ai_valuation' => tr(l, 'payments.record.type.ai_valuation'),
+        'marketplace_purchase' => tr(l, 'payments.record.type.marketplace_purchase'),
+        'subscription' => tr(l, 'payments.record.type.subscription'),
+        'virtual_property_view' => tr(l, 'payments.record.type.virtual_property_view'),
+        _ => tr(l, 'payments.record.type.other'),
       };
 }

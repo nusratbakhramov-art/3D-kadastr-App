@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import 'calculator_draft.dart';
 import 'calculator_pricing.dart';
 
@@ -164,8 +165,4 @@ KadastrServiceEstimate estimateForCategory({
 int kadastrCombinedTotalUzs(Iterable<KadastrServiceEstimate> items) =>
     items.fold(0, (sum, e) => sum + e.totalUzs);
 
-String kadastrQuoteLabel(Locale l) => switch (l.languageCode) {
-  'ru' => 'По договорённости',
-  'en' => 'By agreement',
-  _ => 'Kelishuv asosida',
-};
+String kadastrQuoteLabel(Locale l) => tr(l, 'services.model.kadastr_quote');

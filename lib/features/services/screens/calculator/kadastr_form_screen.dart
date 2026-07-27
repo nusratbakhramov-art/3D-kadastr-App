@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/calculator_pricing_store.dart';
@@ -83,7 +84,7 @@ class _KadastrFormScreenState extends State<KadastrFormScreen> {
                         title: widget.is3d
                             ? CalculatorCategory.kadastr3d.title(locale)
                             : CalculatorCategory.kadastr.title(locale),
-                        subtitle: _Strings.subtitle(locale),
+                        subtitle: tr(locale, 'services.calc.kadastr.subtitle'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -92,7 +93,7 @@ class _KadastrFormScreenState extends State<KadastrFormScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
                           CalculatorSectionLabel(
-                            text: _Strings.chooseObject(locale),
+                            text: tr(locale, 'services.calc.choose_object'),
                           ),
                           const SizedBox(height: 12),
                           for (final t in KadastrObjectType.values) ...[
@@ -105,8 +106,8 @@ class _KadastrFormScreenState extends State<KadastrFormScreen> {
                           ],
                           const SizedBox(height: 14),
                           CalculatorField(
-                            label: _Strings.areaLabel(locale),
-                            placeholder: _Strings.areaPlaceholder(locale),
+                            label: tr(locale, 'services.calc.area_property'),
+                            placeholder: tr(locale, 'services.calc.enter_area'),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -116,7 +117,7 @@ class _KadastrFormScreenState extends State<KadastrFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _Strings.calculate(locale),
+                        label: tr(locale, 'services.calc.calculate'),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -130,42 +131,4 @@ class _KadastrFormScreenState extends State<KadastrFormScreen> {
       ),
     );
   }
-}
-
-class _Strings {
-  const _Strings._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String subtitle(Locale l) => _pick(
-        l,
-        "Pasport va yig'ma jild narxi",
-        'Цена паспорта и кадастрового дела',
-        'Passport & file price',
-      );
-
-  static String chooseObject(Locale l) => _pick(
-        l,
-        "Ob'ekt turini tanlang",
-        'Выберите тип объекта',
-        'Choose object type',
-      );
-
-  static String areaLabel(Locale l) => _pick(
-        l,
-        "Ko'chmas mulk maydoni",
-        'Площадь недвижимости',
-        'Property area',
-      );
-
-  static String areaPlaceholder(Locale l) => _pick(
-        l,
-        'Maydonni kiriting',
-        'Введите площадь',
-        'Enter area',
-      );
-
-  static String calculate(Locale l) =>
-      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
 }

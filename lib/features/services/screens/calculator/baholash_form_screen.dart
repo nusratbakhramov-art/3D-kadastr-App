@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/calculator_pricing_store.dart';
@@ -55,7 +56,7 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
       MaterialPageRoute<void>(
         builder: (ctx) => OnlineCalculatorResultScreen(
           result: result,
-          placeOrderLabel: _Strings.submitOrder(locale),
+          placeOrderLabel: tr(locale, 'services.calc.submit_order'),
           // "Ariza topshirish" → eski 3D kadastr oqimiga o'tamiz
           // (davreestr lookup → mijoz → lokatsiya → skan).
           onPlaceOrder: () => Navigator.of(ctx).push(
@@ -98,7 +99,7 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
                           CalculatorSectionLabel(
-                            text: _Strings.chooseObject(locale),
+                            text: tr(locale, 'services.calc.choose_object'),
                           ),
                           const SizedBox(height: 12),
                           for (final t in BaholashObject.values) ...[
@@ -111,8 +112,8 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
                           ],
                           const SizedBox(height: 14),
                           CalculatorField(
-                            label: _Strings.areaLabel(locale),
-                            placeholder: _Strings.areaPlaceholder(locale),
+                            label: tr(locale, 'services.calc.area_property'),
+                            placeholder: tr(locale, 'services.calc.enter_area'),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -122,7 +123,7 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _Strings.calculate(locale),
+                        label: tr(locale, 'services.calc.calculate'),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -136,42 +137,4 @@ class _BaholashFormScreenState extends State<BaholashFormScreen> {
       ),
     );
   }
-}
-
-class _Strings {
-  const _Strings._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String chooseObject(Locale l) => _pick(
-        l,
-        "Ob'ekt turini tanlang",
-        'Выберите тип объекта',
-        'Choose object type',
-      );
-
-  static String areaLabel(Locale l) => _pick(
-        l,
-        "Ko'chmas mulk maydoni",
-        'Площадь недвижимости',
-        'Property area',
-      );
-
-  static String areaPlaceholder(Locale l) => _pick(
-        l,
-        'Maydonni kiriting',
-        'Введите площадь',
-        'Enter area',
-      );
-
-  static String calculate(Locale l) =>
-      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
-
-  static String submitOrder(Locale l) => _pick(
-        l,
-        'Ariza topshirish',
-        'Подать заявку',
-        'Submit application',
-      );
 }

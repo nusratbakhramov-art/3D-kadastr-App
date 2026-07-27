@@ -3,6 +3,7 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/gradient_surface.dart';
 import '../../../widgets/remote_image.dart';
@@ -180,7 +181,7 @@ class _FeaturedCard extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: _PricePill(
                   label: isFree
-                      ? _FeaturedCarouselStrings.free(locale)
+                      ? tr(locale, 'market.listing.free')
                       : '${_fmtPrice(listing.priceUzs)} UZS',
                   highlight: isFree,
                 ),
@@ -393,16 +394,6 @@ class _PageDots extends StatelessWidget {
       ],
     );
   }
-}
-
-class _FeaturedCarouselStrings {
-  const _FeaturedCarouselStrings._();
-
-  static String free(Locale l) => switch (l.languageCode) {
-    'ru' => 'Бесплатно',
-    'en' => 'Free',
-    _ => 'Bepul',
-  };
 }
 
 class _CarouselSkeleton extends StatelessWidget {

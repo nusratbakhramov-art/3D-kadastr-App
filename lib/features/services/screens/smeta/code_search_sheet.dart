@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/i18n.dart';
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../data/smeta_api_service.dart';
 import '../../models/smeta_draft.dart';
@@ -133,11 +134,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
                 ],
                 decoration: InputDecoration(
-                  labelText: switch (locale.languageCode) {
-                    'ru' => 'Объём (${c.unit})',
-                    'en' => 'Volume (${c.unit})',
-                    _ => 'Hajm (${c.unit})',
-                  },
+                  labelText: '${tr(locale, 'services.smeta.volume')} (${c.unit})',
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -206,11 +203,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
               child: Text(
-                switch (locale.languageCode) {
-                  'ru' => 'Выбрать из каталога СНиР',
-                  'en' => 'Choose from the SNiR catalog',
-                  _ => 'SNiR katalogidan tanlash',
-                },
+                tr(locale, 'services.smeta.choose_from_catalog'),
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
@@ -224,11 +217,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
               child: TextField(
                 controller: _query,
                 decoration: InputDecoration(
-                  hintText: switch (locale.languageCode) {
-                    'ru' => 'Поиск по коду или названию',
-                    'en' => 'Search by code or name',
-                    _ => 'Kod yoki nom bo\'yicha qidirish',
-                  },
+                  hintText: tr(locale, 'services.smeta.search_hint'),
                   prefixIcon: const Icon(Icons.search, size: 20),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -246,11 +235,7 @@ class _CodeSearchSheetState extends State<_CodeSearchSheet> {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
                     _BookChip(
-                      label: switch (locale.languageCode) {
-                        'ru' => 'Все',
-                        'en' => 'All',
-                        _ => 'Hammasi',
-                      },
+                      label: tr(locale, 'services.smeta.all'),
                       selected: _bookFile == null,
                       onTap: () {
                         setState(() => _bookFile = null);
@@ -428,7 +413,7 @@ class _EmptyView extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Text(
-          'Natijalar topilmadi',
+          tr(Localizations.localeOf(context), 'services.smeta.no_results'),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w500,
@@ -458,11 +443,7 @@ class _ErrorView extends StatelessWidget {
             const Icon(Icons.error_outline, size: 32, color: Colors.redAccent),
             const SizedBox(height: 12),
             Text(
-              switch (locale.languageCode) {
-                'ru' => 'Ошибка: $message',
-                'en' => 'Error: $message',
-                _ => 'Xatolik: $message',
-              },
+              '${tr(locale, 'services.smeta.error')}: $message',
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13),
             ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../widgets/pressable_scale.dart';
 
 class HomeCta extends StatelessWidget {
@@ -133,21 +134,9 @@ class _CtaButton extends StatelessWidget {
 class _CtaStrings {
   const _CtaStrings._();
 
-  static String headline(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Расчёт комплексных услуг',
-    'en' => 'Estimate complex services',
-    _ => 'Kompleks xizmatlarini hisoblash',
-  };
+  static String headline(Locale locale) => tr(locale, 'home.cta.headline');
 
-  static String orderLabel(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Онлайн калькулятор',
-    'en' => 'Online calculator',
-    _ => 'Online kalkulyator',
-  };
+  static String orderLabel(Locale locale) => tr(locale, 'home.cta.order_label');
 
-  static String loginLabel(Locale locale) => switch (locale.languageCode) {
-    'ru' => 'Войти',
-    'en' => 'Log in',
-    _ => 'Kirish',
-  };
+  static String loginLabel(Locale locale) => tr(locale, 'home.cta.login_label');
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 
 class ResendTimer extends StatefulWidget {
@@ -74,7 +75,7 @@ class _ResendTimerState extends State<ResendTimer> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Text(
-          _ResendTimerStrings.label(locale),
+          tr(locale, 'auth.resend.label'),
           style: TextStyle(
             color: titleColor,
             fontSize: 14,
@@ -116,14 +117,4 @@ class _ResendTimerState extends State<ResendTimer> {
       ],
     );
   }
-}
-
-class _ResendTimerStrings {
-  const _ResendTimerStrings._();
-
-  static String label(Locale l) => switch (l.languageCode) {
-    'ru' => 'Отправить снова',
-    'en' => 'Resend',
-    _ => 'Qayta yuborish',
-  };
 }

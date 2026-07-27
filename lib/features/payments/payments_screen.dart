@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
 import '../../core/i18n.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
@@ -215,53 +216,23 @@ class _PaymentsScreenState extends State<PaymentsScreen>
     ];
   }
 
+  static const _monthKeys = <String>[
+    'payments.month.january',
+    'payments.month.february',
+    'payments.month.march',
+    'payments.month.april',
+    'payments.month.may',
+    'payments.month.june',
+    'payments.month.july',
+    'payments.month.august',
+    'payments.month.september',
+    'payments.month.october',
+    'payments.month.november',
+    'payments.month.december',
+  ];
+
   String _monthLabel(DateTime d, Locale l) {
-    const months = {
-      'uz': [
-        'yanvar',
-        'fevral',
-        'mart',
-        'aprel',
-        'may',
-        'iyun',
-        'iyul',
-        'avgust',
-        'sentabr',
-        'oktabr',
-        'noyabr',
-        'dekabr',
-      ],
-      'ru': [
-        'январь',
-        'февраль',
-        'март',
-        'апрель',
-        'май',
-        'июнь',
-        'июль',
-        'август',
-        'сентябрь',
-        'октябрь',
-        'ноябрь',
-        'декабрь',
-      ],
-      'en': [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
-      ],
-    };
-    final list = months[l.languageCode] ?? months['uz']!;
-    final name = list[d.month - 1];
+    final name = tr(l, _monthKeys[d.month - 1]);
     return '$name ${d.year}';
   }
 }
@@ -785,29 +756,9 @@ class _EmptyState extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Платежи',
-    'en' => 'Payments',
-    _ => 'To‘lovlar',
-  };
-  static String totalSpent(Locale l) => switch (l.languageCode) {
-    'ru' => 'Всего потрачено',
-    'en' => 'Total spent',
-    _ => 'Jami sarflangan',
-  };
-  static String transactions(Locale l) => switch (l.languageCode) {
-    'ru' => 'операций',
-    'en' => 'transactions',
-    _ => 'tranzaksiya',
-  };
-  static String emptyTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Платежей пока нет',
-    'en' => 'No payments yet',
-    _ => 'Hali to‘lovlar yo‘q',
-  };
-  static String emptyMessage(Locale l) => switch (l.languageCode) {
-    'ru' => 'История ваших платежей появится здесь.',
-    'en' => 'Your payment history will appear here.',
-    _ => 'Sizning to‘lov tarixingiz shu yerda paydo bo‘ladi.',
-  };
+  static String title(Locale l) => tr(l, 'payments.title');
+  static String totalSpent(Locale l) => tr(l, 'payments.total_spent');
+  static String transactions(Locale l) => tr(l, 'payments.transactions');
+  static String emptyTitle(Locale l) => tr(l, 'payments.empty_title');
+  static String emptyMessage(Locale l) => tr(l, 'payments.empty_message');
 }

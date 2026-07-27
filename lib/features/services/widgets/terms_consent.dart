@@ -16,6 +16,7 @@ import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart
 import 'package:http/http.dart' as http;
 
 import '../../../core/api_config.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 
 class TermsConsent extends StatelessWidget {
@@ -380,70 +381,23 @@ Future<bool> showTermsAcceptanceSheet(BuildContext context) async {
 class _S {
   const _S._();
 
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+  static String label(Locale l) => tr(l, 'services.widget.terms.label');
 
-  // Placeholder checkbox label (final legal text pending).
-  static String label(Locale l) => _pick(
-        l,
-        'Yolg\'on ma\'lumot yuklamayman',
-        'Не буду загружать ложную информацию',
-        'I will not upload false information',
-      );
+  static String readFull(Locale l) => tr(l, 'services.widget.terms.read_full');
 
-  static String readFull(Locale l) => _pick(
-        l,
-        'Shartlarni to\'liq o\'qish',
-        'Читать условия полностью',
-        'Read the full terms',
-      );
+  static String sheetTitle(Locale l) =>
+      tr(l, 'services.widget.terms.sheet_title');
 
-  static String sheetTitle(Locale l) => _pick(
-        l,
-        'Foydalanish shartlari',
-        'Условия использования',
-        'Terms of use',
-      );
+  static String close(Locale l) => tr(l, 'services.widget.terms.close');
 
-  static String close(Locale l) => _pick(l, 'Yopish', 'Закрыть', 'Close');
+  static String accept(Locale l) => tr(l, 'services.widget.terms.accept');
 
-  static String accept(Locale l) =>
-      _pick(l, 'QABUL QILAMAN', 'ПРИНИМАЮ', 'I ACCEPT');
+  static String scrollHint(Locale l) =>
+      tr(l, 'services.widget.terms.scroll_hint');
 
-  static String scrollHint(Locale l) => _pick(
-        l,
-        'Davom etish uchun shartlarni oxirigacha o\'qing',
-        'Прочитайте условия до конца, чтобы продолжить',
-        'Read the terms to the end to continue',
-      );
-
-  static List<String> paragraphs(Locale l) => switch (l.languageCode) {
-        'ru' => const [
-            'Пользуясь сервисом оценки, вы подтверждаете, что предоставленные '
-                'данные, фотографии и документы являются достоверными и '
-                'принадлежат оцениваемому объекту.',
-            'Загрузка ложной, чужой или вводящей в заблуждение информации '
-                'запрещена и может привести к отклонению заявки.',
-            'Оценка носит предварительный характер; окончательное заключение '
-                'выдаётся лицензированным экспертом.',
-          ],
-        'en' => const [
-            'By using the valuation service you confirm that the data, photos '
-                'and documents you provide are truthful and belong to the '
-                'object being valued.',
-            'Uploading false, third-party or misleading information is '
-                'prohibited and may lead to your request being rejected.',
-            'The valuation is preliminary; the final conclusion is issued by a '
-                'licensed expert.',
-          ],
-        _ => const [
-            'Baholash xizmatidan foydalanar ekansiz, siz taqdim etgan '
-                'ma\'lumotlar, rasmlar va hujjatlar haqiqiy ekanini hamda '
-                'baholanayotgan obyektga tegishli ekanini tasdiqlaysiz.',
-            'Yolg\'on, o\'zganing yoki chalg\'ituvchi ma\'lumot yuklash '
-                'taqiqlanadi va ariza rad etilishiga olib kelishi mumkin.',
-            'Baholash dastlabki xarakterga ega; yakuniy xulosa litsenziyalangan '
-                'ekspert tomonidan beriladi.',
-          ],
-      };
+  static List<String> paragraphs(Locale l) => [
+        tr(l, 'services.widget.terms.para1'),
+        tr(l, 'services.widget.terms.para2'),
+        tr(l, 'services.widget.terms.para3'),
+      ];
 }

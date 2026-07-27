@@ -9,6 +9,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
+
 /// Yuridik (faqat ko'rsatiladigan) narx satri — til bo'yicha qiymat.
 @immutable
 class YuridikLine {
@@ -203,37 +205,27 @@ const Map<String, num> _defaultRates = {
   'tamirlash.qurilish.per_m2': 2400000,
 };
 
-const List<YuridikLine> _defaultYuridikLines = [
-  YuridikLine(key: 'yuridik.maslahat', value: {
-    'uz': "500 000 so'm",
-    'ru': '500 000 сум',
-    'en': '500,000 UZS',
-  }),
-  YuridikLine(key: 'yuridik.hujjat', value: {
-    'uz': "1 500 000 so'm",
-    'ru': '1 500 000 сум',
-    'en': '1,500,000 UZS',
-  }),
-  YuridikLine(key: 'yuridik.sud', value: {
-    'uz': "5 000 000 – 20 000 000 so'm",
-    'ru': '5 000 000 – 20 000 000 сум',
-    'en': '5,000,000 – 20,000,000 UZS',
-  }),
-  YuridikLine(key: 'yuridik.autsorsing', value: {
-    'uz': "2 000 000 – 20 000 000 so'm/oy",
-    'ru': '2 000 000 – 20 000 000 сум/мес',
-    'en': '2,000,000 – 20,000,000 UZS/month',
-  }),
-  YuridikLine(key: 'yuridik.royxat', value: {
-    'uz': "3 000 000 so'm",
-    'ru': '3 000 000 сум',
-    'en': '3,000,000 UZS',
-  }),
-  YuridikLine(key: 'yuridik.qarz', value: {
-    'uz': '5–20% komissiya',
-    'ru': '5–20% комиссия',
-    'en': '5–20% commission',
-  }),
+/// Backend-driven label map for a default (offline fallback) entry — the three
+/// language values are sourced from the translation bundle, not hard-coded.
+Map<String, String> _trMap(String key) => {
+      for (final loc in const ['uz', 'ru', 'en']) loc: tr(Locale(loc), key),
+    };
+
+final List<YuridikLine> _defaultYuridikLines = [
+  YuridikLine(
+      key: 'yuridik.maslahat',
+      value: _trMap('services.model.yuridik.maslahat')),
+  YuridikLine(
+      key: 'yuridik.hujjat', value: _trMap('services.model.yuridik.hujjat')),
+  YuridikLine(
+      key: 'yuridik.sud', value: _trMap('services.model.yuridik.sud')),
+  YuridikLine(
+      key: 'yuridik.autsorsing',
+      value: _trMap('services.model.yuridik.autsorsing')),
+  YuridikLine(
+      key: 'yuridik.royxat', value: _trMap('services.model.yuridik.royxat')),
+  YuridikLine(
+      key: 'yuridik.qarz', value: _trMap('services.model.yuridik.qarz')),
 ];
 
 // ────────────────────────────────────────────────────────────────────────
@@ -242,73 +234,73 @@ const List<YuridikLine> _defaultYuridikLines = [
 // backend yetib bormaganda shu ro'yxat ishlatiladi.
 // ────────────────────────────────────────────────────────────────────────
 
-CalcOption _o(String value, String uz, String ru, String en, [String? meta]) =>
-    CalcOption(value: value, label: {'uz': uz, 'ru': ru, 'en': en}, meta: meta);
+CalcOption _o(String value, String key, [String? meta]) =>
+    CalcOption(value: value, label: _trMap(key), meta: meta);
 
 final Map<String, List<CalcOption>> _defaultOptions = {
   'colors': [
-    _o('oq', 'Oq', 'Белый', 'White', '#FFFFFF'),
-    _o('bej', 'Bej', 'Бежевый', 'Beige', '#E6D8C3'),
-    _o('kulrang', 'Kulrang', 'Серый', 'Gray', '#9AA0A6'),
-    _o('qora', 'Qora', 'Чёрный', 'Black', '#222222'),
-    _o('jigarrang', 'Jigarrang', 'Коричневый', 'Brown', '#8B5A2B'),
-    _o('yogoch', 'Yog\'och', 'Дерево', 'Wood', '#C89B6C'),
-    _o('kok', 'Ko\'k', 'Синий', 'Blue', '#2F6FED'),
-    _o('moviy', 'Moviy', 'Голубой', 'Light blue', '#56CCF2'),
-    _o('yashil', 'Yashil', 'Зелёный', 'Green', '#3BA55D'),
-    _o('sariq', 'Sariq', 'Жёлтый', 'Yellow', '#F2C94C'),
-    _o('toq_sariq', 'To\'q sariq', 'Оранжевый', 'Orange', '#E8821E'),
-    _o('qizil', 'Qizil', 'Красный', 'Red', '#E0492A'),
-    _o('pushti', 'Pushti', 'Розовый', 'Pink', '#E58FB0'),
-    _o('binafsha', 'Binafsha', 'Фиолетовый', 'Purple', '#7C5CBF'),
+    _o('oq', 'services.model.color.oq', '#FFFFFF'),
+    _o('bej', 'services.model.color.bej', '#E6D8C3'),
+    _o('kulrang', 'services.model.color.kulrang', '#9AA0A6'),
+    _o('qora', 'services.model.color.qora', '#222222'),
+    _o('jigarrang', 'services.model.color.jigarrang', '#8B5A2B'),
+    _o('yogoch', 'services.model.color.yogoch', '#C89B6C'),
+    _o('kok', 'services.model.color.kok', '#2F6FED'),
+    _o('moviy', 'services.model.color.moviy', '#56CCF2'),
+    _o('yashil', 'services.model.color.yashil', '#3BA55D'),
+    _o('sariq', 'services.model.color.sariq', '#F2C94C'),
+    _o('toq_sariq', 'services.model.color.toq_sariq', '#E8821E'),
+    _o('qizil', 'services.model.color.qizil', '#E0492A'),
+    _o('pushti', 'services.model.color.pushti', '#E58FB0'),
+    _o('binafsha', 'services.model.color.binafsha', '#7C5CBF'),
   ],
   'arxitektura.style': [
-    _o('high_tech', 'High-tech', 'High-tech', 'High-tech'),
-    _o('klassik', 'Klassik', 'Классика', 'Classic'),
-    _o('neoklassik', 'Neoklassik', 'Неоклассика', 'Neoclassical'),
-    _o('minimalizm', 'Minimalizm', 'Минимализм', 'Minimalism'),
-    _o('loft', 'Loft', 'Loft', 'Loft'),
+    _o('high_tech', 'services.model.style.high_tech'),
+    _o('klassik', 'services.model.style.klassik'),
+    _o('neoklassik', 'services.model.style.neoklassik'),
+    _o('minimalizm', 'services.model.style.minimalizm'),
+    _o('loft', 'services.model.style.loft'),
   ],
   'arxitektura.facade_material': [
-    _o('gisht', 'G\'isht', 'Кирпич', 'Brick'),
-    _o('tosh', 'Tosh', 'Камень', 'Stone'),
-    _o('kompozit', 'Kompozit panellar', 'Композитные панели', 'Composite panels'),
-    _o('shisha', 'Shisha', 'Стекло', 'Glass'),
-    _o('boyoq', 'Fasad bo\'yoqlari', 'Фасадная краска', 'Facade paint'),
+    _o('gisht', 'services.model.material.gisht'),
+    _o('tosh', 'services.model.material.tosh'),
+    _o('kompozit', 'services.model.material.kompozit'),
+    _o('shisha', 'services.model.material.shisha'),
+    _o('boyoq', 'services.model.material.boyoq_facade'),
   ],
   'dizayn.interior.style': [
-    _o('high_tech', 'High-tech', 'High-tech', 'High-tech'),
-    _o('klassik', 'Klassik', 'Классика', 'Classic'),
-    _o('neoklassik', 'Neoklassik', 'Неоклассика', 'Neoclassical'),
-    _o('minimalizm', 'Minimalizm', 'Минимализм', 'Minimalism'),
-    _o('loft', 'Loft', 'Loft', 'Loft'),
-    _o('boshqa', 'Boshqa', 'Другое', 'Other'),
+    _o('high_tech', 'services.model.style.high_tech'),
+    _o('klassik', 'services.model.style.klassik'),
+    _o('neoklassik', 'services.model.style.neoklassik'),
+    _o('minimalizm', 'services.model.style.minimalizm'),
+    _o('loft', 'services.model.style.loft'),
+    _o('boshqa', 'services.model.opt.boshqa'),
   ],
   'dizayn.interior.material': [
-    _o('boyoq', 'Bo\'yoq', 'Краска', 'Paint'),
-    _o('tosh', 'Tosh', 'Камень', 'Stone'),
-    _o('kompozit', 'Kompozit panellar', 'Композитные панели', 'Composite panels'),
-    _o('shisha', 'Shisha', 'Стекло', 'Glass'),
-    _o('bambuk', 'Bambuk panellar', 'Бамбуковые панели', 'Bamboo panels'),
+    _o('boyoq', 'services.model.material.boyoq'),
+    _o('tosh', 'services.model.material.tosh'),
+    _o('kompozit', 'services.model.material.kompozit'),
+    _o('shisha', 'services.model.material.shisha'),
+    _o('bambuk', 'services.model.material.bambuk'),
   ],
   'dizayn.floor_material': [
-    _o('laminat', 'Laminat', 'Ламинат', 'Laminate'),
-    _o('tosh', 'Tosh', 'Камень', 'Stone'),
-    _o('kafel', 'Kafel', 'Плитка', 'Tile'),
-    _o('boshqa', 'Boshqa', 'Другое', 'Other'),
+    _o('laminat', 'services.model.material.laminat'),
+    _o('tosh', 'services.model.material.tosh'),
+    _o('kafel', 'services.model.material.kafel'),
+    _o('boshqa', 'services.model.opt.boshqa'),
   ],
   'dizayn.exterior.style': [
-    _o('high_tech', 'High-tech', 'High-tech', 'High-tech'),
-    _o('klassik', 'Klassik', 'Классика', 'Classic'),
-    _o('neoklassik', 'Neoklassik', 'Неоклассика', 'Neoclassical'),
-    _o('minimalizm', 'Minimalizm', 'Минимализм', 'Minimalism'),
-    _o('loft', 'Loft', 'Loft', 'Loft'),
-    _o('modern', 'Modern', 'Модерн', 'Modern'),
+    _o('high_tech', 'services.model.style.high_tech'),
+    _o('klassik', 'services.model.style.klassik'),
+    _o('neoklassik', 'services.model.style.neoklassik'),
+    _o('minimalizm', 'services.model.style.minimalizm'),
+    _o('loft', 'services.model.style.loft'),
+    _o('modern', 'services.model.style.modern'),
   ],
   'dizayn.exterior.material': [
-    _o('boyoq', 'Bo\'yoq', 'Краска', 'Paint'),
-    _o('tosh', 'Tosh', 'Камень', 'Stone'),
-    _o('kompozit', 'Kompozit panellar', 'Композитные панели', 'Composite panels'),
-    _o('shisha', 'Shisha', 'Стекло', 'Glass'),
+    _o('boyoq', 'services.model.material.boyoq'),
+    _o('tosh', 'services.model.material.tosh'),
+    _o('kompozit', 'services.model.material.kompozit'),
+    _o('shisha', 'services.model.material.shisha'),
   ],
 };

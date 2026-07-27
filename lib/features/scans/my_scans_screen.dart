@@ -340,80 +340,25 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _S {
-  static String fileNotFound(Locale l) => _p(
-    l,
-    'common.file_not_found',
-    'Fayl topilmadi',
-    'Файл не найден',
-    'File not found',
-  );
+  static String fileNotFound(Locale l) => _p(l, 'common.file_not_found');
   static String openError(Locale l, String message) =>
-      '${_p(l, 'common.open_error', 'Ochishda xatolik', 'Ошибка открытия', 'Open error')}: $message';
-  static String deleteTitle(Locale l) => _p(
-    l,
-    'scan.my.delete_title',
-    'Skanni o\'chirish',
-    'Удалить скан',
-    'Delete scan',
-  );
-  static String deletePrompt(Locale l, String name) => _p(
-    l,
-    'scan.my.delete_prompt',
-    '"$name" ni o\'chirishni tasdiqlaysizmi?',
-    'Подтвердить удаление "$name"?',
-    'Confirm deleting "$name"?',
-  );
-  static String cancel(Locale l) =>
-      _p(l, 'common.cancel', 'Bekor qilish', 'Отмена', 'Cancel');
-  static String delete(Locale l) =>
-      _p(l, 'common.delete', 'O\'chirish', 'Удалить', 'Delete');
-  static String deleted(Locale l) => _p(
-    l,
-    'scan.my.deleted',
-    'Skan o\'chirildi',
-    'Скан удалён',
-    'Scan deleted',
-  );
-  static String error(Locale l) =>
-      _p(l, 'common.error', 'Xatolik', 'Ошибка', 'Error');
-  static String title(Locale l) =>
-      _p(l, 'scan.my.title', 'Skanlarim', 'Мои сканы', 'My scans');
-  static String emptyTitle(Locale l) => _p(
-    l,
-    'scan.my.empty_title',
-    'Hozircha skan yo\'q',
-    'Сканов пока нет',
-    'No scans yet',
-  );
-  static String emptyMessage(Locale l) => _p(
-    l,
-    'scan.my.empty_message',
-    'Birinchi 3D xona skanini yarating',
-    'Создайте свой первый 3D скан комнаты',
-    'Create your first 3D room scan',
-  );
+      '${_p(l, 'common.open_error')}: $message';
+  static String deleteTitle(Locale l) => _p(l, 'scan.my.delete_title');
+  static String deletePrompt(Locale l, String name) =>
+      _p(l, 'scan.my.delete_prompt').replaceAll(r'$name', name);
+  static String cancel(Locale l) => _p(l, 'common.cancel');
+  static String delete(Locale l) => _p(l, 'common.delete');
+  static String deleted(Locale l) => _p(l, 'scan.my.deleted');
+  static String error(Locale l) => _p(l, 'common.error');
+  static String title(Locale l) => _p(l, 'scan.my.title');
+  static String emptyTitle(Locale l) => _p(l, 'scan.my.empty_title');
+  static String emptyMessage(Locale l) => _p(l, 'scan.my.empty_message');
 
-  static String photoCount(Locale l, int count) => _p(
-    l,
-    'scan.common.photo_count',
-    '$count foto',
-    '$count фото',
-    '$count photos',
-  );
-  static String todayAt(Locale l, String time) => _p(
-    l,
-    'common.today_at',
-    'Bugun, $time',
-    'Сегодня, $time',
-    'Today, $time',
-  );
-  static String yesterdayAt(Locale l, String time) => _p(
-    l,
-    'common.yesterday_at',
-    'Kecha, $time',
-    'Вчера, $time',
-    'Yesterday, $time',
-  );
-  static String _p(Locale l, String key, String uz, String ru, String en) =>
-      tr(l, key, uz: uz, ru: ru, en: en);
+  static String photoCount(Locale l, int count) =>
+      _p(l, 'scan.common.photo_count').replaceAll(r'$count', '$count');
+  static String todayAt(Locale l, String time) =>
+      _p(l, 'common.today_at').replaceAll(r'$time', time);
+  static String yesterdayAt(Locale l, String time) =>
+      _p(l, 'common.yesterday_at').replaceAll(r'$time', time);
+  static String _p(Locale l, String key) => tr(l, key);
 }

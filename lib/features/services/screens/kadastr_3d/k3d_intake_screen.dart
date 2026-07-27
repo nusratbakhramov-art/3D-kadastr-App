@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../auth/widgets/auth_toast.dart';
@@ -124,23 +125,29 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
   String? get _missingHint {
     if (_ready) return null;
     final l = localeNotifier.value;
-    if (_anyUploading) return _Strings.uploadingFiles(l);
+    if (_anyUploading) return tr(l, 'services.k3d.intake.uploading_files');
     final missing = <String>[];
-    if (widget.bundle.imageKeys.isEmpty) missing.add(_Strings.missingPhoto(l));
-    if (widget.bundle.kadastrKeys.isEmpty) {
-      missing.add(_Strings.missingKadastr(l));
+    if (widget.bundle.imageKeys.isEmpty) {
+      missing.add(tr(l, 'services.k3d.intake.missing_photo'));
     }
-    if (widget.bundle.rooms.isEmpty) missing.add(_Strings.missingRooms(l));
+    if (widget.bundle.kadastrKeys.isEmpty) {
+      missing.add(tr(l, 'services.k3d.intake.missing_kadastr'));
+    }
+    if (widget.bundle.rooms.isEmpty) {
+      missing.add(tr(l, 'services.k3d.intake.missing_rooms'));
+    }
     final f = widget.bundle.floor;
     final tf = widget.bundle.totalFloors;
     if (f == null || tf == null || f < 1 || tf < 1) {
-      missing.add(_Strings.missingFloor(l));
+      missing.add(tr(l, 'services.k3d.intake.missing_floor'));
     } else if (tf > _maxFloors) {
-      return _Strings.floorMax(l, _maxFloors);
+      return tr(l, 'services.k3d.intake.floor_max')
+          .replaceAll(r'$max', '$_maxFloors');
     } else if (f > tf) {
-      return _Strings.floorExceeds(l);
+      return tr(l, 'services.k3d.intake.floor_exceeds');
     }
-    return _Strings.requiredSuffix(l, missing.join(', '));
+    return tr(l, 'services.k3d.intake.required_suffix')
+        .replaceAll(r'$items', missing.join(', '));
   }
 
   void _setFloor(String raw) {
@@ -168,7 +175,8 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
   Future<void> _addPhotos() async {
     final remaining = 15 - _photoItems.length;
     if (remaining <= 0) {
-      _toast(_Strings.maxPhotos(localeNotifier.value, 15));
+      _toast(tr(localeNotifier.value, 'services.k3d.intake.max_photos')
+          .replaceAll(r'$n', '15'));
       return;
     }
     final List<XFile> picked =
@@ -198,7 +206,8 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
   }) async {
     final remaining = maxTotal - items.length;
     if (remaining <= 0) {
-      _toast(_Strings.maxFiles(localeNotifier.value, maxTotal));
+      _toast(tr(localeNotifier.value, 'services.k3d.intake.max_files')
+          .replaceAll(r'$n', '$maxTotal'));
       return;
     }
     final result = await FilePicker.platform.pickFiles(
@@ -252,7 +261,7 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
     if (token == null || token.isEmpty) {
       setState(() {
         item.status = _UpStatus.failed;
-        item.error = _Strings.authRequired(localeNotifier.value);
+        item.error = tr(localeNotifier.value, 'services.k3d.intake.auth_required');
       });
       return;
     }
@@ -272,7 +281,8 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
         item.key = keys.isNotEmpty ? keys.first : null;
         item.status = item.key != null ? _UpStatus.done : _UpStatus.failed;
         if (item.key == null) {
-          item.error = _Strings.uploadFailed(localeNotifier.value);
+          item.error =
+              tr(localeNotifier.value, 'services.k3d.intake.upload_failed');
         }
       });
     } on AiUploadException catch (e) {
@@ -281,14 +291,15 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
       setState(() {
         item.status = _UpStatus.failed;
         item.error = e.statusCode == 400
-            ? _Strings.uploadRejected(localeNotifier.value)
-            : _Strings.uploadFailed(localeNotifier.value);
+            ? tr(localeNotifier.value, 'services.k3d.intake.upload_rejected')
+            : tr(localeNotifier.value, 'services.k3d.intake.upload_failed');
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         item.status = _UpStatus.failed;
-        item.error = _Strings.uploadFailed(localeNotifier.value);
+        item.error =
+            tr(localeNotifier.value, 'services.k3d.intake.upload_failed');
       });
     } finally {
       sync();
@@ -359,7 +370,7 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
 
   Widget _buildSubmit(Locale l) {
     final button = ListingCtaButton(
-      label: _Strings.ctaContinue(l),
+      label: tr(l, 'services.k3d.continue'),
       enabled: _ready,
       onTap: _continue,
     );
@@ -398,8 +409,8 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                    title: _Strings.appBarTitle(l),
-                    subtitle: _Strings.appBarSubtitle(l),
+                    title: tr(l, 'services.k3d.intake.appbar'),
+                    subtitle: tr(l, 'services.k3d.intake.subtitle'),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -413,11 +424,11 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     children: [
                       _UploadCard(
-                        title: _Strings.objectPhotos(l),
-                        hint: _Strings.objectPhotosHint(l),
+                        title: tr(l, 'services.k3d.intake.object_photos'),
+                        hint: tr(l, 'services.k3d.intake.object_photos_hint'),
                         icon: Icons.photo_camera_outlined,
                         emptyIcon: Icons.add_photo_alternate_outlined,
-                        actionLabel: _Strings.addPhotosCta(l),
+                        actionLabel: tr(l, 'services.k3d.intake.add_photos_cta'),
                         items: _photoItems,
                         maxFiles: 15,
                         onAdd: _addPhotos,
@@ -432,11 +443,11 @@ class _K3dIntakeScreenState extends State<K3dIntakeScreen> {
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
-                        title: _Strings.kadastrDocs(l),
-                        hint: _Strings.kadastrDocsHint(l),
+                        title: tr(l, 'services.k3d.intake.kadastr_docs'),
+                        hint: tr(l, 'services.k3d.intake.kadastr_docs_hint'),
                         icon: Icons.description_outlined,
                         emptyIcon: Icons.upload_file_outlined,
-                        actionLabel: _Strings.addDocsCta(l),
+                        actionLabel: tr(l, 'services.k3d.intake.add_docs_cta'),
                         items: _kadastrItems,
                         maxFiles: 20,
                         onAdd: _addKadastr,
@@ -703,7 +714,7 @@ class _UploadTile extends StatelessWidget {
             Icon(Icons.insert_drive_file_outlined, size: 24, color: muted),
             const SizedBox(height: 4),
             Text(
-              ext.isEmpty ? _Strings.file(l) : ext,
+              ext.isEmpty ? tr(l, 'services.k3d.intake.file') : ext,
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -1024,7 +1035,7 @@ class _FloorSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _Strings.floor(l),
+          tr(l, 'services.k3d.intake.floor'),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -1034,7 +1045,7 @@ class _FloorSection extends StatelessWidget {
         ),
         const SizedBox(height: 2),
         Text(
-          _Strings.floorDescription(l),
+          tr(l, 'services.k3d.intake.floor_description'),
           style: TextStyle(fontFamily: 'MTSCompact', fontSize: 12, color: muted),
         ),
         const SizedBox(height: 12),
@@ -1042,7 +1053,7 @@ class _FloorSection extends StatelessWidget {
           children: [
             Expanded(
               child: _FloorField(
-                label: _Strings.objectFloor(l),
+                label: tr(l, 'services.k3d.intake.object_floor'),
                 controller: floorCtrl,
                 onChanged: onFloorChanged,
               ),
@@ -1050,7 +1061,7 @@ class _FloorSection extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _FloorField(
-                label: _Strings.totalFloors(l),
+                label: tr(l, 'services.k3d.intake.total_floors'),
                 controller: totalFloorsCtrl,
                 onChanged: onTotalChanged,
               ),
@@ -1231,7 +1242,7 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _Strings.rooms(l),
+          tr(l, 'services.k3d.intake.rooms'),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -1241,7 +1252,7 @@ class _RoomsSelectorState extends State<_RoomsSelector> {
         ),
         const SizedBox(height: 2),
         Text(
-          _Strings.roomsHint(l),
+          tr(l, 'services.k3d.intake.rooms_hint'),
           style: TextStyle(fontFamily: 'MTSCompact', fontSize: 12, color: muted),
         ),
         const SizedBox(height: 12),
@@ -1328,11 +1339,7 @@ class _CustomNameInput extends StatelessWidget {
                 color: textColor,
               ),
               decoration: InputDecoration(
-                hintText: switch (locale.languageCode) {
-                  'ru' => 'Название комнаты (например: Кабинет)',
-                  'en' => 'Room name (e.g. Office)',
-                  _ => 'Xona nomi (masalan: Ish xonasi)',
-                },
+                hintText: tr(locale, 'services.k3d.intake.custom_room_hint'),
                 isDense: true,
                 border: InputBorder.none,
                 contentPadding: const EdgeInsets.symmetric(vertical: 14),
@@ -1502,181 +1509,3 @@ class _RoomCountRow extends StatelessWidget {
   }
 }
 
-class _Strings {
-  const _Strings._();
-
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Документы и фото',
-        'en' => 'Documents and photos',
-        _ => 'Hujjat va rasmlar',
-      };
-
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Необходимые данные для 3D модели',
-        'en' => 'Data required for the 3D model',
-        _ => '3D model uchun zarur ma\'lumotlar',
-      };
-
-  static String ctaContinue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
-
-  static String objectPhotos(Locale l) => switch (l.languageCode) {
-        'ru' => 'Фото объекта',
-        'en' => 'Object photos',
-        _ => 'Obyekt rasmlari',
-      };
-
-  static String objectPhotosHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Внутри и снаружи (1-15). Для оценки состояния.',
-        'en' => 'Inside and outside (1-15). To assess the condition.',
-        _ => 'Ichki va tashqi (1-15). Holatni baholash uchun.',
-      };
-
-  static String kadastrDocs(Locale l) => switch (l.languageCode) {
-        'ru' => 'Кадастровые документы',
-        'en' => 'Cadastre documents',
-        _ => 'Kadastr hujjatlari',
-      };
-
-  static String kadastrDocsHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Техпаспорт, план (1-20). Определяются площадь/год.',
-        'en' => 'Tech passport, plan (1-20). Area/year are determined.',
-        _ => 'Texpasport, plan (1-20). Maydon/yil aniqlanadi.',
-      };
-
-  static String floor(Locale l) => switch (l.languageCode) {
-        'ru' => 'Этаж',
-        'en' => 'Floor',
-        _ => 'Qavat',
-      };
-
-  static String floorDescription(Locale l) => switch (l.languageCode) {
-        'ru' => 'Этаж объекта и всего этажей в здании',
-        'en' => 'Object floor and total floors in the building',
-        _ => 'Obyekt qavati va binodagi jami qavatlar',
-      };
-
-  static String objectFloor(Locale l) => switch (l.languageCode) {
-        'ru' => 'Этаж объекта',
-        'en' => 'Object floor',
-        _ => 'Obyekt qavati',
-      };
-
-  static String totalFloors(Locale l) => switch (l.languageCode) {
-        'ru' => 'Всего этажей',
-        'en' => 'Total floors',
-        _ => 'Jami qavatlar',
-      };
-
-  static String rooms(Locale l) => switch (l.languageCode) {
-        'ru' => 'Комнаты',
-        'en' => 'Rooms',
-        _ => 'Xonalar',
-      };
-
-  static String roomsHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Выберите типы комнат, укажите количество',
-        'en' => 'Select room types, enter the count',
-        _ => 'Xona turlarini tanlang, sonini kiriting',
-      };
-
-  static String file(Locale l) => switch (l.languageCode) {
-        'ru' => 'файл',
-        'en' => 'file',
-        _ => 'fayl',
-      };
-
-  static String maxPhotos(Locale l, int n) => switch (l.languageCode) {
-        'ru' => 'Не более $n фото',
-        'en' => 'Up to $n photos',
-        _ => 'Ko\'pi bilan $n ta rasm',
-      };
-
-  static String maxFiles(Locale l, int n) => switch (l.languageCode) {
-        'ru' => 'Не более $n файлов',
-        'en' => 'Up to $n files',
-        _ => 'Ko\'pi bilan $n ta fayl',
-      };
-
-  static String authRequired(Locale l) => switch (l.languageCode) {
-        'ru' => 'Требуется авторизация',
-        'en' => 'Authorization required',
-        _ => 'Avtorizatsiya kerak',
-      };
-
-  static String uploadingFiles(Locale l) => switch (l.languageCode) {
-        'ru' => 'Файлы загружаются…',
-        'en' => 'Uploading files…',
-        _ => 'Fayllar yuklanmoqda…',
-      };
-
-  static String uploadFailed(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не загрузилось — нажмите, чтобы повторить',
-        'en' => 'Upload failed — tap to retry',
-        _ => 'Yuklanmadi — qayta urinish uchun bosing',
-      };
-
-  static String uploadRejected(Locale l) => switch (l.languageCode) {
-        'ru' => 'Файл отклонён (тип/размер) — нажмите для повтора',
-        'en' => 'File rejected (type/size) — tap to retry',
-        _ => 'Fayl rad etildi (tur/hajm) — qayta bosing',
-      };
-
-  static String addPhotosCta(Locale l) => switch (l.languageCode) {
-        'ru' => 'Добавить фото',
-        'en' => 'Add photos',
-        _ => 'Rasm qo\'shish',
-      };
-
-  static String addDocsCta(Locale l) => switch (l.languageCode) {
-        'ru' => 'Добавить документ',
-        'en' => 'Add document',
-        _ => 'Hujjat qo\'shish',
-      };
-
-  static String missingPhoto(Locale l) => switch (l.languageCode) {
-        'ru' => 'фото',
-        'en' => 'photo',
-        _ => 'rasm',
-      };
-
-  static String missingKadastr(Locale l) => switch (l.languageCode) {
-        'ru' => 'кадастровый документ',
-        'en' => 'cadastre document',
-        _ => 'kadastr hujjati',
-      };
-
-  static String missingRooms(Locale l) => switch (l.languageCode) {
-        'ru' => 'комнаты',
-        'en' => 'rooms',
-        _ => 'xonalar',
-      };
-
-  static String missingFloor(Locale l) => switch (l.languageCode) {
-        'ru' => 'этаж',
-        'en' => 'floor',
-        _ => 'qavat',
-      };
-
-  static String floorExceeds(Locale l) => switch (l.languageCode) {
-        'ru' => 'Этаж не может быть больше общего числа этажей',
-        'en' => 'The floor cannot exceed the total number of floors',
-        _ => 'Qavat binodagi jami qavatlardan katta bo\'lmasligi kerak',
-      };
-
-  static String floorMax(Locale l, int max) => switch (l.languageCode) {
-        'ru' => 'Всего этажей не может превышать $max',
-        'en' => 'Total floors cannot exceed $max',
-        _ => 'Jami qavatlar $max dan oshmasligi kerak',
-      };
-
-  static String requiredSuffix(Locale l, String items) =>
-      switch (l.languageCode) {
-        'ru' => '$items — обязательно',
-        'en' => '$items required',
-        _ => '$items majburiy',
-      };
-}

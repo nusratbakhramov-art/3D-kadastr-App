@@ -260,47 +260,24 @@ class _EmptyNote extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Документы оценщика',
-    'en' => 'Appraiser documents',
-    _ => 'Baholovchi hujjatlari',
-  };
+  static String title(Locale l) =>
+      tr(l, 'services.scan.credentials.title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Лицензированный эксперт',
-    'en' => 'Licensed expert',
-    _ => 'Litsenziyalangan ekspert',
-  };
+  static String subtitle(Locale l) =>
+      tr(l, 'services.scan.credentials.subtitle');
 
-  static String trust(Locale l) => switch (l.languageCode) {
-    'ru' => 'Оценку проводит лицензированный и застрахованный эксперт',
-    'en' => 'Valuation is performed by a licensed, insured expert',
-    _ => 'Baholash litsenziyalangan va sug\'urtalangan ekspert tomonidan',
-  };
+  static String trust(Locale l) =>
+      tr(l, 'services.scan.credentials.trust');
 
-  static String viewHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Нажмите, чтобы открыть',
-    'en' => 'Tap to view',
-    _ => 'Ko\'rish uchun bosing',
-  };
+  static String viewHint(Locale l) =>
+      tr(l, 'services.scan.credentials.view_hint');
 
-  static String continueLabel(Locale l) => tr(
-    l,
-    'ai.credentials.use_service',
-    uz: 'Foydalanish',
-    ru: 'Использовать',
-    en: 'Use',
-  );
+  static String continueLabel(Locale l) =>
+      tr(l, 'ai.credentials.use_service');
 
-  static String empty(Locale l) => switch (l.languageCode) {
-    'ru' => 'Документы пока недоступны',
-    'en' => 'Documents are not available yet',
-    _ => 'Hujjatlar hozircha mavjud emas',
-  };
+  static String empty(Locale l) =>
+      tr(l, 'services.scan.credentials.empty');
 
-  static String openError(Locale l) => switch (l.languageCode) {
-    'ru' => 'Не удалось открыть документ',
-    'en' => 'Could not open the document',
-    _ => 'Hujjatni ochib bo\'lmadi',
-  };
+  static String openError(Locale l) =>
+      tr(l, 'services.scan.credentials.open_error');
 }

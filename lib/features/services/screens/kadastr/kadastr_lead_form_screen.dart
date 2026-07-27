@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/uz_phone_mask_formatter.dart';
 import '../../../market/widgets/listing_cta_button.dart';
@@ -94,7 +95,8 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
               children: [
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                  child: ServiceAppBar(title: _S.appBar(l)),
+                  child: ServiceAppBar(
+                      title: tr(l, 'services.kadastr.lead.appbar')),
                 ),
                 Expanded(
                   child: ListView(
@@ -107,7 +109,7 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
                       ),
                       const SizedBox(height: 18),
                       Text(
-                        _S.contact(l),
+                        tr(l, 'services.kadastr.lead.contact'),
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w700,
@@ -117,14 +119,14 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
                       ),
                       const SizedBox(height: 12),
                       _Field(
-                        label: _S.name(l),
-                        hint: _S.nameHint(l),
+                        label: tr(l, 'services.kadastr.lead.name'),
+                        hint: tr(l, 'services.kadastr.lead.name_hint'),
                         controller: _nameCtrl,
                         textCapitalization: TextCapitalization.words,
                       ),
                       const SizedBox(height: 12),
                       _Field(
-                        label: _S.phone(l),
+                        label: tr(l, 'services.kadastr.phone'),
                         hint: '90 123-45-67',
                         controller: _phoneCtrl,
                         keyboardType: TextInputType.phone,
@@ -132,18 +134,18 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
                         inputFormatters: const [UzPhoneMaskFormatter()],
                         errorText:
                             (_phoneCtrl.text.trim().isNotEmpty && !_phoneValid)
-                                ? _S.phoneError(l)
+                                ? tr(l, 'services.kadastr.lead.phone_error')
                                 : null,
                       ),
                       const SizedBox(height: 12),
                       _Field(
-                        label: _S.addressOptional(l),
-                        hint: _S.addressHint(l),
+                        label: tr(l, 'services.kadastr.lead.address_optional'),
+                        hint: tr(l, 'services.kadastr.lead.address_hint'),
                         controller: _addressCtrl,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        _S.privacyHint(l),
+                        tr(l, 'services.kadastr.lead.privacy_hint'),
                         style: TextStyle(
                           fontFamily: 'MTSText',
                           fontSize: 12,
@@ -157,7 +159,7 @@ class _KadastrLeadFormScreenState extends State<KadastrLeadFormScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
-                    label: _S.send(l),
+                    label: tr(l, 'services.kadastr.lead.send'),
                     enabled: _valid,
                     onTap: _continue,
                   ),
@@ -201,7 +203,7 @@ class _SummaryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _S.servicesLabel(locale),
+            tr(locale, 'services.kadastr.selected_services'),
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 12.5,
@@ -241,7 +243,7 @@ class _SummaryCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  _S.totalLabel(locale),
+                  tr(locale, 'services.kadastr.total_label'),
                   style: TextStyle(
                     fontFamily: 'MTSText',
                     fontSize: 13,
@@ -387,58 +389,3 @@ class _Field extends StatelessWidget {
   }
 }
 
-class _S {
-  const _S._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String appBar(Locale l) => _pick(l, 'Ariza', 'Заявка', 'Application');
-
-  static String servicesLabel(Locale l) =>
-      _pick(l, 'Tanlangan xizmatlar', 'Выбранные услуги', 'Selected services');
-
-  static String totalLabel(Locale l) =>
-      _pick(l, 'Taxminiy jami', 'Примерно итого', 'Estimated total');
-
-  static String contact(Locale l) =>
-      _pick(l, "Bog'lanish ma'lumotlari", 'Контактные данные', 'Contact details');
-
-  static String name(Locale l) => _pick(l, 'Ism', 'Имя', 'Name');
-
-  static String nameHint(Locale l) =>
-      _pick(l, 'Ism familiya', 'Имя и фамилия', 'Full name');
-
-  static String phone(Locale l) => _pick(l, 'Telefon', 'Телефон', 'Phone');
-
-  static String phoneError(Locale l) => _pick(
-        l,
-        "To'g'ri telefon raqamini kiriting",
-        'Введите корректный номер телефона',
-        'Enter a valid phone number',
-      );
-
-  static String addressOptional(Locale l) => _pick(
-        l,
-        'Manzil (ixtiyoriy)',
-        'Адрес (необязательно)',
-        'Address (optional)',
-      );
-
-  static String addressHint(Locale l) => _pick(
-        l,
-        'Shahar, tuman, manzil',
-        'Город, район, адрес',
-        'City, district, address',
-      );
-
-  static String privacyHint(Locale l) => _pick(
-        l,
-        "Operatorimiz tez orada siz bilan bog'lanadi va aniq narxni aytadi.",
-        'Наш оператор свяжется с вами и сообщит точную цену.',
-        'Our operator will contact you shortly with the exact price.',
-      );
-
-  static String send(Locale l) =>
-      _pick(l, 'Yuborish', 'Отправить', 'Submit');
-}

@@ -330,52 +330,19 @@ class _EmptyNote extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => tr(
-    l,
-    'about.title',
-    uz: 'Ilova haqida',
-    ru: 'О приложении',
-    en: 'About app',
-  );
+  static String title(Locale l) => tr(l, 'about.title');
 
-  static String appName(Locale l) =>
-      tr(l, 'about.app_name', uz: '3D Kadastr', ru: '3D Kadastr', en: '3D Kadastr');
+  static String appName(Locale l) => tr(l, 'about.app_name');
 
-  static String versionLabel(Locale l) =>
-      tr(l, 'about.version', uz: 'Versiya', ru: 'Версия', en: 'Version');
+  static String versionLabel(Locale l) => tr(l, 'about.version');
 
-  static String tagline(Locale l) => tr(
-    l,
-    'about.tagline',
-    uz:
-        'Ko\'chmas mulkni baholash, 3D kadastr va xizmatlar hisobi — '
-        'litsenziyalangan ekspertlar bilan.',
-    ru:
-        'Оценка недвижимости, 3D-кадастр и расчёт услуг — с лицензированными '
-        'экспертами.',
-    en:
-        'Property valuation, 3D cadastre and service estimates — backed by '
-        'licensed experts.',
-  );
+  static String tagline(Locale l) => tr(l, 'about.tagline');
 
   // Short, because it now sits on every row as the tap affordance rather than
   // as a sentence of instructions under each title.
-  static String viewHint(Locale l) =>
-      tr(l, 'about.view_hint', uz: 'Ko\'rish →', ru: 'Открыть →', en: 'View →');
+  static String viewHint(Locale l) => tr(l, 'about.view_hint');
 
-  static String empty(Locale l) => tr(
-    l,
-    'about.empty',
-    uz: 'Hujjatlar hozircha mavjud emas',
-    ru: 'Документы пока недоступны',
-    en: 'Documents are not available yet',
-  );
+  static String empty(Locale l) => tr(l, 'about.empty');
 
-  static String openError(Locale l) => tr(
-    l,
-    'about.open_error',
-    uz: 'Hujjatni ochib bo\'lmadi',
-    ru: 'Не удалось открыть документ',
-    en: 'Could not open the document',
-  );
+  static String openError(Locale l) => tr(l, 'about.open_error');
 }

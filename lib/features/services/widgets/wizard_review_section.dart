@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 
 class WizardReviewSection extends StatelessWidget {
@@ -179,11 +180,8 @@ class WizardReviewSection extends StatelessWidget {
     );
   }
 
-  static String _notFilled(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не заполнено',
-        'en' => 'Not filled',
-        _ => 'To\'ldirilmagan',
-      };
+  static String _notFilled(Locale l) =>
+      tr(l, 'services.widget.wizard_review.not_filled');
 }
 
 /// Buyurtmachi bo'limi oxirgi arizadan to'ldirilganini bildiruvchi yumshoq izoh.

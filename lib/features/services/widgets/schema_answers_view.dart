@@ -9,6 +9,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/color_tokens.dart';
 import '../api_forms_service.dart';
 import '../models/dynamic_form_schema.dart';
@@ -135,11 +136,7 @@ class _SchemaAnswersViewState extends State<SchemaAnswersView> {
     return null;
   }
 
-  String _yes(Locale l) => switch (l.languageCode) {
-        'ru' => 'Да',
-        'en' => 'Yes',
-        _ => 'Ha',
-      };
+  String _yes(Locale l) => tr(l, 'services.widget.schema.yes');
 }
 
 class _SectionCard extends StatelessWidget {

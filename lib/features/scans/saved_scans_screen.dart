@@ -343,92 +343,24 @@ class _EmptyState extends StatelessWidget {
 }
 
 class _Strings {
-  static String title(Locale l) =>
-      _p(l, 'scan.saved.title', 'Mening skanlarim', 'Мои сканы', 'My scans');
-  static String deleteTitle(Locale l) => _p(
-    l,
-    'scan.saved.delete_title',
-    'Skanni o\'chirish',
-    'Удалить скан',
-    'Delete scan',
-  );
-  static String deletePrompt(Locale l, String name) => _p(
-    l,
-    'scan.saved.delete_prompt',
-    '"$name" — barcha foto va outputlar bilan o\'chiriladi. Davom etamizmi?',
-    '"$name" будет удалён вместе со всеми фото и результатами. Продолжить?',
-    '"$name" will be deleted together with all photos and outputs. Continue?',
-  );
-  static String cancel(Locale l) =>
-      _p(l, 'common.cancel', 'Bekor qilish', 'Отмена', 'Cancel');
-  static String delete(Locale l) =>
-      _p(l, 'common.delete', 'O\'chirish', 'Удалить', 'Delete');
-  static String deleted(Locale l) => _p(
-    l,
-    'scan.saved.deleted',
-    'Skan o\'chirildi',
-    'Скан удалён',
-    'Scan deleted',
-  );
-  static String deleteError(Locale l) => _p(
-    l,
-    'scan.saved.delete_error',
-    'O\'chirishda xatolik',
-    'Ошибка удаления',
-    'Delete error',
-  );
-  static String photoCount(Locale l, int count) => _p(
-    l,
-    'scan.common.photo_count',
-    '$count foto',
-    '$count фото',
-    '$count photos',
-  );
-  static String resultCount(Locale l, int count) => _p(
-    l,
-    'scan.saved.result_count',
-    '$count natija',
-    '$count результатов',
-    '$count results',
-  );
-  static String unprocessed(Locale l) => _p(
-    l,
-    'scan.saved.unprocessed',
-    'Qayta ishlanmagan',
-    'Не обработан',
-    'Not processed',
-  );
-  static String todayAt(Locale l, String time) => _p(
-    l,
-    'common.today_at',
-    'Bugun, $time',
-    'Сегодня, $time',
-    'Today, $time',
-  );
-  static String yesterdayAt(Locale l, String time) => _p(
-    l,
-    'common.yesterday_at',
-    'Kecha, $time',
-    'Вчера, $time',
-    'Yesterday, $time',
-  );
-  static String emptyTitle(Locale l) => _p(
-    l,
-    'scan.saved.empty_title',
-    'Skanlar yo\'q',
-    'Сканов нет',
-    'No scans yet',
-  );
-  static String emptyMessage(Locale l) => _p(
-    l,
-    'scan.saved.empty_message',
-    'AI baholash bo\'limida 3D skan tugmasini bosib, xonangizni skan qiling. '
-        'Bu yerda saqlangan ma\'lumotlar ro\'yxati ko\'rinadi.',
-    'Нажмите AI оценка → 3D-скан и отсканируйте комнату. '
-        'Здесь появится список сохранённых данных.',
-    'Tap AI valuation → 3D scan and scan your room. '
-        'Your saved scans will appear here.',
-  );
-  static String _p(Locale l, String key, String uz, String ru, String en) =>
-      tr(l, key, uz: uz, ru: ru, en: en);
+  static String title(Locale l) => _p(l, 'scan.saved.title');
+  static String deleteTitle(Locale l) => _p(l, 'scan.saved.delete_title');
+  static String deletePrompt(Locale l, String name) =>
+      _p(l, 'scan.saved.delete_prompt').replaceAll(r'$name', name);
+  static String cancel(Locale l) => _p(l, 'common.cancel');
+  static String delete(Locale l) => _p(l, 'common.delete');
+  static String deleted(Locale l) => _p(l, 'scan.saved.deleted');
+  static String deleteError(Locale l) => _p(l, 'scan.saved.delete_error');
+  static String photoCount(Locale l, int count) =>
+      _p(l, 'scan.common.photo_count').replaceAll(r'$count', '$count');
+  static String resultCount(Locale l, int count) =>
+      _p(l, 'scan.saved.result_count').replaceAll(r'$count', '$count');
+  static String unprocessed(Locale l) => _p(l, 'scan.saved.unprocessed');
+  static String todayAt(Locale l, String time) =>
+      _p(l, 'common.today_at').replaceAll(r'$time', time);
+  static String yesterdayAt(Locale l, String time) =>
+      _p(l, 'common.yesterday_at').replaceAll(r'$time', time);
+  static String emptyTitle(Locale l) => _p(l, 'scan.saved.empty_title');
+  static String emptyMessage(Locale l) => _p(l, 'scan.saved.empty_message');
+  static String _p(Locale l, String key) => tr(l, key);
 }

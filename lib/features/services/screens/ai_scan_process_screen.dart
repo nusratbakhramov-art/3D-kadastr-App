@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -522,120 +523,48 @@ class _BusyButton extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI Оценка',
-        'en' => 'AI Valuation',
-        _ => 'AI Baholash',
-      };
+  static String title(Locale l) => tr(l, 'services.scan.process.title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Шаг 3 — обработка в USDZ',
-        'en' => 'Step 3 — process into USDZ',
-        _ => '3-qadam — USDZ ga ishlash',
-      };
+  static String subtitle(Locale l) => tr(l, 'services.scan.process.subtitle');
 
-  static String idleHeading(Locale l) => switch (l.languageCode) {
-        'ru' => 'Обработать скан',
-        'en' => 'Process the scan',
-        _ => 'Skanni ishlash',
-      };
+  static String idleHeading(Locale l) =>
+      tr(l, 'services.scan.process.idle_heading');
 
-  static String idleBody(Locale l) => switch (l.languageCode) {
-        'ru' =>
-          'Сейчас скан превратится в текстурированную 3D модель (USDZ). '
-              'Это занимает около минуты.',
-        'en' =>
-          'The scan will be turned into a textured 3D model (USDZ). '
-              'This takes about a minute.',
-        _ =>
-          'Skan teksturali 3D modelga (USDZ) aylantiriladi. '
-              'Bu taxminan bir daqiqa oladi.',
-      };
+  static String idleBody(Locale l) => tr(l, 'services.scan.process.idle_body');
 
-  static String processingHeading(Locale l) => switch (l.languageCode) {
-        'ru' => 'Обработка…',
-        'en' => 'Processing…',
-        _ => 'Ishlanmoqda…',
-      };
+  static String processingHeading(Locale l) =>
+      tr(l, 'services.scan.process.processing_heading');
 
-  static String processingBody(Locale l) => switch (l.languageCode) {
-        'ru' => 'Строим текстуру и собираем USDZ. Не закрывайте экран.',
-        'en' => 'Building texture and assembling USDZ. Keep the screen open.',
-        _ => 'Tekstura qurilyapti va USDZ yig\'ilyapti. Ekranni yopmang.',
-      };
+  static String processingBody(Locale l) =>
+      tr(l, 'services.scan.process.processing_body');
 
-  static String doneHeading(Locale l) => switch (l.languageCode) {
-        'ru' => 'Текстура готова',
-        'en' => 'Texture ready',
-        _ => 'Tekstura tayyor',
-      };
+  static String doneHeading(Locale l) =>
+      tr(l, 'services.scan.process.done_heading');
 
-  static String doneBody(Locale l) => switch (l.languageCode) {
-        'ru' =>
-          'Текстурированная 3D модель готова. Посмотрите её или продолжайте.',
-        'en' =>
-          'The textured 3D model is ready. Preview it or continue.',
-        _ =>
-          'Teksturali 3D model tayyor. Ko\'rib chiqing yoki davom eting.',
-      };
+  static String doneBody(Locale l) => tr(l, 'services.scan.process.done_body');
 
-  static String viewModel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Посмотреть 3D модель',
-        'en' => 'View 3D model',
-        _ => '3D modelni ko\'rish',
-      };
+  static String viewModel(Locale l) =>
+      tr(l, 'services.scan.process.view_model');
 
-  static String errorHeading(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось обработать',
-        'en' => 'Processing failed',
-        _ => 'Ishlab bo\'lmadi',
-      };
+  static String errorHeading(Locale l) =>
+      tr(l, 'services.scan.process.error_heading');
 
-  static String startProcess(Locale l) => switch (l.languageCode) {
-        'ru' => 'Начать обработку',
-        'en' => 'Start processing',
-        _ => 'Ishlashni boshlash',
-      };
+  static String startProcess(Locale l) =>
+      tr(l, 'services.scan.process.start_process');
 
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
+  static String continueLabel(Locale l) =>
+      tr(l, 'services.scan.process.continue_label');
 
-  static String uploadingHeading(Locale l) => switch (l.languageCode) {
-        'ru' => 'Загрузка данных',
-        'en' => 'Uploading data',
-        _ => 'Ma\'lumotlar yuklanmoqda',
-      };
+  static String uploadingHeading(Locale l) =>
+      tr(l, 'services.scan.process.uploading_heading');
 
-  static String uploadingBody(Locale l) => switch (l.languageCode) {
-        'ru' =>
-          'Все файлы скана (фото, 3D модель, меш) отправляются на сервер. '
-              'Не закрывайте экран.',
-        'en' =>
-          'All scan files (photos, 3D model, mesh) are being sent to the '
-              'server. Keep the screen open.',
-        _ =>
-          'Skanning barcha fayllari (rasmlar, 3D model, mesh) serverga '
-              'yuborilmoqda. Ekranni yopmang.',
-      };
+  static String uploadingBody(Locale l) =>
+      tr(l, 'services.scan.process.uploading_body');
 
-  static String filesWord(Locale l) => switch (l.languageCode) {
-        'ru' => 'файлов',
-        'en' => 'files',
-        _ => 'fayl',
-      };
+  static String filesWord(Locale l) =>
+      tr(l, 'services.scan.process.files_word');
 
-  static String retry(Locale l) => switch (l.languageCode) {
-        'ru' => 'Повторить',
-        'en' => 'Try again',
-        _ => 'Qayta urinish',
-      };
+  static String retry(Locale l) => tr(l, 'services.scan.process.retry');
 
-  static String failed(Locale l) => switch (l.languageCode) {
-        'ru' => 'Обработка не удалась',
-        'en' => 'Processing failed',
-        _ => 'Ishlash muvaffaqiyatsiz',
-      };
+  static String failed(Locale l) => tr(l, 'services.scan.process.failed');
 }

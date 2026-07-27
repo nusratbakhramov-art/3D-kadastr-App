@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../screens/location_picker_screen.dart';
@@ -143,15 +144,9 @@ class LocationPickerField extends StatelessWidget {
 class _LocationFieldStrings {
   const _LocationFieldStrings._();
 
-  static String selectedPoint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Выбранная точка',
-        'en' => 'Selected point',
-        _ => 'Tanlangan nuqta',
-      };
+  static String selectedPoint(Locale l) =>
+      tr(l, 'services.widget.location.selected_point');
 
-  static String pickOnMap(Locale l) => switch (l.languageCode) {
-        'ru' => 'Выберите адрес на карте',
-        'en' => 'Pick an address on the map',
-        _ => 'Manzilni xaritadan tanlang',
-      };
+  static String pickOnMap(Locale l) =>
+      tr(l, 'services.widget.location.pick_on_map');
 }

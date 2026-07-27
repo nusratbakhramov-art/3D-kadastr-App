@@ -10,6 +10,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../api_cadastre_service.dart';
@@ -283,27 +284,12 @@ class _ResultSummary extends StatelessWidget {
 class _CadastreStrings {
   const _CadastreStrings._();
 
-  static String label(Locale l) => switch (l.languageCode) {
-        'ru' => 'Кадастровый номер',
-        'en' => 'Cadastre number',
-        _ => 'Kadastr raqami',
-      };
+  static String label(Locale l) => tr(l, 'services.widget.cadastre.label');
 
-  static String noData(Locale l) => switch (l.languageCode) {
-        'ru' => 'Данные не найдены',
-        'en' => 'No data found',
-        _ => 'Ma\'lumot topilmadi',
-      };
+  static String noData(Locale l) => tr(l, 'services.widget.cadastre.no_data');
 
-  static String searchError(Locale l) => switch (l.languageCode) {
-        'ru' => 'Ошибка при поиске',
-        'en' => 'Search error',
-        _ => 'Qidirishda xatolik',
-      };
+  static String searchError(Locale l) =>
+      tr(l, 'services.widget.cadastre.search_error');
 
-  static String copied(Locale l) => switch (l.languageCode) {
-        'ru' => 'Скопировано',
-        'en' => 'Copied',
-        _ => 'Nusxalandi',
-      };
+  static String copied(Locale l) => tr(l, 'services.widget.cadastre.copied');
 }

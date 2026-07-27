@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/calculator_pricing_store.dart';
@@ -62,7 +63,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
       MaterialPageRoute<void>(
         builder: (ctx) => OnlineCalculatorResultScreen(
           result: result,
-          placeOrderLabel: _Strings.placeTzOrder(locale),
+          placeOrderLabel: tr(locale, 'services.calc.submit_order'),
           onPlaceOrder: () {
             final draft = _draftFromCalculator(objectType, style, area);
             // Kalkulyatorda hisoblangan narxni saqlaymiz — adminka "Итого".
@@ -124,7 +125,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
                         title: CalculatorCategory.dizayn.title(locale),
-                        subtitle: _Strings.subtitle(locale),
+                        subtitle: tr(locale, 'services.calc.dizayn.subtitle'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -133,7 +134,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
                           CalculatorSectionLabel(
-                            text: _Strings.chooseObject(locale),
+                            text: tr(locale, 'services.calc.choose_object'),
                           ),
                           const SizedBox(height: 12),
                           for (final t in DizaynObjectType.values) ...[
@@ -146,7 +147,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                           ],
                           const SizedBox(height: 18),
                           CalculatorSectionLabel(
-                            text: _Strings.chooseStyle(locale),
+                            text: tr(locale, 'services.calc.dizayn.choose_style'),
                           ),
                           const SizedBox(height: 12),
                           Wrap(
@@ -163,8 +164,8 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                           ),
                           const SizedBox(height: 18),
                           CalculatorField(
-                            label: _Strings.areaLabel(locale),
-                            placeholder: _Strings.areaPlaceholder(locale),
+                            label: tr(locale, 'services.calc.dizayn.area_label'),
+                            placeholder: tr(locale, 'services.calc.enter_area'),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -174,7 +175,7 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _Strings.calculate(locale),
+                        label: tr(locale, 'services.calc.calculate'),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -188,52 +189,4 @@ class _DizaynFormScreenState extends State<DizaynFormScreen> {
       ),
     );
   }
-}
-
-class _Strings {
-  const _Strings._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String subtitle(Locale l) => _pick(
-        l,
-        'Interyer va eksteryer',
-        'Интерьер и экстерьер',
-        'Interior & exterior',
-      );
-
-  static String chooseObject(Locale l) => _pick(
-        l,
-        "Ob'ekt turini tanlang",
-        'Выберите тип объекта',
-        'Choose object type',
-      );
-
-  static String chooseStyle(Locale l) => _pick(
-        l,
-        'Dizayn uslubini tanlang',
-        'Выберите стиль дизайна',
-        'Choose design style',
-      );
-
-  static String areaLabel(Locale l) =>
-      _pick(l, 'Dizayn maydoni', 'Площадь дизайна', 'Design area');
-
-  static String areaPlaceholder(Locale l) => _pick(
-        l,
-        'Maydonni kiriting',
-        'Введите площадь',
-        'Enter area',
-      );
-
-  static String calculate(Locale l) =>
-      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
-
-  static String placeTzOrder(Locale l) => _pick(
-        l,
-        'Ariza topshirish',
-        'Подать заявку',
-        'Submit application',
-      );
 }

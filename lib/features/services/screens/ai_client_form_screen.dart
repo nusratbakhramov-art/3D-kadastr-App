@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../home/user_profile.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -491,105 +492,43 @@ class _PhoneMaskFormatter extends TextInputFormatter {
 class _ClientFormStrings {
   const _ClientFormStrings._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Заказчик',
-    'en' => 'Client',
-    _ => 'Buyurtmachi',
-  };
+  static String title(Locale l) => tr(l, 'services.ai.client.title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Введите свои данные',
-    'en' => 'Enter your details',
-    _ => 'Maʼlumotlaringizni kiriting',
-  };
+  static String subtitle(Locale l) => tr(l, 'services.ai.client.subtitle');
 
-  static String nameLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Имя / Компания',
-    'en' => 'Name / Company',
-    _ => 'Ism / Kompaniya',
-  };
+  static String nameLabel(Locale l) => tr(l, 'services.ai.client.name_label');
 
-  static String namePlaceholder(Locale l) => switch (l.languageCode) {
-    'ru' => 'Тошпулат Тошпулатов или ООО «ABC»',
-    'en' => 'Toshpoʻlat Toshpoʻlatov or "ABC" LLC',
-    _ => 'Toshpoʻlat Toshpoʻlatov yoki "ABC" MChJ',
-  };
+  static String namePlaceholder(Locale l) =>
+      tr(l, 'services.ai.client.name_placeholder');
 
-  static String stirLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'ИНН или ПИНФЛ',
-    'en' => 'TIN or PINFL',
-    _ => 'STIR yoki JSHSHIR',
-  };
+  static String stirLabel(Locale l) => tr(l, 'services.ai.client.stir_label');
 
-  static String stirHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Юридическое лицо: 9 цифр. Физическое лицо: 14 цифр.',
-    'en' => 'Legal entity: 9 digits. Individual: 14 digits.',
-    _ => 'Yuridik shaxs: 9 raqam. Jismoniy shaxs: 14 raqam.',
-  };
+  static String stirHint(Locale l) => tr(l, 'services.ai.client.stir_hint');
 
-  static String phoneLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Телефон',
-    'en' => 'Phone',
-    _ => 'Telefon',
-  };
+  static String phoneLabel(Locale l) => tr(l, 'services.ai.client.phone_label');
 
-  static String emailLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Email (необязательно)',
-    'en' => 'Email (optional)',
-    _ => 'Email (ixtiyoriy)',
-  };
+  static String emailLabel(Locale l) => tr(l, 'services.ai.client.email_label');
 
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Продолжить',
-    'en' => 'Continue',
-    _ => 'Davom etish',
-  };
+  static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
 
-  static String nameRequired(Locale l) => switch (l.languageCode) {
-    'ru' => 'Укажите имя',
-    'en' => 'Name is required',
-    _ => 'Ism kerak',
-  };
+  static String nameRequired(Locale l) =>
+      tr(l, 'services.ai.client.name_required');
 
-  static String tooShort(Locale l) => switch (l.languageCode) {
-    'ru' => 'Слишком коротко',
-    'en' => 'Too short',
-    _ => 'Juda qisqa',
-  };
+  static String tooShort(Locale l) => tr(l, 'services.ai.client.too_short');
 
-  static String stirRequired(Locale l) => switch (l.languageCode) {
-    'ru' => 'Укажите ИНН или ПИНФЛ',
-    'en' => 'TIN or PINFL is required',
-    _ => 'STIR yoki JSHSHIR kerak',
-  };
+  static String stirRequired(Locale l) =>
+      tr(l, 'services.ai.client.stir_required');
 
-  static String digitsOnly(Locale l) => switch (l.languageCode) {
-    'ru' => 'Только цифры',
-    'en' => 'Digits only',
-    _ => 'Faqat raqamlar',
-  };
+  static String digitsOnly(Locale l) => tr(l, 'services.ai.client.digits_only');
 
-  static String stirLength(Locale l) => switch (l.languageCode) {
-    'ru' => 'Должно быть ровно 9 или 14 цифр',
-    'en' => 'Must be exactly 9 or 14 digits',
-    _ => "Aniq 9 yoki 14 raqam boʻlishi kerak",
-  };
+  static String stirLength(Locale l) => tr(l, 'services.ai.client.stir_length');
 
-  static String phoneRequired(Locale l) => switch (l.languageCode) {
-    'ru' => 'Укажите телефон',
-    'en' => 'Phone is required',
-    _ => 'Telefon kerak',
-  };
+  static String phoneRequired(Locale l) =>
+      tr(l, 'services.ai.client.phone_required');
 
-  static String phoneFormat(Locale l) => switch (l.languageCode) {
-    'ru' => 'Формат UZ: +998 XX XXX-XX-XX',
-    'en' => 'UZ format: +998 XX XXX-XX-XX',
-    _ => 'UZ formati: +998 XX XXX-XX-XX',
-  };
+  static String phoneFormat(Locale l) =>
+      tr(l, 'services.ai.client.phone_format');
 
-  static String emailInvalid(Locale l) => switch (l.languageCode) {
-    'ru' => 'Неверный email',
-    'en' => 'Invalid email',
-    _ => "Email notoʻgʻri",
-  };
+  static String emailInvalid(Locale l) =>
+      tr(l, 'services.ai.client.email_invalid');
 }

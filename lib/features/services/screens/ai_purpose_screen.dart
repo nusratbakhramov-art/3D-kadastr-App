@@ -8,6 +8,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../ai_draft_saver.dart';
@@ -307,61 +308,27 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
 class _PurposeStrings {
   const _PurposeStrings._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Цель оценки',
-    'en' => 'Valuation purpose',
-    _ => 'Baholash maqsadi',
-  };
+  static String title(Locale l) => tr(l, 'services.ai.purpose.title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Для чего определяется стоимость?',
-    'en' => 'Why is the value being determined?',
-    _ => 'Qiymat nima uchun aniqlanmoqda?',
-  };
+  static String subtitle(Locale l) => tr(l, 'services.ai.purpose.subtitle');
 
-  static String continueLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Продолжить',
-    'en' => 'Continue',
-    _ => 'Davom etish',
-  };
+  static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
 
-  static String basisLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Основание оценки (необязательно)',
-    'en' => 'Valuation basis (optional)',
-    _ => 'Baholash asosi (ixtiyoriy)',
-  };
+  static String basisLabel(Locale l) => tr(l, 'services.ai.purpose.basis_label');
 
-  static String basisSelectHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Выберите основание',
-    'en' => 'Select a basis',
-    _ => 'Asosni tanlang',
-  };
+  static String basisSelectHint(Locale l) =>
+      tr(l, 'services.ai.purpose.basis_select_hint');
 
-  static String basisOtherLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Текст основания',
-    'en' => 'Basis text',
-    _ => 'Asos matni',
-  };
+  static String basisOtherLabel(Locale l) =>
+      tr(l, 'services.ai.purpose.basis_other_label');
 
-  static String basisHint(Locale l) => switch (l.languageCode) {
-    'ru' =>
-      'Напр.: на основании письма Генпрокуратуры РУз № __ от __, для предоставления …',
-    'en' => 'e.g. based on letter No. __ dated __, to be submitted to …',
-    _ =>
-      'Masalan: O‘zR Bosh prokuraturasining __ sonli __ xati asosida, … ga taqdim etish uchun',
-  };
+  static String basisHint(Locale l) => tr(l, 'services.ai.purpose.basis_hint');
 
-  static String addresseeLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кому предоставляется (необязательно)',
-    'en' => 'Addressee (optional)',
-    _ => 'Kimga taqdim etiladi (ixtiyoriy)',
-  };
+  static String addresseeLabel(Locale l) =>
+      tr(l, 'services.ai.purpose.addressee_label');
 
-  static String addresseeHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Ф.И.О. / должность',
-    'en' => 'Full name / position',
-    _ => 'F.I.Sh. / lavozim',
-  };
+  static String addresseeHint(Locale l) =>
+      tr(l, 'services.ai.purpose.addressee_hint');
 }
 
 class _LabeledField extends StatelessWidget {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../auth/widgets/login_required_sheet.dart';
@@ -73,7 +74,9 @@ class _OnlineCalculatorResultScreenState
     } catch (e) {
       if (!mounted) return;
       setState(() => _orderSubmitting = false);
-      _snack(_Strings.sendError(Localizations.localeOf(context), '$e'));
+      _snack(
+        '${tr(Localizations.localeOf(context), 'services.calc.result.send_error')}: $e',
+      );
     }
   }
 
@@ -101,7 +104,7 @@ class _OnlineCalculatorResultScreenState
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: _Strings.appBar(locale),
+                        title: tr(locale, 'services.calc.result.appbar'),
                         subtitle: widget.result.categoryTitle,
                       ),
                     ),
@@ -111,7 +114,7 @@ class _OnlineCalculatorResultScreenState
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
                           Text(
-                            _Strings.totalLabel(locale),
+                            tr(locale, 'services.calc.result.total_label'),
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w600,
@@ -123,7 +126,7 @@ class _OnlineCalculatorResultScreenState
                           _PriceCard(result: widget.result, locale: locale),
                           const SizedBox(height: 18),
                           Text(
-                            _Strings.breakdown(locale),
+                            tr(locale, 'services.calc.result.breakdown'),
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
@@ -145,7 +148,7 @@ class _OnlineCalculatorResultScreenState
                           if (widget.onPlaceOrder != null) ...[
                             ListingCtaButton(
                               label: widget.placeOrderLabel ??
-                                  _Strings.placeOrder(locale),
+                                  tr(locale, 'services.calc.result.place_order'),
                               enabled: true,
                               onTap: widget.onPlaceOrder!,
                             ),
@@ -153,15 +156,15 @@ class _OnlineCalculatorResultScreenState
                             TextButton(
                               onPressed: hapticTap(() => Navigator.of(context)
                                   .popUntil((r) => r.isFirst)),
-                              child: Text(_Strings.close(locale)),
+                              child: Text(tr(locale, 'services.calc.result.close')),
                             ),
                           ] else ...[
                             ListingCtaButton(
                               label: _orderSubmitted
-                                  ? _Strings.submitted(locale)
+                                  ? tr(locale, 'services.calc.result.submitted')
                                   : (_orderSubmitting
-                                      ? _Strings.submitting(locale)
-                                      : _Strings.submitOrder(locale)),
+                                      ? tr(locale, 'services.calc.submitting')
+                                      : tr(locale, 'services.calc.submit_order')),
                               enabled: !_orderSubmitting && !_orderSubmitted,
                               onTap: _submitOrder,
                             ),
@@ -169,7 +172,7 @@ class _OnlineCalculatorResultScreenState
                             TextButton(
                               onPressed: hapticTap(() => Navigator.of(context)
                                   .popUntil((r) => r.isFirst)),
-                              child: Text(_Strings.close(locale)),
+                              child: Text(tr(locale, 'services.calc.result.close')),
                             ),
                           ],
                         ],
@@ -184,64 +187,6 @@ class _OnlineCalculatorResultScreenState
       ),
     );
   }
-}
-
-class _Strings {
-  const _Strings._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String appBar(Locale l) => _pick(
-        l,
-        'Hisob natijasi',
-        'Результат расчёта',
-        'Calculation result',
-      );
-
-  static String totalLabel(Locale l) =>
-      _pick(l, 'Umumiy narx', 'Общая стоимость', 'Total');
-
-  static String breakdown(Locale l) =>
-      _pick(l, 'Tarkibi', 'Состав', 'Breakdown');
-
-  static String close(Locale l) =>
-      _pick(l, 'Yopish', 'Закрыть', 'Close');
-
-  static String placeOrder(Locale l) => _pick(
-        l,
-        'Buyurtma berish',
-        'Оформить заказ',
-        'Place order',
-      );
-
-  static String submitOrder(Locale l) => _pick(
-        l,
-        'Ariza topshirish',
-        'Подать заявку',
-        'Submit application',
-      );
-
-  static String submitting(Locale l) => _pick(
-        l,
-        'Yuborilmoqda...',
-        'Отправка...',
-        'Submitting...',
-      );
-
-  static String submitted(Locale l) => _pick(
-        l,
-        'Ariza yuborildi ✓',
-        'Заявка отправлена ✓',
-        'Application sent ✓',
-      );
-
-  static String sendError(Locale l, String e) => _pick(
-        l,
-        'Yuborishda xatolik: $e',
-        'Ошибка отправки: $e',
-        'Failed to send: $e',
-      );
 }
 
 class _PriceCard extends StatelessWidget {

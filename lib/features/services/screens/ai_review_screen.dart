@@ -12,6 +12,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../models/ai_baholash_bundle.dart';
@@ -378,147 +379,52 @@ class _UploadReviewCard extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Проверка',
-    'en' => 'Review',
-    _ => 'Tekshirish',
-  };
+  static String title(Locale l) => tr(l, 'services.ai.review.title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Проверьте данные перед расчётом',
-    'en' => 'Check everything before the request',
-    _ => 'Hisoblashdan oldin tekshiring',
-  };
+  static String subtitle(Locale l) => tr(l, 'services.ai.review.subtitle');
 
-  static String photos(Locale l) => switch (l.languageCode) {
-    'ru' => 'Фото объекта',
-    'en' => 'Object photos',
-    _ => 'Obyekt rasmlari',
-  };
+  static String photos(Locale l) => tr(l, 'services.ai.review.photos');
 
-  static String docs(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастровые документы',
-    'en' => 'Cadastre documents',
-    _ => 'Kadastr hujjatlari',
-  };
+  static String docs(Locale l) => tr(l, 'services.ai.review.docs');
 
-  static String passport(Locale l) => switch (l.languageCode) {
-    'ru' => 'Паспорт / ID',
-    'en' => 'Passport / ID',
-    _ => 'Pasport / ID',
-  };
+  static String passport(Locale l) => tr(l, 'services.ai.review.passport');
 
-  static String kadastr(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастр',
-    'en' => 'Cadastre',
-    _ => 'Kadastr',
-  };
+  static String kadastr(Locale l) => tr(l, 'services.ai.review.kadastr');
 
-  static String client(Locale l) => switch (l.languageCode) {
-    'ru' => 'Заказчик',
-    'en' => 'Client',
-    _ => 'Buyurtmachi',
-  };
+  static String client(Locale l) => tr(l, 'services.ai.review.client');
 
-  static String location(Locale l) => switch (l.languageCode) {
-    'ru' => 'Местоположение',
-    'en' => 'Location',
-    _ => 'Joylashuv',
-  };
+  static String location(Locale l) => tr(l, 'services.ai.review.location');
 
-  static String purpose(Locale l) => switch (l.languageCode) {
-    'ru' => 'Цель оценки',
-    'en' => 'Valuation purpose',
-    _ => 'Baholash maqsadi',
-  };
+  static String purpose(Locale l) => tr(l, 'services.ai.review.purpose');
 
-  static String floorRooms(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этаж и комнаты',
-    'en' => 'Floor and rooms',
-    _ => 'Qavat va xonalar',
-  };
+  static String floorRooms(Locale l) => tr(l, 'services.ai.review.floor_rooms');
 
-  static String cadastreNumber(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастровый номер',
-    'en' => 'Cadastre number',
-    _ => 'Kadastr raqami',
-  };
+  static String cadastreNumber(Locale l) =>
+      tr(l, 'services.ai.review.cadastre_number');
 
-  static String address(Locale l) => switch (l.languageCode) {
-    'ru' => 'Адрес',
-    'en' => 'Address',
-    _ => 'Manzil',
-  };
+  static String address(Locale l) => tr(l, 'services.ai.review.address');
 
-  static String area(Locale l) => switch (l.languageCode) {
-    'ru' => 'Площадь',
-    'en' => 'Area',
-    _ => 'Maydon',
-  };
+  static String area(Locale l) => tr(l, 'services.ai.review.area');
 
-  static String value(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастровая стоимость',
-    'en' => 'Cadastre value',
-    _ => 'Kadastr qiymati',
-  };
+  static String value(Locale l) => tr(l, 'services.ai.review.value');
 
-  static String name(Locale l) => switch (l.languageCode) {
-    'ru' => 'Имя / название',
-    'en' => 'Name',
-    _ => 'Nomi',
-  };
+  static String name(Locale l) => tr(l, 'services.ai.review.name');
 
-  static String stir(Locale l) => switch (l.languageCode) {
-    'ru' => 'СТИР / ПИНФЛ',
-    'en' => 'STIR / PINFL',
-    _ => 'STIR / JSHSHIR',
-  };
+  static String stir(Locale l) => tr(l, 'services.ai.review.stir');
 
-  static String phone(Locale l) => switch (l.languageCode) {
-    'ru' => 'Телефон',
-    'en' => 'Phone',
-    _ => 'Telefon',
-  };
+  static String phone(Locale l) => tr(l, 'services.ai.review.phone');
 
-  static String email(Locale l) => switch (l.languageCode) {
-    'ru' => 'Эл. почта',
-    'en' => 'Email',
-    _ => 'E-pochta',
-  };
+  static String email(Locale l) => tr(l, 'services.ai.review.email');
 
-  static String coords(Locale l) => switch (l.languageCode) {
-    'ru' => 'Координаты',
-    'en' => 'Coordinates',
-    _ => 'Koordinatalar',
-  };
+  static String coords(Locale l) => tr(l, 'services.ai.review.coords');
 
-  static String floor(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этаж / всего',
-    'en' => 'Floor / total',
-    _ => 'Qavat / jami',
-  };
+  static String floor(Locale l) => tr(l, 'services.ai.review.floor');
 
-  static String calculate(Locale l) => switch (l.languageCode) {
-    'ru' => 'Рассчитать',
-    'en' => 'Calculate',
-    _ => 'Hisoblash',
-  };
+  static String calculate(Locale l) => tr(l, 'services.ai.review.calculate');
 
-  static String empty(Locale l) => switch (l.languageCode) {
-    'ru' => 'Нет файлов',
-    'en' => 'No files',
-    _ => 'Fayl yo\'q',
-  };
+  static String empty(Locale l) => tr(l, 'services.ai.review.empty');
 
-  static String million(Locale l) => switch (l.languageCode) {
-    'ru' => 'млн',
-    'en' => 'mln',
-    _ => 'mln',
-  };
+  static String million(Locale l) => tr(l, 'services.ai.review.million');
 
-  static String billion(Locale l) => switch (l.languageCode) {
-    'ru' => 'млрд',
-    'en' => 'bln',
-    _ => 'mlrd',
-  };
+  static String billion(Locale l) => tr(l, 'services.ai.review.billion');
 }

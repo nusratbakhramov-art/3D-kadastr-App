@@ -19,6 +19,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../../core/i18n.dart';
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../../widgets/app_toast.dart';
 import '../../../market/widgets/listing_cta_button.dart';
@@ -203,7 +204,9 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
     final l = Localizations.localeOf(context);
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
-        if (mounted) AppToast.error(context, _Strings.locationOff(l));
+        if (mounted) {
+          AppToast.error(context, tr(l, 'services.k3d.location.location_off'));
+        }
         return;
       }
       var perm = await Geolocator.checkPermission();
@@ -212,7 +215,10 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
       }
       if (perm == LocationPermission.denied ||
           perm == LocationPermission.deniedForever) {
-        if (mounted) AppToast.error(context, _Strings.locationDenied(l));
+        if (mounted) {
+          AppToast.error(
+              context, tr(l, 'services.k3d.location.location_denied'));
+        }
         return;
       }
       setState(() => _locating = true);
@@ -228,7 +234,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _locating = false);
-      AppToast.error(context, _Strings.locationError(l));
+      AppToast.error(context, tr(l, 'services.k3d.location.location_error'));
     }
   }
 
@@ -264,8 +270,8 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
               child: ServiceAppBar(
-                title: _Strings.appBarTitle(l),
-                subtitle: _Strings.appBarSubtitle(l),
+                title: tr(l, 'services.k3d.location.appbar'),
+                subtitle: tr(l, 'services.k3d.location.subtitle'),
               ),
             ),
             const SizedBox(height: 8),
@@ -347,7 +353,7 @@ class _K3dLocationScreenState extends State<K3dLocationScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               child: ListingCtaButton(
-                label: _Strings.ctaContinue(l),
+                label: tr(l, 'services.k3d.continue'),
                 enabled: !_resolving,
                 onTap: _confirm,
               ),
@@ -680,8 +686,9 @@ class _AddressBanner extends StatelessWidget {
               children: [
                 Text(
                   resolving
-                      ? _Strings.detectingAddress(l)
-                      : (addressText ?? _Strings.addressNotFound(l)),
+                      ? tr(l, 'services.k3d.location.detecting_address')
+                      : (addressText ??
+                          tr(l, 'services.k3d.location.address_not_found')),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -718,54 +725,3 @@ class _AddressBanner extends StatelessWidget {
   }
 }
 
-class _Strings {
-  const _Strings._();
-
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Расположение',
-        'en' => 'Location',
-        _ => 'Joylashuv',
-      };
-
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отметьте расположение объекта на карте',
-        'en' => 'Mark the object location on the map',
-        _ => 'Obyekt joylashuvini xaritada belgilang',
-      };
-
-  static String ctaContinue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
-
-  static String detectingAddress(Locale l) => switch (l.languageCode) {
-        'ru' => 'Определение адреса...',
-        'en' => 'Detecting address...',
-        _ => 'Manzil aniqlanmoqda...',
-      };
-
-  static String addressNotFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'Адрес не найден',
-        'en' => 'Address not found',
-        _ => 'Manzil topilmadi',
-      };
-
-  static String locationOff(Locale l) => switch (l.languageCode) {
-        'ru' => 'Включите геолокацию на устройстве',
-        'en' => 'Turn on location services',
-        _ => 'Qurilmada joylashuvni yoqing',
-      };
-
-  static String locationDenied(Locale l) => switch (l.languageCode) {
-        'ru' => 'Нет доступа к геолокации',
-        'en' => 'Location permission denied',
-        _ => 'Joylashuvga ruxsat berilmadi',
-      };
-
-  static String locationError(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось определить местоположение',
-        'en' => 'Could not determine location',
-        _ => 'Joylashuvni aniqlab boʻlmadi',
-      };
-}

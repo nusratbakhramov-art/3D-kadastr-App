@@ -16,34 +16,12 @@ enum ScanObjectType {
   final String wire;
 
   String localizedLabel(Locale locale) => switch (this) {
-    ScanObjectType.turarJoy => tr(
-      locale,
-      'scan.object_type.residential',
-      uz: 'Turar joy',
-      ru: 'Жилое',
-      en: 'Residential',
-    ),
-    ScanObjectType.noturarJoy => tr(
-      locale,
-      'scan.object_type.non_residential',
-      uz: 'Noturar joy',
-      ru: 'Нежилое',
-      en: 'Non-residential',
-    ),
-    ScanObjectType.ombor => tr(
-      locale,
-      'scan.object_type.warehouse',
-      uz: 'Ombor',
-      ru: 'Склад',
-      en: 'Warehouse',
-    ),
-    ScanObjectType.sanoat => tr(
-      locale,
-      'scan.object_type.industrial',
-      uz: 'Sanoat obyektlari',
-      ru: 'Промышленные объекты',
-      en: 'Industrial',
-    ),
+    ScanObjectType.turarJoy =>
+      tr(locale, 'scan.object_type.residential'),
+    ScanObjectType.noturarJoy =>
+      tr(locale, 'scan.object_type.non_residential'),
+    ScanObjectType.ombor => tr(locale, 'scan.object_type.warehouse'),
+    ScanObjectType.sanoat => tr(locale, 'scan.object_type.industrial'),
   };
 }
 

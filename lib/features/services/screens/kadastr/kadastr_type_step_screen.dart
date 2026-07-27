@@ -13,6 +13,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../models/calculator_draft.dart';
@@ -108,8 +109,9 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
                   child: ServiceAppBar(
                     title: _cat.title(l),
                     subtitle: widget.steps.length > 1
-                        ? _S.stepCounter(
-                            l, widget.stepIndex + 1, widget.steps.length)
+                        ? tr(l, 'services.kadastr.type.step_counter')
+                            .replaceAll(r'$i', '${widget.stepIndex + 1}')
+                            .replaceAll(r'$n', '${widget.steps.length}')
                         : _cat.subtitle(l),
                   ),
                 ),
@@ -119,8 +121,8 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
                     children: [
                       Text(
                         isTamirlash
-                            ? _S.serviceTypeHeading(l)
-                            : _S.objectTypeHeading(l),
+                            ? tr(l, 'services.kadastr.type.service_heading')
+                            : tr(l, 'services.kadastr.type.object_heading'),
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w900,
@@ -138,7 +140,9 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: ListingCtaButton(
-                    label: _isLast ? _S.calculate(l) : _S.next(l),
+                    label: _isLast
+                        ? tr(l, 'services.kadastr.calculate')
+                        : tr(l, 'services.kadastr.type.next'),
                     enabled: _answered,
                     onTap: _continue,
                   ),
@@ -210,10 +214,12 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
     if (a <= 0) return null;
     final sel = widget.choice.arxitektura;
     if (sel == ArxitekturaObject.yakkaSmall && a >= 500) {
-      return _S.areaOverForSmall(l, a);
+      return tr(l, 'services.kadastr.type.area_over_small')
+          .replaceAll(r'$area', _fmtAreaM2(a));
     }
     if (sel == ArxitekturaObject.yakkaLarge && a < 500) {
-      return _S.areaUnderForLarge(l, a);
+      return tr(l, 'services.kadastr.type.area_under_large')
+          .replaceAll(r'$area', _fmtAreaM2(a));
     }
     return null;
   }
@@ -386,45 +392,8 @@ class _RadioDot extends StatelessWidget {
   }
 }
 
-class _S {
-  const _S._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String objectTypeHeading(Locale l) =>
-      _pick(l, "Ob'ekt turini tanlang", 'Выберите тип объекта',
-          'Choose object type');
-
-  static String serviceTypeHeading(Locale l) =>
-      _pick(l, 'Xizmat turini tanlang', 'Выберите тип услуги',
-          'Choose service type');
-
-  static String stepCounter(Locale l, int i, int n) =>
-      _pick(l, 'Qadam $i/$n', 'Шаг $i/$n', 'Step $i/$n');
-
-  static String next(Locale l) => _pick(l, 'Keyingi', 'Далее', 'Next');
-
-  static String calculate(Locale l) =>
-      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
-
-  static String _area(double a) {
-    final s =
-        a == a.roundToDouble() ? a.toInt().toString() : a.toStringAsFixed(1);
-    return '$s m²';
-  }
-
-  static String areaOverForSmall(Locale l, double a) => _pick(
-        l,
-        "Siz ${_area(a)} kiritdingiz — bu 500 m² dan katta. Ehtimol «katta» varianti to'g'riroq.",
-        'Вы указали ${_area(a)} — это больше 500 м². Возможно, вариант «большой» подойдёт лучше.',
-        "You entered ${_area(a)} — that's over 500 m². The 'large' option may fit better.",
-      );
-
-  static String areaUnderForLarge(Locale l, double a) => _pick(
-        l,
-        "Siz ${_area(a)} kiritdingiz — 500 m² dan kam. «Katta» faqat 500 m² dan katta yoki 12 m dan baland binolar uchun.",
-        'Вы указали ${_area(a)} — меньше 500 м². «Большой» — только для зданий свыше 500 м² или выше 12 м.',
-        "You entered ${_area(a)} — under 500 m². 'Large' is only for buildings over 500 m² or taller than 12 m.",
-      );
+String _fmtAreaM2(double a) {
+  final s =
+      a == a.roundToDouble() ? a.toInt().toString() : a.toStringAsFixed(1);
+  return '$s m²';
 }

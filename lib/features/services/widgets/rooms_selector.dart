@@ -533,31 +533,13 @@ class _RoomCountRow extends StatelessWidget {
 class _RoomsSelectorStrings {
   const _RoomsSelectorStrings._();
 
-  static String otherRoom(Locale l) => switch (l.languageCode) {
-        'ru' => 'Другая комната',
-        'en' => 'Other room',
-        _ => 'Boshqa xona',
-      };
+  static String otherRoom(Locale l) =>
+      tr(l, 'services.widget.rooms.other_room');
 
-  static String livingGroup(Locale l) => tr(
-        l,
-        'rooms.group.living',
-        uz: 'Turar (yashash) xonalari',
-        ru: 'Жилые помещения',
-        en: 'Living rooms',
-      );
+  static String livingGroup(Locale l) => tr(l, 'rooms.group.living');
 
-  static String nonLivingGroup(Locale l) => tr(
-        l,
-        'rooms.group.non_living',
-        uz: 'No-turar (yordamchi) xonalari',
-        ru: 'Нежилые помещения',
-        en: 'Non-living rooms',
-      );
+  static String nonLivingGroup(Locale l) => tr(l, 'rooms.group.non_living');
 
-  static String customNameHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Название комнаты (например: кабинет)',
-        'en' => 'Room name (e.g. office)',
-        _ => 'Xona nomi (masalan: ish kabineti)',
-      };
+  static String customNameHint(Locale l) =>
+      tr(l, 'services.widget.rooms.custom_name_hint');
 }

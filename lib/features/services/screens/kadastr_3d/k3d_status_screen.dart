@@ -9,6 +9,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../core/network_error_handler.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
@@ -57,7 +58,10 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
       if (!mounted) return;
       setState(() {
         _submitting = false;
-        _error = _K3dStatusStrings.errLogin(Localizations.localeOf(context));
+        _error = tr(
+          Localizations.localeOf(context),
+          'services.k3d.sign_in_first',
+        );
       });
       return;
     }
@@ -110,8 +114,8 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                     child: ServiceAppBar(
-                      title: _K3dStatusStrings.appBarTitle(l),
-                      subtitle: _K3dStatusStrings.appBarSubtitle(l),
+                      title: tr(l, 'services.k3d.appbar.title'),
+                      subtitle: tr(l, 'services.k3d.status.subtitle'),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -138,7 +142,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
             const CircularProgressIndicator(color: AppColors.splashGreen),
             const SizedBox(height: 16),
             Text(
-              _K3dStatusStrings.submitting(l),
+              tr(l, 'services.k3d.status.submitting'),
               style: const TextStyle(fontFamily: 'MTSText', fontSize: 14),
             ),
           ],
@@ -166,7 +170,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
             SizedBox(
               width: double.infinity,
               child: ListingCtaButton(
-                label: _K3dStatusStrings.retry(l),
+                label: tr(l, 'services.k3d.status.retry'),
                 enabled: true,
                 onTap: _submit,
               ),
@@ -190,7 +194,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
               size: 72, color: AppColors.splashGreen),
           const SizedBox(height: 18),
           Text(
-            _K3dStatusStrings.successTitle(l),
+            tr(l, 'services.k3d.status.success_title'),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSCompact',
@@ -202,9 +206,9 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
           const SizedBox(height: 10),
           Text(
             _jobId == null
-                ? _K3dStatusStrings.successBody(l)
-                : '${_K3dStatusStrings.requestNumber(l, _jobId!)}\n\n'
-                    '${_K3dStatusStrings.successBody(l)}',
+                ? tr(l, 'services.k3d.status.success_body')
+                : '${tr(l, 'services.k3d.status.request_number').replaceAll(r'$id', '${_jobId!}')}\n\n'
+                    '${tr(l, 'services.k3d.status.success_body')}',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'MTSText',
@@ -217,7 +221,7 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
           SizedBox(
             width: double.infinity,
             child: ListingCtaButton(
-              label: _K3dStatusStrings.home(l),
+              label: tr(l, 'services.k3d.status.home'),
               enabled: true,
               onTap: () => Navigator.of(context).popUntil((r) => r.isFirst),
             ),
@@ -228,63 +232,3 @@ class _K3dStatusScreenState extends State<K3dStatusScreen> {
   }
 }
 
-class _K3dStatusStrings {
-  const _K3dStatusStrings._();
-
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => '3D кадастр',
-        'en' => '3D cadastre',
-        _ => '3D kadastr',
-      };
-
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Заявка отправляется',
-        'en' => 'Submitting the request',
-        _ => 'Ariza yuborilmoqda',
-      };
-
-  static String submitting(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отправка…',
-        'en' => 'Submitting…',
-        _ => 'Yuborilmoqda...',
-      };
-
-  static String retry(Locale l) => switch (l.languageCode) {
-        'ru' => 'Повторить',
-        'en' => 'Retry',
-        _ => 'Qayta urinish',
-      };
-
-  static String successTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Ваша заявка принята',
-        'en' => 'Your request has been received',
-        _ => 'Arizangiz qabul qilindi',
-      };
-
-  static String successBody(Locale l) => switch (l.languageCode) {
-        'ru' => 'Специалист подготовит 3D-модель и оценку. '
-            'Мы уведомим вас, когда всё будет готово.',
-        'en' => 'A specialist will prepare the 3D model and valuation. '
-            'We will notify you once it is ready.',
-        _ => 'Mutaxassis 3D model va baholashni tayyorlaydi. '
-            'Tayyor bo\'lganda sizga xabar beramiz.',
-      };
-
-  static String requestNumber(Locale l, int id) => switch (l.languageCode) {
-        'ru' => 'Номер заявки: #$id',
-        'en' => 'Request number: #$id',
-        _ => 'Ariza raqami: #$id',
-      };
-
-  static String home(Locale l) => switch (l.languageCode) {
-        'ru' => 'Главная',
-        'en' => 'Home',
-        _ => 'Asosiy sahifa',
-      };
-
-  static String errLogin(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сначала войдите в систему',
-        'en' => 'Please sign in first',
-        _ => 'Avval tizimga kiring',
-      };
-}

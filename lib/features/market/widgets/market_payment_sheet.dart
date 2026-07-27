@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../core/payment_deep_links.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
@@ -46,7 +47,7 @@ class _MarketPaymentSheetState extends State<_MarketPaymentSheet> {
     final id = widget.listing.backendId;
     final l = Localizations.localeOf(context);
     if (id == null) {
-      AppToast.error(context, _S.openFailed(l));
+      AppToast.error(context, tr(l, 'market.pay_sheet.open_failed'));
       return;
     }
     HapticFeedback.lightImpact();
@@ -72,7 +73,7 @@ class _MarketPaymentSheetState extends State<_MarketPaymentSheet> {
       if (ok) {
         Navigator.of(context).pop();
       } else {
-        AppToast.error(context, _S.openFailed(l));
+        AppToast.error(context, tr(l, 'market.pay_sheet.open_failed'));
       }
     } catch (e) {
       if (!mounted) return;
@@ -123,7 +124,7 @@ class _MarketPaymentSheetState extends State<_MarketPaymentSheet> {
             ),
             const SizedBox(height: 16),
             Text(
-              _S.title(l),
+              tr(l, 'market.pay_sheet.title'),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -146,7 +147,7 @@ class _MarketPaymentSheetState extends State<_MarketPaymentSheet> {
             ),
             const SizedBox(height: 18),
             Text(
-              _S.method(l),
+              tr(l, 'market.pay_sheet.method'),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
@@ -168,13 +169,16 @@ class _MarketPaymentSheetState extends State<_MarketPaymentSheet> {
               selected: false,
               enabled: false,
               isDark: isDark,
-              badge: _S.soon(l),
+              badge: tr(l, 'market.pay_sheet.soon'),
               onTap: null,
             ),
             const SizedBox(height: 22),
             _paying
                 ? const _PayingButton()
-                : ListingCtaButton(label: _S.pay(l), onTap: _pay),
+                : ListingCtaButton(
+                    label: tr(l, 'market.pay_sheet.pay'),
+                    onTap: _pay,
+                  ),
           ],
         ),
       ),
@@ -212,7 +216,7 @@ class _AmountBlock extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _S.amountLabel(locale),
+            tr(locale, 'market.pay_sheet.amount_label'),
             style: TextStyle(fontFamily: 'MTSText', fontSize: 12, color: sub),
           ),
           const SizedBox(height: 6),
@@ -232,7 +236,7 @@ class _AmountBlock extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
-                  _S.soum(locale),
+                  tr(locale, 'market.pay_sheet.soum'),
                   style: TextStyle(
                     fontFamily: 'MTSText',
                     fontSize: 14,
@@ -373,50 +377,4 @@ class _PayingButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _S {
-  const _S._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Покупка модели',
-    'en' => 'Buy model',
-    _ => 'Modelni sotib olish',
-  };
-
-  static String amountLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Сумма к оплате',
-    'en' => 'Amount due',
-    _ => 'To\'lov summasi',
-  };
-
-  static String method(Locale l) => switch (l.languageCode) {
-    'ru' => 'Способ оплаты',
-    'en' => 'Payment method',
-    _ => 'To\'lov usuli',
-  };
-
-  static String soon(Locale l) => switch (l.languageCode) {
-    'ru' => 'скоро',
-    'en' => 'soon',
-    _ => 'tez orada',
-  };
-
-  static String pay(Locale l) => switch (l.languageCode) {
-    'ru' => 'Оплатить',
-    'en' => 'Pay',
-    _ => 'To\'lash',
-  };
-
-  static String soum(Locale l) => switch (l.languageCode) {
-    'ru' => 'сум',
-    'en' => 'soum',
-    _ => 'so\'m',
-  };
-
-  static String openFailed(Locale l) => switch (l.languageCode) {
-    'ru' => 'Не удалось открыть Payme',
-    'en' => 'Could not open Payme',
-    _ => 'Payme ochilmadi',
-  };
 }

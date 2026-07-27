@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 
 class AuthScaffold extends StatelessWidget {
@@ -177,7 +178,7 @@ class _SkipButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _AuthScaffoldStrings.skip(locale),
+                tr(locale, 'auth.scaffold.skip'),
                 style: TextStyle(
                   color: fg,
                   fontSize: 13,
@@ -192,16 +193,6 @@ class _SkipButton extends StatelessWidget {
       ),
     );
   }
-}
-
-class _AuthScaffoldStrings {
-  const _AuthScaffoldStrings._();
-
-  static String skip(Locale l) => switch (l.languageCode) {
-    'ru' => 'Пропустить',
-    'en' => 'Skip',
-    _ => "O'tkazib yuborish",
-  };
 }
 
 class _IconBadge extends StatelessWidget {

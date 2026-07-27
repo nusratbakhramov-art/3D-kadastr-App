@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
@@ -25,7 +26,10 @@ class _HelpScreenState extends State<HelpScreen>
     return ValueListenableBuilder<Locale>(
       valueListenable: localeNotifier,
       builder: (context, locale, _) {
-        final faqs = _S.faqs(locale);
+        final faqs = <({String q, String a})>[
+          for (var i = 1; i <= 5; i++)
+            (q: tr(locale, 'help.faq.q$i'), a: tr(locale, 'help.faq.a$i')),
+        ];
         return Scaffold(
           backgroundColor: ColorTokens.scaffoldBg(context),
           body: Stack(
@@ -45,7 +49,7 @@ class _HelpScreenState extends State<HelpScreen>
                           0.4,
                           curve: Curves.easeOutCubic,
                         ),
-                        child: AppHeaderBack(title: _S.title(locale)),
+                        child: AppHeaderBack(title: tr(locale, 'help.title')),
                       ),
                       const SizedBox(height: 16),
                       AppReveal(
@@ -55,7 +59,7 @@ class _HelpScreenState extends State<HelpScreen>
                           0.6,
                           curve: Curves.easeOutCubic,
                         ),
-                        child: _SectionLabel(text: _S.faqLabel(locale)),
+                        child: _SectionLabel(text: tr(locale, 'help.faq_label')),
                       ),
                       const SizedBox(height: 8),
                       AppReveal(
@@ -75,7 +79,9 @@ class _HelpScreenState extends State<HelpScreen>
                           0.8,
                           curve: Curves.easeOutCubic,
                         ),
-                        child: _SectionLabel(text: _S.contactLabel(locale)),
+                        child: _SectionLabel(
+                          text: tr(locale, 'help.contact_label'),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       AppReveal(
@@ -89,7 +95,7 @@ class _HelpScreenState extends State<HelpScreen>
                           rows: [
                             AppMenuRow(
                               icon: Icons.send_rounded,
-                              label: _S.telegram(locale),
+                              label: tr(locale, 'help.telegram'),
                               trailing: const _ContactValue(
                                 text: '@kadastr_bot',
                               ),
@@ -97,7 +103,7 @@ class _HelpScreenState extends State<HelpScreen>
                             ),
                             AppMenuRow(
                               icon: Icons.mail_outline_rounded,
-                              label: _S.email(locale),
+                              label: tr(locale, 'help.email'),
                               trailing: const _ContactValue(
                                 text: 'support@example.uz',
                               ),
@@ -105,7 +111,7 @@ class _HelpScreenState extends State<HelpScreen>
                             ),
                             AppMenuRow(
                               icon: Icons.call_outlined,
-                              label: _S.phone(locale),
+                              label: tr(locale, 'help.phone'),
                               trailing: const _ContactValue(
                                 text: '+998 71 200 00 00',
                               ),
@@ -289,108 +295,3 @@ class _ContactValue extends StatelessWidget {
   }
 }
 
-class _S {
-  const _S._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Помощь',
-    'en' => 'Help',
-    _ => 'Yordam',
-  };
-  static String faqLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Часто задаваемые вопросы',
-    'en' => 'Frequently asked questions',
-    _ => 'Tez-tez beriladigan savollar',
-  };
-  static String contactLabel(Locale l) => switch (l.languageCode) {
-    'ru' => 'Связаться с нами',
-    'en' => 'Contact us',
-    _ => 'Biz bilan bog‘lanish',
-  };
-  static String telegram(Locale l) => switch (l.languageCode) {
-    'ru' => 'Telegram',
-    'en' => 'Telegram',
-    _ => 'Telegram',
-  };
-  static String email(Locale l) => switch (l.languageCode) {
-    'ru' => 'Электронная почта',
-    'en' => 'Email',
-    _ => 'Elektron pochta',
-  };
-  static String phone(Locale l) => switch (l.languageCode) {
-    'ru' => 'Телефон',
-    'en' => 'Phone',
-    _ => 'Telefon',
-  };
-
-  static List<({String q, String a})> faqs(
-    Locale l,
-  ) => switch (l.languageCode) {
-    'ru' => const [
-      (
-        q: 'Как сделать 3D-сканирование объекта?',
-        a: 'Откройте раздел «Услуги» → «3D Кадастр», введите кадастровый номер и следуйте инструкциям. Сканирование работает с камерой LiDAR (iOS) и эквивалентом на Android.',
-      ),
-      (
-        q: 'Сколько стоит AI-оценка?',
-        a: 'Стоимость зависит от типа объекта и тарифа. Точную сумму вы увидите в карточке объекта перед оплатой.',
-      ),
-      (
-        q: 'Какие методы оплаты поддерживаются?',
-        a: 'Мы принимаем оплату через Click, Payme и Uzum.',
-      ),
-      (
-        q: 'Сохраняется ли мой 3D-скан приватным?',
-        a: 'Да. Все ваши сканы доступны только в вашем личном кабинете и не показываются другим пользователям.',
-      ),
-      (
-        q: 'Можно ли войти с нескольких устройств?',
-        a: 'Активная сессия может быть только на одном устройстве. Вход с нового устройства автоматически завершит предыдущую сессию.',
-      ),
-    ],
-    'en' => const [
-      (
-        q: 'How do I 3D-scan an object?',
-        a: 'Open Services → 3D Kadastr, enter the cadastre number and follow the instructions. Scanning uses the LiDAR camera on iOS and an equivalent technology on Android.',
-      ),
-      (
-        q: 'How much does an AI valuation cost?',
-        a: 'Pricing depends on the object type and tariff. The exact amount appears in the object card before payment.',
-      ),
-      (
-        q: 'Which payment methods are supported?',
-        a: 'We accept Click, Payme and Uzum.',
-      ),
-      (
-        q: 'Are my 3D scans kept private?',
-        a: 'Yes. All your scans live in your personal cabinet and are never visible to other users.',
-      ),
-      (
-        q: 'Can I sign in on multiple devices?',
-        a: 'Only one active session is allowed. Signing in from a new device automatically ends the previous session.',
-      ),
-    ],
-    _ => const [
-      (
-        q: 'Obyektni 3D skan qilish qanday amalga oshiriladi?',
-        a: '«Xizmatlar» → «3D Kadastr» bo‘limini oching, kadastr raqamini kiriting va ko‘rsatmalarga amal qiling. Skan iOS qurilmalarda LiDAR kamerasi, Android qurilmalarda esa ekvivalent texnologiya bilan ishlaydi.',
-      ),
-      (
-        q: 'AI baholash narxi qancha?',
-        a: 'Narx obyekt turi va tarifga bog‘liq. Aniq summani to‘lovdan oldin obyekt kartochkasida ko‘rasiz.',
-      ),
-      (
-        q: 'Qanday to‘lov usullari qo‘llab-quvvatlanadi?',
-        a: 'Click, Payme va Uzum orqali to‘lov qabul qilamiz.',
-      ),
-      (
-        q: '3D skanlarim maxfiy saqlanadimi?',
-        a: 'Ha. Barcha skanlaringiz faqat shaxsiy kabinetingizda saqlanadi va boshqa foydalanuvchilarga ochilmaydi.',
-      ),
-      (
-        q: 'Bir nechta qurilmadan kirish mumkinmi?',
-        a: 'Faqat bitta faol sessiyaga ruxsat beriladi. Yangi qurilmadan kirilganda avvalgi sessiya avtomatik yakunlanadi.',
-      ),
-    ],
-  };
-}

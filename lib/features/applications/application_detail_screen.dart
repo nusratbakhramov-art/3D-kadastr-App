@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../core/api_config.dart';
 import '../../core/haptics.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
@@ -65,10 +66,8 @@ Future<String> _ensureResultCached({
   final res = await client.send(req);
   if (res.statusCode != 200) {
     throw HttpException(
-      _DetailStrings.downloadError(
-        localeNotifier.value.languageCode,
-        res.statusCode,
-      ),
+      tr(localeNotifier.value, 'applications.detail.download_error')
+          .replaceFirst('{code}', '${res.statusCode}'),
     );
   }
   final total = res.contentLength ?? -1;
@@ -95,198 +94,6 @@ Rect? _shareOrigin(BuildContext context) {
   final box = context.findRenderObject() as RenderBox?;
   if (box == null || !box.hasSize) return null;
   return box.localToGlobal(Offset.zero) & box.size;
-}
-
-/// Localized strings for the application detail screen. Uzbek = default.
-class _DetailStrings {
-  const _DetailStrings._();
-
-  static String applications(String lang) => switch (lang) {
-    'ru' => 'Заявки',
-    'en' => 'Applications',
-    _ => 'Arizalar',
-  };
-
-  static String applicationStatus(String lang) => switch (lang) {
-    'ru' => 'Статус заявки',
-    'en' => 'Application status',
-    _ => 'Ariza holati',
-  };
-
-  static String aboutApplication(String lang) => switch (lang) {
-    'ru' => 'О заявке',
-    'en' => 'About application',
-    _ => 'Ariza haqida',
-  };
-
-  static String applicationDetails(String lang) => switch (lang) {
-    'ru' => 'Данные заявки',
-    'en' => 'Application details',
-    _ => 'Ariza maʼlumotlari',
-  };
-
-  static String report(String lang) => switch (lang) {
-    'ru' => 'Отчёт',
-    'en' => 'Report',
-    _ => 'Hisobot',
-  };
-
-  static String reportFile(String lang) => switch (lang) {
-    'ru' => 'Заключение об оценке',
-    'en' => 'Valuation report',
-    _ => 'Baholash xulosasi',
-  };
-
-  static String orderFile(String lang) => switch (lang) {
-    'ru' => 'Narxlash ma\'lumotnomasi',
-    'en' => 'Valuation certificate',
-    _ => 'Narxlash ma\'lumotnomasi',
-  };
-
-  static String orderHint(String lang) => switch (lang) {
-    'ru' => 'Дизайнерский PDF-отчёт',
-    'en' => 'Designed PDF report',
-    _ => 'Dizaynli PDF hisobot',
-  };
-
-  static String specialistConclusion(String lang) => switch (lang) {
-    'ru' => 'Заключение специалиста',
-    'en' => 'Specialist conclusion',
-    _ => 'Mutaxassis xulosasi',
-  };
-
-  static String commentLabel(String lang) => switch (lang) {
-    'ru' => 'Комментарий',
-    'en' => 'Comment',
-    _ => 'Izoh',
-  };
-
-  static String causeLabel(String lang) => switch (lang) {
-    'ru' => 'Обоснование оценки',
-    'en' => 'Valuation basis',
-    _ => 'Baholash sababi',
-  };
-
-  static String noData(String lang) => switch (lang) {
-    'ru' => 'Данные отсутствуют',
-    'en' => 'No data available',
-    _ => 'Maʼlumot mavjud emas',
-  };
-
-  static String noTimelineYet(String lang) => switch (lang) {
-    'ru' => 'Данные о процессе ещё отсутствуют',
-    'en' => 'No process information yet',
-    _ => 'Jarayon maʼlumotlari hali yoʻq',
-  };
-
-  static String contactSpecialist(String lang) => switch (lang) {
-    'ru' => 'Связаться со специалистом',
-    'en' => 'Contact a specialist',
-    _ => 'Mutaxasis bilan bog\'lanish',
-  };
-
-  static String viewViaAr(String lang) => switch (lang) {
-    'ru' => 'Посмотреть через AR',
-    'en' => 'View via AR',
-    _ => 'AR orqali ko\'rish',
-  };
-
-  static String download(String lang) => switch (lang) {
-    'ru' => 'Скачать',
-    'en' => 'Download',
-    _ => 'Yuklash',
-  };
-
-  static String view(String lang) => switch (lang) {
-    'ru' => 'Открыть',
-    'en' => 'Open',
-    _ => 'Ko\'rish',
-  };
-
-  static String model3d(String lang) => switch (lang) {
-    'ru' => '3D модель',
-    'en' => '3D model',
-    _ => '3D Model',
-  };
-
-  static String roomPlanViewerOpens(String lang) => switch (lang) {
-    'ru' => 'Откроется просмотрщик RoomPlan',
-    'en' => 'RoomPlan viewer will open',
-    _ => 'RoomPlan viewer ochiladi',
-  };
-
-  static String scan3d(String lang) => switch (lang) {
-    'ru' => '3D скан объекта',
-    'en' => 'Object 3D scan',
-    _ => 'Obyekt 3D skani',
-  };
-
-  static String scan3dHint(String lang) => switch (lang) {
-    'ru' => 'Нажмите, чтобы открыть в AR',
-    'en' => 'Tap to view in AR',
-    _ => 'AR’da ko‘rish uchun bosing',
-  };
-
-  static String scanPhotos(String lang) => switch (lang) {
-    'ru' => 'Снимки скана',
-    'en' => 'Scan photos',
-    _ => 'Skan rasmlari',
-  };
-
-  static String downloading(String lang) => switch (lang) {
-    'ru' => 'Загрузка…',
-    'en' => 'Downloading…',
-    _ => 'Yuklab olinmoqda…',
-  };
-
-  static String downloadError(String lang, int statusCode) => switch (lang) {
-    'ru' => 'Ошибка загрузки ($statusCode)',
-    'en' => 'Download error ($statusCode)',
-    _ => 'Yuklab olish xatosi ($statusCode)',
-  };
-
-  // Timeline step labels.
-  static String draft(String lang) => switch (lang) {
-    'ru' => 'Черновик (не отправлено)',
-    'en' => 'Draft (not submitted)',
-    _ => 'Qoralama (yuborilmagan)',
-  };
-
-  static String continueDraft(String lang) => switch (lang) {
-    'ru' => 'Продолжить заполнение',
-    'en' => 'Continue editing',
-    _ => 'Davom etish',
-  };
-
-  static String accepted(String lang) => switch (lang) {
-    'ru' => 'Заявка принята',
-    'en' => 'Application accepted',
-    _ => 'Ariza qabul qilindi',
-  };
-
-  static String sentToSystem(String lang) => switch (lang) {
-    'ru' => 'Отправлено в систему',
-    'en' => 'Sent to system',
-    _ => 'Tizimga yuborildi',
-  };
-
-  static String assignedSpecialist(String lang) => switch (lang) {
-    'ru' => 'Назначен специалист',
-    'en' => 'Specialist assigned',
-    _ => 'Mutaxassisga tayinlandi',
-  };
-
-  static String scanned(String lang) => switch (lang) {
-    'ru' => 'Сканировано',
-    'en' => 'Scanned',
-    _ => 'Skan qilindi',
-  };
-
-  static String reportReady(String lang) => switch (lang) {
-    'ru' => 'Отчёт готов',
-    'en' => 'Report ready',
-    _ => 'Hisobot tayyorlandi',
-  };
 }
 
 class ApplicationDetailScreen extends StatefulWidget {
@@ -317,7 +124,7 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               AppHeaderBack(
-                title: _DetailStrings.applications(lang),
+                title: tr(Locale(lang), 'applications.title'),
                 onBack: () => Navigator.of(context).maybePop(),
               ),
               const SizedBox(height: 2),
@@ -338,8 +145,8 @@ class _ApplicationDetailScreenState extends State<ApplicationDetailScreen> {
               SegmentedTabs<_DetailTab>(
                 values: _DetailTab.values,
                 labelOf: (t) => switch (t) {
-                  _DetailTab.status => _DetailStrings.applicationStatus(lang),
-                  _DetailTab.about => _DetailStrings.aboutApplication(lang),
+                  _DetailTab.status => tr(Locale(lang), 'applications.detail.status_tab'),
+                  _DetailTab.about => tr(Locale(lang), 'applications.detail.about_tab'),
                 },
                 selected: _tab,
                 onChanged: (next) => setState(() => _tab = next),
@@ -376,11 +183,11 @@ class _StatusTab extends StatelessWidget {
         const SizedBox(height: 14),
         if (canResume)
           _ResumeDraftAction(
-            label: _DetailStrings.continueDraft(lang),
+            label: tr(Locale(lang), 'applications.detail.continue_draft'),
             jobId: item.resumeJobId!,
           )
         else
-          _PrimaryBlackAction(label: _DetailStrings.contactSpecialist(lang)),
+          _PrimaryBlackAction(label: tr(Locale(lang), 'applications.detail.contact_specialist')),
       ],
     );
   }
@@ -407,8 +214,9 @@ class _TimelineCard extends StatelessWidget {
             _TimelineRow(step: visible[i], showTail: i != visible.length - 1),
           if (visible.isEmpty)
             Text(
-              _DetailStrings.noTimelineYet(
-                Localizations.localeOf(context).languageCode,
+              tr(
+                Localizations.localeOf(context),
+                'applications.detail.no_timeline_yet',
               ),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
@@ -512,32 +320,32 @@ class _TimelineStyle {
     String lang,
   ) => switch (status) {
     ApplicationTimelineStatus.draft => _TimelineStyle(
-      label: _DetailStrings.draft(lang),
+      label: tr(Locale(lang), 'applications.detail.timeline_draft'),
       icon: Icons.edit_note_rounded,
       bg: const Color(0xFFE0A12A), // amber — matches the "Qoralama" badge
     ),
     ApplicationTimelineStatus.accepted => _TimelineStyle(
-      label: _DetailStrings.accepted(lang),
+      label: tr(Locale(lang), 'applications.detail.timeline_accepted'),
       icon: Icons.description_outlined,
       bg: const Color(0xFF18B4E8),
     ),
     ApplicationTimelineStatus.sentToSystem => _TimelineStyle(
-      label: _DetailStrings.sentToSystem(lang),
+      label: tr(Locale(lang), 'applications.detail.timeline_sent'),
       icon: Icons.send_rounded,
       bg: const Color(0xFF6A16F6),
     ),
     ApplicationTimelineStatus.assignedSpecialist => _TimelineStyle(
-      label: _DetailStrings.assignedSpecialist(lang),
+      label: tr(Locale(lang), 'applications.detail.timeline_assigned'),
       icon: Icons.badge_outlined,
       bg: const Color(0xFFFF9800),
     ),
     ApplicationTimelineStatus.scanned => _TimelineStyle(
-      label: _DetailStrings.scanned(lang),
+      label: tr(Locale(lang), 'applications.detail.timeline_scanned'),
       icon: Icons.crop_free_rounded,
       bg: const Color(0xFF03C050),
     ),
     ApplicationTimelineStatus.reportReady => _TimelineStyle(
-      label: _DetailStrings.reportReady(lang),
+      label: tr(Locale(lang), 'applications.detail.timeline_report_ready'),
       icon: Icons.description_outlined,
       bg: const Color(0xFF1A9BF4),
     ),
@@ -562,7 +370,7 @@ Widget _flatRowsCard(
         ? Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: Text(
-              _DetailStrings.noData(lang),
+              tr(Locale(lang), 'applications.detail.no_data'),
               style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w500,
@@ -643,8 +451,8 @@ class _AboutTab extends StatelessWidget {
                   item.aiReportJobId != null ||
                   item.k3dReportJobId != null ||
                   item.k3dModelJobId != null)
-              ? _DetailStrings.report(lang)
-              : _DetailStrings.applicationDetails(lang),
+              ? tr(Locale(lang), 'applications.detail.report')
+              : tr(Locale(lang), 'applications.detail.details'),
           style: TextStyle(
             fontFamily: 'MTSCompact',
             fontWeight: FontWeight.w700,
@@ -730,7 +538,7 @@ class _AboutTab extends StatelessWidget {
           _ModelCard(item: item),
           const SizedBox(height: 18),
           _PrimaryGreenAction(
-            label: _DetailStrings.viewViaAr(lang),
+            label: tr(Locale(lang), 'applications.detail.view_via_ar'),
             item: item,
           ),
         ],
@@ -884,7 +692,7 @@ class _AiFullDetailState extends State<_AiFullDetail> {
         if (summary != null && summary.isNotEmpty) ...[
           const SizedBox(height: 8),
           _SectionHeader(
-            title: _aiLbl(lang, 'AI izoh', 'Комментарий AI', 'AI summary'),
+            title: tr(Locale(lang), 'applications.detail.ai_summary'),
           ),
           Container(
             width: double.infinity,
@@ -930,15 +738,9 @@ String _roomLabel(String lang, Map<String, dynamic> m) {
   }
   if (rk != null && rk != RoomKind.other) return rk.label(Locale(lang));
   if (name != null && name.isNotEmpty) return name;
-  return rk?.label(Locale(lang)) ?? _aiLbl(lang, 'Xona', 'Помещение', 'Room');
+  return rk?.label(Locale(lang)) ?? tr(Locale(lang), 'applications.detail.room');
 }
 
-/// Localized label picker (uz default).
-String _aiLbl(String lang, String uz, String ru, String en) => switch (lang) {
-  'ru' => ru,
-  'en' => en,
-  _ => uz,
-};
 
 /// Thousands-grouped UZS amount, e.g. 622794192 → "622 794 192 so'm".
 String _aiMoney(num v) {
@@ -981,27 +783,27 @@ List<(String, List<(String, String)>)> _buildAiSections(
   final prop = <(String, String)>[];
   add(
     prop,
-    _aiLbl(lang, 'Kadastr raqami', 'Кадастровый номер', 'Cadastre no.'),
+    tr(Locale(lang), 'applications.detail.cadastre_no'),
     str(kad['cadastre_number']),
   );
   add(
     prop,
-    _aiLbl(lang, 'Manzil', 'Адрес', 'Address'),
+    tr(Locale(lang), 'applications.address'),
     str(kad['address']) ?? str(loc['address']),
   );
   add(
     prop,
-    _aiLbl(lang, 'Obyekt turi', 'Тип объекта', 'Object type'),
+    tr(Locale(lang), 'applications.object_type'),
     str(kad['object_type_hint']),
   );
   add(
     prop,
-    _aiLbl(lang, 'Umumiy maydon', 'Общая площадь', 'Total area'),
+    tr(Locale(lang), 'applications.detail.total_area'),
     kad['total_area'] != null ? '${kad['total_area']} m²' : null,
   );
   add(
     prop,
-    _aiLbl(lang, 'Yashash maydoni', 'Жилая площадь', 'Living area'),
+    tr(Locale(lang), 'applications.detail.living_area'),
     kad['living_area'] != null ? '${kad['living_area']} m²' : null,
   );
   final floor = str(req['floor']);
@@ -1009,34 +811,29 @@ List<(String, List<(String, String)>)> _buildAiSections(
     final total = str(req['total_floors']);
     add(
       prop,
-      _aiLbl(lang, 'Qavat', 'Этаж', 'Floor'),
+      tr(Locale(lang), 'applications.detail.floor'),
       total != null ? '$floor / $total' : floor,
     );
   }
   if (kad['cadastre_value'] is num) {
     add(
       prop,
-      _aiLbl(
-        lang,
-        'Kadastr qiymati',
-        'Кадастровая стоимость',
-        'Cadastre value',
-      ),
+      tr(Locale(lang), 'applications.detail.cadastre_value'),
       _aiMoney(kad['cadastre_value'] as num),
     );
   }
   if (prop.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Obyekt', 'Объект', 'Property'), prop));
+    sections.add((tr(Locale(lang), 'applications.detail.section_property'), prop));
   }
 
   // ── Buyurtmachi ─────────────────────────────────────────────────────
   final cl = <(String, String)>[];
-  add(cl, _aiLbl(lang, 'Ism', 'Имя', 'Name'), str(client['name']));
-  add(cl, _aiLbl(lang, 'Telefon', 'Телефон', 'Phone'), str(client['phone']));
-  add(cl, 'STIR / JSHSHIR', str(client['stir']));
-  add(cl, 'Email', str(client['email']));
+  add(cl, tr(Locale(lang), 'applications.detail.name'), str(client['name']));
+  add(cl, tr(Locale(lang), 'applications.detail.phone'), str(client['phone']));
+  add(cl, tr(Locale(lang), 'applications.detail.tin_label'), str(client['stir']));
+  add(cl, tr(Locale(lang), 'applications.detail.email_label'), str(client['email']));
   if (cl.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Buyurtmachi', 'Заказчик', 'Client'), cl));
+    sections.add((tr(Locale(lang), 'applications.detail.section_client'), cl));
   }
 
   // ── Joylashuv ───────────────────────────────────────────────────────
@@ -1044,13 +841,13 @@ List<(String, List<(String, String)>)> _buildAiSections(
   if (loc['lat'] != null && loc['lng'] != null) {
     add(
       lc,
-      _aiLbl(lang, 'Koordinatalar', 'Координаты', 'Coordinates'),
+      tr(Locale(lang), 'applications.detail.coordinates'),
       '${loc['lat']}, ${loc['lng']}',
     );
   }
-  add(lc, _aiLbl(lang, 'Maqsad', 'Цель', 'Purpose'), str(req['purpose']));
+  add(lc, tr(Locale(lang), 'applications.detail.purpose'), str(req['purpose']));
   if (lc.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Joylashuv', 'Локация', 'Location'), lc));
+    sections.add((tr(Locale(lang), 'applications.detail.section_location'), lc));
   }
 
   // ── Xonalar ─────────────────────────────────────────────────────────
@@ -1061,13 +858,13 @@ List<(String, List<(String, String)>)> _buildAiSections(
     final name = _roomLabel(lang, m);
     final parts = <String>[];
     if (m['count'] != null) {
-      parts.add('${m['count']} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
+      parts.add('${m['count']} ${tr(Locale(lang), 'applications.unit.pcs')}');
     }
     if (m['area'] != null) parts.add('${m['area']} m²');
     rm.add((name, parts.isEmpty ? '—' : parts.join(' · ')));
   }
   if (rm.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Xonalar', 'Помещения', 'Rooms'), rm));
+    sections.add((tr(Locale(lang), 'applications.detail.section_rooms'), rm));
   }
 
   // ── Natija ──────────────────────────────────────────────────────────
@@ -1075,7 +872,7 @@ List<(String, List<(String, String)>)> _buildAiSections(
   if (res['estimated_value'] is num) {
     add(
       rs,
-      _aiLbl(lang, 'Taxminiy qiymat', 'Оценочная стоимость', 'Estimated value'),
+      tr(Locale(lang), 'applications.detail.estimated_value'),
       _aiMoney(res['estimated_value'] as num),
     );
   }
@@ -1083,7 +880,7 @@ List<(String, List<(String, String)>)> _buildAiSections(
   if (ppsq is num) {
     add(
       rs,
-      _aiLbl(lang, '1 m² narxi', 'Цена за 1 м²', 'Price per m²'),
+      tr(Locale(lang), 'applications.detail.price_per_sqm'),
       _aiMoney(ppsq),
     );
   }
@@ -1091,31 +888,26 @@ List<(String, List<(String, String)>)> _buildAiSections(
   if (conf is num) {
     add(
       rs,
-      _aiLbl(lang, 'Ishonchlilik', 'Достоверность', 'Confidence'),
+      tr(Locale(lang), 'applications.detail.confidence'),
       conf <= 1 ? '${(conf * 100).round()}%' : conf.toString(),
     );
   }
   if (snap.nearbyListingsCount > 0) {
     add(
       rs,
-      _aiLbl(
-        lang,
-        'Taqqoslangan e\'lonlar',
-        'Сравнимые объявления',
-        'Comparables',
-      ),
+      tr(Locale(lang), 'applications.detail.comparables'),
       '${snap.nearbyListingsCount}',
     );
   }
   if (snap.nearbyPoisCount > 0) {
     add(
       rs,
-      _aiLbl(lang, 'Atrofdagi obyektlar', 'Объекты рядом', 'Nearby POIs'),
+      tr(Locale(lang), 'applications.detail.nearby_pois'),
       '${snap.nearbyPoisCount}',
     );
   }
   if (rs.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Natija', 'Результат', 'Result'), rs));
+    sections.add((tr(Locale(lang), 'applications.detail.section_result'), rs));
   }
 
   return sections;
@@ -1208,20 +1000,10 @@ class _Kadastr3dFullDetailState extends State<_Kadastr3dFullDetail> {
 }
 
 String _k3dObjectType(String lang, String? wire) => switch (wire) {
-  'residential' => _aiLbl(lang, 'Turar joy', 'Жилое', 'Residential'),
-  'non_residential' => _aiLbl(
-    lang,
-    'Noturar joy',
-    'Нежилое',
-    'Non-residential',
-  ),
-  'warehouse' => _aiLbl(lang, 'Ombor', 'Склад', 'Warehouse'),
-  'industrial' => _aiLbl(
-    lang,
-    'Sanoat obyektlari',
-    'Промышленные объекты',
-    'Industrial',
-  ),
+  'residential' => tr(Locale(lang), 'applications.object.residential'),
+  'non_residential' => tr(Locale(lang), 'applications.object.non_residential'),
+  'warehouse' => tr(Locale(lang), 'applications.object.warehouse'),
+  'industrial' => tr(Locale(lang), 'applications.detail.object_industrial'),
   _ => wire ?? '',
 };
 
@@ -1255,35 +1037,35 @@ List<(String, List<(String, String)>)> _buildKadastr3dSections(
   final prop = <(String, String)>[];
   add(
     prop,
-    _aiLbl(lang, 'Kadastr raqami', 'Кадастровый номер', 'Cadastre no.'),
+    tr(Locale(lang), 'applications.detail.cadastre_no'),
     str(kad['cadastre_number']),
   );
   add(
     prop,
-    _aiLbl(lang, 'Manzil', 'Адрес', 'Address'),
+    tr(Locale(lang), 'applications.address'),
     str(kad['address']) ?? str(loc['address_text']),
   );
   final ot = str(req['object_type']);
   if (ot != null) {
     add(
       prop,
-      _aiLbl(lang, 'Obyekt turi', 'Тип объекта', 'Object type'),
+      tr(Locale(lang), 'applications.object_type'),
       _k3dObjectType(lang, ot),
     );
   }
   add(
     prop,
-    _aiLbl(lang, 'Davreestr turi', 'Тип (davreestr)', 'Type (davreestr)'),
+    tr(Locale(lang), 'applications.detail.davreestr_type'),
     str(kad['object_type_hint']),
   );
   add(
     prop,
-    _aiLbl(lang, 'Umumiy maydon', 'Общая площадь', 'Total area'),
+    tr(Locale(lang), 'applications.detail.total_area'),
     kad['total_area'] != null ? '${kad['total_area']} m²' : null,
   );
   add(
     prop,
-    _aiLbl(lang, 'Yashash maydoni', 'Жилая площадь', 'Living area'),
+    tr(Locale(lang), 'applications.detail.living_area'),
     kad['living_area'] != null ? '${kad['living_area']} m²' : null,
   );
   final floor = str(req['floor']);
@@ -1291,34 +1073,29 @@ List<(String, List<(String, String)>)> _buildKadastr3dSections(
     final total = str(req['total_floors']);
     add(
       prop,
-      _aiLbl(lang, 'Qavat', 'Этаж', 'Floor'),
+      tr(Locale(lang), 'applications.detail.floor'),
       total != null ? '$floor / $total' : floor,
     );
   }
   if (kad['cadastre_value'] is num) {
     add(
       prop,
-      _aiLbl(
-        lang,
-        'Kadastr qiymati',
-        'Кадастровая стоимость',
-        'Cadastre value',
-      ),
+      tr(Locale(lang), 'applications.detail.cadastre_value'),
       _aiMoney(kad['cadastre_value'] as num),
     );
   }
   if (prop.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Obyekt', 'Объект', 'Property'), prop));
+    sections.add((tr(Locale(lang), 'applications.detail.section_property'), prop));
   }
 
   // ── Buyurtmachi ─────────────────────────────────────────────────────────
   final cl = <(String, String)>[];
-  add(cl, _aiLbl(lang, 'Ism', 'Имя', 'Name'), str(client['name']));
-  add(cl, _aiLbl(lang, 'Telefon', 'Телефон', 'Phone'), str(client['phone']));
-  add(cl, 'STIR / JSHSHIR', str(client['stir']));
-  add(cl, 'Email', str(client['email']));
+  add(cl, tr(Locale(lang), 'applications.detail.name'), str(client['name']));
+  add(cl, tr(Locale(lang), 'applications.detail.phone'), str(client['phone']));
+  add(cl, tr(Locale(lang), 'applications.detail.tin_label'), str(client['stir']));
+  add(cl, tr(Locale(lang), 'applications.detail.email_label'), str(client['email']));
   if (cl.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Buyurtmachi', 'Заказчик', 'Client'), cl));
+    sections.add((tr(Locale(lang), 'applications.detail.section_client'), cl));
   }
 
   // ── Joylashuv ───────────────────────────────────────────────────────────
@@ -1326,12 +1103,12 @@ List<(String, List<(String, String)>)> _buildKadastr3dSections(
   if (loc['lat'] != null && loc['lng'] != null) {
     add(
       lc,
-      _aiLbl(lang, 'Koordinatalar', 'Координаты', 'Coordinates'),
+      tr(Locale(lang), 'applications.detail.coordinates'),
       '${loc['lat']}, ${loc['lng']}',
     );
   }
   if (lc.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Joylashuv', 'Локация', 'Location'), lc));
+    sections.add((tr(Locale(lang), 'applications.detail.section_location'), lc));
   }
 
   // ── Xonalar ─────────────────────────────────────────────────────────────
@@ -1342,13 +1119,13 @@ List<(String, List<(String, String)>)> _buildKadastr3dSections(
     final name = _roomLabel(lang, m);
     final parts = <String>[];
     if (m['count'] != null) {
-      parts.add('${m['count']} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}');
+      parts.add('${m['count']} ${tr(Locale(lang), 'applications.unit.pcs')}');
     }
     if (m['area'] != null) parts.add('${m['area']} m²');
     rm.add((name, parts.isEmpty ? '—' : parts.join(' · ')));
   }
   if (rm.isNotEmpty) {
-    sections.add((_aiLbl(lang, 'Xonalar', 'Помещения', 'Rooms'), rm));
+    sections.add((tr(Locale(lang), 'applications.detail.section_rooms'), rm));
   }
 
   // ── Yuklangan fayllar ────────────────────────────────────────────────────
@@ -1356,25 +1133,20 @@ List<(String, List<(String, String)>)> _buildKadastr3dSections(
   if (imageKeys.isNotEmpty) {
     add(
       files,
-      _aiLbl(lang, 'Obyekt rasmlari', 'Фото объекта', 'Object photos'),
-      '${imageKeys.length} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}',
+      tr(Locale(lang), 'applications.detail.object_photos'),
+      '${imageKeys.length} ${tr(Locale(lang), 'applications.unit.pcs')}',
     );
   }
   if (kadastrKeys.isNotEmpty) {
     add(
       files,
-      _aiLbl(
-        lang,
-        'Kadastr hujjatlari',
-        'Кадастровые документы',
-        'Cadastre docs',
-      ),
-      '${kadastrKeys.length} ${_aiLbl(lang, 'ta', 'шт', 'pcs')}',
+      tr(Locale(lang), 'applications.detail.cadastre_docs'),
+      '${kadastrKeys.length} ${tr(Locale(lang), 'applications.unit.pcs')}',
     );
   }
   if (files.isNotEmpty) {
     sections.add((
-      _aiLbl(lang, 'Yuklangan fayllar', 'Загруженные файлы', 'Files'),
+      tr(Locale(lang), 'applications.detail.section_files'),
       files,
     ));
   }
@@ -1422,11 +1194,7 @@ class _AiScanCardState extends State<_AiScanCard> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка: $e',
-        'en' => 'Error: $e',
-        _ => 'Xato: $e',
-      });
+      AppToast.error(context, '${tr(localeNotifier.value, 'applications.error')}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -1487,7 +1255,7 @@ class _AiScanCardState extends State<_AiScanCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _DetailStrings.scan3d(lang),
+                    tr(Locale(lang), 'applications.detail.scan_3d'),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w600,
@@ -1498,8 +1266,8 @@ class _AiScanCardState extends State<_AiScanCard> {
                   const SizedBox(height: 2),
                   Text(
                     _loading
-                        ? _DetailStrings.downloading(lang)
-                        : _DetailStrings.scan3dHint(lang),
+                        ? tr(Locale(lang), 'applications.detail.downloading')
+                        : tr(Locale(lang), 'applications.detail.scan_3d_hint'),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w400,
@@ -1615,7 +1383,7 @@ class _AiScanFramesGalleryState extends State<_AiScanFramesGallery> {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${_DetailStrings.scanPhotos(lang)} (${_frames.length})',
+                  '${tr(Locale(lang), 'applications.detail.scan_photos')} (${_frames.length})',
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -1814,11 +1582,7 @@ class _FileCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  switch (localeNotifier.value.languageCode) {
-                    'ru' => 'Заключение 3D Kadastr',
-                    'en' => '3D Kadastr report',
-                    _ => '3D Kadastr xulosasi',
-                  },
+                  tr(localeNotifier.value, 'applications.detail.k3d_report_title'),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -1844,9 +1608,7 @@ class _FileCard extends StatelessWidget {
             ),
           ),
           _MiniPillButton(
-            label: _DetailStrings.download(
-              Localizations.localeOf(context).languageCode,
-            ),
+            label: tr(Localizations.localeOf(context), 'applications.detail.download'),
             fg: const Color(0xFF03B54F),
             bg: isDark
                 ? const Color(0xFF03B54F).withValues(alpha: 0.18)
@@ -1911,7 +1673,7 @@ class _EstimatorCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            _DetailStrings.specialistConclusion(lang),
+            tr(Locale(lang), 'applications.detail.specialist_conclusion'),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,
@@ -1922,11 +1684,11 @@ class _EstimatorCard extends StatelessWidget {
           ),
           if (cz.isNotEmpty) ...[
             const SizedBox(height: 12),
-            block(_DetailStrings.causeLabel(lang), cz),
+            block(tr(Locale(lang), 'applications.detail.cause_label'), cz),
           ],
           if (c.isNotEmpty) ...[
             const SizedBox(height: 12),
-            block(_DetailStrings.commentLabel(lang), c),
+            block(tr(Locale(lang), 'applications.detail.comment_label'), c),
           ],
         ],
       ),
@@ -1983,11 +1745,7 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
       if (mounted) AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка: $e',
-        'en' => 'Error: $e',
-        _ => 'Xato: $e',
-      });
+      AppToast.error(context, '${tr(localeNotifier.value, 'applications.error')}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -2006,7 +1764,7 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
       MaterialPageRoute<void>(
         builder: (_) => PdfViewerScreen(
           filePath: path,
-          title: '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+          title: '${tr(Locale(lang), 'applications.detail.report_file')} #${widget.jobId}',
           shareName: '${_shareName}_${widget.jobId}.pdf',
         ),
       ),
@@ -2069,7 +1827,7 @@ class _AiXulosaCardState extends State<_AiXulosaCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+                    '${tr(Locale(lang), 'applications.detail.report_file')} #${widget.jobId}',
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -2152,11 +1910,7 @@ class _AiOrderCardState extends State<_AiOrderCard> {
       if (mounted) AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка: $e',
-        'en' => 'Error: $e',
-        _ => 'Xato: $e',
-      });
+      AppToast.error(context, '${tr(localeNotifier.value, 'applications.error')}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -2173,7 +1927,7 @@ class _AiOrderCardState extends State<_AiOrderCard> {
       MaterialPageRoute<void>(
         builder: (_) => PdfViewerScreen(
           filePath: path,
-          title: '${_DetailStrings.orderFile(lang)} #${widget.jobId}',
+          title: '${tr(Locale(lang), 'applications.detail.order_file')} #${widget.jobId}',
           shareName: 'Narxlash_Malumotnomasi_${widget.jobId}.pdf',
         ),
       ),
@@ -2225,7 +1979,7 @@ class _AiOrderCardState extends State<_AiOrderCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${_DetailStrings.orderFile(lang)} #${widget.jobId}',
+                    '${tr(Locale(lang), 'applications.detail.order_file')} #${widget.jobId}',
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -2239,8 +1993,8 @@ class _AiOrderCardState extends State<_AiOrderCard> {
                   const SizedBox(height: 2),
                   Text(
                     _loading
-                        ? _DetailStrings.downloading(lang)
-                        : _DetailStrings.orderHint(lang),
+                        ? tr(Locale(lang), 'applications.detail.downloading')
+                        : tr(Locale(lang), 'applications.detail.order_hint'),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w400,
@@ -2324,11 +2078,7 @@ class _K3dReportCardState extends State<_K3dReportCard> {
       if (mounted) AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка: $e',
-        'en' => 'Error: $e',
-        _ => 'Xato: $e',
-      });
+      AppToast.error(context, '${tr(localeNotifier.value, 'applications.error')}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -2346,7 +2096,7 @@ class _K3dReportCardState extends State<_K3dReportCard> {
       MaterialPageRoute<void>(
         builder: (_) => PdfViewerScreen(
           filePath: path,
-          title: '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+          title: '${tr(Locale(lang), 'applications.detail.report_file')} #${widget.jobId}',
           shareName: '${_shareName}_${widget.jobId}.pdf',
         ),
       ),
@@ -2408,7 +2158,7 @@ class _K3dReportCardState extends State<_K3dReportCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${_DetailStrings.reportFile(lang)} #${widget.jobId}',
+                    '${tr(Locale(lang), 'applications.detail.report_file')} #${widget.jobId}',
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -2497,11 +2247,7 @@ class _K3dModelCardState extends State<_K3dModelCard> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка: $e',
-        'en' => 'Error: $e',
-        _ => 'Xato: $e',
-      });
+      AppToast.error(context, '${tr(localeNotifier.value, 'applications.error')}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -2562,7 +2308,7 @@ class _K3dModelCardState extends State<_K3dModelCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _DetailStrings.scan3d(lang),
+                    tr(Locale(lang), 'applications.detail.scan_3d'),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w600,
@@ -2573,8 +2319,8 @@ class _K3dModelCardState extends State<_K3dModelCard> {
                   const SizedBox(height: 2),
                   Text(
                     _loading
-                        ? _DetailStrings.downloading(lang)
-                        : _DetailStrings.scan3dHint(lang),
+                        ? tr(Locale(lang), 'applications.detail.downloading')
+                        : tr(Locale(lang), 'applications.detail.scan_3d_hint'),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w400,
@@ -2631,11 +2377,7 @@ class _ModelCardState extends State<_ModelCard> {
     if (_loading) return;
     final jobId = _photogrammetryJobId;
     if (jobId == null) {
-      AppToast.success(context, switch (localeNotifier.value.languageCode) {
-        'ru' => '3D-модель недоступна для этого типа заявки',
-        'en' => '3D model is not available for this application type',
-        _ => '3D model bu ariza turida mavjud emas',
-      });
+      AppToast.success(context, tr(localeNotifier.value, 'applications.detail.model_unavailable'));
       return;
     }
 
@@ -2651,32 +2393,15 @@ class _ModelCardState extends State<_ModelCard> {
         AppToast.success(
           context,
           job.status == 'failed'
-              ? switch (locale.languageCode) {
-                  'ru' =>
-                    'Не удалось построить 3D-модель: ${job.errorMessage ?? 'ошибка'}',
-                  'en' =>
-                    'Failed to build 3D model: ${job.errorMessage ?? 'error'}',
-                  _ =>
-                    '3D model qurib bo\'lmadi: ${job.errorMessage ?? 'xato'}',
-                }
-              : switch (locale.languageCode) {
-                  'ru' =>
-                    '3D-модель ещё не готова (${job.status}). Пожалуйста, подождите.',
-                  'en' =>
-                    '3D model is not ready yet (${job.status}). Please wait.',
-                  _ =>
-                    '3D model hali tayyor emas (${job.status}). Iltimos, kuting.',
-                },
+              ? '${tr(locale, 'applications.detail.model_build_failed')}: ${job.errorMessage ?? tr(locale, 'applications.detail.error_word')}'
+              : tr(locale, 'applications.detail.model_not_ready')
+                    .replaceFirst('{status}', job.status),
         );
         return;
       }
       if (job.downloadUrl == null) {
         if (!mounted) return;
-        AppToast.error(context, switch (localeNotifier.value.languageCode) {
-          'ru' => 'URL для загрузки не получен',
-          'en' => 'Download URL not received',
-          _ => 'Yuklab olish manzili kelmadi',
-        });
+        AppToast.error(context, tr(localeNotifier.value, 'applications.detail.download_url_missing'));
         return;
       }
 
@@ -2705,11 +2430,7 @@ class _ModelCardState extends State<_ModelCard> {
           MaterialPageRoute(
             builder: (_) => SplatViewerScreen(
               splatFilePath: filePath,
-              title: switch (localeNotifier.value.languageCode) {
-                'ru' => '3D-скан №$jobId',
-                'en' => '3D scan #$jobId',
-                _ => '3D skan №$jobId',
-              },
+              title: tr(localeNotifier.value, 'applications.detail.scan_title').replaceFirst('{id}', '$jobId'),
             ),
           ),
         );
@@ -2724,11 +2445,7 @@ class _ModelCardState extends State<_ModelCard> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка: $e',
-        'en' => 'Error: $e',
-        _ => 'Xato: $e',
-      });
+      AppToast.error(context, '${tr(localeNotifier.value, 'applications.error')}: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -2781,7 +2498,7 @@ class _ModelCardState extends State<_ModelCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _DetailStrings.model3d(lang),
+                    tr(Locale(lang), 'applications.detail.model_3d'),
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w700,
@@ -2793,11 +2510,11 @@ class _ModelCardState extends State<_ModelCard> {
                   const SizedBox(height: 2),
                   Text(
                     !_loading
-                        ? _DetailStrings.roomPlanViewerOpens(lang)
+                        ? tr(Locale(lang), 'applications.detail.roomplan_opens')
                         : _total > 0
-                        ? '${_DetailStrings.downloading(lang)} ${(_progress! * 100).toStringAsFixed(0)}% '
+                        ? '${tr(Locale(lang), 'applications.detail.downloading')} ${(_progress! * 100).toStringAsFixed(0)}% '
                               '(${_fmtBytes(_received)} / ${_fmtBytes(_total)})'
-                        : '${_DetailStrings.downloading(lang)} ${_fmtBytes(_received)}',
+                        : '${tr(Locale(lang), 'applications.detail.downloading')} ${_fmtBytes(_received)}',
                     style: TextStyle(
                       fontFamily: 'MTSCompact',
                       fontWeight: FontWeight.w400,
@@ -2824,7 +2541,7 @@ class _ModelCardState extends State<_ModelCard> {
             ),
             if (!_loading)
               _MiniPillButton(
-                label: _DetailStrings.view(lang),
+                label: tr(Locale(lang), 'applications.detail.view'),
                 fg: ColorTokens.primaryText(context),
                 bg: ColorTokens.iconBg(context),
                 iconAsset: 'assets/icons/chevron-right.svg',
@@ -2861,7 +2578,7 @@ class _ViewChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                _DetailStrings.view(lang),
+                tr(Locale(lang), 'applications.detail.view'),
                 style: const TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w700,
@@ -3058,11 +2775,7 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
     if (_loading) return;
     final id = widget.item.id;
     if (!id.startsWith('photo_')) {
-      AppToast.success(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'AR-просмотр недоступен для этого типа заявки',
-        'en' => 'AR view is not available for this application type',
-        _ => 'AR ko\'rish bu ariza turida mavjud emas',
-      });
+      AppToast.success(context, tr(localeNotifier.value, 'applications.detail.ar_unavailable'));
       return;
     }
     final jobId = int.tryParse(id.substring('photo_'.length));
@@ -3074,11 +2787,7 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
       final job = await api.getJob(jobId);
       if (!job.isCompleted || job.downloadUrl == null) {
         if (!mounted) return;
-        AppToast.success(context, switch (localeNotifier.value.languageCode) {
-          'ru' => '3D-модель ещё не готова',
-          'en' => '3D model is not ready yet',
-          _ => '3D model hali tayyor emas',
-        });
+        AppToast.success(context, tr(localeNotifier.value, 'applications.detail.model_not_ready_short'));
         return;
       }
       final format = job.resultFormat ?? 'usdz';
@@ -3095,11 +2804,7 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
           MaterialPageRoute(
             builder: (_) => SplatViewerScreen(
               splatFilePath: filePath,
-              title: switch (localeNotifier.value.languageCode) {
-                'ru' => '3D-скан №$jobId',
-                'en' => '3D scan #$jobId',
-                _ => '3D skan №$jobId',
-              },
+              title: tr(localeNotifier.value, 'applications.detail.scan_title').replaceFirst('{id}', '$jobId'),
             ),
           ),
         );
@@ -3112,11 +2817,7 @@ class _PrimaryGreenActionState extends State<_PrimaryGreenAction> {
       AppToast.error(context, e.message);
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(context, switch (localeNotifier.value.languageCode) {
-        'ru' => 'Ошибка: $e',
-        'en' => 'Error: $e',
-        _ => 'Xato: $e',
-      });
+      AppToast.error(context, '${tr(localeNotifier.value, 'applications.error')}: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

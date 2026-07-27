@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/user_profile.dart';
 import '../widgets/auth_scaffold.dart';
@@ -93,7 +94,7 @@ class _ProfileStepState extends State<ProfileStep> {
     final showNameError = _nameTouched && !_nameValid;
 
     return AuthScaffold(
-      title: _ProfileStepStrings.title(locale),
+      title: tr(locale, 'auth.profile.title'),
       iconAsset: 'assets/images/auth/user.png',
       onBack: widget.onBack,
       onSkip: widget.onSkip,
@@ -102,12 +103,12 @@ class _ProfileStepState extends State<ProfileStep> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              _ProfileStepStrings.optionalHint(locale),
+              tr(locale, 'auth.profile.optional_hint'),
               style: TextStyle(color: labelColor, fontSize: 13, height: 1.35),
             ),
             const SizedBox(height: 18),
             Text(
-              _ProfileStepStrings.fullName(locale),
+              tr(locale, 'auth.profile.full_name'),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
@@ -124,7 +125,7 @@ class _ProfileStepState extends State<ProfileStep> {
                 onTapOutside: (_) => FocusScope.of(context).unfocus(),
                 style: TextStyle(color: inputTextColor, fontSize: 16),
                 decoration: InputDecoration(
-                  hintText: _ProfileStepStrings.fullNameHint(locale),
+                  hintText: tr(locale, 'auth.profile.full_name_hint'),
                   hintStyle: TextStyle(color: hintColor),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.symmetric(
@@ -137,14 +138,14 @@ class _ProfileStepState extends State<ProfileStep> {
             ),
             const SizedBox(height: 16),
             Text(
-              _ProfileStepStrings.dob(locale),
+              tr(locale, 'auth.profile.dob'),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
             DobField(value: _dob, onChanged: (d) => setState(() => _dob = d)),
             const SizedBox(height: 16),
             Text(
-              _ProfileStepStrings.gender(locale),
+              tr(locale, 'auth.profile.gender'),
               style: TextStyle(color: labelColor, fontSize: 14),
             ),
             const SizedBox(height: 8),
@@ -156,60 +157,11 @@ class _ProfileStepState extends State<ProfileStep> {
         ),
       ),
       bottom: PrimaryCta(
-        label: _ProfileStepStrings.login(locale),
+        label: tr(locale, 'auth.profile.login'),
         enabled: !widget.loading,
         loading: widget.loading,
         onPressed: _submit,
       ),
     );
   }
-}
-
-class _ProfileStepStrings {
-  const _ProfileStepStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'О себе',
-    'en' => 'About you',
-    _ => "O'zingiz haqingizda",
-  };
-
-  static String optionalHint(Locale l) => switch (l.languageCode) {
-    'ru' =>
-      'Эти поля необязательны — можно заполнить позже в настройках или просто нажать «Войти».',
-    'en' =>
-      'These fields are optional — you can fill them later in Settings or just tap “Log in”.',
-    _ =>
-      "Bu maydonlar ixtiyoriy — keyinroq Sozlamalarda to'ldirishingiz yoki shunchaki “Kirish”ni bosishingiz mumkin.",
-  };
-
-  static String fullName(Locale l) => switch (l.languageCode) {
-    'ru' => 'Полное имя',
-    'en' => 'Full name',
-    _ => "To'liq ism",
-  };
-
-  static String fullNameHint(Locale l) => switch (l.languageCode) {
-    'ru' => 'Введите полное имя',
-    'en' => 'Enter your full name',
-    _ => "To'liq ismingizni kiriting",
-  };
-
-  static String dob(Locale l) => switch (l.languageCode) {
-    'ru' => 'Дата рождения',
-    'en' => 'Date of birth',
-    _ => "Tug'ilgan sana",
-  };
-
-  static String gender(Locale l) => switch (l.languageCode) {
-    'ru' => 'Пол',
-    'en' => 'Gender',
-    _ => 'Jins',
-  };
-
-  static String login(Locale l) => switch (l.languageCode) {
-    'ru' => 'Войти',
-    'en' => 'Log in',
-    _ => 'Kirish',
-  };
 }

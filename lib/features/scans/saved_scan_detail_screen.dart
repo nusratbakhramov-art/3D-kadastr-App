@@ -633,151 +633,47 @@ class _OutputCard extends StatelessWidget {
 }
 
 class _Strings {
-  static String processDone(Locale l, int version) => _p(
-    l,
-    'scan.saved_detail.process_done',
-    'Qayta ishlash yakunlandi (v$version)',
-    'Обработка завершена (v$version)',
-    'Processing finished (v$version)',
-  );
-  static String lidarMeshNotFound(Locale l) => _p(
-    l,
-    'scan.saved_detail.lidar_mesh_not_found',
-    'LiDAR mesh topilmadi',
-    'LiDAR mesh не найден',
-    'LiDAR mesh not found',
-  );
-  static String fileNotFound(Locale l) => _p(
-    l,
-    'common.file_not_found',
-    'Fayl topilmadi',
-    'Файл не найден',
-    'File not found',
-  );
-  static String deleteOutputTitle(Locale l) => _p(
-    l,
-    'scan.saved_detail.delete_output_title',
-    'Natija o\'chirilsinmi?',
-    'Удалить результат?',
-    'Delete output?',
-  );
+  static String processDone(Locale l, int version) =>
+      _p(l, 'scan.saved_detail.process_done').replaceAll(r'$version', '$version');
+  static String lidarMeshNotFound(Locale l) =>
+      _p(l, 'scan.saved_detail.lidar_mesh_not_found');
+  static String fileNotFound(Locale l) => _p(l, 'common.file_not_found');
+  static String deleteOutputTitle(Locale l) =>
+      _p(l, 'scan.saved_detail.delete_output_title');
   static String deleteOutputPrompt(Locale l, int version) => _p(
     l,
     'scan.saved_detail.delete_output_prompt',
-    'v$version ni o\'chirishni tasdiqlaysizmi?',
-    'Подтвердить удаление v$version?',
-    'Confirm deleting v$version?',
-  );
-  static String cancel(Locale l) =>
-      _p(l, 'common.cancel', 'Bekor qilish', 'Отмена', 'Cancel');
-  static String delete(Locale l) =>
-      _p(l, 'common.delete', 'O\'chirish', 'Удалить', 'Delete');
-  static String deleteError(Locale l) => _p(
-    l,
-    'common.delete_error',
-    'O\'chirishda xatolik',
-    'Ошибка удаления',
-    'Delete error',
-  );
-  static String scanTitle(Locale l, int id) => _p(
-    l,
-    'scan.saved_detail.scan_title',
-    'Skan #$id',
-    'Скан #$id',
-    'Scan #$id',
-  );
-  static String scanNotFound(Locale l) => _p(
-    l,
-    'scan.saved_detail.scan_not_found',
-    'Skan topilmadi',
-    'Скан не найден',
-    'Scan not found',
-  );
-  static String resultsTitle(Locale l, int count) => _p(
-    l,
-    'scan.saved_detail.results_title',
-    'Natijalar ($count)',
-    'Результаты ($count)',
-    'Results ($count)',
-  );
-  static String infoTitle(Locale l) => _p(
-    l,
-    'scan.saved_detail.info_title',
-    'Skan ma\'lumotlari',
-    'Данные скана',
-    'Scan details',
-  );
-  static String photoCountLabel(Locale l) => _p(
-    l,
-    'scan.saved_detail.photo_count_label',
-    'Foto soni',
-    'Количество фото',
-    'Photo count',
-  );
-  static String areaLabel(Locale l) =>
-      _p(l, 'common.area', 'Maydon', 'Площадь', 'Area');
-  static String createdLabel(Locale l) =>
-      _p(l, 'common.created', 'Yaratilgan', 'Создано', 'Created');
-  static String statusLabel(Locale l) =>
-      _p(l, 'common.status', 'Holat', 'Статус', 'Status');
-  static String unprocessed(Locale l) => _p(
-    l,
-    'scan.saved_detail.unprocessed',
-    'Hali qayta ishlanmagan',
-    'Ещё не обработан',
-    'Not processed yet',
-  );
-  static String outputCount(Locale l, int count) => _p(
-    l,
-    'scan.saved_detail.output_count',
-    '$count ta natija',
-    '$count результатов',
-    '$count outputs',
-  );
-  static String processing(Locale l) => _p(
-    l,
-    'scan.saved_detail.processing',
-    'Model tayyorlanmoqda…',
-    'Модель обрабатывается…',
-    'Model is being prepared…',
-  );
-  static String reprocess(Locale l, int version) => _p(
-    l,
-    'scan.saved_detail.reprocess',
-    'Modelni qayta tayyorlash (v$version)',
-    'Обработать модель заново (v$version)',
-    'Process the model again (v$version)',
-  );
-  static String startTexturing(Locale l) => _p(
-    l,
-    'scan.saved_detail.start_texturing',
-    '3D modelni tayyorlashni boshlash',
-    'Запустить обработку 3D-модели',
-    'Start 3D model processing',
-  );
-  static String viewLidarMesh(Locale l) => _p(
-    l,
-    'scan.saved_detail.view_lidar_mesh',
-    'LiDAR skan to\'rini ko\'rish',
-    'Посмотреть LiDAR-сетку',
-    'View mesh (LiDAR)',
-  );
-  static String latest(Locale l) =>
-      _p(l, 'common.latest', 'oxirgi', 'последний', 'latest');
-  static String todayAt(Locale l, String time) => _p(
-    l,
-    'common.today_at',
-    'Bugun, $time',
-    'Сегодня, $time',
-    'Today, $time',
-  );
-  static String yesterdayAt(Locale l, String time) => _p(
-    l,
-    'common.yesterday_at',
-    'Kecha, $time',
-    'Вчера, $time',
-    'Yesterday, $time',
-  );
-  static String _p(Locale l, String key, String uz, String ru, String en) =>
-      tr(l, key, uz: uz, ru: ru, en: en);
+  ).replaceAll(r'$version', '$version');
+  static String cancel(Locale l) => _p(l, 'common.cancel');
+  static String delete(Locale l) => _p(l, 'common.delete');
+  static String deleteError(Locale l) => _p(l, 'common.delete_error');
+  static String scanTitle(Locale l, int id) =>
+      _p(l, 'scan.saved_detail.scan_title').replaceAll(r'$id', '$id');
+  static String scanNotFound(Locale l) =>
+      _p(l, 'scan.saved_detail.scan_not_found');
+  static String resultsTitle(Locale l, int count) =>
+      _p(l, 'scan.saved_detail.results_title').replaceAll(r'$count', '$count');
+  static String infoTitle(Locale l) => _p(l, 'scan.saved_detail.info_title');
+  static String photoCountLabel(Locale l) =>
+      _p(l, 'scan.saved_detail.photo_count_label');
+  static String areaLabel(Locale l) => _p(l, 'common.area');
+  static String createdLabel(Locale l) => _p(l, 'common.created');
+  static String statusLabel(Locale l) => _p(l, 'common.status');
+  static String unprocessed(Locale l) =>
+      _p(l, 'scan.saved_detail.unprocessed');
+  static String outputCount(Locale l, int count) =>
+      _p(l, 'scan.saved_detail.output_count').replaceAll(r'$count', '$count');
+  static String processing(Locale l) => _p(l, 'scan.saved_detail.processing');
+  static String reprocess(Locale l, int version) =>
+      _p(l, 'scan.saved_detail.reprocess').replaceAll(r'$version', '$version');
+  static String startTexturing(Locale l) =>
+      _p(l, 'scan.saved_detail.start_texturing');
+  static String viewLidarMesh(Locale l) =>
+      _p(l, 'scan.saved_detail.view_lidar_mesh');
+  static String latest(Locale l) => _p(l, 'common.latest');
+  static String todayAt(Locale l, String time) =>
+      _p(l, 'common.today_at').replaceAll(r'$time', time);
+  static String yesterdayAt(Locale l, String time) =>
+      _p(l, 'common.yesterday_at').replaceAll(r'$time', time);
+  static String _p(Locale l, String key) => tr(l, key);
 }

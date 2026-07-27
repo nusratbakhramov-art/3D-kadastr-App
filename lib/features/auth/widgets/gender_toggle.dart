@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/user_profile.dart';
 
@@ -24,7 +25,7 @@ class GenderToggle extends StatelessWidget {
         Expanded(
           child: _Pill(
             selected: value == Gender.male,
-            label: _GenderToggleStrings.male(locale),
+            label: tr(locale, 'auth.gender.male'),
             accentColor: const Color(0xFF4DA3FF),
             onTap: () => _select(Gender.male),
           ),
@@ -33,7 +34,7 @@ class GenderToggle extends StatelessWidget {
         Expanded(
           child: _Pill(
             selected: value == Gender.female,
-            label: _GenderToggleStrings.female(locale),
+            label: tr(locale, 'auth.gender.female'),
             accentColor: const Color(0xFFE57BB9),
             onTap: () => _select(Gender.female),
           ),
@@ -41,22 +42,6 @@ class GenderToggle extends StatelessWidget {
       ],
     );
   }
-}
-
-class _GenderToggleStrings {
-  const _GenderToggleStrings._();
-
-  static String male(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мужчина',
-    'en' => 'Male',
-    _ => 'Erkak',
-  };
-
-  static String female(Locale l) => switch (l.languageCode) {
-    'ru' => 'Женщина',
-    'en' => 'Female',
-    _ => 'Ayol',
-  };
 }
 
 class _Pill extends StatelessWidget {

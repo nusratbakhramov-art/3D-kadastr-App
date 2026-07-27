@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
@@ -152,12 +153,10 @@ class _AiResultScreenState extends State<AiResultScreen> {
         if (mounted) {
           setState(() {
             _loading = false;
-            _error = switch (Localizations.localeOf(context).languageCode) {
-              'ru' =>
-                'Чтобы воспользоваться AI оценкой, сначала войдите в систему.',
-              'en' => 'Please sign in first to use AI valuation.',
-              _ => 'AI baholash uchun avval tizimga kiring.',
-            };
+            _error = tr(
+              Localizations.localeOf(context),
+              'services.ai.result.sign_in',
+            );
           });
         }
         return;
@@ -1034,153 +1033,67 @@ String _fmtUzs(num value, Locale l) {
 }
 
 class _AiResultStrings {
-  static String soum(Locale l) => switch (l.languageCode) {
-        'ru' => 'сум',
-        'en' => 'soum',
-        _ => 'so\'m',
-      };
+  static String soum(Locale l) => tr(l, 'services.ai.common.soum');
 
-  static String networkError(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сетевая ошибка',
-        'en' => 'Network error',
-        _ => 'Tarmoq xatosi',
-      };
+  static String networkError(Locale l) =>
+      tr(l, 'services.ai.result.network_error');
 
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI Оценка',
-        'en' => 'AI Valuation',
-        _ => 'AI Baholash',
-      };
+  static String appBarTitle(Locale l) => tr(l, 'services.ai.common.brand_title');
 
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Результат',
-        'en' => 'Result',
-        _ => 'Natija',
-      };
+  static String appBarSubtitle(Locale l) =>
+      tr(l, 'services.ai.result.app_bar_subtitle');
 
-  static String estimatedTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Ориентировочная рыночная стоимость',
-        'en' => 'Estimated market value',
-        _ => 'Taxminiy bozor qiymati',
-      };
+  static String estimatedTitle(Locale l) =>
+      tr(l, 'services.ai.result.estimated_title');
 
-  static String range(Locale l) => switch (l.languageCode) {
-        'ru' => 'Диапазон',
-        'en' => 'Range',
-        _ => 'Diapazon',
-      };
+  static String range(Locale l) => tr(l, 'services.ai.result.range');
 
-  static String confidence(Locale l) => switch (l.languageCode) {
-        'ru' => 'Уверенность',
-        'en' => 'Confidence',
-        _ => 'Ishonchlilik',
-      };
+  static String confidence(Locale l) => tr(l, 'services.ai.result.confidence');
 
-  static String breakdownTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Структура расчёта',
-        'en' => 'Breakdown',
-        _ => 'Hisob-kitob tarkibi',
-      };
+  static String breakdownTitle(Locale l) =>
+      tr(l, 'services.ai.result.breakdown_title');
 
-  static String basedOn(Locale l, int n) => switch (l.languageCode) {
-        'ru' => 'Использовано $n похожих объявлений',
-        'en' => 'Based on $n similar listings',
-        _ => '$n ta o\'xshash e\'lon asosida',
-      };
+  static String basedOn(Locale l, int n) =>
+      tr(l, 'services.ai.result.based_on').replaceAll(r'$n', '$n');
 
-  static String basePricePerSqm(Locale l) => switch (l.languageCode) {
-        'ru' => 'Базовая цена за м²',
-        'en' => 'Base price per m²',
-        _ => 'Asosiy narx (1 m²)',
-      };
+  static String basePricePerSqm(Locale l) =>
+      tr(l, 'services.ai.result.base_price_per_sqm');
 
-  static String baseValue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Базовая стоимость',
-        'en' => 'Base value',
-        _ => 'Asosiy qiymat',
-      };
+  static String baseValue(Locale l) => tr(l, 'services.ai.result.base_value');
 
-  static String computing(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI считает оценку...',
-        'en' => 'AI is computing the valuation...',
-        _ => 'AI baholash hisoblanmoqda...',
-      };
+  static String computing(Locale l) => tr(l, 'services.ai.result.computing');
 
-  static String computingSub(Locale l) => switch (l.languageCode) {
-        'ru' => 'Анализ похожих объявлений и расчёт корректировок.',
-        'en' => 'Analyzing similar listings and computing adjustments.',
-        _ => 'O\'xshash e\'lonlar tahlil qilinmoqda va korrektirovkalar hisoblanmoqda.',
-      };
+  static String computingSub(Locale l) =>
+      tr(l, 'services.ai.result.computing_sub');
 
-  static String fallbackDefault(Locale l) => switch (l.languageCode) {
-        'ru' => 'Расчёт основан на расширенной выборке.',
-        'en' => 'Estimate is based on a broader dataset.',
-        _ => 'Hisob kengaytirilgan namuna asosida qilindi.',
-      };
+  static String fallbackDefault(Locale l) =>
+      tr(l, 'services.ai.result.fallback_default');
 
-  static String errorTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось рассчитать',
-        'en' => 'Could not compute',
-        _ => 'Hisoblab bo\'lmadi',
-      };
+  static String errorTitle(Locale l) => tr(l, 'services.ai.result.error_title');
 
-  static String retry(Locale l) => switch (l.languageCode) {
-        'ru' => 'Повторить',
-        'en' => 'Retry',
-        _ => 'Qayta urinish',
-      };
+  static String retry(Locale l) => tr(l, 'services.ai.result.retry');
 
-  static String close(Locale l) => switch (l.languageCode) {
-        'ru' => 'Закрыть',
-        'en' => 'Close',
-        _ => 'Yopish',
-      };
+  static String close(Locale l) => tr(l, 'services.ai.result.close');
 
-  static String summaryTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'AI анализ',
-        'en' => 'AI analysis',
-        _ => 'AI tahlili',
-      };
+  static String summaryTitle(Locale l) =>
+      tr(l, 'services.ai.result.summary_title');
 
-  static String summarySubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Почему получилась такая цена',
-        'en' => 'Why the price came out this way',
-        _ => 'Nima uchun shunday narx chiqdi',
-      };
+  static String summarySubtitle(Locale l) =>
+      tr(l, 'services.ai.result.summary_subtitle');
 
-  static String submitConfirmation(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подтвердить цену через специалиста',
-        'en' => 'Submit for specialist confirmation',
-        _ => 'Narxni tasdiqlash uchun ariza yuborish',
-      };
+  static String submitConfirmation(Locale l) =>
+      tr(l, 'services.ai.result.submit_confirmation');
 
-  static String submitting(Locale l) => switch (l.languageCode) {
-        'ru' => 'Отправка...',
-        'en' => 'Submitting...',
-        _ => 'Yuborilmoqda...',
-      };
+  static String submitting(Locale l) => tr(l, 'services.ai.result.submitting');
 
-  static String submitOk(Locale l) => switch (l.languageCode) {
-        'ru' => 'Заявка отправлена. Специалист рассмотрит её в течение 24 часов.',
-        'en' => 'Application sent. A specialist will review it within 24 hours.',
-        _ => 'Arizangiz yuborildi. Mutaxassis 24 soat ichida ko\'rib chiqadi.',
-      };
+  static String submitOk(Locale l) => tr(l, 'services.ai.result.submit_ok');
 
-  static String submittedHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Заявка в очереди на проверку.',
-        'en' => 'Your application is queued for review.',
-        _ => 'Arizangiz mutaxassis ko\'rib chiqishida.',
-      };
+  static String submittedHint(Locale l) =>
+      tr(l, 'services.ai.result.submitted_hint');
 
-  static String approachesTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подходы к оценке',
-        'en' => 'Valuation approaches',
-        _ => 'Yondashuvlar bo\'yicha',
-      };
+  static String approachesTitle(Locale l) =>
+      tr(l, 'services.ai.result.approaches_title');
 
-  static String approachesSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Стоимость рассчитана по 3 классическим методам',
-        'en' => 'Value computed via 3 classical methods',
-        _ => 'Qiymat 3 klassik usul orqali hisoblandi',
-      };
+  static String approachesSubtitle(Locale l) =>
+      tr(l, 'services.ai.result.approaches_subtitle');
 }

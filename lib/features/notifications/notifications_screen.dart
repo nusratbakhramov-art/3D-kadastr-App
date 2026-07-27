@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_glow_background.dart';
@@ -318,20 +319,7 @@ class _EmptyState extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Уведомления',
-    'en' => 'Notifications',
-    _ => 'Bildirishnomalar',
-  };
-  static String emptyTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Уведомлений пока нет',
-    'en' => 'No notifications yet',
-    _ => 'Hozircha bildirishnomalar yo‘q',
-  };
-  static String emptyMessage(Locale l) => switch (l.languageCode) {
-    'ru' => 'Здесь появятся обновления о ваших сканах, оценках и платежах.',
-    'en' => 'Updates about scans, valuations and payments will show up here.',
-    _ =>
-      'Skanlar, baholashlar va to‘lovlar bo‘yicha yangiliklar shu yerda ko‘rinadi.',
-  };
+  static String title(Locale l) => tr(l, 'notifications.title');
+  static String emptyTitle(Locale l) => tr(l, 'notifications.empty_title');
+  static String emptyMessage(Locale l) => tr(l, 'notifications.empty_message');
 }

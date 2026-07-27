@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_toast.dart';
 import 'payment_model.dart';
@@ -406,44 +407,12 @@ class _DashPainter extends CustomPainter {
 class _R {
   const _R._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Чек об оплате',
-    'en' => 'Payment receipt',
-    _ => 'To‘lov cheki',
-  };
-  static String service(Locale l) => switch (l.languageCode) {
-    'ru' => 'Услуга',
-    'en' => 'Service',
-    _ => 'Xizmat',
-  };
-  static String method(Locale l) => switch (l.languageCode) {
-    'ru' => 'Способ оплаты',
-    'en' => 'Payment method',
-    _ => 'To‘lov usuli',
-  };
-  static String date(Locale l) => switch (l.languageCode) {
-    'ru' => 'Дата и время',
-    'en' => 'Date & time',
-    _ => 'Sana va vaqt',
-  };
-  static String txnId(Locale l) => switch (l.languageCode) {
-    'ru' => 'Номер транзакции',
-    'en' => 'Transaction ID',
-    _ => 'Tranzaksiya raqami',
-  };
-  static String receiptNo(Locale l) => switch (l.languageCode) {
-    'ru' => 'Номер чека',
-    'en' => 'Receipt no.',
-    _ => 'Chek raqami',
-  };
-  static String copied(Locale l) => switch (l.languageCode) {
-    'ru' => 'Скопировано',
-    'en' => 'Copied',
-    _ => 'Nusxa olindi',
-  };
-  static String close(Locale l) => switch (l.languageCode) {
-    'ru' => 'Закрыть',
-    'en' => 'Close',
-    _ => 'Yopish',
-  };
+  static String title(Locale l) => tr(l, 'payments.receipt.title');
+  static String service(Locale l) => tr(l, 'payments.receipt.service');
+  static String method(Locale l) => tr(l, 'payments.receipt.method');
+  static String date(Locale l) => tr(l, 'payments.receipt.date');
+  static String txnId(Locale l) => tr(l, 'payments.receipt.txn_id');
+  static String receiptNo(Locale l) => tr(l, 'payments.receipt.receipt_no');
+  static String copied(Locale l) => tr(l, 'payments.receipt.copied');
+  static String close(Locale l) => tr(l, 'payments.receipt.close');
 }

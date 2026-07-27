@@ -264,24 +264,9 @@ class _ErrorView extends StatelessWidget {
 }
 
 class _Strings {
-  static String shareTitle(Locale l) =>
-      _p(l, 'scan.splat.share_title', '3D skan', '3D-скан', '3D scan');
-  static String viewerTitle(Locale l) => _p(
-    l,
-    'scan.splat.viewer_title',
-    '3D ko\'rinish',
-    '3D-просмотр',
-    '3D view',
-  );
-  static String share(Locale l) =>
-      _p(l, 'common.share', 'Ulashish', 'Поделиться', 'Share');
-  static String openError(Locale l) => _p(
-    l,
-    'scan.splat.open_error',
-    '3D modelni ochib bo\'lmadi',
-    'Не удалось открыть 3D-модель',
-    'Could not open the 3D model',
-  );
-  static String _p(Locale l, String key, String uz, String ru, String en) =>
-      tr(l, key, uz: uz, ru: ru, en: en);
+  static String shareTitle(Locale l) => _p(l, 'scan.splat.share_title');
+  static String viewerTitle(Locale l) => _p(l, 'scan.splat.viewer_title');
+  static String share(Locale l) => _p(l, 'common.share');
+  static String openError(Locale l) => _p(l, 'scan.splat.open_error');
+  static String _p(Locale l, String key) => tr(l, key);
 }

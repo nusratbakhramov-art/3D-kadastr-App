@@ -117,11 +117,10 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
       });
     } catch (e) {
       if (mounted) {
-        AppToast.error(context, switch (localeNotifier.value.languageCode) {
-          'ru' => 'Не удалось загрузить скан: $e',
-          'en' => 'Failed to upload scan: $e',
-          _ => 'Skan yuklanmadi: $e',
-        });
+        AppToast.error(
+          context,
+          _ScanLidarStrings.uploadFailed(localeNotifier.value, e),
+        );
       }
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -345,155 +344,53 @@ class _ScanResultCard extends StatelessWidget {
 }
 
 class _ScanLidarStrings {
-  static String _t(
-    Locale locale,
-    String key,
-    String uz,
-    String ru,
-    String en,
-  ) => tr(locale, key, uz: uz, ru: ru, en: en);
+  static String _t(Locale locale, String key) => tr(locale, key);
 
-  static String appBarTitle(Locale locale) => _t(
-    locale,
-    'scan.lidar.app_bar_title',
-    '3D kadastr',
-    '3D Кадастр',
-    '3D Cadastre',
-  );
-  static String appBarSubtitle(Locale locale) => _t(
-    locale,
-    'scan.lidar.app_bar_subtitle',
-    'RoomPlan LiDAR orqali skan qiling',
-    'Сканируйте через RoomPlan LiDAR',
-    'Scan via RoomPlan LiDAR',
-  );
-  static String heading(Locale locale) => _t(
-    locale,
-    'scan.lidar.heading',
-    'Obyektni skan qiling',
-    'Сканируйте объект',
-    'Scan the object',
-  );
-  static String subheading(Locale locale) => _t(
-    locale,
-    'scan.lidar.subheading',
-    'RoomPlan LiDAR orqali skan qiling',
-    'Сканируйте через RoomPlan LiDAR',
-    'Scan via RoomPlan LiDAR',
-  );
-  static String cameraIdle(Locale locale) => _t(
-    locale,
-    'scan.lidar.camera_idle',
-    'LiDAR kamerani ishga tushiring',
-    'Запустите LiDAR-камеру',
-    'Start LiDAR camera',
-  );
-  static String cameraScanning(Locale locale) => _t(
-    locale,
-    'scan.lidar.camera_scanning',
-    'Skanerlanmoqda...',
-    'Сканирование...',
-    'Scanning...',
-  );
-  static String cameraDone(Locale locale) => _t(
-    locale,
-    'scan.lidar.camera_done',
-    'Skan tayyor',
-    'Скан готов',
-    'Scan ready',
-  );
+  static String appBarTitle(Locale locale) =>
+      _t(locale, 'scan.lidar.app_bar_title');
+  static String appBarSubtitle(Locale locale) =>
+      _t(locale, 'scan.lidar.app_bar_subtitle');
+  static String heading(Locale locale) =>
+      _t(locale, 'scan.lidar.heading');
+  static String subheading(Locale locale) =>
+      _t(locale, 'scan.lidar.subheading');
+  static String cameraIdle(Locale locale) =>
+      _t(locale, 'scan.lidar.camera_idle');
+  static String cameraScanning(Locale locale) =>
+      _t(locale, 'scan.lidar.camera_scanning');
+  static String cameraDone(Locale locale) =>
+      _t(locale, 'scan.lidar.camera_done');
   static List<String> tips(Locale locale) => [
-    _t(
-      locale,
-      'scan.lidar.tip_move_slowly',
-      'Qurilmani sekin harakatlantiring',
-      'Двигайте устройство медленно',
-      'Move the device slowly',
-    ),
-    _t(
-      locale,
-      'scan.lidar.tip_cover_room',
-      'Xonani to\'liq qamrab oling',
-      'Охватите всю комнату',
-      'Cover the entire room',
-    ),
-    _t(
-      locale,
-      'scan.lidar.tip_light',
-      'Yorug\'lik yetarli bo\'lishi kerak',
-      'Освещение должно быть достаточным',
-      'Sufficient lighting is required',
-    ),
+    _t(locale, 'scan.lidar.tip_move_slowly'),
+    _t(locale, 'scan.lidar.tip_cover_room'),
+    _t(locale, 'scan.lidar.tip_light'),
   ];
-  static String ctaStart(Locale locale) => _t(
-    locale,
-    'scan.lidar.cta_start',
-    'Scan boshlash',
-    'Начать сканирование',
-    'Start scan',
-  );
+  static String ctaStart(Locale locale) =>
+      _t(locale, 'scan.lidar.cta_start');
   static String ctaContinue(Locale locale) =>
-      _t(locale, 'common.continue', 'Davom etish', 'Продолжить', 'Continue');
+      _t(locale, 'common.continue');
 
   static String unsupportedDevice(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' =>
-          'На этом устройстве нет RoomPlan. Требуется iPhone Pro или iPad Pro '
-              '(iOS 16+ и LiDAR-сенсор).',
-        'en' =>
-          'This device does not support RoomPlan. iPhone Pro or iPad Pro is '
-              'required (iOS 16+ with a LiDAR sensor).',
-        _ =>
-          'Bu qurilmada RoomPlan yo\'q. iPhone Pro yoki iPad Pro kerak '
-              '(iOS 16+ va LiDAR sensori).',
-      };
+      _t(locale, 'scan.lidar.unsupported_device');
 
-  static String scanError(Locale locale) => _t(
-    locale,
-    'scan.lidar.scan_error',
-    'Skan xatosi',
-    'Ошибка сканирования',
-    'Scan error',
-  );
+  static String scanError(Locale locale) =>
+      _t(locale, 'scan.lidar.scan_error');
   static String rowWalls(Locale locale) =>
-      _t(locale, 'scan.lidar.row_walls', 'Devorlar', 'Стены', 'Walls');
+      _t(locale, 'scan.lidar.row_walls');
   static String rowDoors(Locale locale) =>
-      _t(locale, 'scan.lidar.row_doors', 'Eshiklar', 'Двери', 'Doors');
+      _t(locale, 'scan.lidar.row_doors');
   static String rowWindows(Locale locale) =>
-      _t(locale, 'scan.lidar.row_windows', 'Oynalar', 'Окна', 'Windows');
-  static String rowOpenings(Locale locale) => _t(
-    locale,
-    'scan.lidar.row_openings',
-    'Boshqa ochiqliklar',
-    'Другие проёмы',
-    'Other openings',
-  );
-  static String rowObjects(Locale locale) => _t(
-    locale,
-    'scan.lidar.row_objects',
-    'Mebel/obyektlar',
-    'Мебель/объекты',
-    'Furniture/objects',
-  );
-  static String rowFloorArea(Locale locale) => _t(
-    locale,
-    'scan.lidar.row_floor_area',
-    'Maydon (taxminiy)',
-    'Площадь (примерно)',
-    'Area (approx.)',
-  );
-  static String rowFileSize(Locale locale) => _t(
-    locale,
-    'scan.lidar.row_file_size',
-    'Fayl hajmi',
-    'Размер файла',
-    'File size',
-  );
-  static String uploading(Locale locale) => _t(
-    locale,
-    'scan.lidar.uploading',
-    'Skan serverga yuklanmoqda…',
-    'Скан загружается на сервер…',
-    'Uploading scan to the server…',
-  );
+      _t(locale, 'scan.lidar.row_windows');
+  static String rowOpenings(Locale locale) =>
+      _t(locale, 'scan.lidar.row_openings');
+  static String rowObjects(Locale locale) =>
+      _t(locale, 'scan.lidar.row_objects');
+  static String rowFloorArea(Locale locale) =>
+      _t(locale, 'scan.lidar.row_floor_area');
+  static String rowFileSize(Locale locale) =>
+      _t(locale, 'scan.lidar.row_file_size');
+  static String uploading(Locale locale) =>
+      _t(locale, 'scan.lidar.uploading');
+  static String uploadFailed(Locale locale, Object e) =>
+      _t(locale, 'scan.lidar.upload_failed').replaceAll(r'$e', '$e');
 }

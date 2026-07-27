@@ -721,230 +721,84 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _ScanMetadataStrings {
-  static String _t(
-    Locale locale,
-    String key,
-    String uz,
-    String ru,
-    String en,
-  ) => tr(locale, key, uz: uz, ru: ru, en: en);
+  static String _t(Locale locale, String key) => tr(locale, key);
 
-  static String appBarTitle(Locale locale) => _t(
-    locale,
-    'scan.metadata.app_bar_title',
-    'Hudud va xulosa',
-    'Регион и сводка',
-    'Region & summary',
-  );
-  static String appBarSubtitle(Locale locale) => _t(
-    locale,
-    'scan.metadata.app_bar_subtitle',
-    'Hududni tanlang va ma\'lumotlarni tekshiring',
-    'Укажите регион и проверьте данные',
-    'Select the region and review the data',
-  );
+  static String appBarTitle(Locale locale) =>
+      _t(locale, 'scan.metadata.app_bar_title');
+  static String appBarSubtitle(Locale locale) =>
+      _t(locale, 'scan.metadata.app_bar_subtitle');
   static String sectionRegion(Locale locale) =>
-      _t(locale, 'scan.metadata.section_region', 'Hudud', 'Регион', 'Region');
-  static String sectionSummary(Locale locale) => _t(
-    locale,
-    'scan.metadata.section_summary',
-    'Xulosa',
-    'Сводка',
-    'Summary',
-  );
-  static String pickViloyatTitle(Locale locale) => _t(
-    locale,
-    'scan.metadata.pick_viloyat_title',
-    'Viloyatni tanlang',
-    'Выберите регион',
-    'Select region',
-  );
-  static String pickTumanTitle(Locale locale) => _t(
-    locale,
-    'scan.metadata.pick_tuman_title',
-    'Tumanni tanlang',
-    'Выберите район',
-    'Select district',
-  );
-  static String tumanListSoon(Locale locale) => _t(
-    locale,
-    'scan.metadata.tuman_list_soon',
-    'Tumanlar ro\'yxati keyinroq qo\'shiladi',
-    'Список районов появится позже',
-    'District list will be available soon',
-  );
-  static String tzIncomplete(Locale locale) => _t(
-    locale,
-    'scan.metadata.tz_incomplete',
-    'So\'rovnoma to\'liq emas',
-    'Анкета не заполнена',
-    'The form is incomplete',
-  );
-  static String loginRequired(Locale locale) => _t(
-    locale,
-    'scan.metadata.login_required',
-    'Avval tizimga kiring',
-    'Сначала войдите в аккаунт',
-    'Please log in first',
-  );
-  static String networkError(Locale locale) => _t(
-    locale,
-    'scan.metadata.network_error',
-    'Tarmoq xatosi',
-    'Ошибка сети',
-    'Network error',
-  );
-  static String aiValuationStarted(Locale locale) => _t(
-    locale,
-    'scan.metadata.ai_valuation_started',
-    'AI baholash yaqinda ulanadi',
-    'AI-оценка скоро будет подключена',
-    'AI valuation will be connected soon',
-  );
-  static String submitToSpecialist(Locale locale) => _t(
-    locale,
-    'scan.metadata.submit_to_specialist',
-    'Mutaxassisga yuborish',
-    'Отправить специалисту',
-    'Submit to specialist',
-  );
-  static String aiValuationButton(Locale locale) => _t(
-    locale,
-    'scan.metadata.ai_valuation_button',
-    'AI baholash',
-    'AI оценка',
-    'AI valuation',
-  );
-  static String sending(Locale locale) => _t(
-    locale,
-    'scan.metadata.sending',
-    'Yuborilmoqda...',
-    'Отправка...',
-    'Sending...',
-  );
-  static String rowCadastreNumber(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_cadastre_number',
-    'Kadastr raqami',
-    'Кадастровый номер',
-    'Cadastre number',
-  );
-  static String rowObjectType(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_object_type',
-    'Obyekt turi',
-    'Тип объекта',
-    'Object type',
-  );
+      _t(locale, 'scan.metadata.section_region');
+  static String sectionSummary(Locale locale) =>
+      _t(locale, 'scan.metadata.section_summary');
+  static String pickViloyatTitle(Locale locale) =>
+      _t(locale, 'scan.metadata.pick_viloyat_title');
+  static String pickTumanTitle(Locale locale) =>
+      _t(locale, 'scan.metadata.pick_tuman_title');
+  static String tumanListSoon(Locale locale) =>
+      _t(locale, 'scan.metadata.tuman_list_soon');
+  static String tzIncomplete(Locale locale) =>
+      _t(locale, 'scan.metadata.tz_incomplete');
+  static String loginRequired(Locale locale) =>
+      _t(locale, 'scan.metadata.login_required');
+  static String networkError(Locale locale) =>
+      _t(locale, 'scan.metadata.network_error');
+  static String aiValuationStarted(Locale locale) =>
+      _t(locale, 'scan.metadata.ai_valuation_started');
+  static String submitToSpecialist(Locale locale) =>
+      _t(locale, 'scan.metadata.submit_to_specialist');
+  static String aiValuationButton(Locale locale) =>
+      _t(locale, 'scan.metadata.ai_valuation_button');
+  static String sending(Locale locale) =>
+      _t(locale, 'scan.metadata.sending');
+  static String rowCadastreNumber(Locale locale) =>
+      _t(locale, 'scan.metadata.row_cadastre_number');
+  static String rowObjectType(Locale locale) =>
+      _t(locale, 'scan.metadata.row_object_type');
   static String rowScan(Locale locale) =>
-      _t(locale, 'scan.metadata.row_scan', 'Skan', 'Скан', 'Scan');
+      _t(locale, 'scan.metadata.row_scan');
   static String scanReady(Locale locale) =>
-      _t(locale, 'scan.metadata.scan_ready', 'Tayyor', 'Готов', 'Ready');
-  static String scanPending(Locale locale) => _t(
-    locale,
-    'scan.metadata.scan_pending',
-    'Kutilmoqda',
-    'Ожидается',
-    'Pending',
-  );
+      _t(locale, 'scan.metadata.scan_ready');
+  static String scanPending(Locale locale) =>
+      _t(locale, 'scan.metadata.scan_pending');
   static String rowMap(Locale locale) =>
-      _t(locale, 'scan.metadata.row_map', 'Xarita', 'Карта', 'Map');
-  static String rowCustomer(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_customer',
-    'Buyurtmachi',
-    'Заказчик',
-    'Customer',
-  );
+      _t(locale, 'scan.metadata.row_map');
+  static String rowCustomer(Locale locale) =>
+      _t(locale, 'scan.metadata.row_customer');
   static String rowTin(Locale locale) =>
-      _t(locale, 'scan.metadata.row_tin', 'STIR', 'ИНН', 'TIN');
+      _t(locale, 'scan.metadata.row_tin');
   static String rowPhone(Locale locale) =>
-      _t(locale, 'scan.metadata.row_phone', 'Telefon', 'Телефон', 'Phone');
+      _t(locale, 'scan.metadata.row_phone');
   static String rowEmail(Locale locale) =>
-      _t(locale, 'scan.metadata.row_email', 'E-mail', 'E-mail', 'E-mail');
-  static String rowObjectName(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_object_name',
-    'Obyekt nomi',
-    'Название объекта',
-    'Object name',
-  );
-  static String rowProjectType(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_project_type',
-    'Loyiha turi',
-    'Тип проекта',
-    'Project type',
-  );
-  static String rowConstructionType(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_construction_type',
-    'Qurilish turi',
-    'Тип строительства',
-    'Construction type',
-  );
-  static String constructionReconstruction(Locale locale) => _t(
-    locale,
-    'scan.metadata.construction_reconstruction',
-    'Rekonstruksiya',
-    'Реконструкция',
-    'Reconstruction',
-  );
-  static String constructionNew(Locale locale) => _t(
-    locale,
-    'scan.metadata.construction_new',
-    'Yangi qurilish',
-    'Новое строительство',
-    'New construction',
-  );
+      _t(locale, 'scan.metadata.row_email');
+  static String rowObjectName(Locale locale) =>
+      _t(locale, 'scan.metadata.row_object_name');
+  static String rowProjectType(Locale locale) =>
+      _t(locale, 'scan.metadata.row_project_type');
+  static String rowConstructionType(Locale locale) =>
+      _t(locale, 'scan.metadata.row_construction_type');
+  static String constructionReconstruction(Locale locale) =>
+      _t(locale, 'scan.metadata.construction_reconstruction');
+  static String constructionNew(Locale locale) =>
+      _t(locale, 'scan.metadata.construction_new');
   static String rowFloors(Locale locale) =>
-      _t(locale, 'scan.metadata.row_floors', 'Qavatlar', 'Этажность', 'Floors');
-  static String rowTotalArea(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_total_area',
-    'Umumiy maydon',
-    'Общая площадь',
-    'Total area',
-  );
-  static String rowBuildingArea(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_building_area',
-    'Qurilish maydoni',
-    'Площадь застройки',
-    'Building area',
-  );
+      _t(locale, 'scan.metadata.row_floors');
+  static String rowTotalArea(Locale locale) =>
+      _t(locale, 'scan.metadata.row_total_area');
+  static String rowBuildingArea(Locale locale) =>
+      _t(locale, 'scan.metadata.row_building_area');
   static String rowHeight(Locale locale) =>
-      _t(locale, 'scan.metadata.row_height', 'Balandlik', 'Высота', 'Height');
+      _t(locale, 'scan.metadata.row_height');
   static String rowRooms(Locale locale) =>
-      _t(locale, 'scan.metadata.row_rooms', 'Xonalar', 'Помещения', 'Rooms');
-  static String roomsValue(Locale locale, int count) => _t(
-    locale,
-    'scan.metadata.rooms_value',
-    '$count ta',
-    '$count шт.',
-    '$count rooms',
-  );
+      _t(locale, 'scan.metadata.row_rooms');
+  static String roomsValue(Locale locale, int count) =>
+      _t(locale, 'scan.metadata.rooms_value').replaceAll(r'$count', '$count');
   static String rowStyle(Locale locale) =>
-      _t(locale, 'scan.metadata.row_style', 'Uslub', 'Стиль', 'Style');
-  static String rowSketchProject(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_sketch_project',
-    'Eskiz loyiha',
-    'Эскизный проект',
-    'Concept design',
-  );
-  static String rowWorkingProject(Locale locale) => _t(
-    locale,
-    'scan.metadata.row_working_project',
-    'Ishchi loyiha',
-    'Рабочий проект',
-    'Working design',
-  );
-  static String daysValue(Locale locale, int days) => _t(
-    locale,
-    'scan.metadata.days_value',
-    '$days kun',
-    '$days дн.',
-    '$days days',
-  );
+      _t(locale, 'scan.metadata.row_style');
+  static String rowSketchProject(Locale locale) =>
+      _t(locale, 'scan.metadata.row_sketch_project');
+  static String rowWorkingProject(Locale locale) =>
+      _t(locale, 'scan.metadata.row_working_project');
+  static String daysValue(Locale locale, int days) =>
+      _t(locale, 'scan.metadata.days_value').replaceAll(r'$days', '$days');
 }

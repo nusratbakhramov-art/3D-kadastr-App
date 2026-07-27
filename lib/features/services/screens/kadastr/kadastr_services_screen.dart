@@ -7,6 +7,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../../core/haptics.dart';
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/calculator_pricing_store.dart';
@@ -77,7 +78,7 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                    title: _S.appBar(l),
+                    title: tr(l, 'services.kadastr.services.appbar'),
                     subtitle: '${_fmtArea(widget.areaM2)} m²',
                   ),
                 ),
@@ -86,7 +87,7 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                     children: [
                       Text(
-                        _S.heading(l),
+                        tr(l, 'services.kadastr.services.heading'),
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w900,
@@ -97,7 +98,7 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _S.subheading(l),
+                        tr(l, 'services.kadastr.services.subheading'),
                         style: TextStyle(
                           fontFamily: 'MTSText',
                           fontSize: 13,
@@ -196,7 +197,7 @@ class _BottomBar extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _S.totalLabel(locale),
+                          tr(locale, 'services.kadastr.total_label'),
                           style: TextStyle(
                             fontFamily: 'MTSText',
                             fontSize: 12.5,
@@ -227,7 +228,8 @@ class _BottomBar extends StatelessWidget {
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
-                        _S.selectedCount(locale, selected.length),
+                        tr(locale, 'services.kadastr.selected_count')
+                            .replaceAll(r'$n', '${selected.length}'),
                         style: const TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w700,
@@ -240,7 +242,7 @@ class _BottomBar extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               ListingCtaButton(
-                label: _S.next(locale),
+                label: tr(locale, 'services.kadastr.calculate'),
                 enabled: selected.isNotEmpty,
                 onTap: onNext,
               ),
@@ -371,38 +373,3 @@ class _CheckDot extends StatelessWidget {
 String _fmtArea(double v) =>
     v == v.roundToDouble() ? v.toStringAsFixed(0) : v.toStringAsFixed(1);
 
-class _S {
-  const _S._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String appBar(Locale l) => _pick(l, 'Kadastr', 'Кадастр', 'Cadastre');
-
-  static String heading(Locale l) => _pick(
-        l,
-        'Xizmatlarni tanlang',
-        'Выберите услуги',
-        'Choose services',
-      );
-
-  static String subheading(Locale l) => _pick(
-        l,
-        'Bir yoki bir nechta xizmatni tanlang.',
-        'Выберите одну или несколько услуг.',
-        'Pick one or more services.',
-      );
-
-  static String totalLabel(Locale l) => _pick(
-        l,
-        'Taxminiy jami',
-        'Примерно итого',
-        'Estimated total',
-      );
-
-  static String selectedCount(Locale l, int n) =>
-      _pick(l, '$n ta tanlandi', 'выбрано: $n', '$n selected');
-
-  static String next(Locale l) =>
-      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
-}

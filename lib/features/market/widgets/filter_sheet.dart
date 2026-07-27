@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../data/market_regions_store.dart';
 import '../models/market_filters.dart';
@@ -122,7 +123,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                   children: [
                     Expanded(
                       child: Text(
-                        _FilterStrings.title(l),
+                        tr(l, 'market.filter.title'),
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w700,
@@ -135,7 +136,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     TextButton(
                       onPressed: _reset,
                       child: Text(
-                        _FilterStrings.reset(l),
+                        tr(l, 'market.filter.reset'),
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w500,
@@ -154,7 +155,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                   children: [
                     // Narx (price) filtri hozircha yashirilgan — kelajakda
                     // admin paneldan dinamik filtrlar bilan qaytariladi.
-                    _SectionLabel(text: _FilterStrings.area(l), color: fg),
+                    _SectionLabel(text: tr(l, 'market.filter.area'), color: fg),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
@@ -178,11 +179,11 @@ class _FilterSheetState extends State<_FilterSheet> {
                       ),
                     ),
                     const SizedBox(height: 14),
-                    _SectionLabel(text: _FilterStrings.floor(l), color: fg),
+                    _SectionLabel(text: tr(l, 'market.filter.floor'), color: fg),
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
                       child: Text(
-                        '${_floor.start.round()} — ${_floor.end.round()} ${_FilterStrings.floorUnit(l)}',
+                        '${_floor.start.round()} — ${_floor.end.round()} ${tr(l, 'market.filter.floor_unit')}',
                         style: TextStyle(
                           fontFamily: 'MTSCompact',
                           fontWeight: FontWeight.w500,
@@ -206,11 +207,11 @@ class _FilterSheetState extends State<_FilterSheet> {
                       children: [
                         Expanded(
                           child: _SectionLabel(
-                              text: _FilterStrings.region(l), color: fg),
+                              text: tr(l, 'market.filter.region'), color: fg),
                         ),
                         if (_districts.isNotEmpty)
                           Text(
-                            _FilterStrings.selectedCount(l, _districts.length),
+                            '${_districts.length} ${tr(l, 'market.filter.selected_suffix')}',
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w600,
@@ -223,7 +224,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                     const SizedBox(height: 10),
                     _RegionSearchField(
                       controller: _searchCtrl,
-                      hint: _FilterStrings.searchRegion(l),
+                      hint: tr(l, 'market.filter.search_region'),
                       fg: fg,
                       bg: chipBg,
                       onChanged: (v) => setState(() => _regionQuery = v),
@@ -261,7 +262,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                         height: 52,
                         child: Center(
                           child: Text(
-                            _FilterStrings.apply(l),
+                            tr(l, 'market.filter.apply'),
                             style: const TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
@@ -310,7 +311,7 @@ class _FilterSheetState extends State<_FilterSheet> {
       children: [
         for (final d in regions)
           _DistrictChip(
-            label: _FilterStrings.district(l, d),
+            label: _districtLabel(l, d),
             selected: _districts.contains(d),
             onTap: () => _toggleDistrict(d),
             fg: fg,
@@ -332,7 +333,7 @@ class _FilterSheetState extends State<_FilterSheet> {
     final rows = <Widget>[];
 
     rows.add(_FilterRow(
-      label: _FilterStrings.allRegions(l),
+      label: tr(l, 'market.filter.all_regions'),
       fg: fg,
       weight: FontWeight.w600,
       onTap: () {
@@ -385,7 +386,7 @@ class _FilterSheetState extends State<_FilterSheet> {
         final all = node.districts.toSet();
         final allSelected = all.every(_districts.contains);
         rows.add(_FilterRow(
-          label: _FilterStrings.selectAll(l),
+          label: tr(l, 'market.filter.select_all'),
           fg: AppColors.splashGreen,
           weight: FontWeight.w600,
           leftPad: 32,
@@ -406,7 +407,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
     if (rows.length == 1 && q.isNotEmpty) {
       rows.add(_FilterRow(
-        label: _FilterStrings.noResults(l),
+        label: tr(l, 'market.filter.no_results'),
         fg: muted,
         onTap: () {},
       ));
@@ -440,92 +441,19 @@ class _FilterSheetState extends State<_FilterSheet> {
   );
 }
 
-class _FilterStrings {
-  const _FilterStrings._();
-
-  static String title(Locale l) => switch (l.languageCode) {
-    'ru' => 'Фильтры',
-    'en' => 'Filters',
-    _ => 'Filtrlar',
+/// Localized display label for a canonical district value. The value stored
+/// in the filter set stays the original (used as the query/match key); only
+/// the shown prose is routed through the backend-driven bundle.
+String _districtLabel(Locale l, String canonical) {
+  final key = switch (canonical) {
+    'Yashnabod tumani' => 'market.filter.district_yashnabod',
+    'Mirzo Ulug\'bek tumani' => 'market.filter.district_mirzo_ulugbek',
+    'Yunusobod tumani' => 'market.filter.district_yunusobod',
+    'Chilonzor tumani' => 'market.filter.district_chilonzor',
+    'Sergeli tumani' => 'market.filter.district_sergeli',
+    _ => null,
   };
-  static String reset(Locale l) => switch (l.languageCode) {
-    'ru' => 'Очистить',
-    'en' => 'Clear',
-    _ => 'Tozalash',
-  };
-  static String floor(Locale l) => switch (l.languageCode) {
-    'ru' => 'Этаж',
-    'en' => 'Floor',
-    _ => 'Qavat',
-  };
-  static String floorUnit(Locale l) => switch (l.languageCode) {
-    'ru' => 'эт.',
-    'en' => 'fl.',
-    _ => 'qavat',
-  };
-  static String area(Locale l) => switch (l.languageCode) {
-    'ru' => 'Площадь (м²)',
-    'en' => 'Area (m²)',
-    _ => 'Maydon (m²)',
-  };
-  static String apply(Locale l) => switch (l.languageCode) {
-    'ru' => 'Применить',
-    'en' => 'Apply',
-    _ => 'Qo‘llash',
-  };
-  static String region(Locale l) => switch (l.languageCode) {
-    'ru' => 'Регион',
-    'en' => 'Region',
-    _ => 'Hudud',
-  };
-  static String searchRegion(Locale l) => switch (l.languageCode) {
-    'ru' => 'Поиск региона или района',
-    'en' => 'Search region or district',
-    _ => 'Viloyat yoki tuman qidirish',
-  };
-  static String allRegions(Locale l) => switch (l.languageCode) {
-    'ru' => 'Все регионы',
-    'en' => 'All regions',
-    _ => 'Barcha hududlar',
-  };
-  static String selectAll(Locale l) => switch (l.languageCode) {
-    'ru' => 'Выбрать все',
-    'en' => 'Select all',
-    _ => 'Barchasini tanlash',
-  };
-  static String noResults(Locale l) => switch (l.languageCode) {
-    'ru' => 'Ничего не найдено',
-    'en' => 'Nothing found',
-    _ => 'Hech narsa topilmadi',
-  };
-  static String selectedCount(Locale l, int n) => switch (l.languageCode) {
-    'ru' => '$n выбрано',
-    'en' => '$n selected',
-    _ => '$n ta tanlandi',
-  };
-
-  /// Localized display label for a canonical district value. The value stored
-  /// in the filter set stays the original (used as the query/match key).
-  static String district(Locale l, String canonical) =>
-      switch (l.languageCode) {
-        'ru' => switch (canonical) {
-          'Yashnabod tumani' => 'Яшнабадский район',
-          'Mirzo Ulug\'bek tumani' => 'Мирзо-Улугбекский район',
-          'Yunusobod tumani' => 'Юнусабадский район',
-          'Chilonzor tumani' => 'Чиланзарский район',
-          'Sergeli tumani' => 'Сергелийский район',
-          _ => canonical,
-        },
-        'en' => switch (canonical) {
-          'Yashnabod tumani' => 'Yashnabad district',
-          'Mirzo Ulug\'bek tumani' => 'Mirzo Ulugbek district',
-          'Yunusobod tumani' => 'Yunusabad district',
-          'Chilonzor tumani' => 'Chilanzar district',
-          'Sergeli tumani' => 'Sergeli district',
-          _ => canonical,
-        },
-        _ => canonical,
-      };
+  return key == null ? canonical : tr(l, key);
 }
 
 class _SectionLabel extends StatelessWidget {

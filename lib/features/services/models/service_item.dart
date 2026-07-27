@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
+
 enum ServiceId { kadastr3d, aiValuation, calculator, smetaPro }
 
 class ServiceItem {
@@ -25,57 +27,28 @@ enum ServiceLayout { square, wide }
 class ServiceStrings {
   const ServiceStrings._();
 
-  static String pageTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Услуги',
-    'en' => 'Services',
-    _ => 'Xizmatlar',
-  };
+  static String pageTitle(Locale l) => tr(l, 'services.model.services_title');
 
-  static String kadastrTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Кадастр',
-    'en' => 'Cadastre',
-    _ => 'Kadastr',
-  };
+  static String kadastrTitle(Locale l) =>
+      tr(l, 'services.model.service_kadastr.title');
 
-  static String kadastrSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Рассчитайте стоимость услуг и оставьте заявку.',
-    'en' => 'Calculate service prices and submit an application.',
-    _ => 'Xizmatlar narxini hisoblang va ariza qoldiring.',
-  };
+  static String kadastrSubtitle(Locale l) =>
+      tr(l, 'services.model.service_kadastr.subtitle');
 
-  static String aiTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'AI Оценка',
-    'en' => 'AI Valuation',
-    _ => 'AI Baholash',
-  };
+  static String aiTitle(Locale l) => tr(l, 'services.model.service_ai.title');
 
-  static String aiSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Оценка стоимости недвижимости с помощью ИИ.',
-    'en' => 'Real estate valuation powered by AI.',
-    _ => 'Sun\'iy intellekt yordamida ko\'chmas mulk qiymatini aniqlash.',
-  };
+  static String aiSubtitle(Locale l) =>
+      tr(l, 'services.model.service_ai.subtitle');
 
-  static String calculatorTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Онлайн калькулятор',
-    'en' => 'Online calculator',
-    _ => 'Onlayn Kalkulyator',
-  };
+  static String calculatorTitle(Locale l) =>
+      tr(l, 'services.model.service_calc.title');
 
-  static String calculatorSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Расчёт стоимости архитектуры, дизайна и строительства.',
-    'en' => 'Calculate architecture, design and construction costs.',
-    _ => 'Arxitektura, dizayn, qurilish narxlarini hisoblash.',
-  };
+  static String calculatorSubtitle(Locale l) =>
+      tr(l, 'services.model.service_calc.subtitle');
 
-  static String smetaProTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'ABC смета (для смет)',
-    'en' => 'ABC smeta (for estimators)',
-    _ => 'ABC smeta (smetachilar uchun)',
-  };
+  static String smetaProTitle(Locale l) =>
+      tr(l, 'services.model.service_smeta.title');
 
-  static String smetaProSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Профессиональная смета по СНиР через ABC-UZ. Форма N5/N6.',
-    'en' => 'Professional СНиР smeta priced by ABC-UZ. Form N5/N6 output.',
-    _ => "SNiR bo'yicha professional smeta — ABC-UZ asosida. Forma N5/N6 vedomosti.",
-  };
+  static String smetaProSubtitle(Locale l) =>
+      tr(l, 'services.model.service_smeta.subtitle');
 }

@@ -180,42 +180,12 @@ enum ValuationPurpose {
       .firstWhere((p) => p.wire == w, orElse: () => ValuationPurpose.sale);
 
   String label(Locale l) => switch (this) {
-    ValuationPurpose.sale => tr(
-        l,
-        'purpose.sale',
-        uz: 'Sotish uchun',
-        ru: 'Для продажи',
-        en: 'For sale',
-      ),
+    ValuationPurpose.sale => tr(l, 'purpose.sale'),
     // Credit-only framing removed; now Bank / Mortgage / Leasing.
-    ValuationPurpose.mortgage => tr(
-        l,
-        'purpose.mortgage',
-        uz: 'Bank·Ipoteka·Lizing uchun',
-        ru: 'Для банка·ипотеки·лизинга',
-        en: 'For bank·mortgage·leasing',
-      ),
-    ValuationPurpose.insurance => tr(
-        l,
-        'purpose.insurance',
-        uz: 'Sug\'urtalash uchun',
-        ru: 'Для страхования',
-        en: 'For insurance',
-      ),
-    ValuationPurpose.court => tr(
-        l,
-        'purpose.court',
-        uz: 'Sud·Nizolar uchun',
-        ru: 'Для суда·споров',
-        en: 'For court·disputes',
-      ),
-    ValuationPurpose.tax => tr(
-        l,
-        'purpose.tax',
-        uz: 'Soliq buxgalteriyasi uchun',
-        ru: 'Для налогового учёта',
-        en: 'For tax accounting',
-      ),
+    ValuationPurpose.mortgage => tr(l, 'purpose.mortgage'),
+    ValuationPurpose.insurance => tr(l, 'purpose.insurance'),
+    ValuationPurpose.court => tr(l, 'purpose.court'),
+    ValuationPurpose.tax => tr(l, 'purpose.tax'),
   };
 
   String hint(Locale l) => '';
@@ -263,28 +233,15 @@ enum RoomKind {
   final String wire;
   final String labelUz;
 
-  String label(Locale l) => switch (l.languageCode) {
-    'ru' => switch (this) {
-      RoomKind.living => 'Гостиная',
-      RoomKind.bedroom => 'Спальня',
-      RoomKind.kitchen => 'Кухня',
-      RoomKind.bathroom => 'Ванная',
-      RoomKind.hallway => 'Коридор',
-      RoomKind.balcony => 'Балкон',
-      RoomKind.storage => 'Кладовая',
-      RoomKind.other => 'Другое',
-    },
-    'en' => switch (this) {
-      RoomKind.living => 'Living room',
-      RoomKind.bedroom => 'Bedroom',
-      RoomKind.kitchen => 'Kitchen',
-      RoomKind.bathroom => 'Bathroom',
-      RoomKind.hallway => 'Hallway',
-      RoomKind.balcony => 'Balcony',
-      RoomKind.storage => 'Storage',
-      RoomKind.other => 'Other',
-    },
-    _ => labelUz,
+  String label(Locale l) => switch (this) {
+    RoomKind.living => tr(l, 'services.model.room.living'),
+    RoomKind.bedroom => tr(l, 'services.model.room.bedroom'),
+    RoomKind.kitchen => tr(l, 'services.model.room.kitchen'),
+    RoomKind.bathroom => tr(l, 'services.model.room.bathroom'),
+    RoomKind.hallway => tr(l, 'services.model.room.hallway'),
+    RoomKind.balcony => tr(l, 'services.model.room.balcony'),
+    RoomKind.storage => tr(l, 'services.model.room.storage'),
+    RoomKind.other => tr(l, 'services.model.room.other'),
   };
 }
 

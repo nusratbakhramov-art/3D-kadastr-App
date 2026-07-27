@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 
 /// "Bugun, 22:42" ko'rinishidagi sana yorlig'i (dizayndagi kulrang chip).
@@ -62,14 +63,6 @@ String formatNotificationDate(DateTime at, Locale locale) {
   return '$date, $time';
 }
 
-String _today(Locale l) => switch (l.languageCode) {
-  'ru' => 'Сегодня',
-  'en' => 'Today',
-  _ => 'Bugun',
-};
+String _today(Locale l) => tr(l, 'notifications.today');
 
-String _yesterday(Locale l) => switch (l.languageCode) {
-  'ru' => 'Вчера',
-  'en' => 'Yesterday',
-  _ => 'Kecha',
-};
+String _yesterday(Locale l) => tr(l, 'notifications.yesterday');

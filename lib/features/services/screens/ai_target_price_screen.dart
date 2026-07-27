@@ -309,46 +309,21 @@ class _MoneyInputFormatter extends TextInputFormatter {
 class _S {
   const _S._();
 
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
+  static String appBar(Locale l) => tr(l, 'services.ai.target_price.app_bar');
 
-  static String appBar(Locale l) =>
-      _pick(l, 'AI Baholash', 'AI оценка', 'AI valuation');
+  static String appBarSub(Locale l) =>
+      tr(l, 'services.ai.target_price.app_bar_sub');
 
-  static String appBarSub(Locale l) => _pick(
-      l, 'Smeta (qurilish) qiymati', 'Сметная стоимость', 'Estimate (construction) cost');
+  static String heading(Locale l) => tr(l, 'services.ai.target_price.heading');
 
-  static String heading(Locale l) => _pick(
-        l,
-        'Obyektning smeta (qurilish) qiymatini kiriting',
-        'Укажите сметную (строительную) стоимость объекта',
-        'Enter the object\'s estimate (construction) cost',
-      );
+  static String subheading(Locale l) => tr(l, 'ai.target_price.subheading');
 
-  static String subheading(Locale l) => tr(
-        l,
-        'ai.target_price.subheading',
-        uz: 'Yoki o\'z taklif summangizni yozing',
-        ru: 'Или укажите свою предлагаемую сумму',
-        en: 'Or enter your own proposed amount',
-      );
+  static String assessment(Locale l) =>
+      tr(l, 'services.ai.target_price.assessment');
 
-  static String assessment(Locale l) => _pick(
-        l,
-        'Ko\'chmas mulk bozor qiymatini baholash xulosasini olasiz',
-        'Вы получите заключение об оценке рыночной стоимости недвижимости',
-        'You will receive a real-estate market-value assessment report',
-      );
+  static String soum(Locale l) => tr(l, 'services.ai.common.soum');
 
-  static String soum(Locale l) => _pick(l, 'so\'m', 'сум', 'soum');
+  static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
 
-  static String continueLabel(Locale l) =>
-      _pick(l, 'Davom etish', 'Продолжить', 'Continue');
-
-  static String skip(Locale l) => _pick(
-        l,
-        'O\'tkazib yuborish',
-        'Пропустить',
-        'Skip',
-      );
+  static String skip(Locale l) => tr(l, 'services.ai.target_price.skip');
 }

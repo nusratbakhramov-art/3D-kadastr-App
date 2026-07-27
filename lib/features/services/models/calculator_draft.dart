@@ -6,6 +6,7 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import 'calculator_pricing.dart';
 
 // ────────────────────────────────────────────────────────────────────────
@@ -37,93 +38,28 @@ enum CalculatorCategory {
   yuridik;
 
   String title(Locale l) => switch (this) {
-    CalculatorCategory.arxitektura => _pick(
-      l,
-      uz: 'Arxitektura va qurilish loyihasi',
-      ru: 'Архитектура и проектирование',
-      en: 'Architecture & construction project',
-    ),
-    CalculatorCategory.kadastr => _pick(
-      l,
-      uz: 'Qurilish buxgalteriyasi',
-      ru: 'Строительная бухгалтерия',
-      en: 'Construction accounting',
-    ),
-    CalculatorCategory.kadastr3d => _pick(
-      l,
-      uz: '3D kadastr hujjatlari',
-      ru: '3D кадастровые документы',
-      en: '3D cadastre documents',
-    ),
-    CalculatorCategory.baholash => _pick(
-      l,
-      uz: 'Mulk qiymatini baholash',
-      ru: 'Оценка стоимости имущества',
-      en: 'Property valuation',
-    ),
-    CalculatorCategory.dizayn => _pick(
-      l,
-      uz: 'Dizayn loyihasi',
-      ru: 'Дизайн-проект',
-      en: 'Design project',
-    ),
-    CalculatorCategory.tamirlash => _pick(
-      l,
-      uz: "Ta'mirlash va qurilish ishlari",
-      ru: 'Ремонт и строительство',
-      en: 'Repair & construction',
-    ),
-    CalculatorCategory.yuridik => _pick(
-      l,
-      uz: 'Yuridik xizmat',
-      ru: 'Юридические услуги',
-      en: 'Legal services',
-    ),
+    CalculatorCategory.arxitektura =>
+      tr(l, 'services.model.cat.arxitektura.title'),
+    CalculatorCategory.kadastr => tr(l, 'services.model.cat.kadastr.title'),
+    CalculatorCategory.kadastr3d => tr(l, 'services.model.cat.kadastr3d.title'),
+    CalculatorCategory.baholash => tr(l, 'services.model.cat.baholash.title'),
+    CalculatorCategory.dizayn => tr(l, 'services.model.cat.dizayn.title'),
+    CalculatorCategory.tamirlash => tr(l, 'services.model.cat.tamirlash.title'),
+    CalculatorCategory.yuridik => tr(l, 'services.model.cat.yuridik.title'),
   };
 
   String subtitle(Locale l) => switch (this) {
-    CalculatorCategory.arxitektura => _pick(
-      l,
-      uz: 'Loyiha hajmiga qarab',
-      ru: 'По объёму проекта',
-      en: 'Based on project size',
-    ),
-    CalculatorCategory.kadastr => _pick(
-      l,
-      uz: 'Buxgalteriya va hisob xizmatlari',
-      ru: 'Бухгалтерия и учёт',
-      en: 'Accounting & bookkeeping',
-    ),
-    CalculatorCategory.kadastr3d => _pick(
-      l,
-      uz: "3D pasport va yig'ma jild",
-      ru: '3D паспорт и кадастровое дело',
-      en: '3D passport & file',
-    ),
-    CalculatorCategory.baholash => _pick(
-      l,
-      uz: 'Bozor qiymatini aniqlash',
-      ru: 'Определение рыночной стоимости',
-      en: 'Determine market value',
-    ),
-    CalculatorCategory.dizayn => _pick(
-      l,
-      uz: 'Interyer va eksteryer dizayn',
-      ru: 'Интерьер и экстерьер',
-      en: 'Interior & exterior design',
-    ),
-    CalculatorCategory.tamirlash => _pick(
-      l,
-      uz: "Ta'mir va qurilish xizmatlari",
-      ru: 'Услуги ремонта и строительства',
-      en: 'Repair & construction services',
-    ),
-    CalculatorCategory.yuridik => _pick(
-      l,
-      uz: "Maslahat, sud, ro'yxatga olish",
-      ru: 'Консультация, суд, регистрация',
-      en: 'Consultation, court, registration',
-    ),
+    CalculatorCategory.arxitektura =>
+      tr(l, 'services.model.cat.arxitektura.subtitle'),
+    CalculatorCategory.kadastr => tr(l, 'services.model.cat.kadastr.subtitle'),
+    CalculatorCategory.kadastr3d =>
+      tr(l, 'services.model.cat.kadastr3d.subtitle'),
+    CalculatorCategory.baholash =>
+      tr(l, 'services.model.cat.baholash.subtitle'),
+    CalculatorCategory.dizayn => tr(l, 'services.model.cat.dizayn.subtitle'),
+    CalculatorCategory.tamirlash =>
+      tr(l, 'services.model.cat.tamirlash.subtitle'),
+    CalculatorCategory.yuridik => tr(l, 'services.model.cat.yuridik.subtitle'),
   };
 
   IconData get icon => switch (this) {
@@ -171,69 +107,27 @@ enum ArxitekturaObject {
   };
 
   String label(Locale l) => switch (this) {
-    ArxitekturaObject.yakkaSmall => _pick(
-      l,
-      uz: 'Yakka tartibdagi uy (kichik)',
-      ru: 'Индивидуальный дом (малый)',
-      en: 'Single-family house (small)',
-    ),
-    ArxitekturaObject.yakkaLarge => _pick(
-      l,
-      uz: 'Yakka tartibdagi uy (katta)',
-      ru: 'Индивидуальный дом (большой)',
-      en: 'Single-family house (large)',
-    ),
-    ArxitekturaObject.kopQavatli => _pick(
-      l,
-      uz: "Ko'p qavatli turar-joy binosi",
-      ru: 'Многоэтажный жилой дом',
-      en: 'Multi-storey residential building',
-    ),
-    ArxitekturaObject.jamoat => _pick(
-      l,
-      uz: 'Jamoat binolari',
-      ru: 'Общественные здания',
-      en: 'Public buildings',
-    ),
-    ArxitekturaObject.sanoat => _pick(
-      l,
-      uz: 'Sanoat binolari',
-      ru: 'Промышленные здания',
-      en: 'Industrial buildings',
-    ),
-    ArxitekturaObject.rekonstruksiya => _pick(
-      l,
-      uz: 'Rekonstruksiya (qayta qurish)',
-      ru: 'Реконструкция',
-      en: 'Reconstruction',
-    ),
+    ArxitekturaObject.yakkaSmall =>
+      tr(l, 'services.model.arxitektura.yakka_small'),
+    ArxitekturaObject.yakkaLarge =>
+      tr(l, 'services.model.arxitektura.yakka_large'),
+    ArxitekturaObject.kopQavatli =>
+      tr(l, 'services.model.arxitektura.kop_qavatli'),
+    ArxitekturaObject.jamoat => tr(l, 'services.model.arxitektura.jamoat'),
+    ArxitekturaObject.sanoat => tr(l, 'services.model.arxitektura.sanoat'),
+    ArxitekturaObject.rekonstruksiya =>
+      tr(l, 'services.model.arxitektura.rekonstruksiya'),
   };
 
   String? hint(Locale l) => switch (this) {
-    ArxitekturaObject.yakkaSmall => _pick(
-      l,
-      uz: '500 m² dan kichik, balandligi 12 m dan past',
-      ru: 'меньше 500 м², высота до 12 м',
-      en: 'under 500 m², height under 12 m',
-    ),
-    ArxitekturaObject.yakkaLarge => _pick(
-      l,
-      uz: "500 m² dan katta yoki 12 m dan baland",
-      ru: 'больше 500 м² или выше 12 м',
-      en: 'over 500 m² or above 12 m',
-    ),
-    ArxitekturaObject.jamoat => _pick(
-      l,
-      uz: "Ofis, biznes markaz, savdo markaz, restoran",
-      ru: 'Офис, бизнес-центр, ТЦ, ресторан',
-      en: 'Office, business center, mall, restaurant',
-    ),
-    ArxitekturaObject.sanoat => _pick(
-      l,
-      uz: "Ishlab chiqarish, zavod, fabrika, ombor",
-      ru: 'Производство, завод, фабрика, склад',
-      en: 'Production, plant, factory, warehouse',
-    ),
+    ArxitekturaObject.yakkaSmall =>
+      tr(l, 'services.model.arxitektura.yakka_small.hint'),
+    ArxitekturaObject.yakkaLarge =>
+      tr(l, 'services.model.arxitektura.yakka_large.hint'),
+    ArxitekturaObject.jamoat =>
+      tr(l, 'services.model.arxitektura.jamoat.hint'),
+    ArxitekturaObject.sanoat =>
+      tr(l, 'services.model.arxitektura.sanoat.hint'),
     _ => null,
   };
 }
@@ -248,24 +142,10 @@ enum KadastrObjectType {
   kopKvartirali;
 
   String label(Locale l) => switch (this) {
-    KadastrObjectType.yakka => _pick(
-      l,
-      uz: 'Yakka tartibdagi uy (hovli-joy)',
-      ru: 'Индивидуальный дом (с двором)',
-      en: 'Single-family house (with yard)',
-    ),
-    KadastrObjectType.xonadon => _pick(
-      l,
-      uz: "Ko'p kvartirali uydagi xonadon",
-      ru: 'Квартира в многоквартирном доме',
-      en: 'Apartment in multi-unit building',
-    ),
-    KadastrObjectType.kopKvartirali => _pick(
-      l,
-      uz: "Ko'p kvartirali xonadonlar (yirik)",
-      ru: 'Многоквартирные дома (крупные)',
-      en: 'Multi-unit residential (large)',
-    ),
+    KadastrObjectType.yakka => tr(l, 'services.model.kadastr_obj.yakka'),
+    KadastrObjectType.xonadon => tr(l, 'services.model.kadastr_obj.xonadon'),
+    KadastrObjectType.kopKvartirali =>
+      tr(l, 'services.model.kadastr_obj.kop_kvartirali'),
   };
 }
 
@@ -296,24 +176,10 @@ enum BaholashObject {
   };
 
   String label(Locale l) => switch (this) {
-    BaholashObject.uyJoy => _pick(
-      l,
-      uz: 'Uy-joy mulki',
-      ru: 'Жилое имущество',
-      en: 'Residential property',
-    ),
-    BaholashObject.tijorat => _pick(
-      l,
-      uz: "Tijorat ko'chmas mulki",
-      ru: 'Коммерческая недвижимость',
-      en: 'Commercial property',
-    ),
-    BaholashObject.tugallanmagan => _pick(
-      l,
-      uz: 'Tugallanmagan qurilish va yer uchastkasi',
-      ru: 'Незавершённое строительство и земельный участок',
-      en: 'Unfinished construction & land plot',
-    ),
+    BaholashObject.uyJoy => tr(l, 'services.model.baholash_obj.uy_joy'),
+    BaholashObject.tijorat => tr(l, 'services.model.baholash_obj.tijorat'),
+    BaholashObject.tugallanmagan =>
+      tr(l, 'services.model.baholash_obj.tugallanmagan'),
   };
 }
 
@@ -326,8 +192,8 @@ enum DizaynObjectType {
   noturar;
 
   String label(Locale l) => switch (this) {
-    DizaynObjectType.turar => _pick(l, uz: 'Turar', ru: 'Жилой', en: 'Residential'),
-    DizaynObjectType.noturar => _pick(l, uz: 'Noturar', ru: 'Нежилой', en: 'Non-residential'),
+    DizaynObjectType.turar => tr(l, 'services.model.obj.turar'),
+    DizaynObjectType.noturar => tr(l, 'services.model.obj.noturar'),
   };
 }
 
@@ -340,12 +206,12 @@ enum DizaynStyle {
   japandi;
 
   String label(Locale l) => switch (this) {
-    DizaynStyle.highTech => 'High-tech',
-    DizaynStyle.klassik => _pick(l, uz: 'Klassik', ru: 'Классика', en: 'Classic'),
-    DizaynStyle.neoklassik => _pick(l, uz: 'Neoklassik', ru: 'Неоклассика', en: 'Neoclassical'),
-    DizaynStyle.minimalizm => _pick(l, uz: 'Minimalizm', ru: 'Минимализм', en: 'Minimalism'),
-    DizaynStyle.loft => 'Loft',
-    DizaynStyle.japandi => 'Japandi',
+    DizaynStyle.highTech => tr(l, 'services.model.style.high_tech'),
+    DizaynStyle.klassik => tr(l, 'services.model.style.klassik'),
+    DizaynStyle.neoklassik => tr(l, 'services.model.style.neoklassik'),
+    DizaynStyle.minimalizm => tr(l, 'services.model.style.minimalizm'),
+    DizaynStyle.loft => tr(l, 'services.model.style.loft'),
+    DizaynStyle.japandi => tr(l, 'services.model.style.japandi'),
   };
 }
 
@@ -358,8 +224,8 @@ enum TamirlashObjectType {
   noturar;
 
   String label(Locale l) => switch (this) {
-    TamirlashObjectType.turar => _pick(l, uz: 'Turar', ru: 'Жилой', en: 'Residential'),
-    TamirlashObjectType.noturar => _pick(l, uz: 'Noturar', ru: 'Нежилой', en: 'Non-residential'),
+    TamirlashObjectType.turar => tr(l, 'services.model.obj.turar'),
+    TamirlashObjectType.noturar => tr(l, 'services.model.obj.noturar'),
   };
 }
 
@@ -369,24 +235,11 @@ enum TamirlashLocation {
   boshqa;
 
   String label(Locale l) => switch (this) {
-    TamirlashLocation.toshkentShahar => _pick(
-      l,
-      uz: 'Toshkent shahar',
-      ru: 'г. Ташкент',
-      en: 'Tashkent city',
-    ),
-    TamirlashLocation.toshkentViloyat => _pick(
-      l,
-      uz: 'Toshkent viloyat',
-      ru: 'Ташкентская область',
-      en: 'Tashkent region',
-    ),
-    TamirlashLocation.boshqa => _pick(
-      l,
-      uz: 'Boshqa viloyat',
-      ru: 'Другая область',
-      en: 'Other region',
-    ),
+    TamirlashLocation.toshkentShahar =>
+      tr(l, 'services.model.tamir_loc.toshkent_shahar'),
+    TamirlashLocation.toshkentViloyat =>
+      tr(l, 'services.model.tamir_loc.toshkent_viloyat'),
+    TamirlashLocation.boshqa => tr(l, 'services.model.tamir_loc.boshqa'),
   };
 }
 
@@ -401,13 +254,10 @@ enum TamirlashServiceType {
   };
 
   String label(Locale l) => switch (this) {
-    TamirlashServiceType.tamir => _pick(l, uz: "Ta'mir", ru: 'Ремонт', en: 'Repair'),
-    TamirlashServiceType.qurilish => _pick(
-      l,
-      uz: 'Qurilish',
-      ru: 'Строительство',
-      en: 'Construction',
-    ),
+    TamirlashServiceType.tamir =>
+      tr(l, 'services.model.tamir_service.tamir'),
+    TamirlashServiceType.qurilish =>
+      tr(l, 'services.model.tamir_service.qurilish'),
   };
 }
 
@@ -443,62 +293,40 @@ class _ComputeStrings {
   const _ComputeStrings._();
 
   static String selectedType(Locale l) =>
-      _pick(l, uz: 'Tanlangan turi', ru: 'Тип', en: 'Type');
+      tr(l, 'services.model.compute.selected_type');
 
-  static String area(Locale l) =>
-      _pick(l, uz: 'Maydon', ru: 'Площадь', en: 'Area');
+  static String area(Locale l) => tr(l, 'services.model.compute.area');
 
-  static String perM2(Locale l) =>
-      _pick(l, uz: '1 m² uchun', ru: 'За 1 м²', en: 'Per 1 m²');
+  static String perM2(Locale l) => tr(l, 'services.model.compute.per_m2');
 
-  static String tariff(Locale l) =>
-      _pick(l, uz: 'Tarif', ru: 'Тариф', en: 'Rate');
+  static String tariff(Locale l) => tr(l, 'services.model.compute.tariff');
 
-  static String calc(Locale l) =>
-      _pick(l, uz: 'Hisob', ru: 'Расчёт', en: 'Calculation');
+  static String calc(Locale l) => tr(l, 'services.model.compute.calc');
 
-  static String location(Locale l) =>
-      _pick(l, uz: 'Manzil', ru: 'Адрес', en: 'Location');
+  static String location(Locale l) => tr(l, 'services.model.compute.location');
 
   static String serviceType(Locale l) =>
-      _pick(l, uz: 'Xizmat turi', ru: 'Тип услуги', en: 'Service type');
+      tr(l, 'services.model.compute.service_type');
 
   static String objectType(Locale l) =>
-      _pick(l, uz: "Ob'ekt turi", ru: 'Тип объекта', en: 'Object type');
+      tr(l, 'services.model.compute.object_type');
 
   static String designStyle(Locale l) =>
-      _pick(l, uz: 'Dizayn uslubi', ru: 'Стиль дизайна', en: 'Design style');
+      tr(l, 'services.model.compute.design_style');
 
-  static String inclVat(Locale l) =>
-      _pick(l, uz: 'QQS bilan', ru: 'С НДС', en: 'incl. VAT');
+  static String inclVat(Locale l) => tr(l, 'services.model.compute.incl_vat');
 
-  static String fixedPrice(Locale l) => _pick(
-        l,
-        uz: 'Belgilangan narx',
-        ru: 'Фиксированная цена',
-        en: 'Fixed price',
-      );
+  static String fixedPrice(Locale l) =>
+      tr(l, 'services.model.compute.fixed_price');
 
-  static String fixedMinFor200(Locale l) => _pick(
-        l,
-        uz: '200 m² gacha belgilangan minimum',
-        ru: 'Фиксированный минимум до 200 м²',
-        en: 'Fixed minimum for ≤200 m²',
-      );
+  static String fixedMinFor200(Locale l) =>
+      tr(l, 'services.model.compute.fixed_min_200');
 
-  static String upTo(Locale l, int v) => _pick(
-        l,
-        uz: '$v m² gacha',
-        ru: 'до $v м²',
-        en: 'up to $v m²',
-      );
+  static String upTo(Locale l, int v) =>
+      tr(l, 'services.model.compute.up_to').replaceAll(r'$v', '$v');
 
-  static String over(Locale l, int v) => _pick(
-        l,
-        uz: '$v m² dan ortiq',
-        ru: 'свыше $v м²',
-        en: 'over $v m²',
-      );
+  static String over(Locale l, int v) =>
+      tr(l, 'services.model.compute.over').replaceAll(r'$v', '$v');
 
   static String range(int from, int to) =>
       '${_fmtNumber(from)}–${_fmtNumber(to)} m²';

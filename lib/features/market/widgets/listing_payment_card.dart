@@ -34,13 +34,7 @@ class ListingPaymentCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            tr(
-              Localizations.localeOf(context),
-              'market.payment.title',
-              uz: 'To\'lov usuli',
-              ru: 'Оплата',
-              en: 'Payment',
-            ),
+            tr(Localizations.localeOf(context), 'market.payment.title'),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w700,

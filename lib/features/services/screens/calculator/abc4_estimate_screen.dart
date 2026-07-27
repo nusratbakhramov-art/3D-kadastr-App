@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../market/widgets/listing_cta_button.dart';
 import '../../data/abc4_estimate_client.dart';
@@ -101,7 +102,7 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_Strings.error(locale))),
+        SnackBar(content: Text(tr(locale, 'services.calc.abc4.error'))),
       );
     } finally {
       if (mounted) setState(() => _submitting = false);
@@ -113,18 +114,22 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
     Locale locale,
   ) {
     final lines = <CalculatorLine>[
-      CalculatorLine(_Strings.objectLine(locale), r.profileSummary),
+      CalculatorLine(tr(locale, 'services.calc.abc4.object_line'), r.profileSummary),
       CalculatorLine(
-        _Strings.methodLine(locale),
-        r.isAbc ? _Strings.methodAbc(locale) : _Strings.methodApprox(locale),
+        tr(locale, 'services.calc.abc4.method_line'),
+        r.isAbc
+            ? tr(locale, 'services.calc.abc4.method_abc')
+            : tr(locale, 'services.calc.abc4.method_approx'),
       ),
       for (final l in r.lines)
         CalculatorLine(l.section, fmtUzsPublic(locale, l.costUzs)),
     ];
     return CalculatorResult(
-      categoryTitle: _Strings.title(locale),
+      categoryTitle: tr(locale, 'services.calc.repair_construction'),
       totalUzs: r.totalUzs,
-      note: r.isAbc ? _Strings.methodAbc(locale) : _Strings.noteApprox(locale),
+      note: r.isAbc
+          ? tr(locale, 'services.calc.abc4.method_abc')
+          : tr(locale, 'services.calc.abc4.note_approx'),
       lines: lines,
     );
   }
@@ -149,8 +154,8 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: _Strings.title(locale),
-                        subtitle: _Strings.subtitle(locale),
+                        title: tr(locale, 'services.calc.repair_construction'),
+                        subtitle: tr(locale, 'services.calc.abc4.subtitle'),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -158,7 +163,7 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
                         children: [
-                          CalculatorSectionLabel(text: _Strings.workKind(locale)),
+                          CalculatorSectionLabel(text: tr(locale, 'services.calc.abc4.work_kind')),
                           const SizedBox(height: 12),
                           for (final w in WorkKind.values) ...[
                             ChoiceTile(
@@ -170,7 +175,7 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
                           ],
                           const SizedBox(height: 18),
                           CalculatorSectionLabel(
-                            text: _Strings.buildingType(locale),
+                            text: tr(locale, 'services.calc.abc4.building_type'),
                           ),
                           const SizedBox(height: 12),
                           for (final t in BuildingType.values) ...[
@@ -183,7 +188,7 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
                           ],
                           const SizedBox(height: 18),
                           CalculatorSectionLabel(
-                            text: _Strings.wallMaterial(locale),
+                            text: tr(locale, 'services.calc.abc4.wall_material'),
                           ),
                           const SizedBox(height: 12),
                           for (final m in WallMaterial.values) ...[
@@ -196,7 +201,7 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
                           ],
                           const SizedBox(height: 18),
                           CalculatorSectionLabel(
-                            text: _Strings.finishLevel(locale),
+                            text: tr(locale, 'services.calc.abc4.finish_level'),
                           ),
                           const SizedBox(height: 12),
                           for (final f in FinishLevel.values) ...[
@@ -208,7 +213,7 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
                             const SizedBox(height: 10),
                           ],
                           const SizedBox(height: 18),
-                          CalculatorSectionLabel(text: _Strings.floors(locale)),
+                          CalculatorSectionLabel(text: tr(locale, 'services.calc.abc4.floors')),
                           const SizedBox(height: 12),
                           _FloorStepper(
                             value: _floors,
@@ -216,8 +221,8 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
                           ),
                           const SizedBox(height: 18),
                           CalculatorField(
-                            label: _Strings.areaLabel(locale),
-                            placeholder: _Strings.areaPlaceholder(locale),
+                            label: tr(locale, 'services.calc.abc4.area_label'),
+                            placeholder: tr(locale, 'services.calc.enter_area'),
                             controller: _area,
                             suffix: 'm²',
                           ),
@@ -228,8 +233,8 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
                         label: _submitting
-                            ? _Strings.calculating(locale)
-                            : _Strings.calculate(locale),
+                            ? tr(locale, 'services.calc.abc4.calculating')
+                            : tr(locale, 'services.calc.calculate'),
                         enabled: _ready,
                         onTap: _calculate,
                       ),
@@ -308,78 +313,4 @@ class _FloorStepper extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Strings {
-  const _Strings._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String title(Locale l) => _pick(
-        l,
-        "Ta'mirlash va qurilish",
-        'Ремонт и строительство',
-        'Repair & construction',
-      );
-
-  static String subtitle(Locale l) => _pick(
-        l,
-        'ABC-UZ smeta asosida hisob',
-        'Расчёт по смете ABC-UZ',
-        'ABC-UZ estimate-based calc',
-      );
-
-  static String workKind(Locale l) =>
-      _pick(l, 'Ish turi', 'Тип работ', 'Work type');
-
-  static String buildingType(Locale l) =>
-      _pick(l, 'Obyekt turi', 'Тип объекта', 'Building type');
-
-  static String wallMaterial(Locale l) =>
-      _pick(l, 'Devor materiali', 'Материал стен', 'Wall material');
-
-  static String finishLevel(Locale l) =>
-      _pick(l, 'Pardoz darajasi', 'Уровень отделки', 'Finish level');
-
-  static String floors(Locale l) =>
-      _pick(l, 'Qavatlar soni', 'Этажность', 'Floors');
-
-  static String areaLabel(Locale l) =>
-      _pick(l, 'Umumiy maydon', 'Общая площадь', 'Total area');
-
-  static String areaPlaceholder(Locale l) =>
-      _pick(l, 'Maydonni kiriting', 'Введите площадь', 'Enter area');
-
-  static String calculate(Locale l) =>
-      _pick(l, 'Hisoblash', 'Рассчитать', 'Calculate');
-
-  static String calculating(Locale l) =>
-      _pick(l, 'Hisoblanmoqda...', 'Расчёт...', 'Calculating...');
-
-  static String objectLine(Locale l) =>
-      _pick(l, 'Obyekt', 'Объект', 'Object');
-
-  static String methodLine(Locale l) =>
-      _pick(l, 'Hisob usuli', 'Метод расчёта', 'Method');
-
-  static String methodAbc(Locale l) =>
-      _pick(l, 'ABC-UZ smeta dasturi', 'Смета ABC-UZ', 'ABC-UZ estimate');
-
-  static String methodApprox(Locale l) =>
-      _pick(l, "Taxminiy (1 m² me'yori)", 'Приблизительно', 'Approximate');
-
-  static String noteApprox(Locale l) => _pick(
-        l,
-        "Taxminiy hisob — aniq smeta uchun ariza qoldiring.",
-        'Приблизительный расчёт — для точной сметы оставьте заявку.',
-        'Approximate — request a precise estimate.',
-      );
-
-  static String error(Locale l) => _pick(
-        l,
-        "Hisoblashda xatolik. Internetni tekshiring.",
-        'Ошибка расчёта. Проверьте интернет.',
-        'Calculation failed. Check your connection.',
-      );
 }

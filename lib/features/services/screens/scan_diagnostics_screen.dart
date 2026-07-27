@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../settings/settings_state.dart';
 import '../data/scan_capability_probe.dart';
@@ -400,91 +401,42 @@ class _ErrorBody extends StatelessWidget {
 }
 
 class _ScanDiagnosticsStrings {
-  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Диагностика сканирования',
-        'en' => 'Scan diagnostics',
-        _ => 'Skan diagnostika',
-      };
+  static String appBarTitle(Locale locale) =>
+      tr(locale, 'services.scan.diagnostics.app_bar_title');
 
-  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'LiDAR / depth sensor probe',
-        'en' => 'LiDAR / depth sensor probe',
-        _ => 'LiDAR / depth sensor probe',
-      };
+  static String appBarSubtitle(Locale locale) =>
+      tr(locale, 'services.scan.diagnostics.app_bar_subtitle');
 
-  static String selectedTier(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Выбранный уровень',
-        'en' => 'Selected tier',
-        _ => 'Tanlangan tier',
-      };
+  static String selectedTier(Locale locale) =>
+      tr(locale, 'services.scan.diagnostics.selected_tier');
 
-  static String reprobe(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Перепроверить',
-        'en' => 'Re-probe',
-        _ => 'Qayta tekshirish',
-      };
+  static String reprobe(Locale locale) =>
+      tr(locale, 'services.scan.diagnostics.reprobe');
 
-  static String retry(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Повторить',
-        'en' => 'Retry',
-        _ => 'Qayta urinish',
-      };
+  static String retry(Locale locale) =>
+      tr(locale, 'services.scan.diagnostics.retry');
 
-  static String probeError(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Ошибка проверки',
-        'en' => 'Probe error',
-        _ => 'Probe xatoligi',
-      };
+  static String probeError(Locale locale) =>
+      tr(locale, 'services.scan.diagnostics.probe_error');
 
   static String tierRoomPlanHint(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'На этом устройстве доступно полное RoomPlan-сканирование.',
-        'en' => 'Full RoomPlan scanning is available on this device.',
-        _ => 'Bu qurilmada to\'liq RoomPlan skani mavjud.',
-      };
+      tr(locale, 'services.scan.diagnostics.tier_roomplan_hint');
 
-  static String tierLidarHint(Locale locale) => switch (locale.languageCode) {
-        'ru' =>
-          'Доступна реконструкция меша LiDAR, RoomPlan нет (iOS < 16).',
-        'en' =>
-          'LiDAR mesh reconstruction is available, no RoomPlan (iOS < 16).',
-        _ => 'LiDAR mesh rekonstruksiyasi mavjud, RoomPlan yo\'q (iOS < 16).',
-      };
+  static String tierLidarHint(Locale locale) =>
+      tr(locale, 'services.scan.diagnostics.tier_lidar_hint');
 
-  static String tierDepthHint(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Аппаратного LiDAR нет, но depth sensing доступен.',
-        'en' => 'No hardware LiDAR, but depth sensing is available.',
-        _ => 'Hardware LiDAR yo\'q, lekin depth sensing mavjud.',
-      };
+  static String tierDepthHint(Locale locale) =>
+      tr(locale, 'services.scan.diagnostics.tier_depth_hint');
 
   static String tierPhotogrammetryLabel(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Фотограмметрия',
-        'en' => 'Photogrammetry',
-        _ => 'Fotogrammetriya',
-      };
+      tr(locale, 'services.scan.diagnostics.tier_photogrammetry_label');
 
   static String tierPhotogrammetryHint(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' =>
-          'Real-time depth нет. Будет fallback на фото-сканирование.',
-        'en' =>
-          'No real-time depth. Will fall back to photo-based scanning.',
-        _ =>
-          'Real-time depth yo\'q. Foto-asosli skanga fallback bo\'ladi.',
-      };
+      tr(locale, 'services.scan.diagnostics.tier_photogrammetry_hint');
 
   static String tierUnsupportedLabel(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => 'Не поддерживается',
-        'en' => 'Unsupported',
-        _ => 'Qo\'llab-quvvatlanmaydi',
-      };
+      tr(locale, 'services.scan.diagnostics.tier_unsupported_label');
 
   static String tierUnsupportedHint(Locale locale) =>
-      switch (locale.languageCode) {
-        'ru' => '3D-сканирование не работает.',
-        'en' => '3D scanning is not available.',
-        _ => '3D skan ishlamaydi.',
-      };
+      tr(locale, 'services.scan.diagnostics.tier_unsupported_hint');
 }

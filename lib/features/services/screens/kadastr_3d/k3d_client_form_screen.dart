@@ -14,6 +14,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../home/user_profile.dart';
 import '../../../market/widgets/listing_cta_button.dart';
@@ -146,8 +147,8 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                       child: ServiceAppBar(
-                        title: _K3dClientFormStrings.appBarTitle(l),
-                        subtitle: _K3dClientFormStrings.appBarSubtitle(l),
+                        title: tr(l, 'services.k3d.client.appbar'),
+                        subtitle: tr(l, 'services.k3d.client.subtitle'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -159,24 +160,24 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
-                          _FieldLabel(_K3dClientFormStrings.nameLabel(l),
+                          _FieldLabel(tr(l, 'services.k3d.client.name_label'),
                               isDark: isDark),
                           const SizedBox(height: 8),
                           _AppTextField(
                             controller: _nameCtrl,
                             isDark: isDark,
                             placeholder:
-                                _K3dClientFormStrings.namePlaceholder(l),
+                                tr(l, 'services.k3d.client.name_placeholder'),
                             keyboardType: TextInputType.name,
                             textCapitalization: TextCapitalization.words,
                             errorText: _nameErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(_K3dClientFormStrings.stirLabel(l),
+                          _FieldLabel(tr(l, 'services.k3d.client.stir_label'),
                               isDark: isDark),
                           const SizedBox(height: 4),
                           Text(
-                            _K3dClientFormStrings.stirHint(l),
+                            tr(l, 'services.k3d.client.stir_hint'),
                             style: TextStyle(
                               fontFamily: 'MTSText',
                               fontSize: 12,
@@ -198,7 +199,7 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                             errorText: _stirErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(_K3dClientFormStrings.phoneLabel(l),
+                          _FieldLabel(tr(l, 'services.k3d.phone'),
                               isDark: isDark),
                           const SizedBox(height: 8),
                           _AppTextField(
@@ -210,7 +211,7 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                             errorText: _phoneErr,
                           ),
                           const SizedBox(height: 16),
-                          _FieldLabel(_K3dClientFormStrings.emailLabel(l),
+                          _FieldLabel(tr(l, 'services.k3d.client.email_label'),
                               isDark: isDark),
                           const SizedBox(height: 8),
                           _AppTextField(
@@ -227,7 +228,7 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _K3dClientFormStrings.ctaContinue(l),
+                        label: tr(l, 'services.k3d.continue'),
                         enabled: true,
                         onTap: _continue,
                       ),
@@ -248,29 +249,29 @@ class _K3dClientFormScreenState extends State<K3dClientFormScreen> {
 
 String? _validateName(String raw, Locale l) {
   final v = raw.trim();
-  if (v.isEmpty) return _K3dClientFormStrings.errNameRequired(l);
-  if (v.length < 2) return _K3dClientFormStrings.errTooShort(l);
+  if (v.isEmpty) return tr(l, 'services.k3d.client.err_name_required');
+  if (v.length < 2) return tr(l, 'services.k3d.client.err_too_short');
   return null;
 }
 
 String? _validateStir(String raw, Locale l) {
   final v = raw.trim();
-  if (v.isEmpty) return _K3dClientFormStrings.errStirRequired(l);
+  if (v.isEmpty) return tr(l, 'services.k3d.client.err_stir_required');
   if (!RegExp(r'^\d+$').hasMatch(v)) {
-    return _K3dClientFormStrings.errDigitsOnly(l);
+    return tr(l, 'services.k3d.client.err_digits_only');
   }
   if (v.length != 9 && v.length != 14) {
-    return _K3dClientFormStrings.errStirLength(l);
+    return tr(l, 'services.k3d.client.err_stir_length');
   }
   return null;
 }
 
 String? _validatePhone(String raw, Locale l) {
   final digits = raw.replaceAll(RegExp(r'\D'), '');
-  if (digits.isEmpty) return _K3dClientFormStrings.errPhoneRequired(l);
+  if (digits.isEmpty) return tr(l, 'services.k3d.client.err_phone_required');
   final normalized = digits.length == 9 ? '998$digits' : digits;
   if (normalized.length != 12 || !normalized.startsWith('998')) {
-    return _K3dClientFormStrings.errPhoneFormat(l);
+    return tr(l, 'services.k3d.client.err_phone_format');
   }
   return null;
 }
@@ -279,7 +280,7 @@ String? _validateEmail(String raw, Locale l) {
   final v = raw.trim();
   if (v.isEmpty) return null;
   if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v)) {
-    return _K3dClientFormStrings.errEmailInvalid(l);
+    return tr(l, 'services.k3d.client.err_email_invalid');
   }
   return null;
 }
@@ -453,108 +454,3 @@ class _PhoneMaskFormatter extends TextInputFormatter {
   }
 }
 
-class _K3dClientFormStrings {
-  const _K3dClientFormStrings._();
-
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Заказчик',
-        'en' => 'Client',
-        _ => 'Buyurtmachi',
-      };
-
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Введите ваши данные',
-        'en' => 'Enter your details',
-        _ => 'Ma\'lumotlaringizni kiriting',
-      };
-
-  static String nameLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Имя / Компания',
-        'en' => 'Name / Company',
-        _ => 'Ism / Kompaniya',
-      };
-
-  static String namePlaceholder(Locale l) => switch (l.languageCode) {
-        'ru' => 'Иванов Иван или ООО «ABC»',
-        'en' => 'John Smith or "ABC" LLC',
-        _ => 'Toshpo\'lat Toshpo\'latov yoki "ABC" MChJ',
-      };
-
-  static String stirLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'ИНН или ПИНФЛ',
-        'en' => 'TIN or PINFL',
-        _ => 'STIR yoki JSHSHIR',
-      };
-
-  static String stirHint(Locale l) => switch (l.languageCode) {
-        'ru' => 'Юр. лицо: 9 цифр. Физ. лицо: 14 цифр.',
-        'en' => 'Legal entity: 9 digits. Individual: 14 digits.',
-        _ => 'Yuridik shaxs: 9 raqam. Jismoniy shaxs: 14 raqam.',
-      };
-
-  static String phoneLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Телефон',
-        'en' => 'Phone',
-        _ => 'Telefon',
-      };
-
-  static String emailLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Email (необязательно)',
-        'en' => 'Email (optional)',
-        _ => 'Email (ixtiyoriy)',
-      };
-
-  static String ctaContinue(Locale l) => switch (l.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
-
-  static String errNameRequired(Locale l) => switch (l.languageCode) {
-        'ru' => 'Введите имя',
-        'en' => 'Name is required',
-        _ => 'Ism kerak',
-      };
-
-  static String errTooShort(Locale l) => switch (l.languageCode) {
-        'ru' => 'Слишком коротко',
-        'en' => 'Too short',
-        _ => 'Juda qisqa',
-      };
-
-  static String errStirRequired(Locale l) => switch (l.languageCode) {
-        'ru' => 'Введите ИНН или ПИНФЛ',
-        'en' => 'TIN or PINFL is required',
-        _ => 'STIR yoki JSHSHIR kerak',
-      };
-
-  static String errDigitsOnly(Locale l) => switch (l.languageCode) {
-        'ru' => 'Только цифры',
-        'en' => 'Digits only',
-        _ => 'Faqat raqamlar',
-      };
-
-  static String errStirLength(Locale l) => switch (l.languageCode) {
-        'ru' => 'Должно быть ровно 9 или 14 цифр',
-        'en' => 'Must be exactly 9 or 14 digits',
-        _ => 'Aniq 9 yoki 14 raqam bo\'lishi kerak',
-      };
-
-  static String errPhoneRequired(Locale l) => switch (l.languageCode) {
-        'ru' => 'Введите телефон',
-        'en' => 'Phone is required',
-        _ => 'Telefon kerak',
-      };
-
-  static String errPhoneFormat(Locale l) => switch (l.languageCode) {
-        'ru' => 'Формат UZ: +998 XX XXX-XX-XX',
-        'en' => 'UZ format: +998 XX XXX-XX-XX',
-        _ => 'UZ formati: +998 XX XXX-XX-XX',
-      };
-
-  static String errEmailInvalid(Locale l) => switch (l.languageCode) {
-        'ru' => 'Неверный email',
-        'en' => 'Invalid email',
-        _ => 'Email noto\'g\'ri',
-      };
-}

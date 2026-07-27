@@ -437,71 +437,30 @@ class _PayingButton extends StatelessWidget {
 class _S {
   const _S._();
 
-  static String title(Locale l) => switch (l.languageCode) {
-        'ru' => 'Подача заявки',
-        'en' => 'Submit application',
-        _ => 'Ariza yuborish',
-      };
+  static String title(Locale l) => tr(l, 'payments.ai.title');
 
-  static String subtitle(Locale l) => switch (l.languageCode) {
-        'ru' => 'Оплатите, чтобы оформить официальную заявку',
-        'en' => 'Pay to submit the official application',
-        _ => 'Rasmiy arizani rasmiylashtirish uchun to\'lov qiling',
-      };
+  static String subtitle(Locale l) => tr(l, 'payments.ai.subtitle');
 
-  static String amountLabel(Locale l) => switch (l.languageCode) {
-        'ru' => 'Сумма к оплате',
-        'en' => 'Amount due',
-        _ => 'To\'lov summasi',
-      };
+  static String amountLabel(Locale l) => tr(l, 'payments.ai.amount_label');
 
-  static String method(Locale l) => switch (l.languageCode) {
-        'ru' => 'Способ оплаты',
-        'en' => 'Payment method',
-        _ => 'To\'lov usuli',
-      };
+  static String method(Locale l) => tr(l, 'payments.ai.method');
 
-  static String soon(Locale l) => switch (l.languageCode) {
-        'ru' => 'скоро',
-        'en' => 'soon',
-        _ => 'tez orada',
-      };
+  static String soon(Locale l) => tr(l, 'payments.ai.soon');
 
-  static String pay(Locale l) => tr(
-        l,
-        'ai.payment.submit_cta',
-        uz: 'Ariza yuborish (xizmat pullik)',
-        ru: 'Отправить заявку (услуга платная)',
-        en: 'Submit application (paid service)',
-      );
+  static String pay(Locale l) => tr(l, 'ai.payment.submit_cta');
 
+  // Bare currency unit glued to the amount — locale-neutral, kept inline.
   static String soum(Locale l) => switch (l.languageCode) {
         'ru' => 'сум',
         'en' => 'soum',
         _ => 'so\'m',
       };
 
-  static String loadingAmount(Locale l) => switch (l.languageCode) {
-        'ru' => 'Загрузка суммы...',
-        'en' => 'Loading amount...',
-        _ => 'Summa yuklanmoqda...',
-      };
+  static String loadingAmount(Locale l) => tr(l, 'payments.ai.loading_amount');
 
-  static String amountError(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось получить сумму',
-        'en' => 'Could not load the amount',
-        _ => 'Summani olib bo\'lmadi',
-      };
+  static String amountError(Locale l) => tr(l, 'payments.ai.amount_error');
 
-  static String retry(Locale l) => switch (l.languageCode) {
-        'ru' => 'Повторить',
-        'en' => 'Retry',
-        _ => 'Qayta urinish',
-      };
+  static String retry(Locale l) => tr(l, 'payments.ai.retry');
 
-  static String openFailed(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось открыть Payme',
-        'en' => 'Could not open Payme',
-        _ => 'Payme ochilmadi',
-      };
+  static String openFailed(Locale l) => tr(l, 'payments.ai.open_failed');
 }

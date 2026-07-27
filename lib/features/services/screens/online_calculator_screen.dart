@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/calculator_draft.dart';
 import '../widgets/service_app_bar.dart';
@@ -60,7 +61,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: ServiceAppBar(title: _Strings.appBar(locale)),
+                      child: ServiceAppBar(title: tr(locale, 'services.calc.appbar')),
                     ),
                     Expanded(
                       child: ListView(
@@ -70,7 +71,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                             controller: _controller,
                             index: 0,
                             child: Text(
-                              _Strings.heading(locale),
+                              tr(locale, 'services.calc.choose_service_heading'),
                               style: TextStyle(
                                 fontFamily: 'MTSCompact',
                                 fontWeight: FontWeight.w900,
@@ -85,7 +86,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                             controller: _controller,
                             index: 0,
                             child: Text(
-                              _Strings.subheading(locale),
+                              tr(locale, 'services.calc.subheading'),
                               style: TextStyle(
                                 fontFamily: 'MTSText',
                                 fontSize: 13,
@@ -223,30 +224,6 @@ class _CategoryCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _Strings {
-  const _Strings._();
-
-  static String _pick(Locale l, String uz, String ru, String en) =>
-      switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
-
-  static String appBar(Locale l) => _pick(
-        l,
-        'Onlayn kalkulyator',
-        'Онлайн калькулятор',
-        'Online calculator',
-      );
-
-  static String heading(Locale l) =>
-      _pick(l, 'Xizmatni tanlang', 'Выберите услугу', 'Choose a service');
-
-  static String subheading(Locale l) => _pick(
-        l,
-        'Har bir xizmatning narxini alohida hisoblang.',
-        'Рассчитайте стоимость каждой услуги отдельно.',
-        'Calculate the cost of each service separately.',
-      );
 }
 
 class _StaggeredEntry extends StatelessWidget {

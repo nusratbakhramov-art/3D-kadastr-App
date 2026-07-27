@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -236,51 +237,27 @@ class _ScanObjectTypeScreenState extends State<ScanObjectTypeScreen> {
 }
 
 class _ScanObjectTypeStrings {
-  static String appBarTitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => '3D Кадастр',
-        'en' => '3D Cadastre',
-        _ => '3D kadastr',
-      };
+  static String appBarTitle(Locale locale) =>
+      tr(locale, 'services.scan.object_type.app_bar_title');
 
-  static String appBarSubtitle(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Выберите тип объекта',
-        'en' => 'Select object type',
-        _ => 'Obyekt turini tanlang',
-      };
+  static String appBarSubtitle(Locale locale) =>
+      tr(locale, 'services.scan.object_type.app_bar_subtitle');
 
-  static String heading(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Тип объекта',
-        'en' => 'Object type',
-        _ => 'Obyekt turi',
-      };
+  static String heading(Locale locale) =>
+      tr(locale, 'services.scan.object_type.heading');
 
-  static String subheading(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Выберите тип сканируемого объекта',
-        'en' => 'Select the type of object being scanned',
-        _ => 'Skan qilinayotgan obyekt turini tanlang',
-      };
+  static String subheading(Locale locale) =>
+      tr(locale, 'services.scan.object_type.subheading');
 
-  static String ctaContinue(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Продолжить',
-        'en' => 'Continue',
-        _ => 'Davom etish',
-      };
+  static String ctaContinue(Locale locale) =>
+      tr(locale, 'services.scan.object_type.cta_continue');
 
-  static String retry(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Повторить',
-        'en' => 'Retry',
-        _ => 'Qayta urinish',
-      };
+  static String retry(Locale locale) =>
+      tr(locale, 'services.scan.object_type.retry');
 
-  static String errLoad(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Не удалось загрузить типы объектов',
-        'en' => 'Could not load object types',
-        _ => 'Obyekt turlarini yuklab boʻlmadi',
-      };
+  static String errLoad(Locale locale) =>
+      tr(locale, 'services.scan.object_type.err_load');
 
-  static String errLogin(Locale locale) => switch (locale.languageCode) {
-        'ru' => 'Сессия истекла, войдите снова',
-        'en' => 'Session expired, please sign in again',
-        _ => 'Sessiya tugadi, qaytadan kiring',
-      };
+  static String errLogin(Locale locale) =>
+      tr(locale, 'services.scan.object_type.err_login');
 }

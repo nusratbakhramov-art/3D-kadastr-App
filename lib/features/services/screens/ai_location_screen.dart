@@ -17,6 +17,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/i18n.dart';
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
@@ -846,51 +847,24 @@ class _AddressBanner extends StatelessWidget {
 class _AiLocationStrings {
   const _AiLocationStrings._();
 
-  static String appBarTitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Расположение',
-    'en' => 'Location',
-    _ => 'Joylashuv',
-  };
+  static String appBarTitle(Locale l) =>
+      tr(l, 'services.ai.location.app_bar_title');
 
-  static String appBarSubtitle(Locale l) => switch (l.languageCode) {
-    'ru' => 'Отметьте расположение объекта на карте',
-    'en' => 'Mark the object location on the map',
-    _ => 'Obyekt joylashuvini xaritada belgilang',
-  };
+  static String appBarSubtitle(Locale l) =>
+      tr(l, 'services.ai.location.app_bar_subtitle');
 
-  static String confirm(Locale l) => switch (l.languageCode) {
-    'ru' => 'Подтвердить и отправить',
-    'en' => 'Confirm and submit',
-    _ => 'Tasdiqlash va yuborish',
-  };
+  static String confirm(Locale l) => tr(l, 'services.ai.location.confirm');
 
-  static String detecting(Locale l) => switch (l.languageCode) {
-    'ru' => 'Определение адреса...',
-    'en' => 'Detecting address...',
-    _ => 'Manzil aniqlanmoqda...',
-  };
+  static String detecting(Locale l) => tr(l, 'services.ai.location.detecting');
 
-  static String notFound(Locale l) => switch (l.languageCode) {
-        'ru' => 'Адрес не найден',
-        'en' => 'Address not found',
-        _ => 'Manzil topilmadi',
-      };
+  static String notFound(Locale l) => tr(l, 'services.ai.location.not_found');
 
-  static String locationOff(Locale l) => switch (l.languageCode) {
-        'ru' => 'Включите геолокацию на устройстве',
-        'en' => 'Turn on location services',
-        _ => 'Qurilmada joylashuvni yoqing',
-      };
+  static String locationOff(Locale l) =>
+      tr(l, 'services.ai.location.location_off');
 
-  static String locationDenied(Locale l) => switch (l.languageCode) {
-        'ru' => 'Нет доступа к геолокации',
-        'en' => 'Location permission denied',
-        _ => 'Joylashuvga ruxsat berilmadi',
-      };
+  static String locationDenied(Locale l) =>
+      tr(l, 'services.ai.location.location_denied');
 
-  static String locationError(Locale l) => switch (l.languageCode) {
-        'ru' => 'Не удалось определить местоположение',
-        'en' => 'Could not determine location',
-        _ => 'Joylashuvni aniqlab boʻlmadi',
-      };
+  static String locationError(Locale l) =>
+      tr(l, 'services.ai.location.location_error');
 }

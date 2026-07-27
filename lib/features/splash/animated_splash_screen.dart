@@ -283,9 +283,12 @@ class _BrandText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Text(
+    // Brand wordmark — intentionally NOT backend-driven. The splash paints the
+    // very first frame, before the i18n bundle finishes loading, so a tr() key
+    // would flash raw. It's a fixed brand mark anyway.
+    return Text(
       '3D kadastr',
-      style: TextStyle(
+      style: const TextStyle(
         fontFamily: 'MTSCompact',
         fontWeight: FontWeight.w900,
         fontSize: _AnimatedSplashScreenState._textFontSize,

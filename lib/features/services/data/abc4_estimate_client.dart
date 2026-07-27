@@ -12,11 +12,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../../../core/api_config.dart';
+import '../../../core/i18n/app_translations.dart';
 
 // ─── enums (mirror backend app/schemas/construction_estimate.py) ──────────
-
-String _pick(Locale l, {required String uz, required String ru, required String en}) =>
-    switch (l.languageCode) { 'ru' => ru, 'en' => en, _ => uz };
 
 enum WorkKind {
   construction('construction'),
@@ -27,9 +25,8 @@ enum WorkKind {
 
   String label(Locale l) => switch (this) {
         WorkKind.construction =>
-          _pick(l, uz: 'Qurilish (noldan)', ru: 'Строительство', en: 'New construction'),
-        WorkKind.renovation =>
-          _pick(l, uz: "Ta'mirlash", ru: 'Ремонт', en: 'Renovation'),
+          tr(l, 'services.data.abc4.work_kind.construction'),
+        WorkKind.renovation => tr(l, 'services.data.abc4.work_kind.renovation'),
       };
 }
 
@@ -45,27 +42,15 @@ enum BuildingType {
 
   String label(Locale l) => switch (this) {
         BuildingType.apartment =>
-          _pick(l, uz: 'Xonadon', ru: 'Квартира', en: 'Apartment'),
-        BuildingType.privateHouse => _pick(
-            l,
-            uz: 'Yakka tartibdagi uy',
-            ru: 'Частный дом',
-            en: 'Private house',
-          ),
-        BuildingType.multiStorey => _pick(
-            l,
-            uz: "Ko'p qavatli bino",
-            ru: 'Многоэтажное здание',
-            en: 'Multi-storey building',
-          ),
-        BuildingType.commercial => _pick(
-            l,
-            uz: 'Tijorat obyekti',
-            ru: 'Коммерческий объект',
-            en: 'Commercial',
-          ),
+          tr(l, 'services.data.abc4.building.apartment'),
+        BuildingType.privateHouse =>
+          tr(l, 'services.data.abc4.building.private_house'),
+        BuildingType.multiStorey =>
+          tr(l, 'services.data.abc4.building.multi_storey'),
+        BuildingType.commercial =>
+          tr(l, 'services.data.abc4.building.commercial'),
         BuildingType.industrial =>
-          _pick(l, uz: 'Sanoat obyekti', ru: 'Промышленный', en: 'Industrial'),
+          tr(l, 'services.data.abc4.building.industrial'),
       };
 }
 
@@ -80,14 +65,11 @@ enum WallMaterial {
   final String wire;
 
   String label(Locale l) => switch (this) {
-        WallMaterial.brick => _pick(l, uz: "G'isht", ru: 'Кирпич', en: 'Brick'),
-        WallMaterial.block =>
-          _pick(l, uz: 'Blok (gazoblok)', ru: 'Блок', en: 'Block'),
-        WallMaterial.panel => _pick(l, uz: 'Panel', ru: 'Панель', en: 'Panel'),
-        WallMaterial.monolith =>
-          _pick(l, uz: 'Monolit', ru: 'Монолит', en: 'Monolith'),
-        WallMaterial.wood =>
-          _pick(l, uz: "Yog'och / karkas", ru: 'Дерево / каркас', en: 'Wood / frame'),
+        WallMaterial.brick => tr(l, 'services.data.abc4.wall.brick'),
+        WallMaterial.block => tr(l, 'services.data.abc4.wall.block'),
+        WallMaterial.panel => tr(l, 'services.data.abc4.wall.panel'),
+        WallMaterial.monolith => tr(l, 'services.data.abc4.wall.monolith'),
+        WallMaterial.wood => tr(l, 'services.data.abc4.wall.wood'),
       };
 }
 
@@ -100,12 +82,9 @@ enum FinishLevel {
   final String wire;
 
   String label(Locale l) => switch (this) {
-        FinishLevel.rough =>
-          _pick(l, uz: 'Qora suvoq', ru: 'Черновая', en: 'Rough'),
-        FinishLevel.standard =>
-          _pick(l, uz: "O'rtacha pardoz", ru: 'Стандарт', en: 'Standard'),
-        FinishLevel.premium =>
-          _pick(l, uz: 'Lyuks pardoz', ru: 'Премиум', en: 'Premium'),
+        FinishLevel.rough => tr(l, 'services.data.abc4.finish.rough'),
+        FinishLevel.standard => tr(l, 'services.data.abc4.finish.standard'),
+        FinishLevel.premium => tr(l, 'services.data.abc4.finish.premium'),
       };
 }
 

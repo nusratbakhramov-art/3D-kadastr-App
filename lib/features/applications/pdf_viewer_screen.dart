@@ -13,6 +13,7 @@ import 'package:pdfx/pdfx.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/haptics.dart';
+import '../../core/i18n/app_translations.dart';
 import '../../theme/color_tokens.dart';
 
 class PdfViewerScreen extends StatefulWidget {
@@ -90,7 +91,7 @@ class _PdfViewerScreenState extends State<PdfViewerScreen> {
         ),
         actions: [
           IconButton(
-            tooltip: _PdfStrings.share(lang),
+            tooltip: tr(Locale(lang), 'applications.pdf.share'),
             onPressed: hapticTap(_share),
             icon: const Icon(Icons.ios_share_rounded),
           ),
@@ -149,7 +150,7 @@ class _ErrorView extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
-          _PdfStrings.error(lang),
+          tr(Locale(lang), 'applications.pdf.error'),
           textAlign: TextAlign.center,
           style: TextStyle(
             fontFamily: 'MTSCompact',
@@ -162,18 +163,3 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-class _PdfStrings {
-  const _PdfStrings._();
-
-  static String share(String lang) => switch (lang) {
-        'ru' => 'Поделиться',
-        'en' => 'Share',
-        _ => 'Ulashish',
-      };
-
-  static String error(String lang) => switch (lang) {
-        'ru' => 'Не удалось открыть PDF',
-        'en' => 'Could not open the PDF',
-        _ => 'PDF ochib bo\'lmadi',
-      };
-}

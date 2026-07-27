@@ -222,11 +222,11 @@ class _BellButton extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // Real 3D-rendered bell asset (green), sized to the same 40pt
-            // footprint so the tap target and unread dot stay put.
+            // Real 3D-rendered bell asset (green), sized to a 48pt footprint
+            // so the tap target and unread dot stay put.
             SizedBox(
-              width: 40,
-              height: 40,
+              width: 48,
+              height: 48,
               child: Padding(
                 padding: const EdgeInsets.all(2),
                 child: Image.asset(
@@ -261,26 +261,14 @@ class _HomeStrings {
   const _HomeStrings._();
 
   static String userGreeting(Locale locale, String name) {
-    final prefix = tr(
-      locale,
-      'home.header.greeting_prefix',
-      uz: 'Salom',
-      ru: 'Привет',
-      en: 'Hi',
-    );
+    final prefix = tr(locale, 'home.header.greeting_prefix');
     return '$prefix, $name👋';
   }
 
-  static String guestGreeting(Locale locale) => tr(
-    locale,
-    'home.header.guest_greeting',
-    uz: 'Salom, mehmon👋',
-    ru: 'Привет, гость👋',
-    en: 'Hi, guest👋',
-  );
+  static String guestGreeting(Locale locale) =>
+      tr(locale, 'home.header.guest_greeting');
 
-  static String loginLabel(Locale locale) =>
-      tr(locale, 'home.header.login', uz: 'Kirish', ru: 'Войти', en: 'Log in');
+  static String loginLabel(Locale locale) => tr(locale, 'home.header.login');
 
   static String formatDate(Locale locale, DateTime date) {
     final month = _monthName(locale, date.month);
@@ -288,53 +276,21 @@ class _HomeStrings {
   }
 
   static String _monthName(Locale locale, int month) {
-    const uz = [
-      'yanvar',
-      'fevral',
-      'mart',
-      'aprel',
-      'may',
-      'iyun',
-      'iyul',
-      'avgust',
-      'sentabr',
-      'oktabr',
-      'noyabr',
-      'dekabr',
-    ];
-    const ru = [
-      'января',
-      'февраля',
-      'марта',
-      'апреля',
-      'мая',
-      'июня',
-      'июля',
-      'августа',
-      'сентября',
-      'октября',
-      'ноября',
-      'декабря',
-    ];
-    const en = [
-      'January',
-      'February',
-      'March',
-      'April',
-      'May',
-      'June',
-      'July',
-      'August',
-      'September',
-      'October',
-      'November',
-      'December',
+    const keys = [
+      'home.month.jan',
+      'home.month.feb',
+      'home.month.mar',
+      'home.month.apr',
+      'home.month.may',
+      'home.month.jun',
+      'home.month.jul',
+      'home.month.aug',
+      'home.month.sep',
+      'home.month.oct',
+      'home.month.nov',
+      'home.month.dec',
     ];
     final i = (month - 1).clamp(0, 11);
-    return switch (locale.languageCode) {
-      'ru' => ru[i],
-      'en' => en[i],
-      _ => uz[i],
-    };
+    return tr(locale, keys[i]);
   }
 }

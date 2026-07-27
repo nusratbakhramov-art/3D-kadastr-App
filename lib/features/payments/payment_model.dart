@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/i18n/app_translations.dart';
+
 /// Payment provider (mirrors backend `PaymentProvider`).
 enum PaymentMethod { click, payme, uzum }
 
@@ -94,26 +96,10 @@ extension PaymentTypeX on PaymentType {
   };
 
   String label(Locale l) => switch (this) {
-    PaymentType.aiValuation => switch (l.languageCode) {
-      'ru' => 'AI-оценка',
-      'en' => 'AI valuation',
-      _ => 'AI baholash',
-    },
-    PaymentType.marketplacePurchase => switch (l.languageCode) {
-      'ru' => 'Покупка в маркетплейсе',
-      'en' => 'Marketplace purchase',
-      _ => 'Marketplace xaridi',
-    },
-    PaymentType.virtualPropertyView => switch (l.languageCode) {
-      'ru' => 'Виртуальный объект',
-      'en' => 'Virtual property',
-      _ => 'Virtual obyekt',
-    },
-    PaymentType.subscription => switch (l.languageCode) {
-      'ru' => 'Подписка',
-      'en' => 'Subscription',
-      _ => 'Obuna',
-    },
+    PaymentType.aiValuation => tr(l, 'payments.type.ai_valuation'),
+    PaymentType.marketplacePurchase => tr(l, 'payments.type.marketplace_purchase'),
+    PaymentType.virtualPropertyView => tr(l, 'payments.type.virtual_property_view'),
+    PaymentType.subscription => tr(l, 'payments.type.subscription'),
     // Unknown codes fall back to the prettified raw code via Payment.title().
     PaymentType.other => '',
   };
@@ -153,36 +139,12 @@ extension PaymentStatusX on PaymentStatus {
   };
 
   String label(Locale l) => switch (this) {
-    PaymentStatus.completed => switch (l.languageCode) {
-      'ru' => 'Оплачено',
-      'en' => 'Paid',
-      _ => 'To‘langan',
-    },
-    PaymentStatus.pending => switch (l.languageCode) {
-      'ru' => 'В ожидании',
-      'en' => 'Pending',
-      _ => 'Kutilmoqda',
-    },
-    PaymentStatus.processing => switch (l.languageCode) {
-      'ru' => 'В обработке',
-      'en' => 'Processing',
-      _ => 'Jarayonda',
-    },
-    PaymentStatus.failed => switch (l.languageCode) {
-      'ru' => 'Ошибка',
-      'en' => 'Failed',
-      _ => 'Amalga oshmadi',
-    },
-    PaymentStatus.cancelled => switch (l.languageCode) {
-      'ru' => 'Отменён',
-      'en' => 'Cancelled',
-      _ => 'Bekor qilindi',
-    },
-    PaymentStatus.refunded => switch (l.languageCode) {
-      'ru' => 'Возврат',
-      'en' => 'Refunded',
-      _ => 'Qaytarildi',
-    },
+    PaymentStatus.completed => tr(l, 'payments.status.completed'),
+    PaymentStatus.pending => tr(l, 'payments.status.pending'),
+    PaymentStatus.processing => tr(l, 'payments.status.processing'),
+    PaymentStatus.failed => tr(l, 'payments.status.failed'),
+    PaymentStatus.cancelled => tr(l, 'payments.status.cancelled'),
+    PaymentStatus.refunded => tr(l, 'payments.status.refunded'),
   };
 }
 

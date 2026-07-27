@@ -305,65 +305,21 @@ class _RowSpec {
 class _ProfileStrings {
   const _ProfileStrings._();
 
-  static String guestName(Locale l) => switch (l.languageCode) {
-    'ru' => 'Гость',
-    'en' => 'Guest',
-    _ => 'Mehmon',
-  };
+  static String guestName(Locale l) => tr(l, 'profile.guest_name');
 
-  static String myProfile(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мой профиль',
-    'en' => 'My profile',
-    _ => 'Mening profilim',
-  };
+  static String myProfile(Locale l) => tr(l, 'profile.my_profile');
 
+  static String aboutApp(Locale l) => tr(l, 'profile.about_app');
 
+  static String ratings(Locale l) => tr(l, 'profile.ratings');
 
+  static String payments(Locale l) => tr(l, 'profile.payments');
 
-  static String aboutApp(Locale l) => tr(
-    l,
-    'profile.about_app',
-    uz: 'Ilova haqida',
-    ru: 'О приложении',
-    en: 'About app',
-  );
+  static String settings(Locale l) => tr(l, 'profile.settings');
 
-  static String ratings(Locale l) => switch (l.languageCode) {
-    'ru' => 'Мои оценки',
-    'en' => 'My ratings',
-    _ => 'Baholashlarim',
-  };
+  static String help(Locale l) => tr(l, 'profile.help');
 
-  static String payments(Locale l) => switch (l.languageCode) {
-    'ru' => 'Платежи',
-    'en' => 'Payments',
-    _ => "To'lovlar",
-  };
+  static String login(Locale l) => tr(l, 'profile.login');
 
-  static String settings(Locale l) => switch (l.languageCode) {
-    'ru' => 'Настройки',
-    'en' => 'Settings',
-    _ => 'Sozlamalar',
-  };
-
-  static String help(Locale l) => switch (l.languageCode) {
-    'ru' => 'Помощь',
-    'en' => 'Help',
-    _ => 'Yordam',
-  };
-
-  static String login(Locale l) => switch (l.languageCode) {
-    'ru' => 'Войти',
-    'en' => 'Log in',
-    _ => 'Kirish',
-  };
-
-  static String guestHint(Locale l) => switch (l.languageCode) {
-    'ru' =>
-        'Войдите, чтобы видеть свои сканирования, оценки и историю заказов.',
-    'en' =>
-        'Log in to see your scans, valuations and order history.',
-    _ => 'Skanerlaringiz, baholashlaringiz va buyurtmalar tarixini ko\'rish '
-        'uchun tizimga kiring.',
-  };
+  static String guestHint(Locale l) => tr(l, 'profile.guest_hint');
 }
