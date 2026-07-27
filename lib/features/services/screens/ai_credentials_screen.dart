@@ -143,16 +143,30 @@ class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
                           if (creds.isEmpty)
                             _EmptyNote(text: _S.empty(l), isDark: isDark)
                           else
-                            // Single column — one appraiser doc per row.
-                            for (final c in creds) ...[
-                              AppraiserCredentialCard(
-                                credential: c,
-                                viewHint: _S.viewHint(l),
-                                isDark: isDark,
-                                onTap: () => _openDoc(creds, c),
-                              ),
-                              const SizedBox(height: 10),
-                            ],
+                            // Two-up poster grid — same as the profile About page.
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                const gap = 10.0;
+                                final w = (constraints.maxWidth - gap) / 2;
+                                return Wrap(
+                                  spacing: gap,
+                                  runSpacing: gap,
+                                  children: [
+                                    for (final c in creds)
+                                      SizedBox(
+                                        width: w,
+                                        child: AppraiserCredentialCard(
+                                          credential: c,
+                                          viewHint: _S.viewHint(l),
+                                          isDark: isDark,
+                                          poster: true,
+                                          onTap: () => _openDoc(creds, c),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
                         ],
                       );
                     },
