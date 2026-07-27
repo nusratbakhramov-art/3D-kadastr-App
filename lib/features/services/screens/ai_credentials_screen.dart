@@ -13,15 +13,14 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
-import '../../../core/haptics.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
-import '../../../widgets/remote_image.dart';
 import '../../market/widgets/fullscreen_gallery.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../applications/pdf_viewer_screen.dart';
 import '../../payments/ai_payment_sheet.dart';
 import '../api_appraiser_service.dart';
+import '../widgets/appraiser_credential_card.dart';
 import '../widgets/service_app_bar.dart';
 
 class AiCredentialsScreen extends StatefulWidget {
@@ -144,30 +143,16 @@ class _AiCredentialsScreenState extends State<AiCredentialsScreen> {
                           if (creds.isEmpty)
                             _EmptyNote(text: _S.empty(l), isDark: isDark)
                           else
-                            // 2-column grid of appraiser ("Baholovchi") docs.
-                            LayoutBuilder(
-                              builder: (context, constraints) {
-                                const gap = 10.0;
-                                final w =
-                                    (constraints.maxWidth - gap) / 2;
-                                return Wrap(
-                                  spacing: gap,
-                                  runSpacing: gap,
-                                  children: [
-                                    for (final c in creds)
-                                      SizedBox(
-                                        width: w,
-                                        child: _CredentialCard(
-                                          credential: c,
-                                          viewHint: _S.viewHint(l),
-                                          isDark: isDark,
-                                          onTap: () => _openDoc(creds, c),
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              },
-                            ),
+                            // Single column — one appraiser doc per row.
+                            for (final c in creds) ...[
+                              AppraiserCredentialCard(
+                                credential: c,
+                                viewHint: _S.viewHint(l),
+                                isDark: isDark,
+                                onTap: () => _openDoc(creds, c),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
                         ],
                       );
                     },
@@ -235,108 +220,6 @@ class _TrustBanner extends StatelessWidget {
 }
 
 // ── One credential document ───────────────────────────────────────────
-class _CredentialCard extends StatelessWidget {
-  const _CredentialCard({
-    required this.credential,
-    required this.viewHint,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final AppraiserCredential credential;
-  final String viewHint;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final surface = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
-    final titleColor = isDark ? Colors.white : AppColors.textBlack;
-    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
-
-    return Material(
-      color: surface,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: hapticTap(onTap),
-        child: Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: border),
-          ),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: SizedBox(
-                  width: 58,
-                  height: 78,
-                  // Images (and PDFs whose first page the server rendered) show
-                  // a real thumbnail; a PDF with no rendered preview falls back
-                  // to its icon rather than a broken image.
-                  child: credential.previewUrl.isNotEmpty
-                      ? RemoteImage(
-                          url: credential.previewUrl,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 240,
-                        )
-                      : credential.isPdf
-                      ? ColoredBox(
-                          color: AppColors.declineRed.withValues(alpha: 0.12),
-                          child: const Center(
-                            child: Icon(
-                              Icons.picture_as_pdf_rounded,
-                              size: 26,
-                              color: AppColors.declineRed,
-                            ),
-                          ),
-                        )
-                      : RemoteImage(
-                          url: credential.imageUrl,
-                          fit: BoxFit.cover,
-                          memCacheWidth: 240,
-                        ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      credential.title,
-                      style: TextStyle(
-                        fontFamily: 'MTSCompact',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.5,
-                        color: titleColor,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      viewHint,
-                      style: TextStyle(
-                        fontFamily: 'MTSText',
-                        fontSize: 12,
-                        color: muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.zoom_out_map_rounded, size: 20, color: muted),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Empty / failed-to-load note (non-blocking) ────────────────────────
 class _EmptyNote extends StatelessWidget {
   const _EmptyNote({required this.text, required this.isDark});
 

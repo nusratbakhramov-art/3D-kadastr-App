@@ -12,15 +12,14 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/app_version.dart';
-import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
 import '../../widgets/app_header_back.dart';
-import '../../widgets/remote_image.dart';
 import '../applications/pdf_viewer_screen.dart';
 import '../market/widgets/fullscreen_gallery.dart';
 import '../services/api_appraiser_service.dart';
+import '../services/widgets/appraiser_credential_card.dart';
 
 class AboutAppScreen extends StatefulWidget {
   const AboutAppScreen({super.key});
@@ -152,14 +151,29 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                                 ),
                                 const SizedBox(height: 4),
                               ],
-                              for (var i = 0; i < entry.value.length; i++)
-                                _CredentialRow(
-                                  credential: entry.value[i],
-                                  viewHint: _S.viewHint(l),
-                                  isDark: isDark,
-                                  isLast: i == entry.value.length - 1,
-                                  onTap: () => _openDoc(creds, entry.value[i]),
-                                ),
+                              // Two-up grid of appraiser ("Baholovchi") docs.
+                              LayoutBuilder(
+                                builder: (context, constraints) {
+                                  const gap = 10.0;
+                                  final w = (constraints.maxWidth - gap) / 2;
+                                  return Wrap(
+                                    spacing: gap,
+                                    runSpacing: gap,
+                                    children: [
+                                      for (final c in entry.value)
+                                        SizedBox(
+                                          width: w,
+                                          child: AppraiserCredentialCard(
+                                            credential: c,
+                                            viewHint: _S.viewHint(l),
+                                            isDark: isDark,
+                                            onTap: () => _openDoc(creds, c),
+                                          ),
+                                        ),
+                                    ],
+                                  );
+                                },
+                              ),
                             ],
                         ],
                       );
@@ -311,101 +325,6 @@ class _SectionLabel extends StatelessWidget {
 /// entry — ten elements saying what one says. Now: hairline rows, the hint
 /// collapsed into a single green affordance, and no card chrome competing with
 /// the documents themselves.
-class _CredentialRow extends StatelessWidget {
-  const _CredentialRow({
-    required this.credential,
-    required this.viewHint,
-    required this.isDark,
-    required this.isLast,
-    required this.onTap,
-  });
-
-  final AppraiserCredential credential;
-  final String viewHint;
-  final bool isDark;
-  final bool isLast;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final titleColor = isDark ? Colors.white : AppColors.textBlack;
-    final divider = isDark
-        ? Colors.white.withValues(alpha: 0.07)
-        : Colors.black.withValues(alpha: 0.07);
-
-    return InkWell(
-      onTap: hapticTap(onTap),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 2),
-        decoration: BoxDecoration(
-          border: isLast ? null : Border(bottom: BorderSide(color: divider)),
-        ),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(5),
-              child: SizedBox(
-                width: 36,
-                height: 47,
-                // Images (and PDFs whose first page the server rendered) show a
-                // real thumbnail; a PDF with no rendered preview falls back to
-                // its icon rather than a broken image.
-                child: credential.previewUrl.isNotEmpty
-                    ? RemoteImage(
-                        url: credential.previewUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 150,
-                      )
-                    : credential.isPdf
-                    ? ColoredBox(
-                        color: AppColors.declineRed.withValues(alpha: 0.12),
-                        child: const Center(
-                          child: Icon(
-                            Icons.picture_as_pdf_rounded,
-                            size: 20,
-                            color: AppColors.declineRed,
-                          ),
-                        ),
-                      )
-                    : RemoteImage(
-                        url: credential.imageUrl,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 150,
-                      ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                credential.title,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13.5,
-                  height: 1.3,
-                  color: titleColor,
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              viewHint,
-              style: const TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w600,
-                fontSize: 11,
-                height: 1.1,
-                color: AppColors.splashGreen,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Empty / failed-to-load note (non-blocking) ────────────────────────
 class _EmptyNote extends StatelessWidget {
   const _EmptyNote({required this.text, required this.isDark});
 
