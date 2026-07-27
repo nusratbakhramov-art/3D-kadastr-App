@@ -29,7 +29,7 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   static const double _logoRiseFromY = 300; // pastdan shu balandlikda paydo
   static const double _logoEndOffsetX = -82; // REVEAL: chapga
   static const double _textStartOffsetX = 0;
-  static const double _textEndOffsetX = 62; // REVEAL: o'ngga
+  static const double _textEndOffsetX = 74; // REVEAL: o'ngga (+12px nudge)
 
   static const Cubic _riseCurve = Cubic(0.16, 1.0, 0.3, 1.0);
   static const Cubic _emphasizedMove = Cubic(0.22, 1.0, 0.36, 1.0);
