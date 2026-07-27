@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../theme/app_colors.dart';
 import '../../../auth/auth_storage.dart';
 import '../../../auth/widgets/login_required_sheet.dart';
+import '../../../market/widgets/listing_cta_button.dart';
 import '../../api_calculator_order_service.dart';
 import '../../data/calculator_pricing_store.dart';
 import '../../models/calculator_draft.dart';
@@ -18,68 +19,12 @@ class YuridikScreen extends StatefulWidget {
 }
 
 class _YuridikScreenState extends State<YuridikScreen> {
-  final CalculatorOrderApiService _orders = CalculatorOrderApiService();
-
-  @override
-  void dispose() {
-    _orders.dispose();
-    super.dispose();
-  }
-
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  /// Tap a service → open a detail drawer (its info + an optional note + submit).
-  /// Login is checked before opening so the login prompt isn't nested inside the
-  /// sheet. On success the sheet returns the order id and we show the success
-  /// screen.
-  Future<void> _openSheet(_YuridikItem item) async {
-    if (!await ensureLoggedIn(context)) return;
-    if (!mounted) return;
-    final id = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _YuridikSheet(
-        item: item,
-        onSubmit: (note) => _submitOrder(item, note),
-      ),
+  /// Tap a service → push its application screen (a full page, like the other
+  /// calculator services), not a modal.
+  void _openApply(_YuridikItem item) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => _YuridikApplyScreen(item: item)),
     );
-    if (id != null && mounted) {
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => ArxitekturaTzSuccessScreen(orderId: id),
-        ),
-      );
-    }
-  }
-
-  /// Submit one legal-service application. Reuses the calculator-order endpoint,
-  /// so it lands in the user's "Arizalar" and the admin's calculator-orders view
-  /// — no separate pipeline. Returns the new order id, or null on failure.
-  Future<int?> _submitOrder(_YuridikItem item, String note) async {
-    final session = await const AuthStorage().loadSession();
-    final token = session.token;
-    if (token == null || token.isEmpty) return null;
-    final total = int.tryParse(item.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
-    final trimmed = note.trim();
-    final fullNote = trimmed.isEmpty
-        ? '${item.title} — ${item.description}'
-        : '${item.title} — ${item.description}\n\nIzoh: $trimmed';
-    final result = CalculatorResult(
-      categoryTitle: 'Yuridik xizmat',
-      totalUzs: total,
-      note: fullNote,
-      lines: [CalculatorLine(item.title, item.price)],
-    );
-    try {
-      return await _orders.submit(result: result, token: token);
-    } catch (e) {
-      _snack('$e');
-      return null;
-    }
   }
 
   @override
@@ -134,7 +79,7 @@ class _YuridikScreenState extends State<YuridikScreen> {
                                   item: services[i],
                                   titleColor: headingColor,
                                   subColor: subColor,
-                                  onTap: () => _openSheet(services[i]),
+                                  onTap: () => _openApply(services[i]),
                                 ),
                                 const SizedBox(height: 10),
                               ],
@@ -344,173 +289,221 @@ class _ServiceCard extends StatelessWidget {
   }
 }
 
-/// Bottom-sheet drawer for one legal service: shows its details, an optional
-/// note, and the "Ariza topshirish" action. `onSubmit` returns the new order id
-/// (or null on failure); on success the sheet pops with that id.
-class _YuridikSheet extends StatefulWidget {
-  const _YuridikSheet({required this.item, required this.onSubmit});
+/// Full-page application screen for one legal service — matches the other
+/// calculator services (a pushed page, not a modal). Shows the service, an
+/// optional case note, and submits a calculator order (→ user's Arizalar +
+/// admin calculator-orders).
+class _YuridikApplyScreen extends StatefulWidget {
+  const _YuridikApplyScreen({required this.item});
 
   final _YuridikItem item;
-  final Future<int?> Function(String note) onSubmit;
 
   @override
-  State<_YuridikSheet> createState() => _YuridikSheetState();
+  State<_YuridikApplyScreen> createState() => _YuridikApplyScreenState();
 }
 
-class _YuridikSheetState extends State<_YuridikSheet> {
+class _YuridikApplyScreenState extends State<_YuridikApplyScreen> {
+  final CalculatorOrderApiService _orders = CalculatorOrderApiService();
   final TextEditingController _note = TextEditingController();
   bool _submitting = false;
 
   @override
   void dispose() {
+    _orders.dispose();
     _note.dispose();
     super.dispose();
   }
 
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _submit() async {
     if (_submitting) return;
-    setState(() => _submitting = true);
-    final id = await widget.onSubmit(_note.text);
+    if (!await ensureLoggedIn(context)) return;
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null || token.isEmpty) return;
     if (!mounted) return;
-    if (id != null) {
-      Navigator.of(context).pop(id);
-    } else {
+    setState(() => _submitting = true);
+    final item = widget.item;
+    final total = int.tryParse(item.price.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+    final trimmed = _note.text.trim();
+    final fullNote = trimmed.isEmpty
+        ? '${item.title} — ${item.description}'
+        : '${item.title} — ${item.description}\n\nIzoh: $trimmed';
+    final result = CalculatorResult(
+      categoryTitle: 'Yuridik xizmat',
+      totalUzs: total,
+      note: fullNote,
+      lines: [CalculatorLine(item.title, item.price)],
+    );
+    try {
+      final id = await _orders.submit(result: result, token: token);
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => ArxitekturaTzSuccessScreen(orderId: id),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
       setState(() => _submitting = false);
+      _snack('$e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bg = isDark ? const Color(0xFF15191A) : Colors.white;
+    final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final titleColor = isDark ? Colors.white : AppColors.textBlack;
     final subColor = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
     final priceColor = isDark ? const Color(0xFF7DD992) : AppColors.splashGreen;
+    final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
     final locale = Localizations.localeOf(context);
     final item = widget.item;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: bottomInset),
-      child: Container(
-        decoration: BoxDecoration(
-          color: bg,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: subColor.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Text(
-                item.title,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w800,
-                  fontSize: 19,
-                  height: 1.2,
-                  color: titleColor,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                item.description,
-                style: TextStyle(
-                  fontFamily: 'MTSText',
-                  fontSize: 13.5,
-                  height: 1.4,
-                  color: subColor,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                item.price,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                  color: priceColor,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _note,
-                minLines: 2,
-                maxLines: 4,
-                style: TextStyle(color: titleColor, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: _pick(
-                    locale,
-                    "Holatingizni qisqacha yozing (ixtiyoriy)",
-                    'Кратко опишите ситуацию (необязательно)',
-                    'Briefly describe your case (optional)',
-                  ),
-                  hintStyle: TextStyle(color: subColor, fontSize: 13.5),
-                  filled: true,
-                  fillColor: isDark
-                      ? const Color(0xFF1F2426)
-                      : const Color(0xFFF3F4F6),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: const EdgeInsets.all(14),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: Material(
-                  color: AppColors.splashGreen,
-                  borderRadius: BorderRadius.circular(14),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: _submitting ? null : _submit,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 15),
-                      child: Center(
-                        child: _submitting
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor:
-                                      AlwaysStoppedAnimation(Colors.white),
-                                ),
-                              )
-                            : Text(
-                                _pick(locale, 'Ariza topshirish',
-                                    'Оставить заявку', 'Submit application'),
-                                style: const TextStyle(
-                                  fontFamily: 'MTSCompact',
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15,
-                                  color: Colors.white,
-                                ),
-                              ),
+    return Scaffold(
+      backgroundColor: bg,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final maxContent = constraints.maxWidth.clamp(0.0, 640.0);
+            return Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxContent),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+                      child: ServiceAppBar(
+                        title: item.title,
+                        subtitle: _pick(locale, 'Ariza topshirish',
+                            'Оставить заявку', 'Apply'),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: ListView(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        children: [
+                          Text(
+                            item.description,
+                            style: TextStyle(
+                              fontFamily: 'MTSText',
+                              fontSize: 14,
+                              height: 1.45,
+                              color: subColor,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 14),
+                            decoration: BoxDecoration(
+                              color: cardBg,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _pick(locale, 'Narxi', 'Цена', 'Price'),
+                                    style: TextStyle(
+                                      fontFamily: 'MTSText',
+                                      fontSize: 13.5,
+                                      color: subColor,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  item.price,
+                                  style: TextStyle(
+                                    fontFamily: 'MTSCompact',
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    color: priceColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 18),
+                          Text(
+                            _pick(locale, "Qo'shimcha izoh",
+                                'Дополнительный комментарий', 'Additional note'),
+                            style: TextStyle(
+                              fontFamily: 'MTSCompact',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: titleColor,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          TextField(
+                            controller: _note,
+                            minLines: 3,
+                            maxLines: 6,
+                            style: TextStyle(color: titleColor, fontSize: 14),
+                            decoration: InputDecoration(
+                              hintText: _pick(
+                                locale,
+                                "Holatingizni qisqacha yozing (ixtiyoriy)",
+                                'Кратко опишите ситуацию (необязательно)',
+                                'Briefly describe your case (optional)',
+                              ),
+                              hintStyle:
+                                  TextStyle(color: subColor, fontSize: 13.5),
+                              filled: true,
+                              fillColor: isDark
+                                  ? const Color(0xFF1F2426)
+                                  : const Color(0xFFF3F4F6),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide.none,
+                              ),
+                              contentPadding: const EdgeInsets.all(14),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            _pick(
+                              locale,
+                              "Mutaxassislarimiz siz bilan bog'lanib, narx va shartlarni tasdiqlaydi.",
+                              'Наши специалисты свяжутся с вами и подтвердят цену и условия.',
+                              'Our specialists will contact you to confirm price and terms.',
+                            ),
+                            style: TextStyle(
+                              fontFamily: 'MTSText',
+                              fontSize: 12.5,
+                              height: 1.4,
+                              color: subColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: ListingCtaButton(
+                        label: _submitting
+                            ? _pick(locale, 'Yuborilmoqda...', 'Отправка...',
+                                'Submitting...')
+                            : _pick(locale, 'Ariza topshirish',
+                                'Оставить заявку', 'Submit application'),
+                        enabled: !_submitting,
+                        onTap: _submit,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
