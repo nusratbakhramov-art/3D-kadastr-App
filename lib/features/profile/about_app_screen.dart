@@ -166,6 +166,7 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                                             credential: c,
                                             viewHint: _S.viewHint(l),
                                             isDark: isDark,
+                                            poster: true,
                                             onTap: () => _openDoc(creds, c),
                                           ),
                                         ),
