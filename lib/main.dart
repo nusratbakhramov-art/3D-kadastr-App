@@ -21,6 +21,7 @@ import 'features/onboarding/onboarding_storage.dart';
 import 'features/market/data/market_regions_store.dart';
 import 'features/services/data/calculator_pricing_store.dart';
 import 'features/settings/locale_storage.dart';
+import 'features/settings/theme_storage.dart';
 import 'features/settings/settings_state.dart';
 import 'features/shell/main_shell.dart';
 import 'features/splash/animated_splash_screen.dart';
@@ -274,6 +275,12 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
       if (localeNotifier.value != const Locale('uz')) {
         localeNotifier.value = const Locale('uz');
       }
+    }
+
+    // Saqlangan mavzuni (light/dark/system) tiklaymiz — bo'lmasa system default.
+    final savedTheme = await const ThemeStorage().load();
+    if (savedTheme != null && savedTheme != themeModeNotifier.value) {
+      themeModeNotifier.value = savedTheme;
     }
 
     final done = await widget.onboardingStorage.hasCompleted();

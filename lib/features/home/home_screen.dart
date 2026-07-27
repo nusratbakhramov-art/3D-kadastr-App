@@ -308,7 +308,7 @@ class _ImageFab extends StatelessWidget {
   final VoidCallback? onTap;
   final String tooltip;
 
-  static const double _size = 64;
+  static const double _size = 56;
 
   @override
   Widget build(BuildContext context) {
@@ -529,14 +529,20 @@ class _CardsGrid extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final squareWidth = (constraints.maxWidth - gap) / 2;
-        const squareAspect = 0.84;
+        const squareAspect = 0.78;
         // The cards are sized by aspect ratio, so on a Pro Max-class phone the
         // extra width used to stretch them ~30pt taller than the artwork and
         // copy need — a dead gap under the subtitle, and "Top modellar" pushed
         // off-screen. Cap the height so surplus width widens the cards instead
         // of stretching them; narrow phones keep the original proportions.
-        final squareHeight = (squareWidth / squareAspect).clamp(150.0, 208.0);
-        final wideHeight = (squareHeight * 0.88).clamp(160.0, 240.0);
+        // The floor is deliberately tall: the 3D logo is bottom-anchored, so a
+        // taller card pushes it down and away from the top-left copy, which is
+        // what keeps the subtitle off the logo on small phones (e.g. S23).
+        final squareHeight = (squareWidth / squareAspect).clamp(172.0, 230.0);
+        // Keep the wide (Calculator) card at its ORIGINAL height — it must not
+        // grow just because the square cards got taller, so it's derived from
+        // the old square proportion, not the new taller one.
+        final wideHeight = (squareWidth / 0.84).clamp(150.0, 208.0) * 0.72;
 
         return Column(
           mainAxisSize: MainAxisSize.min,

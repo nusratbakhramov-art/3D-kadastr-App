@@ -25,6 +25,7 @@ import '../../widgets/app_menu_card.dart';
 import '../../widgets/app_reveal.dart';
 import '../../widgets/app_toast.dart';
 import 'locale_storage.dart';
+import 'theme_storage.dart';
 import 'settings_state.dart';
 
 const _kAppStoreId = '6744487945';
@@ -353,6 +354,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
     if (selected != null && selected != themeModeNotifier.value) {
       themeModeNotifier.value = selected;
+      // Persist so the choice survives an app restart (like the locale does).
+      await const ThemeStorage().save(selected);
       if (!context.mounted) return;
       AppToast.success(context, _S.savedToast(locale));
     }

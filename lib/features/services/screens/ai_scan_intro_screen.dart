@@ -431,9 +431,9 @@ class _S {
 
   // Parallel to [steps]; empty string ⇒ no asset (fall back to a glyph).
   static const List<String> stepAssets = [
-    'assets/images/howitworks/step1.jpg',
-    'assets/images/howitworks/step2.jpg',
-    'assets/images/howitworks/step3.jpg',
+    'assets/images/howitworks/step1.png',
+    'assets/images/howitworks/step2.png',
+    'assets/images/howitworks/step3.png',
     'assets/images/howitworks/step4.png',
     'assets/images/howitworks/step5.png',
     'assets/images/howitworks/step6.png',
