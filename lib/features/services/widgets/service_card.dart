@@ -4,6 +4,18 @@ import 'package:flutter/services.dart';
 import '../../../widgets/pressable_scale.dart';
 import '../models/service_item.dart';
 
+/// A dark halo behind the card copy so the title/subtitle stay legible even
+/// where a line passes over the bright 3D logo. Three stacked shadows: a solid
+/// black core hugging the glyphs (kills contrast against light art), plus two
+/// progressively wider, softer fall-offs so the halo reads as a glow of depth
+/// rather than a hard outline. Strong on purpose — it has to hold up over the
+/// brightest part of the logo.
+const List<Shadow> _textShadows = [
+  Shadow(color: Color(0xFF000000), blurRadius: 6),
+  Shadow(color: Color(0xCC000000), blurRadius: 14),
+  Shadow(color: Color(0x99000000), blurRadius: 22),
+];
+
 class ServiceCard extends StatefulWidget {
   const ServiceCard({super.key, required this.item, required this.onTap});
 
@@ -45,7 +57,7 @@ class _ServiceCardState extends State<ServiceCard>
 
   Future<void> _handleTap() async {
     if (_bounce.isAnimating) return; // ignore double-taps mid-bounce
-    HapticFeedback.selectionClick();
+    HapticFeedback.mediumImpact();
     await _bounce.forward(from: 0);
     if (!mounted) return;
     widget.onTap();
@@ -118,7 +130,7 @@ class _ServiceCardState extends State<ServiceCard>
                   scale: _logoScale,
                   child: Image.asset(
                     item.asset,
-                    height: isWide ? 188 : 142,
+                    height: isWide ? 148 : 142,
                     fit: BoxFit.fitHeight,
                     filterQuality: FilterQuality.medium,
                   ),
@@ -140,6 +152,7 @@ class _ServiceCardState extends State<ServiceCard>
                         height: 1.2,
                         letterSpacing: -0.2,
                         color: Colors.white,
+                        shadows: _textShadows,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -150,14 +163,13 @@ class _ServiceCardState extends State<ServiceCard>
                       widthFactor: isWide ? 0.62 : 0.9,
                       child: Text(
                         item.subtitle,
-                        maxLines: isWide ? 2 : 4,
-                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontFamily: 'MTSText',
                           fontWeight: FontWeight.w400,
-                          fontSize: 12.5,
-                          height: 1.4,
+                          fontSize: 11.5,
+                          height: 1.35,
                           color: Color(0xFFB7BDC2),
+                          shadows: _textShadows,
                         ),
                       ),
                     ),
