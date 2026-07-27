@@ -1,4 +1,4 @@
-import 'dart:async' show Completer, StreamSubscription, Timer;
+import 'dart:async' show Completer, StreamSubscription, Timer, unawaited;
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
@@ -10,6 +10,7 @@ import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../home/user_profile.dart';
 import '../api_chat_service.dart';
+import '../data/chat_suggestions_store.dart';
 import '../models/chat_message.dart';
 
 /// 3D Kadastr yordamchi bot ekrani — streaming FAQ chat.
@@ -32,8 +33,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _sending = false;
   double _lastInset = 0;
 
-  /// Backend'dan olingan boshlang'ich takliflar. null/bo'sh bo'lsa (yuklanmaguncha
-  /// yoki xatoda) `_defaultSuggestions` zaxira ro'yxati ishlatiladi.
+  /// Keshli backend takliflari (joriy til). Bo'sh bo'lsa (hali yuklanmagan yoki
+  /// xato) `_defaultSuggestions` zaxira ro'yxati ishlatiladi. Manba —
+  /// [chatSuggestionsNotifier] (app startida prefetch qilinadi, versiya bo'yicha
+  /// keshlanadi).
   List<String>? _remoteSuggestions;
 
   /// Held so the reply can actually be cancelled. An `await for` loop can only
@@ -56,20 +59,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _loadSuggestions();
+    // Keshli takliflardan darhol o'qiymiz; app-start prefetch odatda allaqachon
+    // to'ldirgan bo'ladi. Notifier'ni tinglaymiz, fonda yangilanish kelsa
+    // ro'yxat o'zi yangilanadi.
+    _remoteSuggestions = chatSuggestionsNotifier.value.forLocale(_lang);
+    chatSuggestionsNotifier.addListener(_onSuggestionsChanged);
+    // Chat ochilganda ham versiyani tekshiramiz (arzon — o'zgargan bo'lsagina
+    // to'liq ro'yxat yuklanadi). Fire-and-forget.
+    unawaited(ChatSuggestionsStore.instance.refresh());
   }
 
-  /// Boshlang'ich takliflarni backend'dan oladi (adminka boshqaradi). Xatoda
-  /// jimgina zaxira ro'yxatga tushamiz — ekran baribir ishlaydi.
-  Future<void> _loadSuggestions() async {
-    final list = await _api.fetchSuggestions(_lang);
-    if (!mounted || list.isEmpty) return;
-    setState(() => _remoteSuggestions = list);
+  void _onSuggestionsChanged() {
+    if (!mounted) return;
+    setState(
+      () => _remoteSuggestions = chatSuggestionsNotifier.value.forLocale(_lang),
+    );
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    chatSuggestionsNotifier.removeListener(_onSuggestionsChanged);
     _sub?.cancel();
     _input.dispose();
     _scroll.dispose();

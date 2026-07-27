@@ -72,6 +72,20 @@ enum CalculatorCategory {
     CalculatorCategory.yuridik => Icons.gavel_rounded,
   };
 
+  /// 3D image icon for the service tile. Null → fall back to [icon].
+  /// (kadastr3d keeps the AR glyph — no 3D image supplied for it.)
+  String? get assetIcon => switch (this) {
+    CalculatorCategory.arxitektura =>
+      'assets/images/services/architecture.webp',
+    CalculatorCategory.kadastr => 'assets/images/services/accounting.webp',
+    CalculatorCategory.kadastr3d => 'assets/images/services/kadastr3d.png',
+    CalculatorCategory.baholash =>
+      'assets/images/services/property-value.webp',
+    CalculatorCategory.dizayn => 'assets/images/services/design.webp',
+    CalculatorCategory.tamirlash => 'assets/images/services/repair.webp',
+    CalculatorCategory.yuridik => 'assets/images/services/legal.webp',
+  };
+
   Color get accent => switch (this) {
     CalculatorCategory.arxitektura => const Color(0xFF22D3EE),
     CalculatorCategory.kadastr => const Color(0xFF00E135),

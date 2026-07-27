@@ -18,6 +18,7 @@ import 'features/home/user_profile.dart';
 import 'features/notifications/notification_model.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
+import 'features/chat/data/chat_suggestions_store.dart';
 import 'features/market/data/market_regions_store.dart';
 import 'features/services/data/calculator_pricing_store.dart';
 import 'features/settings/locale_storage.dart';
@@ -259,6 +260,10 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
     // UI tarjimalarini keshdan darhol olib, har startda fonda versiyasini
     // tekshiramiz. Faqat server versiyasi kattaroq bo'lsa yangi bundle yuklanadi.
     unawaited(AppTranslationsStore.instance.loadCachedThenRefresh());
+
+    // Yordamchi bot "tez savol" chiplari — xuddi tarjimalar kabi keshdan o'qib,
+    // fonda versiya bo'yicha yangilaymiz (chat ekrani ochilishini kutmaymiz).
+    unawaited(ChatSuggestionsStore.instance.loadCachedThenRefresh());
 
     // Avval saqlangan locale ni yuklab, app bo'ylab qo'llaymiz. Bu
     // localeNotifier'ni o'zgartiradi va MaterialApp rebuild bo'lib, butun

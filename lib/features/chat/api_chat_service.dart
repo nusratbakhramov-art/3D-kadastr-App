@@ -41,29 +41,6 @@ class ChatApiService {
   final http.Client _client;
   final String _baseUrl;
 
-  /// Joriy til uchun faol boshlang'ich savol matnlari (backend boshqaradi).
-  /// Xatolik/bo'sh javobda `[]` qaytadi — chaqiruvchi o'shanda ilovadagi zaxira
-  /// ro'yxatga tushadi.
-  Future<List<String>> fetchSuggestions(String lang) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/chat/suggestions')
-          .replace(queryParameters: {'locale': lang});
-      final res = await _client
-          .get(uri)
-          .timeout(const Duration(seconds: 10));
-      if (res.statusCode != 200) return const [];
-      final data = jsonDecode(res.body);
-      if (data is! List) return const [];
-      return data
-          .whereType<Map<String, dynamic>>()
-          .map((m) => (m['text'] as String?)?.trim() ?? '')
-          .where((t) => t.isNotEmpty)
-          .toList();
-    } catch (_) {
-      return const [];
-    }
-  }
-
   /// Foydalanuvchi xabarini yuboradi va javobni token-token oqim qiladi.
   Stream<ChatStreamEvent> streamReply({
     required String message,

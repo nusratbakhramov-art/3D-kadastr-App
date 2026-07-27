@@ -49,6 +49,7 @@ class ApplicationItem {
     this.estimatorComment,
     this.estimatorCause,
     this.hasResultPreview = false,
+    this.aiPreviewJobId,
     this.formKey,
     this.formPayload,
     required this.createdAt,
@@ -124,6 +125,11 @@ class ApplicationItem {
   /// AI Baholash natijasi tayyor (taxminiy qiymat mavjud) — ariza hali
   /// yakunlanmagan bo'lsa ham foydalanuvchi "Natijani ko'rish" orqali ko'radi.
   final bool hasResultPreview;
+
+  /// AI dastlabki natija tayyor, lekin TO'LOV qilinmagan (status = preview_ready)
+  /// — kartaga bosilganda natija + to'lov ekrani (qolgan qadam) qayta ochiladi.
+  /// Faqat shu holatda to'ldiriladi; to'langach (under_review+) null bo'ladi.
+  final int? aiPreviewJobId;
 
   /// Dinamik forma kaliti (masalan "arxitektura_tz"). Berilgan bo'lsa, detail
   /// ekrani arizani backend sxemasi bo'yicha to'liq (barcha maydonlar, bo'limga

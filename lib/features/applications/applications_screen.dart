@@ -13,6 +13,7 @@ import '../auth/auth_storage.dart';
 import '../settings/settings_state.dart';
 import '../services/ai_draft_resume.dart';
 import '../services/api_ai_valuation_job_service.dart';
+import '../services/screens/ai_status_screen.dart';
 import '../services/api_architecture_order_service.dart';
 import '../services/api_calculator_order_service.dart';
 import '../services/api_design_order_service.dart';
@@ -140,6 +141,28 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       duration: const Duration(milliseconds: 420),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  /// Kartaga bosilganda: preview tayyor-yu to'lanmagan AI ariza bo'lsa —
+  /// natija + to'lov ekranini qayta ochamiz; aks holda oddiy detal ekrani.
+  Future<void> _onCardTap(ApplicationItem item) {
+    final previewJobId = item.aiPreviewJobId;
+    if (previewJobId != null) return _openAiPreviewPayment(previewJobId);
+    return _openDetails(item);
+  }
+
+  /// "Jarayonda" (preview_ready) AI arizasini — foydalanuvchi natijani ko'rgan,
+  /// lekin to'lamagan — o'sha natija + to'lov ekranida qayta ochadi (qolgan
+  /// qadam). Qaytganda ro'yxatni yangilaymiz: to'lov holatni o'zgartirgan
+  /// bo'lishi mumkin (preview_ready → under_review).
+  Future<void> _openAiPreviewPayment(int jobId) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'ai/preview-payment'),
+        builder: (_) => AiStatusScreen.existing(jobId: jobId),
+      ),
+    );
+    if (mounted) await _refresh();
   }
 
   Future<void> _openDetails(ApplicationItem item) async {
@@ -426,6 +449,10 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
       estimatorCause: j.estimatorCause,
       // Natija (taxminiy qiymat) tayyor — under_review yoki completed.
       hasResultPreview: hasValue && j.status.hasResult,
+      // Preview tayyor, lekin hali to'lanmagan — kartaga bosilganda natija +
+      // to'lov ekrani qayta ochiladi (foydalanuvchi qolgan joyidan davom etadi).
+      aiPreviewJobId:
+          j.status == AiJobStatus.previewReady ? j.id : null,
       createdAt: j.createdAt,
       updatedAt: j.updatedAt,
       addressLabel: hasValue
@@ -1001,7 +1028,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                               seed: seed,
                               child: _ApplicationCard(
                                 item: item,
-                                onTap: () => _openDetails(item),
+                                onTap: () => _onCardTap(item),
                                 onResume: item.resumeJobId == null
                                     ? null
                                     : () => _resumeDraft(item.resumeJobId!),

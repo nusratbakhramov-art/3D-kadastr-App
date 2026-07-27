@@ -27,9 +27,21 @@ import '../widgets/terms_consent.dart';
 import 'ai_credentials_screen.dart';
 
 class AiStatusScreen extends StatefulWidget {
-  const AiStatusScreen({super.key, required this.bundle});
+  /// Wizard entry — submits [bundle] (draft → queued), then polls + renders.
+  const AiStatusScreen({super.key, required this.bundle}) : existingJobId = null;
 
-  final AiBaholashBundle bundle;
+  /// "Davom etish → to'lov" entry: reopen an EXISTING preview-ready job by id
+  /// (no re-submit) so the user lands back on the result + paywall screen they
+  /// left off at and can continue to payment. Used from the "Jarayonda" card.
+  const AiStatusScreen.existing({super.key, required int jobId})
+      : bundle = null,
+        existingJobId = jobId;
+
+  /// Non-null only on the wizard (submit) entry.
+  final AiBaholashBundle? bundle;
+
+  /// Non-null only on the reopen-existing entry.
+  final int? existingJobId;
 
   @override
   State<AiStatusScreen> createState() => _AiStatusScreenState();
@@ -49,7 +61,38 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
   @override
   void initState() {
     super.initState();
-    _submit();
+    if (widget.existingJobId != null) {
+      _openExisting();
+    } else {
+      _submit();
+    }
+  }
+
+  // ── Reopen an existing job (no submit) ───────────────────────────────
+  // For a preview-ready ariza the user already saw but left without paying:
+  // skip submit, just fetch the snapshot and poll. The result view + paywall
+  // render exactly as they did the first time.
+  Future<void> _openExisting() async {
+    setState(() => _submitting = false);
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (!mounted) return;
+    if (token == null || token.isEmpty) {
+      setState(() => _submitError =
+          _AiStatusStrings.errLogin(Localizations.localeOf(context)));
+      return;
+    }
+    setState(() => _jobId = widget.existingJobId);
+    _startPolling(token);
+  }
+
+  /// Retry the right entry: reopen-existing has no bundle to re-submit.
+  void _retry() {
+    if (widget.existingJobId != null) {
+      _openExisting();
+    } else {
+      _submit();
+    }
   }
 
   @override
@@ -81,18 +124,19 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
     try {
       // MAVJUD draft bo'lsa (skan/3D model biriktirilgan) — uни yakunlaymiz
       // (draft → queued), yangi job YARATMAYMIZ. Aks holda yangi job.
-      final draftId = widget.bundle.draftId;
+      final bundle = widget.bundle!; // non-null on the wizard (submit) entry
+      final draftId = bundle.draftId;
       final id = draftId != null
           ? await _api.submitDraft(
               draftId: draftId,
-              bundleJson: widget.bundle.toJson(),
+              bundleJson: bundle.toJson(),
               token: token,
             )
-          : await _api.create(bundleJson: widget.bundle.toJson(), token: token);
+          : await _api.create(bundleJson: bundle.toJson(), token: token);
       // Maqsadli narx/maydon natijadan OLDIN kiritilgan bo'lsa — ariza
       // yaratilgach darhol biriktiramiz (best-effort; uzilsa bloklamaymiz).
-      final price = widget.bundle.targetSellPrice;
-      final area = widget.bundle.areaM2;
+      final price = bundle.targetSellPrice;
+      final area = bundle.areaM2;
       if (price != null || area != null) {
         try {
           await _api.setTargetPrice(
@@ -215,7 +259,7 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
         isDark: isDark,
         title: _AiStatusStrings.appBarTitle(l),
         subtitle: _AiStatusStrings.notSubmitted(l),
-        child: _ErrorBlock(message: _submitError!, onRetry: _submit),
+        child: _ErrorBlock(message: _submitError!, onRetry: _retry),
       );
     }
     final snap = _snapshot;
@@ -234,14 +278,20 @@ class _AiStatusScreenState extends State<AiStatusScreen> {
         subtitle: _AiStatusStrings.errorSubtitle(l),
         child: _ErrorBlock(
           message: snap.errorMessage ?? _AiStatusStrings.unknownError(l),
-          onRetry: _submit,
+          onRetry: _retry,
         ),
       );
     }
     // Result is viewable as soon as the AI value lands (under_review) — not
     // only after the estimate group finalizes the report (completed).
     if (snap.status.hasResult) {
-      return _ResultView(snapshot: snap, isDark: isDark);
+      return _ResultView(
+        snapshot: snap,
+        isDark: isDark,
+        // Reopened from the "Jarayonda" card → back pops one route to Arizalar.
+        // Wizard entry → back unwinds the whole wizard stack to the root.
+        isExistingView: widget.existingJobId != null,
+      );
     }
     return _scaffoldFrame(
       isDark: isDark,
@@ -477,10 +527,18 @@ class _ErrorBlock extends StatelessWidget {
 // ── Completed result ──────────────────────────────────────────────────
 
 class _ResultView extends StatelessWidget {
-  const _ResultView({required this.snapshot, required this.isDark});
+  const _ResultView({
+    required this.snapshot,
+    required this.isDark,
+    this.isExistingView = false,
+  });
 
   final AiJobSnapshot snapshot;
   final bool isDark;
+
+  /// True when reopened from the "Jarayonda" card (single pushed route) — back
+  /// pops once instead of unwinding to the navigator root.
+  final bool isExistingView;
 
   @override
   Widget build(BuildContext context) {
@@ -508,8 +566,9 @@ class _ResultView extends StatelessWidget {
                         Icons.arrow_back,
                         color: isDark ? Colors.white : AppColors.textBlack,
                       ),
-                      onPressed: () =>
-                          Navigator.of(context).popUntil((r) => r.isFirst),
+                      onPressed: () => isExistingView
+                          ? Navigator.of(context).pop()
+                          : Navigator.of(context).popUntil((r) => r.isFirst),
                     ),
                     const SizedBox(width: 4),
                     Expanded(

@@ -604,22 +604,20 @@ class _CallCenterBlock extends StatelessWidget {
   final Locale locale;
   final VoidCallback? onTap;
 
-  // New key (not the old home.call_center) so the backend i18n override for
-  // that key — "Call markaz" — doesn't win over this "Aloqa markazi" default.
-  static String _label(Locale l) => tr(l, 'home.contact_center');
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
 
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        // No card bg/border — the green orb + "Aloqa markazi / 24/7" sit
-        // centred directly on the feed background.
+        // No card bg/border — the green orb + phone number / 24/7 sit centred
+        // directly on the feed background. The number (fetched from backend) is
+        // the hero line; the hours read as a quiet subline beneath it.
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -635,21 +633,23 @@ class _CallCenterBlock extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _label(locale),
+                  phone,
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    height: 1.15,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                    letterSpacing: 0.2,
                     color: textColor,
                   ),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   tr(locale, 'home.contact_center.hours'),
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                     height: 1.15,
-                    color: textColor,
+                    color: muted,
                   ),
                 ),
               ],

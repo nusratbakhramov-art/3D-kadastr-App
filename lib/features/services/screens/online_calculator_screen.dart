@@ -178,11 +178,19 @@ class _CategoryCard extends StatelessWidget {
               Container(
                 width: 44,
                 height: 44,
+                padding: category.assetIcon != null
+                    ? const EdgeInsets.all(4)
+                    : EdgeInsets.zero,
                 decoration: BoxDecoration(
-                  color: category.accent.withValues(alpha: 0.15),
+                  // Whiteish neutral tile so the colourful 3D icons pop.
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : const Color(0xFFF1F2F4),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(category.icon, color: category.accent, size: 22),
+                child: category.assetIcon != null
+                    ? Image.asset(category.assetIcon!, fit: BoxFit.contain)
+                    : Icon(category.icon, color: category.accent, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(
