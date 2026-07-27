@@ -187,6 +187,38 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
     return w.contains('credit') || w.contains('kredit') || w == 'loan';
   }
 
+  // Owner-approved display labels, keyed by wire — overrides the backend/enum
+  // label so the five purposes always read as "… uchun", on a single line with
+  // no basis hint. Unknown wires fall back to the source label.
+  String _displayLabel(String wire, Locale l, String fallback) {
+    final ru = l.languageCode == 'ru';
+    final en = l.languageCode == 'en';
+    switch (wire) {
+      case 'sale':
+        return ru ? 'Для продажи' : (en ? 'For sale' : 'Sotish uchun');
+      case 'mortgage':
+        return ru
+            ? 'Для банка / ипотеки / лизинга'
+            : (en
+                ? 'For bank / mortgage / leasing'
+                : 'Bank / Ipoteka / Lizing uchun');
+      case 'insurance':
+        return ru
+            ? 'Для страхования'
+            : (en ? 'For insurance' : 'Sug\'urtalash uchun');
+      case 'court':
+        return ru
+            ? 'Для суда / споров'
+            : (en ? 'For court / disputes' : 'Sud / Nizolar uchun');
+      case 'tax':
+        return ru
+            ? 'Для налогового учёта'
+            : (en ? 'For tax accounting' : 'Soliq buxgalteriyasi uchun');
+      default:
+        return fallback;
+    }
+  }
+
   List<({String wire, String label, String hint})> _purposeTiles(Locale l) {
     final opts = _options;
     if (opts != null) {
@@ -194,12 +226,12 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
       return [
         for (final o in opts)
           if (!_isCreditWire(o.wire))
-            (wire: o.wire, label: o.label(lang), hint: o.hint(lang)),
+            (wire: o.wire, label: _displayLabel(o.wire, l, o.label(lang)), hint: ''),
       ];
     }
     return [
       for (final p in ValuationPurpose.values)
-        (wire: p.wire, label: p.label(l), hint: p.hint(l)),
+        (wire: p.wire, label: _displayLabel(p.wire, l, p.label(l)), hint: ''),
     ];
   }
 
