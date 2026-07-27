@@ -33,7 +33,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   /// Backend'dan olingan boshlang'ich takliflar. null/bo'sh bo'lsa (yuklanmaguncha
   /// yoki xatoda) `_S.suggestions` zaxira ro'yxati ishlatiladi.
-  List<ChatSuggestion>? _remoteSuggestions;
+  List<String>? _remoteSuggestions;
 
   /// Held so the reply can actually be cancelled. An `await for` loop can only
   /// break when the *next* event arrives, which is useless for a stop button —
@@ -54,7 +54,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   /// Boshlang'ich takliflarni backend'dan oladi (adminka boshqaradi). Xatoda
   /// jimgina zaxira ro'yxatga tushamiz — ekran baribir ishlaydi.
   Future<void> _loadSuggestions() async {
-    final list = await _api.fetchSuggestions();
+    final list = await _api.fetchSuggestions(_lang);
     if (!mounted || list.isEmpty) return;
     setState(() => _remoteSuggestions = list);
   }
@@ -289,8 +289,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                         (_remoteSuggestions != null &&
                             _remoteSuggestions!.isNotEmpty)
                         ? _remoteSuggestions!
-                              .map((s) => s.text(_lang))
-                              .toList()
                         : _S.suggestions(_lang),
                   )
                 : ListView.builder(

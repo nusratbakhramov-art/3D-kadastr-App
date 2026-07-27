@@ -211,7 +211,6 @@ class _BellButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final iconColor = isDark ? Colors.white : const Color(0xFF18181B);
     final dotBorderColor = isDark ? const Color(0xFF000702) : Colors.white;
 
     return Material(
@@ -223,34 +222,17 @@ class _BellButton extends StatelessWidget {
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // Placeholder "3D-style" bell: gradient fill + soft drop shadow +
-            // filled glyph so it reads as a lit object rather than a flat line
-            // icon. TODO(design): replace with a real 3D-rendered bell asset.
-            Container(
+            // Real 3D-rendered bell asset (green), sized to the same 40pt
+            // footprint so the tap target and unread dot stay put.
+            SizedBox(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: isDark
-                      ? const [Color(0xFF262C2F), Color(0xFF14181A)]
-                      : const [Colors.white, Color(0xFFEDEFF2)],
+              child: Padding(
+                padding: const EdgeInsets.all(2),
+                child: Image.asset(
+                  'assets/icons/notification-icon.png',
+                  fit: BoxFit.contain,
                 ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.12),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              alignment: Alignment.center,
-              child: Icon(
-                Icons.notifications_rounded,
-                size: 22,
-                color: iconColor,
               ),
             ),
             if (hasUnread)

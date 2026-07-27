@@ -287,7 +287,7 @@ class _BrandText extends StatelessWidget {
       '3D kadastr',
       style: TextStyle(
         fontFamily: 'MTSCompact',
-        fontWeight: FontWeight.w500,
+        fontWeight: FontWeight.w900,
         fontSize: _AnimatedSplashScreenState._textFontSize,
         color: Color(0xFF011606),
         letterSpacing: -0.5,
