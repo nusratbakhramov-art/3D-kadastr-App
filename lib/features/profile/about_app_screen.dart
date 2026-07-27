@@ -339,7 +339,7 @@ class _S {
   );
 
   static String appName(Locale l) =>
-      tr(l, 'about.app_name', uz: 'Kadastr', ru: 'Kadastr', en: 'Kadastr');
+      tr(l, 'about.app_name', uz: '3D Kadastr', ru: '3D Kadastr', en: '3D Kadastr');
 
   static String versionLabel(Locale l) =>
       tr(l, 'about.version', uz: 'Versiya', ru: 'Версия', en: 'Version');

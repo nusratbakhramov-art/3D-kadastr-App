@@ -98,16 +98,21 @@ class AppraiserCredentialCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                credential.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  height: 1.2,
-                  color: _title,
+              // Always reserve two lines so cards in a row are the same height
+              // whether the title wraps or not.
+              SizedBox(
+                height: 13 * 1.2 * 2,
+                child: Text(
+                  credential.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    height: 1.2,
+                    color: _title,
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
