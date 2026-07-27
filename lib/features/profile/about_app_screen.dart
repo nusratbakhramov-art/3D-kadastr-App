@@ -147,7 +147,6 @@ class _AboutAppScreenState extends State<AboutAppScreen> {
                                 _SectionLabel(
                                   text: entry.key.name(l.languageCode),
                                   isDark: isDark,
-                                  count: entry.value.length,
                                 ),
                                 const SizedBox(height: 4),
                               ],
@@ -263,13 +262,10 @@ class _AppIdentity extends StatelessWidget {
 }
 
 class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.text, required this.isDark, this.count});
+  const _SectionLabel({required this.text, required this.isDark});
 
   final String text;
   final bool isDark;
-
-  /// Shown as a chip once the documents have loaded. Null while loading.
-  final int? count;
 
   @override
   Widget build(BuildContext context) {
@@ -293,27 +289,6 @@ class _SectionLabel extends StatelessWidget {
             ),
           ),
         ),
-        if (count != null && count! > 0)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.splashGreen.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: AppColors.splashGreen.withValues(alpha: 0.28),
-              ),
-            ),
-            child: Text(
-              '$count',
-              style: const TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w600,
-                fontSize: 10.5,
-                height: 1.1,
-                color: AppColors.splashGreen,
-              ),
-            ),
-          ),
       ],
     );
   }
