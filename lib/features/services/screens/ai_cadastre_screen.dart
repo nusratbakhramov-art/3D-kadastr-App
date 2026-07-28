@@ -171,9 +171,12 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
       return;
     }
     try {
+      // AI Baholash never reads the shared davreestr cache — the area/value here
+      // become part of a legal valuation document, so we always scrape fresh.
       final result = await CadastreApiService().lookup(
         cadastreNumber: number,
         token: token,
+        forceRefresh: true,
       );
       if (!mounted || reqId != _lookupRequestId) return;
       // davreest.uz returns an all-null result for a non-existent number
@@ -236,7 +239,9 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
         kadastr: info,
         scan: widget.scan,
         draftId: widget.draftId,
-        areaM2: widget.areaM2,
+        // Area now comes straight from the cadastre (total_area) — the manual
+        // area step was removed. widget.areaM2 is only a resume fallback.
+        areaM2: info.totalArea ?? widget.areaM2,
       );
       _bundle = bundle;
     }
@@ -250,16 +255,17 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     );
   }
 
-  Future<void> _continue() async {
-    if (_status != _LoadStatus.loaded || _info == null) return;
-    await _goNext(_info!);
-  }
+  /// Kadastr endi MAJBURIY: davom etish uchun davreestr topilishi VA obyekt
+  /// maydoni (total_area) bo'lishi shart — maydon shu yerdan olinadi (alohida
+  /// maydon qadami olib tashlangan).
+  bool get _areaReady =>
+      _info?.totalArea != null && (_info?.totalArea ?? 0) > 0;
 
-  /// Davreestr lookup ixtiyoriy — foydalanuvchi o'tkazib yuborsa, bo'sh kadastr
-  /// bilan davom etamiz (bundle.toJson placeholder cadastre_number yuboradi;
-  /// obyekt maydoni oldingi qadamdan allaqachon olingan).
-  Future<void> _skip() async {
-    await _goNext(const CadastreLookupResult(cadastreNumber: ''));
+  bool get _canContinue => _status == _LoadStatus.loaded && _areaReady;
+
+  Future<void> _continue() async {
+    if (!_canContinue || _info == null) return;
+    await _goNext(_info!);
   }
 
   @override
@@ -293,7 +299,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 8, activeIndex: 1),
+                      child: const StepProgressBar(count: 7, activeIndex: 0),
                     ),
                     if (widget.scanJobId != null) ...[
                       const SizedBox(height: 12),
@@ -381,13 +387,30 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                                           isDark: isDark,
                                           locale: l,
                                         )
-                                      else if (_info != null)
+                                      else if (_info != null) ...[
                                         _PropertyInfoCard(
                                           isDark: isDark,
                                           info: _info!,
                                           locale: l,
-                                        )
-                                      else
+                                        ),
+                                        if (!_areaReady) ...[
+                                          const SizedBox(height: 10),
+                                          _AreaMissingCard(
+                                            isDark: isDark,
+                                            locale: l,
+                                          ),
+                                        ],
+                                        const SizedBox(height: 10),
+                                        // "Our side didn't catch it" safety net:
+                                        // davreestr may have returned the data but
+                                        // our parse dropped a field. Let the user
+                                        // force a fresh (cache-free) re-lookup.
+                                        _RefreshRow(
+                                          isDark: isDark,
+                                          locale: l,
+                                          onTap: _runLookup,
+                                        ),
+                                      ] else
                                         const SizedBox.shrink(),
                                     ],
                                   ),
@@ -397,27 +420,11 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
                         label: _CadastreStrings.continueLabel(l),
-                        enabled: _status == _LoadStatus.loaded,
+                        enabled: _canContinue,
                         onTap: _continue,
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                      child: TextButton(
-                        onPressed: _skip,
-                        child: Text(
-                          _CadastreStrings.skip(l),
-                          style: TextStyle(
-                            fontFamily: 'MTSText',
-                            fontSize: 13.5,
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.6)
-                                : const Color(0xFF8A9097),
-                          ),
-                        ),
                       ),
                     ),
                   ],
@@ -989,8 +996,87 @@ class _LookupErrorCard extends StatelessWidget {
   }
 }
 
+/// Shown when the lookup succeeded but no usable object area (total_area) came
+/// back — the area is now REQUIRED (it feeds the valuation), so the user can't
+/// continue. Nudges a fresh re-lookup.
+class _AreaMissingCard extends StatelessWidget {
+  const _AreaMissingCard({required this.isDark, required this.locale});
+
+  final bool isDark;
+  final Locale locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final cardBg = isDark
+        ? const Color(0xFF2A2410)
+        : const Color(0xFFFFF7E6);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    return Container(
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE0A32A)),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              color: Color(0xFFE0A32A), size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _CadastreStrings.areaMissing(locale),
+              style: TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 13,
+                height: 1.35,
+                color: textColor,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A subtle "data wrong? re-fetch" affordance under the loaded property card.
+class _RefreshRow extends StatelessWidget {
+  const _RefreshRow({
+    required this.isDark,
+    required this.locale,
+    required this.onTap,
+  });
+
+  final bool isDark;
+  final Locale locale;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.refresh, size: 18),
+        label: Text(_CadastreStrings.refresh(locale)),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.splashGreen,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        ),
+      ),
+    );
+  }
+}
+
 class _CadastreStrings {
   const _CadastreStrings._();
+
+  static String areaMissing(Locale l) =>
+      tr(l, 'services.ai.cadastre.area_missing');
+
+  static String refresh(Locale l) => tr(l, 'services.ai.cadastre.refresh');
 
   static String title(Locale l) => tr(l, 'services.ai.common.brand_title');
 
@@ -1006,8 +1092,6 @@ class _CadastreStrings {
       tr(l, 'services.ai.cadastre.property_info');
 
   static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
-
-  static String skip(Locale l) => tr(l, 'services.ai.cadastre.skip');
 
   static String helperSuffix(Locale l) =>
       tr(l, 'services.ai.cadastre.helper_suffix');

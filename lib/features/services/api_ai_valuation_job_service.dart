@@ -234,6 +234,15 @@ class AiValuationJobService {
   final http.Client _client;
   final String _baseUrl;
 
+  /// Process-lifetime cache for the purpose / basis reference lists. These are
+  /// small, rarely-changing config the backend owns so the offered options can
+  /// change without an app-store release. We fetch each ONCE per app run and
+  /// reuse until the app is killed (a cold start clears the static field), so a
+  /// server-side change is picked up on the next launch — one request, not one
+  /// per visit to the purpose step.
+  static List<PurposeOption>? _purposeCache;
+  static List<BasisOption>? _basisCache;
+
   Future<int> create({
     required Map<String, dynamic> bundleJson,
     required String token,
@@ -373,6 +382,8 @@ class AiValuationJobService {
   /// no token. The screen renders its select from this; on failure it falls
   /// back to a small built-in list so the flow never blocks offline.
   Future<List<PurposeOption>> fetchPurposeOptions() async {
+    final cached = _purposeCache;
+    if (cached != null) return cached;
     final uri = Uri.parse('$_baseUrl/ai-valuations/purposes');
     final res = await _client
         .get(uri, headers: {'Accept': 'application/json'})
@@ -384,14 +395,20 @@ class AiValuationJobService {
       );
     }
     final body = jsonDecode(res.body) as List<dynamic>;
-    return body
+    final opts = body
         .map((e) => PurposeOption.fromJson(e as Map<String, dynamic>))
         .toList(growable: false);
+    // Cache only a non-empty result — an empty list would wrongly pin the
+    // built-in fallback for the rest of the app run.
+    if (opts.isNotEmpty) _purposeCache = opts;
+    return opts;
   }
 
   /// "Baholash asosi" presets for the purpose step. Public reference data —
   /// no token. Mirrors [fetchPurposeOptions]; ends with the `other` option.
   Future<List<BasisOption>> fetchBasisOptions() async {
+    final cached = _basisCache;
+    if (cached != null) return cached;
     final uri = Uri.parse('$_baseUrl/ai-valuations/valuation-bases');
     final res = await _client
         .get(uri, headers: {'Accept': 'application/json'})
@@ -403,9 +420,11 @@ class AiValuationJobService {
       );
     }
     final body = jsonDecode(res.body) as List<dynamic>;
-    return body
+    final opts = body
         .map((e) => BasisOption.fromJson(e as Map<String, dynamic>))
         .toList(growable: false);
+    if (opts.isNotEmpty) _basisCache = opts;
+    return opts;
   }
 
   /// Arizaga biriktirilgan teksturali 3D skan (GLB) ni backend'dan yuklab,

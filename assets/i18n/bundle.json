@@ -1545,7 +1545,18 @@
       "support.email": "Email",
       "support.hours": "Working hours",
       "support.launch_failed": "Could not open",
-      "support.title": "Support center"
+      "support.title": "Support center",
+      "services.ai.cadastre.area_missing": "This cadastre record has no usable area. Refresh to fetch it again.",
+      "services.ai.cadastre.refresh": "Data looks wrong? Refresh",
+      "purpose.inheritance": "Determining shares in inheritance",
+      "services.ai.target_price.has_smeta_q": "Does the property have smeta documents?",
+      "services.ai.target_price.has_smeta_sub": "Smeta (construction estimate) documents help determine the cost approach.",
+      "services.ai.target_price.has_smeta_yes": "Yes, I have smeta documents",
+      "services.ai.target_price.has_smeta_no": "No",
+      "services.ai.target_price.docs_label": "Smeta documents",
+      "services.ai.target_price.docs_optional": "Optional — you can upload PDF, Word, Excel or images.",
+      "services.ai.target_price.add_docs": "Add document",
+      "services.ai.target_price.upload_failed": "Upload failed"
     },
     "ru": {
       "about.app_name": "3D Kadastr",
@@ -3092,7 +3103,18 @@
       "support.email": "Эл. почта",
       "support.hours": "Часы работы",
       "support.launch_failed": "Не удалось открыть",
-      "support.title": "Центр поддержки"
+      "support.title": "Центр поддержки",
+      "services.ai.cadastre.area_missing": "В этой кадастровой записи нет площади. Обновите, чтобы загрузить заново.",
+      "services.ai.cadastre.refresh": "Данные неверны? Обновить",
+      "purpose.inheritance": "Для определения долей в наследстве",
+      "services.ai.target_price.has_smeta_q": "Есть ли у объекта сметные документы?",
+      "services.ai.target_price.has_smeta_sub": "Сметные (строительные) документы помогают определить затратный подход.",
+      "services.ai.target_price.has_smeta_yes": "Да, есть сметные документы",
+      "services.ai.target_price.has_smeta_no": "Нет",
+      "services.ai.target_price.docs_label": "Сметные документы",
+      "services.ai.target_price.docs_optional": "Необязательно — можно загрузить PDF, Word, Excel или фото.",
+      "services.ai.target_price.add_docs": "Добавить документ",
+      "services.ai.target_price.upload_failed": "Не удалось загрузить"
     },
     "uz": {
       "about.app_name": "3D Kadastr",
@@ -4639,7 +4661,18 @@
       "support.email": "Email",
       "support.hours": "Ish vaqti",
       "support.launch_failed": "Ochib bo'lmadi",
-      "support.title": "Yordam markazi"
+      "support.title": "Yordam markazi",
+      "services.ai.cadastre.area_missing": "Bu kadastr yozuvida obyekt maydoni yo'q. Qayta yuklab ko'ring.",
+      "services.ai.cadastre.refresh": "Ma'lumot noto'g'rimi? Yangilash",
+      "purpose.inheritance": "Meros masalasida ulushlarni aniqlash uchun",
+      "services.ai.target_price.has_smeta_q": "Obyektning smeta hujjatlari bormi?",
+      "services.ai.target_price.has_smeta_sub": "Smeta (qurilish) hujjatlari xarajat yondashuvini aniqlashda yordam beradi.",
+      "services.ai.target_price.has_smeta_yes": "Ha, smeta hujjatlarim bor",
+      "services.ai.target_price.has_smeta_no": "Yo'q",
+      "services.ai.target_price.docs_label": "Smeta hujjatlari",
+      "services.ai.target_price.docs_optional": "Ixtiyoriy — PDF, Word, Excel yoki rasm yuklashingiz mumkin.",
+      "services.ai.target_price.add_docs": "Hujjat qo'shish",
+      "services.ai.target_price.upload_failed": "Yuklab bo'lmadi"
     }
   },
   "version": 0

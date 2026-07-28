@@ -210,7 +210,10 @@ class DavreestrClient {
         // Success path.
         final parsed = _parseResultHtml(searchBody, cadastreNumber);
         // Cache for next time (fire-and-forget — never block/fail on this).
-        unawaited(_storeCached(parsed));
+        // On a forced refresh we deliberately don't write the cache either: the
+        // AI Baholash flow must stay cache-free end-to-end (a stale/global entry
+        // must never feed a legal valuation document).
+        if (!forceRefresh) unawaited(_storeCached(parsed));
         return parsed;
       }
 

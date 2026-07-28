@@ -64,6 +64,7 @@ class CadastreApiService {
   Future<CadastreLookupResult> lookup({
     required String cadastreNumber,
     required String token,
+    bool forceRefresh = false,
   }) async {
     final scraper = DavreestrClient(
       backendBaseUrl: _backendBaseUrl,
@@ -71,7 +72,7 @@ class CadastreApiService {
       backendClient: _backendClient,
     );
     try {
-      final r = await scraper.lookup(cadastreNumber);
+      final r = await scraper.lookup(cadastreNumber, forceRefresh: forceRefresh);
       return CadastreLookupResult(
         cadastreNumber: r.cadastreNumber,
         address: r.address,

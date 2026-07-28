@@ -81,7 +81,7 @@ class _AiReviewScreenState extends State<AiReviewScreen> {
                 const SizedBox(height: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 8, activeIndex: 6),
+                  child: StepProgressBar(count: 7, activeIndex: 5),
                 ),
                 const SizedBox(height: 12),
                 Expanded(

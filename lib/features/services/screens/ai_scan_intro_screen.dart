@@ -9,7 +9,7 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
 import '../data/room_plan_scanner.dart';
 import '../widgets/service_app_bar.dart';
-import 'ai_area_screen.dart';
+import 'ai_cadastre_screen.dart';
 import 'ai_scan_process_screen.dart';
 
 /// AI Baholashning 1-qadami — 3D LiDAR skan.
@@ -41,17 +41,17 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
     setState(() => _supported = ok);
   }
 
-  /// Dev-only: jumps to the area step with no scan, so the rest of the wizard
-  /// can be exercised on a device without LiDAR. Gated on [AppEnv.isAdmin] —
-  /// never reachable in production. The draft is created by the area step,
+  /// Dev-only: jumps to the cadastre step with no scan, so the rest of the
+  /// wizard can be exercised on a device without LiDAR. Gated on [AppEnv.isAdmin]
+  /// — never reachable in production. The draft is created by the cadastre step,
   /// which covers the missing scan upload.
   void _skipScan() {
     if (_scanning) return;
     HapticFeedback.lightImpact();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/area'),
-        builder: (_) => const AiAreaScreen(),
+        settings: const RouteSettings(name: 'ai/cadastre'),
+        builder: (_) => const AiCadastreScreen(),
       ),
     );
   }

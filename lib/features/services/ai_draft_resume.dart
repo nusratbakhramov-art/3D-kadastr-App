@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import '../auth/auth_storage.dart';
 import 'api_ai_valuation_job_service.dart';
 import 'models/ai_baholash_bundle.dart';
-import 'screens/ai_area_screen.dart';
 import 'screens/ai_cadastre_screen.dart';
 import 'screens/ai_client_form_screen.dart';
 import 'screens/ai_intake_screen.dart';
@@ -18,17 +17,8 @@ import 'screens/ai_purpose_screen.dart';
 /// resume mantig'i bir joyda.
 Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
   switch (step) {
-    case 'area':
-      return AiAreaScreen(
-        scan: bundle.scan,
-        draftId: bundle.draftId,
-        scanJobId: scanJobId,
-        initialArea: bundle.areaM2,
-        // Carry the saved davreestr result so Back→forward re-prefills cadastre.
-        initialCadastre: bundle.kadastr.cadastreNumber.trim().isEmpty
-            ? null
-            : bundle.kadastr,
-      );
+    // Legacy drafts saved at the removed 'area' step resume straight into the
+    // cadastre step (which now owns the area, sourced from davreestr).
     case 'client':
       return AiClientFormScreen(bundle: bundle);
     case 'location':
@@ -54,11 +44,10 @@ Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
 }
 
 /// Wizard steps, in order. On resume we stack them up to the saved step so Back
-/// walks all the way to the first step (`area`) instead of exiting to Arizalar.
-/// Every screen rebuilds from the saved bundle: `area` prefills the m², and
-/// `cadastre` shows the saved davreestr result without a re-lookup.
+/// walks all the way to the first step (`cadastre`) instead of exiting to
+/// Arizalar. Every screen rebuilds from the saved bundle: `cadastre` shows the
+/// saved davreestr result without a re-lookup (and owns the object area).
 const List<String> _resumableChain = [
-  'area',
   'cadastre',
   'client',
   'location',

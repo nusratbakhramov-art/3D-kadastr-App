@@ -11,7 +11,7 @@ import '../api_ai_upload_service.dart';
 import '../data/room_plan_scanner.dart';
 import '../models/ai_scan_result.dart';
 import '../widgets/service_app_bar.dart';
-import 'ai_area_screen.dart';
+import 'ai_cadastre_screen.dart';
 
 enum _ProcStage { idle, processing, done, error }
 
@@ -154,18 +154,19 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
 
     // Skandan keyin DRAFT ariza (skan kaliti + to'liq to'plam + keyingi qadam).
     final draftId = await createAiDraft(
-      currentStep: 'area',
+      currentStep: 'cadastre',
       scanUsdzKey: scanKey,
       scanFiles: scanFiles,
     );
     if (!mounted) return;
     setState(() => _uploading = false);
-    // Skan oqimi tugadi — obyekt maydoni qadamiga o'tamiz (process ekraniga
-    // qaytmaymiz). Maydondan keyin (ixtiyoriy) davreestr lookup keladi.
+    // Skan oqimi tugadi — endi to'g'ridan-to'g'ri kadastr qadamiga o'tamiz
+    // (alohida maydon qadami olib tashlandi; obyekt maydoni davreestr'dan
+    // avtomatik olinadi).
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/area'),
-        builder: (_) => AiAreaScreen(scan: r, draftId: draftId),
+        settings: const RouteSettings(name: 'ai/cadastre'),
+        builder: (_) => AiCadastreScreen(scan: r, draftId: draftId),
       ),
     );
   }

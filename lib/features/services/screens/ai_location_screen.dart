@@ -383,7 +383,7 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
             const SizedBox(height: 8),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: StepProgressBar(count: 8, activeIndex: 3),
+              child: StepProgressBar(count: 7, activeIndex: 2),
             ),
             const SizedBox(height: 12),
             Padding(

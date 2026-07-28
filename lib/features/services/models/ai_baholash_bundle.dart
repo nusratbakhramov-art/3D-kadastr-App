@@ -29,16 +29,20 @@ class AiBaholashBundle {
     List<String>? imageKeys,
     List<String>? kadastrKeys,
     List<String>? passportKeys,
+    List<String>? smetaKeys,
     List<String>? imagePaths,
     List<String>? kadastrPaths,
     List<String>? passportPaths,
+    List<String>? smetaPaths,
   }) : rooms = rooms ?? <AiRoom>[],
        imageKeys = imageKeys ?? <String>[],
        kadastrKeys = kadastrKeys ?? <String>[],
        passportKeys = passportKeys ?? <String>[],
+       smetaKeys = smetaKeys ?? <String>[],
        imagePaths = imagePaths ?? <String>[],
        kadastrPaths = kadastrPaths ?? <String>[],
-       passportPaths = passportPaths ?? <String>[];
+       passportPaths = passportPaths ?? <String>[],
+       smetaPaths = smetaPaths ?? <String>[];
 
   final CadastreLookupResult kadastr;
 
@@ -89,6 +93,7 @@ class AiBaholashBundle {
   final List<String> imageKeys; // property photos (property_photo)
   final List<String> kadastrKeys; // kadastr docs (kadastr)
   final List<String> passportKeys; // owner ID (passport)
+  final List<String> smetaKeys; // smeta (construction estimate) docs (smeta)
 
   /// Local on-device file paths, index-aligned with the *Keys lists above.
   /// Transient — NOT serialized. Used only to render thumbnails on the review
@@ -96,6 +101,7 @@ class AiBaholashBundle {
   final List<String> imagePaths;
   final List<String> kadastrPaths;
   final List<String> passportPaths;
+  final List<String> smetaPaths;
 
   Map<String, dynamic> toJson() => {
         'kadastr': {
@@ -127,6 +133,7 @@ class AiBaholashBundle {
         if (imageKeys.isNotEmpty) 'image_keys': imageKeys,
         if (kadastrKeys.isNotEmpty) 'kadastr_keys': kadastrKeys,
         if (passportKeys.isNotEmpty) 'passport_keys': passportKeys,
+        if (smetaKeys.isNotEmpty) 'smeta_keys': smetaKeys,
       };
 
   /// Draft `request_payload`'dan bundle qayta tiklash (resume). `draftId` —
@@ -150,6 +157,8 @@ class AiBaholashBundle {
           ((j['kadastr_keys'] as List?) ?? const []).map((e) => '$e').toList(),
       passportKeys:
           ((j['passport_keys'] as List?) ?? const []).map((e) => '$e').toList(),
+      smetaKeys:
+          ((j['smeta_keys'] as List?) ?? const []).map((e) => '$e').toList(),
     );
     final c = j['client'];
     if (c is Map) {
@@ -171,7 +180,8 @@ enum ValuationPurpose {
   mortgage('mortgage'),
   insurance('insurance'),
   court('court'),
-  tax('tax');
+  tax('tax'),
+  inheritance('inheritance');
 
   const ValuationPurpose(this.wire);
   final String wire;
@@ -186,6 +196,7 @@ enum ValuationPurpose {
     ValuationPurpose.insurance => tr(l, 'purpose.insurance'),
     ValuationPurpose.court => tr(l, 'purpose.court'),
     ValuationPurpose.tax => tr(l, 'purpose.tax'),
+    ValuationPurpose.inheritance => tr(l, 'purpose.inheritance'),
   };
 
   String hint(Locale l) => '';
