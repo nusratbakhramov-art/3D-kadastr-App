@@ -78,6 +78,12 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   CadastreLookupResult? _info;
   String? _errorMsg;
   int _lookupRequestId = 0;
+
+  /// Kadastr number of the lookup currently in flight, if any. Guards the
+  /// manual "Ma'lumot noto'g'rimi? Yangilash" / "Qayta urinish" buttons: repeat
+  /// taps on the same number are dropped instead of firing another
+  /// davreest.uz scrape, which can get the user rate-limited or blocked.
+  String? _inFlightNumber;
   List<String> _recent = const [];
 
   /// The bundle this screen created, kept so that returning here (Back from a
@@ -157,7 +163,27 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
 
   Future<void> _runLookup() async {
     final number = _cadastreController.text;
+    // Already scraping this exact number — ignore the tap (see [_inFlightNumber]).
+    if (_inFlightNumber == number) return;
+    _loadTimer?.cancel();
+    _inFlightNumber = number;
     final reqId = ++_lookupRequestId;
+    // Manual refresh / retry enters here with the status still `loaded` or
+    // `error`, so flip to `loading` — that swaps the card for the skeleton, hides
+    // the button (no double-taps) and disables "Davom etish" until fresh data
+    // lands.
+    setState(() {
+      _status = _LoadStatus.loading;
+      _errorMsg = null;
+    });
+    try {
+      await _performLookup(number, reqId);
+    } finally {
+      if (_inFlightNumber == number) _inFlightNumber = null;
+    }
+  }
+
+  Future<void> _performLookup(String number, int reqId) async {
     final session = await const AuthStorage().loadSession();
     final token = session.token;
     if (token == null) {
@@ -220,6 +246,10 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
           '$e',
         );
       });
+      // Release the in-flight guard before awaiting the error sheet — its
+      // "retry" calls back into _runLookup, which would otherwise be dropped as
+      // a duplicate of this (already finished) request.
+      _inFlightNumber = null;
       await NetworkErrorHandler.maybeShow(context, e, onRetry: _runLookup);
     }
   }

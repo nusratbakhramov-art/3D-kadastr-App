@@ -181,7 +181,7 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
   /// The rows to render: backend options when loaded, otherwise the built-in
   /// enum so the step works before the fetch finishes (and offline).
   /// Credit-only purposes are no longer offered — drop any such option coming
-  /// from the backend so the list stays the five approved purposes.
+  /// from the backend so only the approved purposes are shown.
   static bool _isCreditWire(String wire) {
     final w = wire.toLowerCase();
     return w.contains('credit') || w.contains('kredit') || w == 'loan';
