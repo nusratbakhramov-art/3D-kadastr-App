@@ -620,14 +620,15 @@ class _CallCenterBlock extends StatelessWidget {
         // the hero line; the hours read as a quiet subline beneath it.
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Image.asset(
               'assets/icons/ai-phone-icon.png',
-              width: 52,
-              height: 52,
+              width: 46,
+              height: 46,
               fit: BoxFit.contain,
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -635,18 +636,18 @@ class _CallCenterBlock extends StatelessWidget {
                 Text(
                   phone,
                   style: TextStyle(
-                    fontSize: 22,
+                    fontSize: 21,
                     fontWeight: FontWeight.w800,
-                    height: 1.1,
+                    height: 1.05,
                     letterSpacing: 0.2,
                     color: textColor,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
                   tr(locale, 'home.contact_center.hours'),
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 13,
                     fontWeight: FontWeight.w600,
                     height: 1.15,
                     color: muted,

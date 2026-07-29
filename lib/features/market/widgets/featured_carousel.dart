@@ -1,11 +1,8 @@
-import 'dart:ui' show ImageFilter;
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
-import '../../../widgets/gradient_surface.dart';
 import '../../../widgets/remote_image.dart';
 import '../market_controller.dart';
 import '../models/market_listing.dart';
@@ -96,15 +93,14 @@ class _FeaturedCarouselState extends State<FeaturedCarousel> {
                       // active card is the leftmost one and its edge must not
                       // drift while the others shrink.
                       //
-                      // Scale carries the depth; the fade is only a hint. It
-                      // stays shallow because Opacity blends toward whatever is
-                      // behind it — on the light background a deeper fade turned
-                      // the neighbouring photo milky, which read as a broken
-                      // image rather than a card standing further back.
+                      // Scale alone carries the depth. The old Opacity fade was
+                      // dropped: it forces a saveLayer per card every frame,
+                      // which stacked with the panel blurs to stutter the whole
+                      // feed. Scale reads as depth on its own.
                       return Transform.scale(
                         scale: 0.92 + 0.08 * t,
                         alignment: Alignment.centerLeft,
-                        child: Opacity(opacity: 0.88 + 0.12 * t, child: child),
+                        child: child,
                       );
                     },
                     child: Padding(
@@ -210,7 +206,14 @@ class _FeaturedCard extends StatelessWidget {
   }
 }
 
-/// Frosted info panel floating over the photo.
+/// Info panel floating over the photo.
+///
+/// This used to be a live `BackdropFilter` (frosted glass). That blur was
+/// re-sampled every frame as the home feed scrolled behind it — the main cause
+/// of the scroll stutter — so it's now a solid dark scrim: a higher panel
+/// opacity holds the text contrast over any user-supplied render without any
+/// per-frame GPU work. The `→` button was dropped too; the whole card is
+/// tappable, so it was redundant chrome.
 class _GlassPanel extends StatelessWidget {
   const _GlassPanel({required this.listing});
 
@@ -223,74 +226,45 @@ class _GlassPanel extends StatelessWidget {
       if (listing.district.isNotEmpty) listing.district,
     ].join('  •  ');
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(12, 10, 10, 11),
-          decoration: BoxDecoration(
-            color: const Color(0xFF0A120D).withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 11),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A120D).withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            listing.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w700,
+              fontSize: 14.5,
+              height: 1.15,
+              letterSpacing: -0.2,
+              color: Colors.white,
+            ),
           ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      listing.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontFamily: 'MTSCompact',
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.5,
-                        height: 1.15,
-                        letterSpacing: -0.2,
-                        color: Colors.white,
-                      ),
-                    ),
-                    if (meta.isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        meta,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'MTSText',
-                          fontSize: 11,
-                          height: 1.2,
-                          color: Colors.white.withValues(alpha: 0.62),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(
+              meta,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 11,
+                height: 1.2,
+                color: Colors.white.withValues(alpha: 0.62),
               ),
-              const SizedBox(width: 8),
-              // Same gradient material as the home call/chat FABs that float
-              // over this card. As a flat green-tinted outline it was the odd
-              // one out on the screen and read as decoration; on the shared
-              // surface it reads as the button it always was.
-              const GradientSurface(
-                light: AppColors.callGreenLight,
-                base: AppColors.callGreen,
-                deep: AppColors.callGreenDeep,
-                size: 28,
-                radius: 9,
-                child: Icon(
-                  Icons.arrow_forward_rounded,
-                  size: 15,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
+            ),
+          ],
+        ],
       ),
     );
   }
@@ -299,10 +273,10 @@ class _GlassPanel extends StatelessWidget {
 /// Price/"Bepul" chip. Free listings keep the green accent — it's the hook; a
 /// real price stays neutral so it doesn't shout louder than a free model.
 ///
-/// The base is dark glass rather than a green tint: the photo behind is a
-/// user-supplied render, and green-on-green (a sunlit lawn, say) washed the
-/// label out completely. Blur + a dark base hold contrast over any image, which
-/// is the same reason the info panel below is readable.
+/// The base is a solid dark scrim (not a live blur): the photo behind is a
+/// user-supplied render, and green-on-green washed the label out. A dark, near
+/// opaque base holds contrast over any image — and, unlike the old
+/// `BackdropFilter`, costs nothing per scroll frame.
 class _PricePill extends StatelessWidget {
   const _PricePill({required this.label, required this.highlight});
 
@@ -314,7 +288,6 @@ class _PricePill extends StatelessWidget {
     final radius = BorderRadius.circular(999);
 
     return DecoratedBox(
-      // Outside the clip — a shadow drawn inside it would be clipped away.
       decoration: BoxDecoration(
         borderRadius: radius,
         boxShadow: [
@@ -325,35 +298,29 @@ class _PricePill extends StatelessWidget {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: radius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: highlight
-                  ? const Color(0xFF041209).withValues(alpha: 0.58)
-                  : const Color(0xFF060E09).withValues(alpha: 0.60),
-              borderRadius: radius,
-              border: Border.all(
-                color: highlight
-                    ? AppColors.splashGreen.withValues(alpha: 0.55)
-                    : Colors.white.withValues(alpha: 0.22),
-              ),
-            ),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w700,
-                fontSize: 11.5,
-                height: 1.1,
-                color: highlight ? AppColors.splashGreen : Colors.white,
-              ),
-            ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: highlight
+              ? const Color(0xFF041209).withValues(alpha: 0.82)
+              : const Color(0xFF060E09).withValues(alpha: 0.85),
+          borderRadius: radius,
+          border: Border.all(
+            color: highlight
+                ? AppColors.splashGreen.withValues(alpha: 0.55)
+                : Colors.white.withValues(alpha: 0.22),
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            fontFamily: 'MTSCompact',
+            fontWeight: FontWeight.w700,
+            fontSize: 11.5,
+            height: 1.1,
+            color: highlight ? AppColors.splashGreen : Colors.white,
           ),
         ),
       ),
