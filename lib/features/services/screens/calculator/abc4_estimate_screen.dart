@@ -126,6 +126,7 @@ class _Abc4EstimateScreenState extends State<Abc4EstimateScreen> {
     ];
     return CalculatorResult(
       categoryTitle: tr(locale, 'services.calc.repair_construction'),
+      category: CalculatorCategory.tamirlash.name,
       totalUzs: r.totalUzs,
       note: r.isAbc
           ? tr(locale, 'services.calc.abc4.method_abc')

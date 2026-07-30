@@ -249,6 +249,7 @@ CalculatorResult _withContact(
 ) =>
     CalculatorResult(
       categoryTitle: r.categoryTitle,
+      category: r.category,
       totalUzs: r.totalUzs,
       note: r.note,
       lines: [

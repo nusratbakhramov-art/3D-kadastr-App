@@ -57,6 +57,7 @@ class CalculatorOrderApiService {
     final uri = Uri.parse('$_baseUrl/services/calculator/orders');
     final body = jsonEncode({
       'category_title': result.categoryTitle,
+      'category': result.category,
       'total_uzs': result.totalUzs,
       'currency': 'UZS',
       'note': result.note,

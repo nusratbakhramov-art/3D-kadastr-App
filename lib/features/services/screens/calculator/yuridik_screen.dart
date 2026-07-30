@@ -268,6 +268,7 @@ class _YuridikApplyScreenState extends State<_YuridikApplyScreen> {
         : '${item.title} — ${item.description}\n\nIzoh: $trimmed';
     final result = CalculatorResult(
       categoryTitle: 'Yuridik xizmat',
+      category: CalculatorCategory.yuridik.name,
       totalUzs: total,
       note: fullNote,
       lines: [CalculatorLine(item.title, item.price)],

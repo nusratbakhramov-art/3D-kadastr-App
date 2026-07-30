@@ -153,6 +153,7 @@ KadastrServiceEstimate estimateForCategory({
         isQuote: true,
         result: CalculatorResult(
           categoryTitle: category.title(locale),
+          category: category.name,
           totalUzs: 0,
           note: kadastrQuoteLabel(locale),
           lines: const [],

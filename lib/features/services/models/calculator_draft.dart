@@ -282,12 +282,16 @@ enum TamirlashServiceType {
 class CalculatorResult {
   const CalculatorResult({
     required this.categoryTitle,
+    required this.category,
     required this.totalUzs,
     required this.note,
     required this.lines,
   });
 
   final String categoryTitle;
+  // Stable, locale-independent key (CalculatorCategory enum name) — the backend
+  // filters admin pages by this; `categoryTitle` stays the localised display.
+  final String category;
   final int totalUzs;
   final String note;
   final List<CalculatorLine> lines;
@@ -371,6 +375,7 @@ CalculatorResult computeArxitektura({
   final total = (areaM2 * rate).round();
   return CalculatorResult(
     categoryTitle: CalculatorCategory.arxitektura.title(locale),
+    category: CalculatorCategory.arxitektura.name,
     totalUzs: total,
     note: _ComputeStrings.inclVat(locale),
     lines: [
@@ -440,6 +445,7 @@ CalculatorResult computeKadastr({
 
   return CalculatorResult(
     categoryTitle: categoryTitle,
+    category: p,  // 'kadastr3d' | 'kadastr' — matches CalculatorCategory.name
     totalUzs: total,
     note: _ComputeStrings.inclVat(locale),
     lines: [
@@ -471,6 +477,7 @@ CalculatorResult computeBaholash({
 
   return CalculatorResult(
     categoryTitle: CalculatorCategory.baholash.title(locale),
+    category: CalculatorCategory.baholash.name,
     totalUzs: total,
     note: _ComputeStrings.inclVat(locale),
     lines: [
@@ -498,6 +505,7 @@ CalculatorResult computeDizayn({
 
   return CalculatorResult(
     categoryTitle: CalculatorCategory.dizayn.title(locale),
+    category: CalculatorCategory.dizayn.name,
     totalUzs: total,
     note: _ComputeStrings.inclVat(locale),
     lines: [
@@ -524,6 +532,7 @@ CalculatorResult computeTamirlash({
   final total = (areaM2 * rate).round();
   return CalculatorResult(
     categoryTitle: CalculatorCategory.tamirlash.title(locale),
+    category: CalculatorCategory.tamirlash.name,
     totalUzs: total,
     note: _ComputeStrings.inclVat(locale),
     lines: [
