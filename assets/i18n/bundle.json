@@ -158,8 +158,8 @@
       "auth.resend.label": "Resend",
       "auth.scaffold.skip": "Skip",
       "auth.verify.success_toast": "The verification code you entered is correct!",
-      "chat.error_connect": "Could not connect to the server. Check WiFi and the server.",
-      "chat.error_generic": "An error occurred.",
+      "chat.error_connect": "No internet connection. Check your connection and try again.",
+      "chat.error_generic": "Couldn't get a reply. Try again.",
       "chat.greet_ask": "How can I help?",
       "chat.greeting": "Hello, $name.",
       "chat.greeting_guest": "Hello!",
@@ -1556,7 +1556,11 @@
       "services.ai.target_price.docs_label": "Smeta documents",
       "services.ai.target_price.docs_optional": "Optional — you can upload PDF, Word, Excel or images.",
       "services.ai.target_price.add_docs": "Add document",
-      "services.ai.target_price.upload_failed": "Upload failed"
+      "services.ai.target_price.upload_failed": "Upload failed",
+      "chat.error_busy": "We're doing maintenance — back shortly.",
+      "chat.error_session": "Your session expired. Sign in again.",
+      "chat.error_too_many": "Too many questions at once. Try again in a minute.",
+      "chat.retry": "Try again"
     },
     "ru": {
       "about.app_name": "3D Kadastr",
@@ -1716,8 +1720,8 @@
       "auth.resend.label": "Отправить снова",
       "auth.scaffold.skip": "Пропустить",
       "auth.verify.success_toast": "Введённый код подтверждения верный!",
-      "chat.error_connect": "Не удалось подключиться к серверу. Проверьте WiFi и сервер.",
-      "chat.error_generic": "Произошла ошибка.",
+      "chat.error_connect": "Нет соединения с интернетом. Проверьте связь и попробуйте снова.",
+      "chat.error_generic": "Не удалось получить ответ. Попробуйте ещё раз.",
       "chat.greet_ask": "Чем могу помочь?",
       "chat.greeting": "Здравствуйте, $name.",
       "chat.greeting_guest": "Здравствуйте!",
@@ -3114,7 +3118,11 @@
       "services.ai.target_price.docs_label": "Сметные документы",
       "services.ai.target_price.docs_optional": "Необязательно — можно загрузить PDF, Word, Excel или фото.",
       "services.ai.target_price.add_docs": "Добавить документ",
-      "services.ai.target_price.upload_failed": "Не удалось загрузить"
+      "services.ai.target_price.upload_failed": "Не удалось загрузить",
+      "chat.error_busy": "Ведутся технические работы — скоро вернёмся.",
+      "chat.error_session": "Сессия истекла. Войдите в приложение заново.",
+      "chat.error_too_many": "Слишком много запросов. Попробуйте через минуту.",
+      "chat.retry": "Повторить"
     },
     "uz": {
       "about.app_name": "3D Kadastr",
@@ -3274,8 +3282,8 @@
       "auth.resend.label": "Qayta yuborish",
       "auth.scaffold.skip": "O'tkazib yuborish",
       "auth.verify.success_toast": "Siz kiritgan tasdiqlash kodi to'g'ri kiritildi!",
-      "chat.error_connect": "Serverga ulanib bo'lmadi. WiFi va server ishlayotganini tekshiring.",
-      "chat.error_generic": "Xatolik yuz berdi.",
+      "chat.error_connect": "Internet aloqasi yo'q. Ulanishni tekshirib, qayta urinib ko'ring.",
+      "chat.error_generic": "Javobni olib bo'lmadi. Qayta urinib ko'ring.",
       "chat.greet_ask": "Nima bilan yordam beray?",
       "chat.greeting": "Salom, $name.",
       "chat.greeting_guest": "Salom!",
@@ -4672,7 +4680,11 @@
       "services.ai.target_price.docs_label": "Smeta hujjatlari",
       "services.ai.target_price.docs_optional": "Ixtiyoriy — PDF, Word, Excel yoki rasm yuklashingiz mumkin.",
       "services.ai.target_price.add_docs": "Hujjat qo'shish",
-      "services.ai.target_price.upload_failed": "Yuklab bo'lmadi"
+      "services.ai.target_price.upload_failed": "Yuklab bo'lmadi",
+      "chat.error_busy": "Texnik ishlar olib borilmoqda, tez orada qaytamiz.",
+      "chat.error_session": "Sessiya muddati tugadi. Ilovaga qaytadan kiring.",
+      "chat.error_too_many": "Juda ko'p savol yuborildi. Bir daqiqadan so'ng urinib ko'ring.",
+      "chat.retry": "Qayta urinish"
     }
   },
   "version": 0

@@ -35,6 +35,21 @@ class AppTranslations {
   }
 
   Map<String, dynamic> toJson() => {'version': version, 'locales': byLang};
+
+  /// [base] ustiga shu bundle'ni qo'yadi: kalit ikkalasida bo'lsa — shu
+  /// bundle'niki yutadi, faqat [base]'da bo'lsa — saqlanadi.
+  ///
+  /// Kerak, chunki backend bundle'i seed'ni TO'LIQ almashtiradi: ilovada bor,
+  /// lekin prod'da hali seed qilinmagan kalit xom ko'rinishda (`chat.retry`)
+  /// chiqib qolardi. Seed poydevor bo'lib qoladi, backend esa uni yangilaydi.
+  AppTranslations over(AppTranslations base) {
+    if (base.isEmpty) return this;
+    final merged = <String, Map<String, String>>{};
+    for (final lang in {...base.byLang.keys, ...byLang.keys}) {
+      merged[lang] = {...?base.byLang[lang], ...?byLang[lang]};
+    }
+    return AppTranslations(version: version, byLang: merged);
+  }
 }
 
 final ValueNotifier<AppTranslations> appTranslationsNotifier =

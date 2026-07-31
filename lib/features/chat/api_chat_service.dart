@@ -18,19 +18,28 @@ import '../auth/auth_http_client.dart';
 
 /// SSE hodisasi: meta (conversation_id) | delta (matn bo'lagi) | error | done.
 class ChatStreamEvent {
-  const ChatStreamEvent._(this.type, {this.content, this.conversationId});
+  const ChatStreamEvent._(
+    this.type, {
+    this.content,
+    this.conversationId,
+    this.retryable = true,
+  });
 
   factory ChatStreamEvent.meta(int? id) =>
       ChatStreamEvent._('meta', conversationId: id);
   factory ChatStreamEvent.delta(String c) =>
       ChatStreamEvent._('delta', content: c);
-  factory ChatStreamEvent.error(String c) =>
-      ChatStreamEvent._('error', content: c);
+  factory ChatStreamEvent.error(String c, {bool retryable = true}) =>
+      ChatStreamEvent._('error', content: c, retryable: retryable);
   factory ChatStreamEvent.done() => const ChatStreamEvent._('done');
 
   final String type;
   final String? content;
   final int? conversationId;
+
+  /// Xatoni qayta urinish mantiqiymi. Sessiya tugagan yoki savol noto'g'ri
+  /// bo'lsa — yo'q: bir xil so'rov bir xil natija beradi.
+  final bool retryable;
 }
 
 class ChatApiService {
@@ -62,16 +71,12 @@ class ChatApiService {
     final res = await _client.send(req).timeout(const Duration(seconds: 20));
 
     if (res.statusCode != 200) {
-      final body = await res.stream.bytesToString();
-      String detail =
-          '${tr(locale, 'chat.server_error')} (${res.statusCode})';
-      try {
-        final j = jsonDecode(body);
-        if (j is Map && j['detail'] != null) detail = j['detail'].toString();
-      } catch (_) {
-        // generic xabar qoladi
-      }
-      yield ChatStreamEvent.error(detail);
+      // Javob tanasi ATAYLAB o'qilmaydi: backend `detail`'i ichki matn
+      // ("Xabar bo'sh"), deploy paytida esa nginx'ning HTML 502 sahifasi
+      // keladi. Ikkalasi ham foydalanuvchiga ko'rsatiladigan matn emas —
+      // status kodni o'zimiz insoniy xabarga o'giramiz.
+      await res.stream.drain<void>();
+      yield _errorFor(res.statusCode, locale);
       return;
     }
 
@@ -96,13 +101,30 @@ class ChatApiService {
         case 'delta':
           yield ChatStreamEvent.delta(d['content'] as String? ?? '');
         case 'error':
-          yield ChatStreamEvent.error(
-            d['message'] as String? ?? tr(locale, 'common.error'),
-          );
+          // Backend `message`'i ham ichki matn — foydalanuvchiga o'z
+          // xabarimizni ko'rsatamiz.
+          yield ChatStreamEvent.error(tr(locale, 'chat.error_generic'));
         case 'done':
           yield ChatStreamEvent.done();
           return;
       }
     }
   }
+
+  /// HTTP status → foydalanuvchi o'qiydigan xabar. Status kod hech qachon
+  /// ekranga chiqmaydi: "502" foydalanuvchiga hech narsa aytmaydi, u faqat
+  /// nima bo'lgani va endi nima qilishni bilishi kerak.
+  ChatStreamEvent _errorFor(int status, Locale locale) => switch (status) {
+    // Prod deploy oynasi: nginx app konteynerga ulana olmayapti. Bir necha
+    // soniyadan keyin o'zi tuzaladi — shuning uchun "keyinroq urinib ko'ring".
+    502 || 503 || 504 => ChatStreamEvent.error(
+      tr(locale, 'chat.error_busy'),
+    ),
+    401 || 403 => ChatStreamEvent.error(
+      tr(locale, 'chat.error_session'),
+      retryable: false,
+    ),
+    429 => ChatStreamEvent.error(tr(locale, 'chat.error_too_many')),
+    _ => ChatStreamEvent.error(tr(locale, 'chat.error_generic')),
+  };
 }

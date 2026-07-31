@@ -17,13 +17,17 @@ class AppTranslationsStore {
   static const String _seedAsset = 'assets/i18n/bundle.json';
   static const Duration _timeout = Duration(seconds: 12);
 
+  /// Ilova bilan kelgan seed — har doim poydevor sifatida saqlanadi, backend
+  /// bundle'i uning ustiga qo'yiladi (`.over(_seed)`).
+  AppTranslations _seed = AppTranslations.empty;
+
   Future<void> loadCachedThenRefresh({http.Client? client}) async {
+    await _loadSeed();
     await _loadCache();
     // No prior backend cache on this device (fresh install / offline first run):
-    // fall back to the bundled seed so the UI is never raw keys before the
-    // first successful network fetch.
+    // the seed alone carries the UI until the first successful network fetch.
     if (appTranslationsNotifier.value.isEmpty) {
-      await _loadSeed();
+      appTranslationsNotifier.value = _seed;
     }
     await refresh(client: client);
   }
@@ -31,9 +35,7 @@ class AppTranslationsStore {
   Future<void> _loadSeed() async {
     try {
       final raw = await rootBundle.loadString(_seedAsset);
-      appTranslationsNotifier.value = AppTranslations.fromJson(
-        jsonDecode(raw) as Map<String, dynamic>,
-      );
+      _seed = AppTranslations.fromJson(jsonDecode(raw) as Map<String, dynamic>);
     } catch (_) {
       // Seed missing or malformed. Keep defaults (empty).
     }
@@ -46,7 +48,7 @@ class AppTranslationsStore {
       if (raw == null || raw.isEmpty) return;
       appTranslationsNotifier.value = AppTranslations.fromJson(
         jsonDecode(raw) as Map<String, dynamic>,
-      );
+      ).over(_seed);
     } catch (_) {
       // Bad cache. Keep defaults.
     }
@@ -81,8 +83,10 @@ class AppTranslationsStore {
       final bundle = AppTranslations.fromJson(
         jsonDecode(bundleResponse.body) as Map<String, dynamic>,
       );
-      appTranslationsNotifier.value = bundle;
+      appTranslationsNotifier.value = bundle.over(_seed);
       final prefs = await SharedPreferences.getInstance();
+      // Keshga backend javobi TOZA holda yoziladi — seed o'qishda qo'shiladi,
+      // shunda yangi ilova versiyasining seed'i eski keshni ham to'ldiradi.
       await prefs.setString(_cacheKey, jsonEncode(bundle.toJson()));
     } catch (_) {
       // Network or parse error. Keep cache/defaults.
