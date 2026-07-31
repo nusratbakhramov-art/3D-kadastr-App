@@ -4,9 +4,11 @@ import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show SystemUiOverlayStyle;
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:gpt_markdown/gpt_markdown.dart';
 
 import '../../../core/haptics.dart';
 import '../../../core/i18n/app_translations.dart';
+import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../home/user_profile.dart';
 import '../api_chat_service.dart';
@@ -141,6 +143,24 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     _done = done;
     _stopped = false;
 
+    // Xato — bot javobi EMAS. Shuning uchun u assistant matniga qo'shilmaydi,
+    // alohida qator bo'lib chiqadi. Oqim yarim yo'lda uzilgan bo'lsa, kelgan
+    // matn saqlanadi: u haqiqiy javobning bo'lagi, uni o'chirish ma'nosiz.
+    void showError(String message, {bool retryable = true}) {
+      if (!mounted) return;
+      setState(() {
+        if (assistant.content.isEmpty) {
+          _messages.remove(assistant);
+        } else {
+          assistant.isStreaming = false;
+        }
+        _messages.add(
+          ChatMessage.error(message, retryPrompt: retryable ? text : null),
+        );
+      });
+      _followBottom();
+    }
+
     _sub = _api
         .streamReply(
           message: text,
@@ -157,17 +177,21 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 setState(() => assistant.content += ev.content ?? '');
                 _followBottom();
               case 'error':
-                setState(() {
-                  final sep = assistant.content.isEmpty ? '' : '\n\n';
-                  assistant.content += sep +
-                      (ev.content ?? tr(widget.locale, 'chat.error_generic'));
-                });
+                showError(
+                  ev.content ?? tr(widget.locale, 'chat.error_generic'),
+                  retryable: ev.retryable,
+                );
             }
           },
-          onError: (Object _) {
-            if (mounted && assistant.content.isEmpty) {
-              setState(
-                () => assistant.content = tr(widget.locale, 'chat.error_connect'),
+          onError: (Object e) {
+            // Oqim yarim yo'lda uzilsa ham xabar beramiz. Avval bu holat
+            // jim yutilardi (faqat matn bo'sh bo'lsagina ko'rsatilardi) —
+            // natijada yarim javob TUGAGAN javobga o'xshab qolardi.
+            if (!_stopped) {
+              showError(
+                NetworkErrorHandler.isNetworkError(e)
+                    ? tr(widget.locale, 'chat.error_connect')
+                    : tr(widget.locale, 'chat.error_generic'),
               );
             }
             if (!done.isCompleted) done.complete();
@@ -193,6 +217,25 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       });
     }
     _stopped = false;
+  }
+
+  /// Xato qatoridagi "Qayta urinish": xato qatorini ham, unga tegishli savolni
+  /// ham olib tashlab, savolni qaytadan yuboradi — shunda tarixda takrorlangan
+  /// savol ham, o'lik xato qatori ham qolmaydi.
+  void _retry(ChatMessage errorMessage) {
+    final prompt = errorMessage.retryPrompt;
+    if (prompt == null || _sending) return;
+    setState(() {
+      _messages.remove(errorMessage);
+      // Faqat savol oxirgi qatorda turgan bo'lsa olib tashlaymiz. Yarim
+      // kelgan javob bo'lsa — savol o'sha javobning tepasida turibdi, uni
+      // olib tashlash javobni ega'siz qoldiradi; u holda yangi tur ochamiz.
+      final last = _messages.isEmpty ? null : _messages.last;
+      if (last != null && last.isUser && last.content == prompt) {
+        _messages.removeLast();
+      }
+    });
+    _send(prompt);
   }
 
   /// Cancels an in-flight reply. Keeps whatever already streamed in.
@@ -319,6 +362,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                       message: _messages[i],
                       isDark: isDark,
                       lang: _lang,
+                      locale: widget.locale,
+                      onRetry: _retry,
                     ),
                   ),
           ),
@@ -459,13 +504,26 @@ class _Bubble extends StatelessWidget {
     required this.message,
     required this.isDark,
     required this.lang,
+    required this.locale,
+    required this.onRetry,
   });
   final ChatMessage message;
   final bool isDark;
   final String lang;
+  final Locale locale;
+  final void Function(ChatMessage) onRetry;
 
   @override
   Widget build(BuildContext context) {
+    if (message.isError) {
+      return _ErrorRow(
+        message: message,
+        isDark: isDark,
+        locale: locale,
+        onRetry: onRetry,
+      );
+    }
+
     // Waiting on the first token: show the working indicator bare, not wrapped
     // in a bubble — there's no message yet, so a bubble would be a lie.
     if (message.isStreaming && message.content.isEmpty) {
@@ -510,12 +568,19 @@ class _Bubble extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: SelectableText(
-                message.content,
-                style: TextStyle(
-                  color: textColor,
-                  fontSize: 15,
-                  height: 1.45,
+              // The model replies in markdown (bold labels, numbered steps).
+              // Render it so `**...**` and lists format instead of showing raw
+              // asterisks. SelectionArea keeps the text copyable like the old
+              // SelectableText did. gpt_markdown tolerates half-typed markdown
+              // mid-stream, so it stays clean while the answer streams in.
+              child: SelectionArea(
+                child: GptMarkdown(
+                  message.content,
+                  style: TextStyle(
+                    color: textColor,
+                    fontSize: 15,
+                    height: 1.45,
+                  ),
                 ),
               ),
             ),
@@ -546,6 +611,96 @@ class _Bubble extends StatelessWidget {
             message.content,
             style: TextStyle(color: textColor, fontSize: 15, height: 1.35),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Xato qatori — ataylab bot javobiga o'xshamaydi: brend belgisi yo'q, fon
+/// qizg'ish, matn chapdan to'liq kenglikda emas. Foydalanuvchi buni "bot shuni
+/// aytdi" deb emas, "yubormadi" deb o'qishi kerak.
+class _ErrorRow extends StatelessWidget {
+  const _ErrorRow({
+    required this.message,
+    required this.isDark,
+    required this.locale,
+    required this.onRetry,
+  });
+
+  final ChatMessage message;
+  final bool isDark;
+  final Locale locale;
+  final void Function(ChatMessage) onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    const accent = AppColors.declineRed;
+    final bg = accent.withValues(alpha: isDark ? 0.14 : 0.07);
+    final border = accent.withValues(alpha: isDark ? 0.30 : 0.20);
+    final textColor = isDark ? const Color(0xFFFFB4AE) : const Color(0xFFA32D2D);
+    final canRetry = message.retryPrompt != null;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 8, 14),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: border, width: 0.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.error_outline_rounded, size: 17, color: textColor),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    message.content,
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 14,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (canRetry) ...[
+              const SizedBox(height: 10),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: hapticTap(() => onRetry(message)),
+                  icon: Icon(Icons.refresh_rounded, size: 16, color: textColor),
+                  label: Text(
+                    tr(locale, 'chat.retry'),
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(9),
+                      side: BorderSide(color: border, width: 0.5),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
