@@ -117,6 +117,15 @@ enum CalculatorCategory {
     CalculatorCategory.yuridik => 'assets/images/services/legal.webp',
   };
 
+  /// Ikonka kattaligini tekislash — asset'larning ichki shaffof hoshiyasi har
+  /// xil, shuning uchun ba'zilari 44pt plitkada kichikroq ko'rinadi.
+  /// 1.0 = asl o'lcham.
+  double get iconScale => switch (this) {
+    CalculatorCategory.kadastr3d => 1.2,
+    CalculatorCategory.dizayn => 1.2,
+    _ => 1.0,
+  };
+
   Color get accent => switch (this) {
     CalculatorCategory.arxitektura => const Color(0xFF22D3EE),
     CalculatorCategory.kadastr => const Color(0xFF00E135),

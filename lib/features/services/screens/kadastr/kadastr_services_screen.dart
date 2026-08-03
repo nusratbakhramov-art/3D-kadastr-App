@@ -313,7 +313,13 @@ class _SelectableServiceCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: category.assetIcon != null
-                    ? Image.asset(category.assetIcon!, fit: BoxFit.contain)
+                    ? Transform.scale(
+                        scale: category.iconScale,
+                        child: Image.asset(
+                          category.assetIcon!,
+                          fit: BoxFit.contain,
+                        ),
+                      )
                     : Icon(category.icon, color: category.accent, size: 22),
               ),
               const SizedBox(width: 12),
