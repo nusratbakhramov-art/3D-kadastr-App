@@ -40,9 +40,6 @@ enum CalculatorCategory {
   baholash,
   buxgalteriya,
   yuridik,
-  /// Retired from the service lists (2026-08-03) — the member stays so old
-  /// orders/prices keyed `tamirlash` still resolve, and so the admin's
-  /// Ta'mirlash page keeps working. Not in [listed], so it is never offered.
   tamirlash;
 
   /// The services actually offered, in display order. Both the Onlayn
@@ -54,8 +51,9 @@ enum CalculatorCategory {
     kadastr3d,
     dizayn,
     baholash,
-    buxgalteriya,
+    tamirlash,
     yuridik,
+    buxgalteriya,
   ];
 
   String title(Locale l) => switch (this) {
@@ -363,6 +361,9 @@ class _ComputeStrings {
   static String objectType(Locale l) =>
       tr(l, 'services.model.compute.object_type');
 
+  static String objectValue(Locale l) =>
+      tr(l, 'services.model.compute.object_value');
+
   static String designStyle(Locale l) =>
       tr(l, 'services.model.compute.design_style');
 
@@ -577,6 +578,103 @@ CalculatorResult computeTamirlash({
       CalculatorLine(_ComputeStrings.perM2(locale), _fmtUzs(locale, rate)),
     ],
   );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Qurilish buxgalteriyasi — obyekt qiymati bo'yicha progressiv shkala
+// ────────────────────────────────────────────────────────────────────────
+
+/// Xizmat haqi obyekt qiymatidan pog'onali (marginal) hisoblanadi: har
+/// pog'ona faqat qiymatning O'ZIGA tushgan qismidan olinadi, natijalar
+/// qo'shiladi — daromad solig'i shkalasi kabi. `fixed` pog'ona (birinchisi)
+/// qiymatdan qat'i nazar to'liq qo'shiladi, ya'ni minimal haq bo'lib xizmat
+/// qiladi.
+///
+/// Misol (12,5 mlrd): 6 000 000 + 4 mlrd×0,1% + 5 mlrd×0,06% + 2,5 mlrd×0,04%
+/// = 14 000 000 so'm.
+CalculatorResult computeBuxgalteriya({
+  required double objectValueUzs,
+  required CalculatorPricing pricing,
+  required Locale locale,
+}) {
+  final bands = pricing.scale(kBuxgalteriyaValueScaleKey);
+  final lines = <CalculatorLine>[
+    CalculatorLine(
+      _ComputeStrings.objectValue(locale),
+      _fmtUzs(locale, objectValueUzs.round()),
+    ),
+  ];
+
+  var total = 0.0;
+  num lower = 0;
+  for (final band in bands) {
+    final upper = band.upto;
+    // Shu pog'onaga tushgan qism: MAX(0, MIN(qiymat, yuqori) - quyi).
+    final capped = upper == null
+        ? objectValueUzs
+        : (objectValueUzs < upper ? objectValueUzs : upper.toDouble());
+    final slice = capped - lower;
+    final portion = slice > 0 ? slice : 0.0;
+
+    if (band.isFixed) {
+      // Qat'iy pog'ona — har doim qo'shiladi (minimal haq).
+      total += band.value.toDouble();
+      lines.add(CalculatorLine(
+        _bandLabel(locale, lower, upper),
+        _fmtUzs(locale, band.value.round()),
+      ));
+    } else if (portion > 0) {
+      final amount = portion * band.value.toDouble();
+      total += amount;
+      lines.add(CalculatorLine(
+        '${_bandLabel(locale, lower, upper)} · ${_fmtPercent(band.value)}',
+        _fmtUzs(locale, amount.round()),
+      ));
+    }
+    if (upper == null) break;
+    lower = upper;
+  }
+
+  return CalculatorResult(
+    categoryTitle: CalculatorCategory.buxgalteriya.title(locale),
+    category: CalculatorCategory.buxgalteriya.name,
+    totalUzs: total.round(),
+    note: _ComputeStrings.inclVat(locale),
+    lines: lines,
+  );
+}
+
+/// "1,0 mlrd gacha" / "1,0 – 5,0 mlrd" / "100,0 mlrd dan yuqori".
+String _bandLabel(Locale l, num lower, num? upper) {
+  final unit = _pick(l, uz: 'mlrd', ru: 'млрд', en: 'bn');
+  String bn(num v) {
+    final b = v / 1000000000;
+    final s = b == b.roundToDouble() ? b.toStringAsFixed(1) : b.toStringAsFixed(2);
+    return _pick(l, uz: s.replaceAll('.', ','), ru: s.replaceAll('.', ','), en: s);
+  }
+
+  if (lower == 0 && upper != null) {
+    return _pick(l,
+        uz: '${bn(upper)} $unit gacha',
+        ru: 'до ${bn(upper)} $unit',
+        en: 'up to ${bn(upper)} $unit');
+  }
+  if (upper == null) {
+    return _pick(l,
+        uz: '${bn(lower)} $unit dan yuqori',
+        ru: 'свыше ${bn(lower)} $unit',
+        en: 'over ${bn(lower)} $unit');
+  }
+  return '${bn(lower)} – ${bn(upper)} $unit';
+}
+
+/// 0.0006 → "0,06%"; ortiqcha nollarsiz.
+String _fmtPercent(num fraction) {
+  final pct = fraction * 100;
+  var s = pct.toStringAsFixed(4);
+  s = s.replaceFirst(RegExp(r'0+$'), '');
+  s = s.replaceFirst(RegExp(r'[.,]$'), '');
+  return '${s.replaceAll('.', ',')}%';
 }
 
 // ────────────────────────────────────────────────────────────────────────

@@ -1,23 +1,22 @@
-/// Qurilish buxgalteriyasi — quote-only calculator service.
+/// Qurilish buxgalteriyasi — obyekt qiymati bo'yicha progressiv kalkulyator.
 ///
-/// There is no per-m² tariff for accounting work, so this mirrors the Yuridik
-/// flow rather than the m²-based forms: the user describes what they need and
-/// submits a calculator order (`category: buxgalteriya`, total 0, "kelishuv
-/// asosida"), which lands in their Arizalar and the admin's per-service page.
+/// Boshqa xizmatlar 1 m² narxidan hisoblanadi; buxgalteriya haqi esa obyekt
+/// QIYMATIDAN pog'onali olinadi (`computeBuxgalteriya`, shkala adminkadan:
+/// `buxgalteriya.value_scale`). Natija ekrani har pog'onani alohida satr qilib
+/// ko'rsatadi, shuning uchun mijoz summaning qayerdan chiqqanini ko'radi.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/i18n/app_translations.dart';
 import '../../../../theme/app_colors.dart';
-import '../../../auth/auth_storage.dart';
-import '../../../auth/widgets/login_required_sheet.dart';
 import '../../../market/widgets/listing_cta_button.dart';
-import '../../api_calculator_order_service.dart';
+import '../../data/calculator_pricing_store.dart';
 import '../../models/calculator_draft.dart';
-import '../../models/kadastr_estimate.dart' show kadastrQuoteLabel;
 import '../../widgets/service_app_bar.dart';
-import 'arxitektura_tz_success_screen.dart';
+import '../online_calculator_result_screen.dart';
+import '_calculator_field.dart';
 
 class BuxgalteriyaScreen extends StatefulWidget {
   const BuxgalteriyaScreen({super.key});
@@ -27,53 +26,41 @@ class BuxgalteriyaScreen extends StatefulWidget {
 }
 
 class _BuxgalteriyaScreenState extends State<BuxgalteriyaScreen> {
-  final CalculatorOrderApiService _orders = CalculatorOrderApiService();
-  final TextEditingController _note = TextEditingController();
-  bool _submitting = false;
+  final TextEditingController _value = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _value.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   void dispose() {
-    _orders.dispose();
-    _note.dispose();
+    _value.dispose();
     super.dispose();
   }
 
-  void _snack(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  bool get _ready {
+    final v = parseAmount(_value.text);
+    return v != null && v > 0;
   }
 
-  Future<void> _submit() async {
-    if (_submitting) return;
-    if (!await ensureLoggedIn(context)) return;
-    final session = await const AuthStorage().loadSession();
-    final token = session.token;
-    if (token == null || token.isEmpty) return;
-    if (!mounted) return;
+  void _calculate() {
+    if (!_ready) return;
+    HapticFeedback.lightImpact();
     final locale = Localizations.localeOf(context);
-    setState(() => _submitting = true);
-    final trimmed = _note.text.trim();
-    final result = CalculatorResult(
-      categoryTitle: CalculatorCategory.buxgalteriya.title(locale),
-      category: CalculatorCategory.buxgalteriya.name,
-      // Quote-only — the operator sets the price after contact.
-      totalUzs: 0,
-      note: trimmed.isEmpty ? kadastrQuoteLabel(locale) : trimmed,
-      lines: const [],
+    final result = computeBuxgalteriya(
+      objectValueUzs: parseAmount(_value.text)!,
+      pricing: calculatorPricingNotifier.value,
+      locale: locale,
     );
-    try {
-      final id = await _orders.submit(result: result, token: token);
-      if (!mounted) return;
-      await Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => ArxitekturaTzSuccessScreen(orderId: id),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _submitting = false);
-      _snack('$e');
-    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => OnlineCalculatorResultScreen(result: result),
+      ),
+    );
   }
 
   @override
@@ -84,8 +71,6 @@ class _BuxgalteriyaScreenState extends State<BuxgalteriyaScreen> {
     final subColor = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
-    final priceColor = isDark ? const Color(0xFF7DD992) : AppColors.splashGreen;
-    final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
     final locale = Localizations.localeOf(context);
 
     return Scaffold(
@@ -113,99 +98,37 @@ class _BuxgalteriyaScreenState extends State<BuxgalteriyaScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                         children: [
                           Text(
-                            tr(locale, 'services.calc.buxgalteriya.note'),
-                            style: TextStyle(
-                              fontFamily: 'MTSText',
-                              fontSize: 14,
-                              height: 1.45,
-                              color: subColor,
-                            ),
-                          ),
-                          const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 16, vertical: 14),
-                            decoration: BoxDecoration(
-                              color: cardBg,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    tr(locale, 'services.calc.yuridik.price'),
-                                    style: TextStyle(
-                                      fontFamily: 'MTSText',
-                                      fontSize: 13.5,
-                                      color: subColor,
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  kadastrQuoteLabel(locale),
-                                  style: TextStyle(
-                                    fontFamily: 'MTSCompact',
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 15,
-                                    color: priceColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          Text(
-                            tr(locale, 'services.calc.buxgalteriya.ask'),
+                            tr(locale, 'services.calc.buxgalteriya.heading'),
                             style: TextStyle(
                               fontFamily: 'MTSCompact',
                               fontWeight: FontWeight.w700,
-                              fontSize: 14,
+                              fontSize: 16,
+                              height: 1.3,
                               color: titleColor,
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          TextField(
-                            controller: _note,
-                            minLines: 3,
-                            maxLines: 6,
-                            style: TextStyle(color: titleColor, fontSize: 14),
-                            decoration: InputDecoration(
-                              hintText: tr(
-                                locale,
-                                'services.calc.buxgalteriya.note_hint',
-                              ),
-                              hintStyle:
-                                  TextStyle(color: subColor, fontSize: 13.5),
-                              filled: true,
-                              fillColor:
-                                  isDark ? const Color(0xFF1F2426) : Colors.white,
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: isDark
-                                      ? const Color(0xFF2C3133)
-                                      : const Color(0xFFE3E5E8),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: const BorderSide(
-                                  color: AppColors.splashGreen,
-                                  width: 1.4,
-                                ),
-                              ),
-                              contentPadding: const EdgeInsets.all(14),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 6),
                           Text(
-                            tr(locale, 'services.calc.yuridik.contact_note'),
+                            tr(locale, 'services.calc.buxgalteriya.scale_note'),
                             style: TextStyle(
                               fontFamily: 'MTSText',
-                              fontSize: 12.5,
+                              fontSize: 13,
                               height: 1.4,
                               color: subColor,
                             ),
+                          ),
+                          const SizedBox(height: 18),
+                          CalculatorField(
+                            label: tr(
+                              locale,
+                              'services.calc.buxgalteriya.value_label',
+                            ),
+                            placeholder: tr(
+                              locale,
+                              'services.calc.buxgalteriya.value_hint',
+                            ),
+                            controller: _value,
+                            suffix: "so'm",
                           ),
                         ],
                       ),
@@ -213,11 +136,10 @@ class _BuxgalteriyaScreenState extends State<BuxgalteriyaScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: ListingCtaButton(
-                        label: _submitting
-                            ? tr(locale, 'services.calc.buxgalteriya.sending')
-                            : tr(locale, 'services.calc.yuridik.submit'),
-                        enabled: !_submitting,
-                        onTap: _submit,
+                        label:
+                            tr(locale, 'services.calc.buxgalteriya.calculate'),
+                        enabled: _ready,
+                        onTap: _calculate,
                       ),
                     ),
                   ],

@@ -74,6 +74,36 @@ class CalcOption {
       };
 }
 
+/// Bitta tarif pog'onasi (progressiv shkala) — obyekt qiymatining shu oraliqqa
+/// tushgan qismi uchun narx. [upto] — pog'ona yuqori chegarasi (so'mda);
+/// `null` = cheksiz (oxirgi pog'ona).
+///
+/// [kind] `'fixed'` — oraliqqa tushgan har qanday obyekt uchun qat'iy summa
+/// ([value] so'mda). `'percent'` — oraliqdagi qismning ulushi ([value] kasr
+/// ko'rinishida: 0.001 = 0,1%).
+@immutable
+class TariffBand {
+  const TariffBand({required this.upto, required this.kind, required this.value});
+
+  final num? upto;
+  final String kind; // 'fixed' | 'percent'
+  final num value;
+
+  bool get isFixed => kind == 'fixed';
+
+  factory TariffBand.fromJson(Map<String, dynamic> j) => TariffBand(
+        upto: j['upto'] as num?,
+        kind: (j['kind'] as String?) ?? 'percent',
+        value: (j['value'] as num?) ?? 0,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'upto': upto,
+        'kind': kind,
+        'value': value,
+      };
+}
+
 /// Kalkulyator narxlari. [rate] kalit bo'yicha summani qaytaradi (topilmasa
 /// default). [defaults] hech qachon bo'sh emas — ekranlar null tekshirmaydi.
 @immutable
@@ -82,6 +112,7 @@ class CalculatorPricing {
     required this.rates,
     required this.yuridik,
     this.options = const {},
+    this.scales = const {},
     this.version,
   });
 
@@ -91,6 +122,10 @@ class CalculatorPricing {
 
   /// guruh → variantlar (rang/uslub/material). Masalan `options['colors']`.
   final Map<String, List<CalcOption>> options;
+
+  /// shkala kaliti → progressiv tarif pog'onalari. Masalan
+  /// `scales['buxgalteriya.value_scale']`.
+  final Map<String, List<TariffBand>> scales;
 
   /// Eng so'nggi `updated_at` (backend) — kesh yangiligini bilish uchun.
   final String? version;
@@ -104,6 +139,13 @@ class CalculatorPricing {
 
   /// Narx; topilmasa default qiymatga tushadi (har doim mavjud).
   num rate(String key) => rates[key] ?? _defaultRates[key] ?? 0;
+
+  /// Progressiv shkala pog'onalari; backend bermagan bo'lsa — default.
+  List<TariffBand> scale(String key) {
+    final r = scales[key];
+    if (r != null && r.isNotEmpty) return r;
+    return _defaultScales[key] ?? const [];
+  }
 
   /// Yuridik satr matni (key bo'yicha); topilmasa default.
   String yuridikValue(String key, Locale l) {
@@ -120,6 +162,7 @@ class CalculatorPricing {
     final r = (j['rates'] as Map?) ?? const {};
     final y = (j['yuridik'] as List?) ?? const [];
     final o = (j['options'] as Map?) ?? const {};
+    final sc = (j['scales'] as Map?) ?? const {};
     return CalculatorPricing(
       version: j['version'] as String?,
       rates: {
@@ -136,6 +179,13 @@ class CalculatorPricing {
               CalcOption.fromJson(item as Map<String, dynamic>),
           ],
       },
+      scales: {
+        for (final e in sc.entries)
+          e.key as String: [
+            for (final item in (e.value as List? ?? const []))
+              TariffBand.fromJson(item as Map<String, dynamic>),
+          ],
+      },
     );
   }
 
@@ -149,6 +199,10 @@ class CalculatorPricing {
           for (final e in options.entries)
             e.key: [for (final o in e.value) o.toJson()],
         },
+        'scales': {
+          for (final e in scales.entries)
+            e.key: [for (final b in e.value) b.toJson()],
+        },
       };
 
   /// Hard-code default — `online calculator.doc` qiymatlari (backend bilan bir xil seed).
@@ -156,6 +210,7 @@ class CalculatorPricing {
     rates: _defaultRates,
     yuridik: _defaultYuridikLines,
     options: _defaultOptions,
+    scales: _defaultScales,
   );
 }
 
@@ -302,5 +357,28 @@ final Map<String, List<CalcOption>> _defaultOptions = {
     _o('tosh', 'services.model.material.tosh'),
     _o('kompozit', 'services.model.material.kompozit'),
     _o('shisha', 'services.model.material.shisha'),
+  ],
+};
+
+// ────────────────────────────────────────────────────────────────────────
+// Progressiv tarif shkalalari (offline / fallback) — backend seed bilan bir xil.
+//
+// Qurilish buxgalteriyasi: xizmat haqi obyekt qiymatiga qarab pog'onali
+// hisoblanadi (daromad solig'i kabi) — har pog'ona faqat O'ZIGA tushgan
+// qismdan olinadi, natijalar qo'shiladi. 1-pog'ona qat'iy 6 mln so'm, ya'ni
+// eng kichik obyekt uchun ham minimal haq.
+// ────────────────────────────────────────────────────────────────────────
+
+const String kBuxgalteriyaValueScaleKey = 'buxgalteriya.value_scale';
+
+const Map<String, List<TariffBand>> _defaultScales = {
+  kBuxgalteriyaValueScaleKey: [
+    TariffBand(upto: 1000000000, kind: 'fixed', value: 6000000), // 1,0 mlrd gacha
+    TariffBand(upto: 5000000000, kind: 'percent', value: 0.001), // 1,0–5,0
+    TariffBand(upto: 10000000000, kind: 'percent', value: 0.0006), // 5,0–10,0
+    TariffBand(upto: 20000000000, kind: 'percent', value: 0.0004), // 10,0–20,0
+    TariffBand(upto: 50000000000, kind: 'percent', value: 0.0002), // 20,0–50,0
+    TariffBand(upto: 100000000000, kind: 'percent', value: 0.00015), // 50,0–100,0
+    TariffBand(upto: null, kind: 'percent', value: 0.0001), // 100,0 dan yuqori
   ],
 };
