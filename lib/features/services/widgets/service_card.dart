@@ -30,9 +30,17 @@ class _ServiceCardState extends State<ServiceCard>
     with SingleTickerProviderStateMixin {
   // Subtle press-bounce on the card's logo: dip in, overshoot, settle. We let it
   // finish before navigating so the tap feels acknowledged (a beat, not a lag).
+  //
+  // Shortened from 300ms, which had crossed from beat into lag: with the ~300ms
+  // route transition queued behind it a tap cost ~600ms before the next screen
+  // was on its way, and a profile trace showed the app producing NO frames at
+  // all for ~340ms after a tap — it was parked on this controller. 150ms still
+  // reads as a distinct jump without outstaying it.
+  static const Duration _bounceDuration = Duration(milliseconds: 150);
+
   late final AnimationController _bounce = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 300),
+    duration: _bounceDuration,
   );
   late final Animation<double> _logoScale = TweenSequence<double>([
     TweenSequenceItem(
@@ -128,11 +136,16 @@ class _ServiceCardState extends State<ServiceCard>
                 bottom: isWide ? -6 : -12,
                 child: ScaleTransition(
                   scale: _logoScale,
-                  child: Image.asset(
-                    item.asset,
-                    height: isWide ? 148 : 142,
-                    fit: BoxFit.fitHeight,
-                    filterQuality: FilterQuality.medium,
+                  // Boundary inside the transition, around the thing being
+                  // scaled, so the bounce doesn't drag the card's gradients,
+                  // shadow and blurred text into a repaint with it.
+                  child: RepaintBoundary(
+                    child: Image.asset(
+                      item.asset,
+                      height: isWide ? 148 : 142,
+                      fit: BoxFit.fitHeight,
+                      filterQuality: FilterQuality.medium,
+                    ),
                   ),
                 ),
               ),
