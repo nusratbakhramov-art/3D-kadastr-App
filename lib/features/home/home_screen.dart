@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:url_launcher/url_launcher.dart';
@@ -57,7 +57,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // The FABs auto-hide while the user scrolls down (reading through the feed)
   // and come back on any upward move, when the scroll settles, or at the top.
-  bool _fabsVisible = true;
+  //
+  // A notifier, NOT setState: the visibility flips repeatedly mid-fling (drag →
+  // idle → drag), and a setState here rebuilt the whole feed — header, three
+  // service cards, the carousel — on every flip, right when the raster thread
+  // was already busy scrolling. Only the two FABs listen now.
+  final ValueNotifier<bool> _fabsVisible = ValueNotifier<bool>(true);
   SupportInfo _supportInfo = const SupportInfo(
     phone: SupportService.fallbackPhone,
   );
@@ -76,6 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _scroll.dispose();
+    _fabsVisible.dispose();
     super.dispose();
   }
 
@@ -92,9 +98,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // pixels<=0 guard stops a top overscroll bounce from sticking them hidden.
     final show = pos.pixels <= 0 ||
         (!nearBottom && pos.userScrollDirection != ScrollDirection.reverse);
-    if (show != _fabsVisible) {
-      setState(() => _fabsVisible = show);
-    }
+    // ValueNotifier already no-ops when the value is unchanged.
+    _fabsVisible.value = show;
   }
 
   Future<void> _loadSupportInfo() async {
@@ -195,34 +200,45 @@ class _HomeScreenState extends State<HomeScreen> {
               // Modest tail — the FABs step aside across the bottom stretch, so
               // the block doesn't need a big gap to clear them.
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+              // Every block below is wrapped in a RepaintBoundary. A
+              // SingleChildScrollView — unlike a sliver list — adds none of its
+              // own, so without them one scroll frame re-rasterised the whole
+              // column: three cards' radial glow + elevation shadow + six
+              // strings each carrying three blurred text shadows, the carousel,
+              // and the pattern. With them, scrolling just translates layers
+              // the raster cache already holds.
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ValueListenableBuilder<UserProfile?>(
-                    valueListenable: userProfileNotifier,
-                    builder: (context, profile, _) {
-                      return ValueListenableBuilder<int>(
-                        valueListenable: notificationUnreadNotifier,
-                        builder: (context, unread, _) {
-                          return HomeHeader(
-                            profile: profile,
-                            unreadCount: unread,
-                            locale: widget.locale,
-                            today: date,
-                            onLoginTap: widget.onLoginTap,
-                            onAvatarTap: widget.onOpenProfile,
-                            onBellTap: widget.onOpenNotifications,
-                          );
-                        },
-                      );
-                    },
+                  RepaintBoundary(
+                    child: ValueListenableBuilder<UserProfile?>(
+                      valueListenable: userProfileNotifier,
+                      builder: (context, profile, _) {
+                        return ValueListenableBuilder<int>(
+                          valueListenable: notificationUnreadNotifier,
+                          builder: (context, unread, _) {
+                            return HomeHeader(
+                              profile: profile,
+                              unreadCount: unread,
+                              locale: widget.locale,
+                              today: date,
+                              onLoginTap: widget.onLoginTap,
+                              onAvatarTap: widget.onOpenProfile,
+                              onBellTap: widget.onOpenNotifications,
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 20),
-                  _CardsGrid(
-                    locale: widget.locale,
-                    onOpenKadastr3d: widget.onOpenKadastr3d,
-                    onOpenAiValuation: widget.onOpenAiValuation,
-                    onOpenKalkulyator: widget.onOpenKalkulyator,
+                  RepaintBoundary(
+                    child: _CardsGrid(
+                      locale: widget.locale,
+                      onOpenKadastr3d: widget.onOpenKadastr3d,
+                      onOpenAiValuation: widget.onOpenAiValuation,
+                      onOpenKalkulyator: widget.onOpenKalkulyator,
+                    ),
                   ),
                   const SizedBox(height: 24),
                   _SectionHeader(
@@ -231,9 +247,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     onSeeAll: widget.onOpenMarket,
                   ),
                   const SizedBox(height: 12),
-                  FeaturedCarousel(
-                    controller: _marketController,
-                    onTap: _onListingTap,
+                  RepaintBoundary(
+                    child: FeaturedCarousel(
+                      controller: _marketController,
+                      onTap: _onListingTap,
+                    ),
                   ),
                   const SizedBox(height: 16),
                   // Support number — always in the feed. Rendering it only at
@@ -242,10 +260,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   // which removed it — an oscillation that read as a glitch).
                   // The floating FABs step aside via _atBottom instead, so they
                   // don't cover it down here.
-                  _CallCenterBlock(
-                    phone: _supportInfo.phone,
-                    locale: widget.locale,
-                    onTap: hapticTap(_callSupport),
+                  RepaintBoundary(
+                    child: _CallCenterBlock(
+                      phone: _supportInfo.phone,
+                      locale: widget.locale,
+                      onTap: hapticTap(_callSupport),
+                    ),
                   ),
                 ],
               ),
@@ -283,6 +303,15 @@ class _HomeScreenState extends State<HomeScreen> {
 /// already carries its own colour/disc), with a soft drop shadow so it lifts
 /// off the content and a tap target matched to the 64pt gradient FABs it sits
 /// beside.
+///
+/// The shadow used to be a blurred silhouette of the PNG itself
+/// (`ImageFiltered` + `ImageFilter.blur`). That is a live GPU blur of a
+/// saveLayer, re-run on every frame the FAB paints — and because it sits inside
+/// the reveal's `AnimatedScale`, the raster cache could never hold it. Two of
+/// them, over a scrolling feed, was the single most expensive thing on Home.
+/// Both icons are full-bleed circular discs (their alpha is a circle inscribed
+/// in the 400×400 box), so an ordinary circular `BoxShadow` draws the same
+/// shape for free.
 class _ImageFab extends StatelessWidget {
   const _ImageFab({
     required this.asset,
@@ -298,36 +327,33 @@ class _ImageFab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The PNGs are 400×400 — decoding them at that size to draw at 56pt burns
+    // ~640 KB and a downscale per paint. Decode straight to the device size.
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+
     return Tooltip(
       message: tooltip,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: SizedBox(
-          width: _size,
-          height: _size,
-          child: Stack(
-            clipBehavior: Clip.none,
-            alignment: Alignment.center,
-            children: [
-              // Shape-accurate drop shadow — a blurred dark silhouette of the
-              // icon, offset down, so it lifts off the busy photos underneath.
-              Transform.translate(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.45),
+                blurRadius: 12,
                 offset: const Offset(0, 4),
-                child: ImageFiltered(
-                  imageFilter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-                  child: Image.asset(
-                    asset,
-                    width: _size,
-                    height: _size,
-                    fit: BoxFit.contain,
-                    color: Colors.black.withValues(alpha: 0.55),
-                    colorBlendMode: BlendMode.srcIn,
-                  ),
-                ),
               ),
-              Image.asset(asset, fit: BoxFit.contain),
             ],
+          ),
+          child: Image.asset(
+            asset,
+            width: _size,
+            height: _size,
+            fit: BoxFit.contain,
+            cacheWidth: (_size * dpr).round(),
+            filterQuality: FilterQuality.medium,
           ),
         ),
       ),
@@ -336,22 +362,34 @@ class _ImageFab extends StatelessWidget {
 }
 
 /// Scales + fades a FAB away while the feed scrolls under it.
+///
+/// Subscribes to the visibility itself so a scroll never rebuilds anything
+/// above it, and sits behind a [RepaintBoundary] so the reveal animation
+/// repaints 56pt of FAB rather than the whole Home stack under it.
 class _FabReveal extends StatelessWidget {
   const _FabReveal({required this.visible, required this.child});
 
-  final bool visible;
+  final ValueListenable<bool> visible;
   final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedScale(
-      scale: visible ? 1 : 0,
-      duration: const Duration(milliseconds: 170),
-      curve: Curves.easeOutCubic,
-      child: AnimatedOpacity(
-        opacity: visible ? 1 : 0,
-        duration: const Duration(milliseconds: 170),
+    return RepaintBoundary(
+      child: ValueListenableBuilder<bool>(
+        valueListenable: visible,
         child: child,
+        builder: (context, show, child) {
+          return AnimatedScale(
+            scale: show ? 1 : 0,
+            duration: const Duration(milliseconds: 170),
+            curve: Curves.easeOutCubic,
+            child: AnimatedOpacity(
+              opacity: show ? 1 : 0,
+              duration: const Duration(milliseconds: 170),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }
@@ -437,30 +475,38 @@ class _HomePatternBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IgnorePointer(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(color: backgroundColor),
-                ),
-              ),
-              if (showPattern)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  width: constraints.maxWidth,
-                  height: constraints.maxWidth,
-                  child: Image.asset(
-                    'assets/images/home/pattern.png',
-                    fit: BoxFit.contain,
-                    alignment: Alignment.topRight,
+      child: RepaintBoundary(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // The source is 1468×1516 — ~8.9 MB of decoded ARGB for something
+            // drawn one screen wide. Decode it at the width it's actually
+            // painted at instead.
+            final dpr = MediaQuery.of(context).devicePixelRatio;
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(color: backgroundColor),
                   ),
                 ),
-            ],
-          );
-        },
+                if (showPattern)
+                  Positioned(
+                    top: 0,
+                    right: 0,
+                    width: constraints.maxWidth,
+                    height: constraints.maxWidth,
+                    child: Image.asset(
+                      'assets/images/home/pattern.png',
+                      fit: BoxFit.contain,
+                      alignment: Alignment.topRight,
+                      cacheWidth: (constraints.maxWidth * dpr).round(),
+                      filterQuality: FilterQuality.medium,
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
