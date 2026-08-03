@@ -61,7 +61,9 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
     CalculatorCategory.kadastr3d => widget.choice.kadastr3d != null,
     CalculatorCategory.baholash => widget.choice.baholash != null,
     CalculatorCategory.tamirlash => widget.choice.tamirlash != null,
-    CalculatorCategory.dizayn || CalculatorCategory.yuridik => true,
+    CalculatorCategory.dizayn ||
+    CalculatorCategory.buxgalteriya ||
+    CalculatorCategory.yuridik => true,
   };
 
   void _continue() {
@@ -199,6 +201,7 @@ class _KadastrTypeStepScreenState extends State<KadastrTypeStepScreen> {
                 () => widget.choice.tamirlash = t),
         ];
       case CalculatorCategory.dizayn:
+      case CalculatorCategory.buxgalteriya:
       case CalculatorCategory.yuridik:
         return const [];
     }

@@ -7,6 +7,7 @@ import '../models/calculator_draft.dart';
 import '../widgets/service_app_bar.dart';
 import 'calculator/arxitektura_form_screen.dart';
 import 'calculator/baholash_form_screen.dart';
+import 'calculator/buxgalteriya_screen.dart';
 import 'calculator/dizayn_form_screen.dart';
 import 'calculator/kadastr_form_screen.dart';
 import 'calculator/tamirlash_form_screen.dart';
@@ -97,17 +98,17 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                           ),
                           const SizedBox(height: 18),
                           for (var i = 0;
-                              i < CalculatorCategory.values.length;
+                              i < CalculatorCategory.listed.length;
                               i++) ...[
                             _StaggeredEntry(
                               controller: _controller,
                               index: i + 1,
                               child: _CategoryCard(
-                                category: CalculatorCategory.values[i],
+                                category: CalculatorCategory.listed[i],
                                 locale: locale,
                                 onTap: () => _open(
                                   context,
-                                  CalculatorCategory.values[i],
+                                  CalculatorCategory.listed[i],
                                 ),
                               ),
                             ),
@@ -136,6 +137,7 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
       CalculatorCategory.baholash => (_) => const BaholashFormScreen(),
       CalculatorCategory.dizayn => (_) => const DizaynFormScreen(),
       CalculatorCategory.tamirlash => (_) => const TamirlashFormScreen(),
+      CalculatorCategory.buxgalteriya => (_) => const BuxgalteriyaScreen(),
       CalculatorCategory.yuridik => (_) => const YuridikScreen(),
     };
     Navigator.of(context).push(MaterialPageRoute<void>(builder: builder));

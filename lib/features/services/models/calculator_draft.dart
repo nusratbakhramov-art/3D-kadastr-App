@@ -28,22 +28,50 @@ String _pick(Locale l, {required String uz, required String ru, required String 
 // Categories
 // ────────────────────────────────────────────────────────────────────────
 
+/// Declaration order IS the display order — both the Onlayn kalkulyator grid
+/// and the 3D Kadastr "Xizmatlarni tanlang" list iterate [values].
+/// `name` is the stable wire key the backend files orders under, so members may
+/// be reordered but never renamed.
 enum CalculatorCategory {
   arxitektura,
   kadastr,
   kadastr3d,
-  baholash,
   dizayn,
-  tamirlash,
-  yuridik;
+  baholash,
+  buxgalteriya,
+  yuridik,
+  /// Retired from the service lists (2026-08-03) — the member stays so old
+  /// orders/prices keyed `tamirlash` still resolve, and so the admin's
+  /// Ta'mirlash page keeps working. Not in [listed], so it is never offered.
+  tamirlash;
+
+  /// The services actually offered, in display order. Both the Onlayn
+  /// kalkulyator grid and the 3D Kadastr "Xizmatlarni tanlang" list use this —
+  /// never [values], which still carries retired categories.
+  static const List<CalculatorCategory> listed = [
+    arxitektura,
+    kadastr,
+    kadastr3d,
+    dizayn,
+    baholash,
+    buxgalteriya,
+    yuridik,
+  ];
 
   String title(Locale l) => switch (this) {
     CalculatorCategory.arxitektura =>
       tr(l, 'services.model.cat.arxitektura.title'),
-    CalculatorCategory.kadastr => tr(l, 'services.model.cat.kadastr.title'),
+    // `.title`/`.subtitle` are pinned in prod's app_translations to the OLD
+    // accounting wording (this category was mislabelled until 2026-08-03) and
+    // the backend bundle wins over the app's seed, so the corrected text ships
+    // under fresh `.docs.*` keys. Retire the old rows in the admin i18n page.
+    CalculatorCategory.kadastr =>
+      tr(l, 'services.model.cat.kadastr.docs.title'),
     CalculatorCategory.kadastr3d => tr(l, 'services.model.cat.kadastr3d.title'),
     CalculatorCategory.baholash => tr(l, 'services.model.cat.baholash.title'),
     CalculatorCategory.dizayn => tr(l, 'services.model.cat.dizayn.title'),
+    CalculatorCategory.buxgalteriya =>
+      tr(l, 'services.model.cat.buxgalteriya.title'),
     CalculatorCategory.tamirlash => tr(l, 'services.model.cat.tamirlash.title'),
     CalculatorCategory.yuridik => tr(l, 'services.model.cat.yuridik.title'),
   };
@@ -51,12 +79,15 @@ enum CalculatorCategory {
   String subtitle(Locale l) => switch (this) {
     CalculatorCategory.arxitektura =>
       tr(l, 'services.model.cat.arxitektura.subtitle'),
-    CalculatorCategory.kadastr => tr(l, 'services.model.cat.kadastr.subtitle'),
+    CalculatorCategory.kadastr =>
+      tr(l, 'services.model.cat.kadastr.docs.subtitle'),
     CalculatorCategory.kadastr3d =>
       tr(l, 'services.model.cat.kadastr3d.subtitle'),
     CalculatorCategory.baholash =>
       tr(l, 'services.model.cat.baholash.subtitle'),
     CalculatorCategory.dizayn => tr(l, 'services.model.cat.dizayn.subtitle'),
+    CalculatorCategory.buxgalteriya =>
+      tr(l, 'services.model.cat.buxgalteriya.subtitle'),
     CalculatorCategory.tamirlash =>
       tr(l, 'services.model.cat.tamirlash.subtitle'),
     CalculatorCategory.yuridik => tr(l, 'services.model.cat.yuridik.subtitle'),
@@ -68,6 +99,7 @@ enum CalculatorCategory {
     CalculatorCategory.kadastr3d => Icons.view_in_ar_rounded,
     CalculatorCategory.baholash => Icons.assessment_outlined,
     CalculatorCategory.dizayn => Icons.palette_outlined,
+    CalculatorCategory.buxgalteriya => Icons.calculate_outlined,
     CalculatorCategory.tamirlash => Icons.construction_rounded,
     CalculatorCategory.yuridik => Icons.gavel_rounded,
   };
@@ -77,11 +109,12 @@ enum CalculatorCategory {
   String? get assetIcon => switch (this) {
     CalculatorCategory.arxitektura =>
       'assets/images/services/architecture.webp',
-    CalculatorCategory.kadastr => 'assets/images/services/accounting.webp',
+    CalculatorCategory.kadastr => 'assets/images/services/kadastr-docs.webp',
     CalculatorCategory.kadastr3d => 'assets/images/services/kadastr3d.png',
     CalculatorCategory.baholash =>
       'assets/images/services/property-value.webp',
     CalculatorCategory.dizayn => 'assets/images/services/design.webp',
+    CalculatorCategory.buxgalteriya => 'assets/images/services/accounting.webp',
     CalculatorCategory.tamirlash => 'assets/images/services/repair.webp',
     CalculatorCategory.yuridik => 'assets/images/services/legal.webp',
   };
@@ -92,6 +125,7 @@ enum CalculatorCategory {
     CalculatorCategory.kadastr3d => const Color(0xFF7C3AED),
     CalculatorCategory.baholash => const Color(0xFFF59E0B),
     CalculatorCategory.dizayn => const Color(0xFFEC4899),
+    CalculatorCategory.buxgalteriya => const Color(0xFF10B981),
     CalculatorCategory.tamirlash => const Color(0xFF2B7FFF),
     CalculatorCategory.yuridik => const Color(0xFF64748B),
   };

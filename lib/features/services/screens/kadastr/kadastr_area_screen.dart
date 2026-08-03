@@ -71,7 +71,7 @@ class _KadastrAreaScreenState extends State<KadastrAreaScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                      title: tr(l, 'services.kadastr.area.appbar')),
+                      title: tr(l, 'services.kadastr.flow.appbar')),
                 ),
                 Expanded(
                   child: ListView(

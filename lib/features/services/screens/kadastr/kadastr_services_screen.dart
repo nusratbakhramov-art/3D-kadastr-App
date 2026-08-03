@@ -38,7 +38,7 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
   void _next() {
     if (_selected.isEmpty) return;
     // Preserve enum order for a stable layout.
-    final ordered = CalculatorCategory.values
+    final ordered = CalculatorCategory.listed
         .where(_selected.contains)
         .toList(growable: false);
     // Calculation-only flow: no per-service type/TZ step — go straight to the
@@ -78,7 +78,7 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                    title: tr(l, 'services.kadastr.services.appbar'),
+                    title: tr(l, 'services.kadastr.flow.appbar'),
                     subtitle: '${_fmtArea(widget.areaM2)} m²',
                   ),
                 ),
@@ -107,7 +107,7 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      for (final c in CalculatorCategory.values) ...[
+                      for (final c in CalculatorCategory.listed) ...[
                         _SelectableServiceCard(
                           category: c,
                           locale: l,
@@ -296,14 +296,25 @@ class _SelectableServiceCard extends StatelessWidget {
           ),
           child: Row(
             children: [
+              // Same tile as the Onlayn kalkulyator list: the 3D image when the
+              // category has one, the flat glyph (accent-tinted) otherwise.
               Container(
                 width: 44,
                 height: 44,
+                padding: category.assetIcon != null
+                    ? const EdgeInsets.all(4)
+                    : EdgeInsets.zero,
                 decoration: BoxDecoration(
-                  color: category.accent.withValues(alpha: 0.15),
+                  color: category.assetIcon != null
+                      ? (isDark
+                          ? Colors.white.withValues(alpha: 0.06)
+                          : const Color(0xFFF1F2F4))
+                      : category.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(category.icon, color: category.accent, size: 22),
+                child: category.assetIcon != null
+                    ? Image.asset(category.assetIcon!, fit: BoxFit.contain)
+                    : Icon(category.icon, color: category.accent, size: 22),
               ),
               const SizedBox(width: 12),
               Expanded(

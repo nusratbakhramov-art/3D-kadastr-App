@@ -67,7 +67,9 @@ bool categoryNeedsTypeStep(CalculatorCategory category) => switch (category) {
   CalculatorCategory.kadastr3d ||
   CalculatorCategory.baholash ||
   CalculatorCategory.tamirlash => true,
-  CalculatorCategory.dizayn || CalculatorCategory.yuridik => false,
+  CalculatorCategory.dizayn ||
+  CalculatorCategory.buxgalteriya ||
+  CalculatorCategory.yuridik => false,
 };
 
 /// Indicative estimate for a service. When [choice] carries the user's picked
@@ -146,6 +148,7 @@ KadastrServiceEstimate estimateForCategory({
           locale: locale,
         ),
       );
+    case CalculatorCategory.buxgalteriya:
     case CalculatorCategory.yuridik:
       // No area-based price — settled individually with the client.
       return KadastrServiceEstimate(
