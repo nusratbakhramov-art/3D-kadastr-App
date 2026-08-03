@@ -263,16 +263,14 @@ class _MainShellState extends State<MainShell> {
           HomeScreen(
             locale: widget.locale,
             onLoginTap: _openAuth,
-            // "3D kadastr" karta → 3D kadastr oqimi (maydon → xizmatlar →
-            // taxminiy hisob). Avval xizmatlar ro'yxatiga borardi — karta bilan
-            // ekran sarlavhasi mos kelmasdi.
-            onOpenKadastr3d: _openCombinedCalc,
+            // "3D kadastr" karta → xizmatlar ro'yxati kalkulyatori.
+            onOpenKadastr3d: _openServiceList,
             onOpenAiValuation: _openAiValuation,
             onOpenMarket: _openMarketTab,
-            // "Kalkulyator" karta → "Onlayn kalkulyator" xizmatlar ro'yxati.
-            onOpenKalkulyator: _openServiceList,
-            // Banner "Online kalkulyator" → o'sha ro'yxat.
-            onOpenOrder: _openServiceList,
+            // "Kalkulyator" karta → birlashgan (maydon → xizmatlar) kalkulyator.
+            onOpenKalkulyator: _openCombinedCalc,
+            // Banner "Online kalkulyator" → birlashgan kalkulyator.
+            onOpenOrder: _openCombinedCalc,
             onOpenProfile: () => _onTabChanged(3),
             onOpenNotifications: _openNotifications,
           ),

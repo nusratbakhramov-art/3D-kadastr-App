@@ -62,7 +62,13 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
-                      child: ServiceAppBar(title: tr(locale, 'services.calc.appbar')),
+                      // Bu ro'yxat bosh sahifadagi "3D kadastr" kartadan
+                      // ochiladi — sarlavha karta bilan bir xil bo'lishi kerak.
+                      // (`services.calc.appbar` prod'da "Onlayn kalkulyator"ga
+                      // qotirilgan, shuning uchun alohida kalit.)
+                      child: ServiceAppBar(
+                        title: tr(locale, 'services.calc.appbar.k3d'),
+                      ),
                     ),
                     Expanded(
                       child: ListView(
