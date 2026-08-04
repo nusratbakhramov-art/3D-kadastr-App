@@ -20,6 +20,7 @@ import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../home/user_profile.dart' show paymentsHidden;
 import '../../market/widgets/listing_cta_button.dart';
+import '../../support/support_service.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
@@ -593,10 +594,26 @@ class _ResultView extends StatelessWidget {
                 confidence: confidence,
                 isDark: isDark,
                 locale: l,
+                suppressed: result['needs_call_center'] == true,
               ),
+              // Backend decided the market data cannot support a value (no
+              // comparable ads at all, or nothing priced). Showing a figure we
+              // have just said we cannot stand behind is worse than saying so,
+              // so the number is suppressed and the user gets a person.
+              if (result['needs_call_center'] == true) ...[
+                const SizedBox(height: 14),
+                _CallCenterCard(
+                  reason: result['call_center_reason'] as String?,
+                  isDark: isDark,
+                  locale: l,
+                ),
+              ],
               // AI narrative summary (plain Uzbek), if the LLM produced one.
-              if ((result['summary'] as String?)?.trim().isNotEmpty ??
-                  false) ...[
+              // The LLM narrative explains how the value was reached, so it has
+              // nothing honest to say about a value we are not showing.
+              if (result['needs_call_center'] != true &&
+                  ((result['summary'] as String?)?.trim().isNotEmpty ??
+                      false)) ...[
                 const SizedBox(height: 14),
                 _SummaryCard(
                   text: (result['summary'] as String).trim(),
@@ -604,7 +621,11 @@ class _ResultView extends StatelessWidget {
                 ),
               ],
               // 3-approach breakdown (cost / income / comparison + weights).
-              if (result['approaches'] is Map) ...[
+              // Hidden when the value is suppressed: the approaches card prints
+              // the very figure we just replaced with «—», so leaving it would
+              // hand back the number two cards further down.
+              if (result['needs_call_center'] != true &&
+                  result['approaches'] is Map) ...[
                 const SizedBox(height: 18),
                 _SectionTitle(
                   _AiStatusStrings.approachesTitle(l),
@@ -618,8 +639,11 @@ class _ResultView extends StatelessWidget {
                 ),
               ],
               // Comparables actually used (the market approach evidence).
-              if ((result['comparables_preview'] as List?)?.isNotEmpty ??
-                  false) ...[
+              // Also hidden when suppressed — the reason we suppressed IS that
+              // there is no usable comparable evidence.
+              if (result['needs_call_center'] != true &&
+                  ((result['comparables_preview'] as List?)?.isNotEmpty ??
+                      false)) ...[
                 const SizedBox(height: 18),
                 _SectionTitle(
                   _AiStatusStrings.comparablesTitle(l),
@@ -658,7 +682,13 @@ class _ResultView extends StatelessWidget {
         // ("Pullik xizmatdan foydalanish") → appraiser docs → to'lov (Payme).
         // Reviewer (demo) akkaunti uchun yashiriladi — AI dastlabki natijasi
         // bepul ko'rinadi, lekin pullik rasmiy ariza topshirish ko'rsatilmaydi.
-        if (!paymentsHidden) _PaidSubmitBar(referenceId: snapshot.id),
+        //
+        // Ham yashiriladi `needs_call_center` bo'lганda: biz endigina «bu
+        // obyektni baholab bo'lmadi, aloqa markaziga qo'ng'iroq qiling» deб
+        // turib, o'sha ekranda pullik baholash uchun to'lov taklif qilish —
+        // qarama-qarshi. Foydalanuvchida bitta aniq yo'l qolishi kerak.
+        if (!paymentsHidden && result['needs_call_center'] != true)
+          _PaidSubmitBar(referenceId: snapshot.id),
       ],
     );
   }
@@ -713,6 +743,7 @@ class _PriceCard extends StatelessWidget {
     required this.confidence,
     required this.isDark,
     required this.locale,
+    this.suppressed = false,
   });
 
   final double? estimated;
@@ -721,6 +752,11 @@ class _PriceCard extends StatelessWidget {
   final double confidence;
   final bool isDark;
   final Locale locale;
+
+  /// Backend `needs_call_center` — bozor ma'lumoti bahoni qo'llab-quvvatlay
+  /// olmaydi. Shunday paytda raqam ko'rsatilmaydi: o'zimiz "ishonib bo'lmaydi"
+  /// deb turib, baribir aniq son chiqarish — foydalanuvchini chalg'itish.
+  final bool suppressed;
 
   @override
   Widget build(BuildContext context) {
@@ -745,20 +781,24 @@ class _PriceCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            estimated == null ? '—' : _formatUzs(estimated!, locale),
+            (suppressed || estimated == null)
+                ? '—'
+                : _formatUzs(estimated!, locale),
             style: TextStyle(
               fontFamily: 'MTSCompact',
               fontWeight: FontWeight.w900,
               fontSize: 28,
-              color: text,
+              color: suppressed ? sub : text,
             ),
           ),
-          const SizedBox(height: 4),
-          Text(
-            _AiStatusStrings.soum(locale),
-            style: TextStyle(fontFamily: 'MTSText', fontSize: 13, color: sub),
-          ),
-          if (low != null && high != null) ...[
+          if (!suppressed) ...[
+            const SizedBox(height: 4),
+            Text(
+              _AiStatusStrings.soum(locale),
+              style: TextStyle(fontFamily: 'MTSText', fontSize: 13, color: sub),
+            ),
+          ],
+          if (!suppressed && low != null && high != null) ...[
             const SizedBox(height: 16),
             Row(
               children: [
@@ -798,6 +838,120 @@ class _PriceCard extends StatelessWidget {
   }
 }
 
+/// Bozor ma'lumoti baho uchun yetarli bo'lmaganda ko'rsatiladigan karta:
+/// sababi + aloqa markaziga qo'ng'iroq tugmasi.
+///
+/// Backend `needs_call_center` bayrog'ini o'zi qo'yadi — bu yerda hech qanday
+/// chegara qayta hisoblanmaydi, aks holda ikki joyda ikki xil qoida bo'lib
+/// qolardi. Bayroq shu hafta 41 ta arizadan 3 tasida yoqilgan (hammasi bitta
+/// obyekt — Buxorodagi 38.3 m² xonadon, unga o'xshash e'lon umuman topilmagan).
+class _CallCenterCard extends StatefulWidget {
+  const _CallCenterCard({
+    required this.reason,
+    required this.isDark,
+    required this.locale,
+  });
+
+  final String? reason;
+  final bool isDark;
+  final Locale locale;
+
+  @override
+  State<_CallCenterCard> createState() => _CallCenterCardState();
+}
+
+class _CallCenterCardState extends State<_CallCenterCard> {
+  String? _number;
+
+  @override
+  void initState() {
+    super.initState();
+    SupportService()
+        .fetchInfo()
+        .then((info) {
+          if (mounted) setState(() => _number = info.callNumber);
+        })
+        .catchError((_) => null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fill = widget.isDark
+        ? const Color(0xFF332B1A)
+        : const Color(0xFFFFF6E0);
+    final fg = widget.isDark
+        ? const Color(0xFFFFD68A)
+        : const Color(0xFF8A6F1A);
+    final number = _number;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: fill,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline_rounded, size: 18, color: fg),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _AiStatusStrings.callCenterNote(widget.locale, widget.reason),
+                  style: TextStyle(
+                    fontFamily: 'MTSText',
+                    fontSize: 12.5,
+                    height: 1.35,
+                    color: fg,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (number != null) ...[
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: () => launchUrl(Uri.parse('tel:$number')),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.splashGreen,
+                borderRadius: BorderRadius.circular(100),
+              ),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    '${_AiStatusStrings.callCenter(widget.locale)} · $number',
+                    style: const TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                      color: Color(0xFF00320C),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.call, size: 16, color: Color(0xFF00320C)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Ishonchlilik darajalari chegarasi (foizda). Backend modeli o'zgarsa
+/// (masalan ҳолат тузатиши тузалиб, тарқоқлик пасайса) shu ikki son qayta
+/// sozlanadi — boshqa joyda takrorlanmaydi.
+const int _confHighFrom = 65;
+const int _confMediumFrom = 40;
+
 class _ConfidenceBar extends StatelessWidget {
   const _ConfidenceBar({
     required this.value,
@@ -811,11 +965,24 @@ class _ConfidenceBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final track = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
     final pct = (value.clamp(0.0, 1.0) * 100).round();
-    final label = pct >= 70
+    // Bands are cut against how the backend's confidence model actually
+    // scores. Measured over 106 real jobs it runs min 0.15, median 0.38,
+    // max 0.74 — so the previous «>=70 Yuqori» was unreachable (1 job in 106)
+    // and «<45 Past» labelled the median valuation as low. An ordinary job
+    // now reads «O'rtacha», which is what it is.
+    final label = pct >= _confHighFrom
         ? _AiStatusStrings.confHigh(locale)
-        : (pct >= 45
+        : (pct >= _confMediumFrom
               ? _AiStatusStrings.confMedium(locale)
               : _AiStatusStrings.confLow(locale));
+    // The bar used to be brand green at every value, so «44% · Past» rendered
+    // in the same success colour as a strong result — and colour beats text at
+    // a glance. It now follows the band.
+    final levelColor = pct >= _confHighFrom
+        ? AppColors.splashGreen
+        : (pct >= _confMediumFrom
+              ? const Color(0xFFEF9F27)
+              : const Color(0xFFE24B4A));
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -833,11 +1000,11 @@ class _ConfidenceBar extends StatelessWidget {
             ),
             Text(
               '$pct% · $label',
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'MTSCompact',
                 fontWeight: FontWeight.w700,
                 fontSize: 12,
-                color: AppColors.splashGreen,
+                color: levelColor,
               ),
             ),
           ],
@@ -849,7 +1016,7 @@ class _ConfidenceBar extends StatelessWidget {
             value: value.clamp(0.0, 1.0),
             minHeight: 8,
             backgroundColor: track,
-            valueColor: const AlwaysStoppedAnimation(AppColors.splashGreen),
+            valueColor: AlwaysStoppedAnimation(levelColor),
           ),
         ),
       ],
@@ -1539,6 +1706,20 @@ class _AiStatusStrings {
       tr(l, 'services.scan.status.conf_medium');
 
   static String confLow(Locale l) => tr(l, 'services.scan.status.conf_low');
+
+  static String callCenter(Locale l) =>
+      tr(l, 'services.scan.status.call_center');
+
+  /// Nega baho bo'lmagani — sabab bo'yicha turli matn. Noma'lum sabab
+  /// umumiy matnga tushadi, hech qachon bo'sh qolmaydi.
+  static String callCenterNote(Locale l, String? reason) => tr(
+    l,
+    reason == 'no_comparables'
+        ? 'services.scan.status.cc_no_comparables'
+        : (reason == 'low_confidence'
+              ? 'services.scan.status.cc_low_confidence'
+              : 'services.scan.status.cc_generic'),
+  );
 
   static String approachesTitle(Locale l) =>
       tr(l, 'services.scan.status.approaches_title');

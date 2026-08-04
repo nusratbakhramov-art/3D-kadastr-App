@@ -12,12 +12,22 @@ class SupportInfo {
     this.email,
     this.telegram,
     this.workingHours,
+    this.callCenter,
   });
 
   final String phone;
   final String? email;
   final String? telegram;
   final String? workingHours;
+
+  /// «Aloqa markazi» qisqa raqami. Baholab bo'lmaydigan obyektlar uchun
+  /// ko'rsatiladi. Adminkada to'ldirilmagan bo'lsa `null` — shunda [callNumber]
+  /// oddiy qo'llab-quvvatlash raqamiga qaytadi.
+  final String? callCenter;
+
+  /// Aloqa markazi raqami, bo'lmasa — umumiy qo'llab-quvvatlash raqami.
+  String get callNumber =>
+      (callCenter?.isNotEmpty == true) ? callCenter! : phone;
 
   factory SupportInfo.fromJson(Map<String, dynamic> json) => SupportInfo(
     phone: (json['phone'] as String?)?.trim().isNotEmpty == true
@@ -26,6 +36,7 @@ class SupportInfo {
     email: (json['email'] as String?)?.trim(),
     telegram: (json['telegram'] as String?)?.trim(),
     workingHours: (json['working_hours'] as String?)?.trim(),
+    callCenter: (json['call_center'] as String?)?.trim(),
   );
 }
 
