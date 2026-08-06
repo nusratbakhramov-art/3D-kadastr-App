@@ -1,6 +1,14 @@
 /// Reusable "I agree to the terms" gate — a manual checkbox (CAPTCHA-style) the
 /// user must tick before proceeding, plus a link that opens the full terms.
 ///
+/// The consent sheet ([showTermsAcceptanceSheet]) is the OFFER ACCEPTANCE step:
+/// we sign no bilateral contract with the client, so the service is formed by
+/// accepting the public offer here. That is why it asks for TWO separate ticks
+/// — (1) the offer was read and is accepted, (2) the fee is non-refundable —
+/// and why the caller must persist them (`POST
+/// /ai-valuations/{id}/offer-acceptance`): the generated report cites this
+/// acceptance, with its date and time, as the legal basis for the valuation.
+///
 /// The checkbox label is the agreed placeholder ("Yolg'on ma'lumot yuklamayman").
 /// The full-text sheet fetches the live terms from the backend
 /// (`GET /legal/terms?lang=`, admin-editable via RTE) and renders the returned
@@ -138,9 +146,10 @@ class TermsConsent extends StatelessWidget {
 class _TermsSheet extends StatefulWidget {
   const _TermsSheet({this.acceptMode = false});
 
-  /// When true the sheet is a consent gate: it shows an "QABUL QILAMAN" button
-  /// (enabled only once the user has scrolled through the terms) and pops
-  /// `true` on accept. When false it's read-only with a "Yopish" button.
+  /// When true the sheet is a consent gate: the user scrolls through the offer,
+  /// then ticks BOTH boxes (terms accepted + payment non-refundable) before
+  /// "QABUL QILAMAN" enables; it pops `true` on accept. When false it's
+  /// read-only with a "Yopish" button.
   final bool acceptMode;
 
   @override
@@ -155,9 +164,19 @@ class _TermsSheetState extends State<_TermsSheet> {
   bool _started = false;
 
   final ScrollController _scrollCtrl = ScrollController();
-  // Accept mode: enabled once the user has scrolled to the end of the terms
-  // (or the text already fits without scrolling).
+  // Accept mode: the two boxes unlock once the user has scrolled to the end of
+  // the offer (or the text already fits without scrolling).
   bool _read = false;
+
+  // The two consents the generated report cites as its legal basis:
+  //   _okTerms  — oferta shartlari o'qib chiqildi va qabul qilindi
+  //   _okRefund — to'langan xizmat haqi qaytarilmasligiga rozilik
+  // BOTH are required — the backend rejects a half-consent, and the report's
+  // "Baholash uchun asos" paragraph asserts both were given.
+  bool _okTerms = false;
+  bool _okRefund = false;
+
+  bool get _canAccept => _read && _okTerms && _okRefund;
 
   @override
   void initState() {
@@ -180,9 +199,15 @@ class _TermsSheetState extends State<_TermsSheet> {
     }
   }
 
-  // After content lays out, if it isn't tall enough to scroll, count it as read.
+  // After the content lays out, if it isn't tall enough to scroll there is
+  // nothing to scroll THROUGH — count it as read, otherwise the consent boxes
+  // would stay locked forever with no way for the user to unlock them.
+  //
+  // Runs as a post-frame callback (not a fixed delay): the check needs the
+  // ListView to be attached to `_scrollCtrl`, and the frame that builds it is
+  // the one this very setState schedules. A timer guess raced that frame.
   void _markReadIfFits() {
-    Future<void>.delayed(const Duration(milliseconds: 350), () {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _read) return;
       if (_scrollCtrl.hasClients &&
           _scrollCtrl.position.maxScrollExtent <= 0) {
@@ -313,17 +338,33 @@ class _TermsSheetState extends State<_TermsSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (widget.acceptMode && !_read && !_loading) ...[
-                  Text(
-                    _S.scrollHint(l),
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontFamily: 'MTSText',
-                      fontSize: 12.5,
-                      color: muted,
-                    ),
+                if (widget.acceptMode && !_loading) ...[
+                  _ConsentCheck(
+                    value: _okTerms,
+                    enabled: _read,
+                    label: _S.checkOffer(l),
+                    onChanged: (v) => setState(() => _okTerms = v),
                   ),
                   const SizedBox(height: 8),
+                  _ConsentCheck(
+                    value: _okRefund,
+                    enabled: _read,
+                    label: _S.checkRefund(l),
+                    onChanged: (v) => setState(() => _okRefund = v),
+                  ),
+                  if (!_canAccept) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      _read ? _S.checkHint(l) : _S.scrollHint(l),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'MTSText',
+                        fontSize: 12.5,
+                        color: muted,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 10),
                 ],
                 SizedBox(
                   width: double.infinity,
@@ -338,7 +379,7 @@ class _TermsSheetState extends State<_TermsSheet> {
                       ),
                     ),
                     onPressed: widget.acceptMode
-                        ? (_read
+                        ? (_canAccept
                             ? () {
                                 HapticFeedback.lightImpact();
                                 Navigator.of(context).pop(true);
@@ -360,6 +401,77 @@ class _TermsSheetState extends State<_TermsSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// One tick line inside the consent gate. Stays greyed out (and inert) until
+/// the user has scrolled through the offer — you cannot agree to what you have
+/// not been shown.
+class _ConsentCheck extends StatelessWidget {
+  const _ConsentCheck({
+    required this.value,
+    required this.enabled,
+    required this.label,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final bool enabled;
+  final String label;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final off = isDark ? const Color(0xFF4A5054) : const Color(0xFFB9BEC4);
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.45,
+      child: GestureDetector(
+        onTap: enabled
+            ? () {
+                HapticFeedback.selectionClick();
+                onChanged(!value);
+              }
+            : null,
+        behavior: HitTestBehavior.opaque,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 1),
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: value ? AppColors.splashGreen : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: value ? AppColors.splashGreen : off,
+                  width: 2,
+                ),
+              ),
+              child: value
+                  ? const Icon(Icons.check, size: 15, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'MTSText',
+                  fontSize: 13,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: textColor,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -394,6 +506,15 @@ class _S {
 
   static String scrollHint(Locale l) =>
       tr(l, 'services.widget.terms.scroll_hint');
+
+  static String checkOffer(Locale l) =>
+      tr(l, 'services.widget.terms.check_offer');
+
+  static String checkRefund(Locale l) =>
+      tr(l, 'services.widget.terms.check_refund');
+
+  static String checkHint(Locale l) =>
+      tr(l, 'services.widget.terms.check_hint');
 
   static List<String> paragraphs(Locale l) => [
         tr(l, 'services.widget.terms.para1'),

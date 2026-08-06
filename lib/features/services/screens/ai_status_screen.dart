@@ -17,12 +17,14 @@ import '../../../core/i18n.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/app_toast.dart';
 import '../../auth/auth_storage.dart';
 import '../../home/user_profile.dart' show paymentsHidden;
 import '../../market/widgets/listing_cta_button.dart';
 import '../../support/support_service.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../offer_acceptance_service.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/terms_consent.dart';
 import 'ai_credentials_screen.dart';
@@ -708,12 +710,35 @@ class _PaidSubmitBar extends StatelessWidget {
 
   final int? referenceId;
 
-  // Tapping the paid CTA opens the terms as a scroll-through consent drawer.
-  // The user must read to the end and tap "QABUL QILAMAN" before the paid
-  // (appraiser docs → payment) flow opens.
+  // Tapping the paid CTA opens the public offer as a scroll-through consent
+  // drawer. The user must read to the end, tick BOTH boxes (offer accepted +
+  // fee non-refundable) and tap "QABUL QILAMAN" before the paid (appraiser
+  // docs → payment) flow opens.
+  //
+  // The acceptance is then PERSISTED before we move on: the generated report
+  // names it — date, time, offer no. — as the legal basis for the valuation
+  // (we sign no bilateral contract). If it can't be saved we stop here rather
+  // than take money against an acceptance nothing recorded.
   Future<void> _onTap(BuildContext context) async {
     final accepted = await showTermsAcceptanceSheet(context);
     if (!accepted || !context.mounted) return;
+    final id = referenceId;
+    if (id != null) {
+      try {
+        await OfferAcceptanceService().accept(
+          jobId: id,
+          lang: Localizations.localeOf(context).languageCode,
+        );
+      } catch (_) {
+        if (!context.mounted) return;
+        AppToast.error(
+          context,
+          _AiStatusStrings.consentSaveFailed(Localizations.localeOf(context)),
+        );
+        return;
+      }
+      if (!context.mounted) return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AiCredentialsScreen(referenceId: referenceId),
@@ -1643,6 +1668,9 @@ class _AiStatusStrings {
 
   static String appBarTitle(Locale l) =>
       tr(l, 'services.scan.status.app_bar_title');
+
+  static String consentSaveFailed(Locale l) =>
+      tr(l, 'services.widget.terms.save_error');
 
   static String submittingSubtitle(Locale l) =>
       tr(l, 'services.scan.status.submitting_subtitle');
