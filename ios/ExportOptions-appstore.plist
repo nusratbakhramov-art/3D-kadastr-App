@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- App Store / TestFlight export. Needs an "Apple Distribution: UNITED IT
+     COMPANY, MChJ (KHGXWF53U9)" identity (certificate + private key) in the
+     keychain — the development ExportOptions.plist next to this file is for
+     device builds and cannot be uploaded to App Store Connect. -->
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store</string>
+	<key>teamID</key>
+	<string>KHGXWF53U9</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>stripSwiftSymbols</key>
+	<true/>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>compileBitcode</key>
+	<false/>
+	<key>destination</key>
+	<string>export</string>
+</dict>
+</plist>

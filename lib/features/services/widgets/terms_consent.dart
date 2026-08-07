@@ -17,11 +17,14 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:pdfx/pdfx.dart';
 
 import '../../../core/api_config.dart';
 import '../../../core/i18n/app_translations.dart';
@@ -178,6 +181,20 @@ class _TermsSheetState extends State<_TermsSheet> {
 
   bool get _canAccept => _read && _okTerms && _okRefund;
 
+  // ── Oferta PDF ────────────────────────────────────────────────────────
+  // Backend PDF bergan bo'lsa (`pdf_url`) foydalanuvchi AYNAN shu hujjatni
+  // ko'radi — HTML matn emas. Rozilik bandlari hujjat OXIRGI sahifasigacha
+  // ko'rilmaguncha ochilmaydi: imzolanadigan shartnomani ko'rmasdan qabul
+  // qilish mumkin bo'lmasligi kerak.
+  PdfControllerPinch? _pdfCtrl;
+  int _pdfPages = 0;
+  int _pdfPage = 1;
+  // PDF bor, lekin yuklab bo'lmadi → matnli variantga tushamiz (oqim
+  // to'xtamasligi uchun), lekin rozilik gate'i baribir ishlaydi.
+  bool _pdfFailed = false;
+
+  bool get _hasPdf => _pdfCtrl != null;
+
   @override
   void initState() {
     super.initState();
@@ -188,7 +205,43 @@ class _TermsSheetState extends State<_TermsSheet> {
   void dispose() {
     _scrollCtrl.removeListener(_onScroll);
     _scrollCtrl.dispose();
+    _pdfCtrl?.dispose();
     super.dispose();
+  }
+
+  /// Oferta PDF'ini yuklab, keshlab, ko'rsatishga tayyorlaydi.
+  ///
+  /// Kesh kaliti — backend bergan `pdf_version` (fayl mtime): admin hujjatni
+  /// almashtirsa versiya o'zgaradi va eski nusxa ishlatilmaydi. Shu bilan har
+  /// safar 200 KB qayta yuklanmaydi ham.
+  Future<void> _loadPdf(String url, int version, String lang) async {
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/legal_terms_${lang}_$version.pdf');
+      if (!file.existsSync() || file.lengthSync() == 0) {
+        final res = await http
+            .get(Uri.parse(ApiConfig.resolveUrl(url)))
+            .timeout(const Duration(seconds: 30));
+        if (res.statusCode != 200 || res.bodyBytes.isEmpty) {
+          throw Exception('HTTP ${res.statusCode}');
+        }
+        await file.writeAsBytes(res.bodyBytes, flush: true);
+      }
+      if (!mounted) return;
+      setState(() {
+        _pdfCtrl = PdfControllerPinch(document: PdfDocument.openFile(file.path));
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      // PDF'siz qolsak ham foydalanuvchi tiqilib qolmasin: matnli variant
+      // ko'rsatiladi va o'sha yerdagi skroll gate ishlaydi.
+      setState(() {
+        _pdfFailed = true;
+        _loading = false;
+      });
+      if (widget.acceptMode) _markReadIfFits();
+    }
   }
 
   void _onScroll() {
@@ -236,8 +289,15 @@ class _TermsSheetState extends State<_TermsSheet> {
         setState(() {
           _title = body['title'] as String?;
           _html = body['content'] as String?;
-          _loading = false;
         });
+        // Oferta PDF'i bo'lsa — SHU ko'rsatiladi, HTML matn emas.
+        final pdfUrl = body['pdf_url'] as String?;
+        final pdfVersion = (body['pdf_version'] as num?)?.toInt() ?? 0;
+        if (pdfUrl != null && pdfUrl.isNotEmpty) {
+          await _loadPdf(pdfUrl, pdfVersion, lang);
+          return;
+        }
+        setState(() => _loading = false);
         if (widget.acceptMode) _markReadIfFits();
         return;
       }
@@ -318,10 +378,60 @@ class _TermsSheetState extends State<_TermsSheet> {
                     padding: EdgeInsets.symmetric(vertical: 48),
                     child: Center(child: CircularProgressIndicator()),
                   )
-                : ListView(
+                : _hasPdf
+                    ? PdfViewPinch(
+                        controller: _pdfCtrl!,
+                        onDocumentLoaded: (doc) {
+                          if (!mounted) return;
+                          setState(() => _pdfPages = doc.pagesCount);
+                          // Bir sahifali hujjat — ochilishining o'zi ko'rilgan
+                          // hisoblanadi (skroll qiladigan joyi yo'q).
+                          if (doc.pagesCount <= 1) {
+                            setState(() => _read = true);
+                          }
+                        },
+                        onPageChanged: (page) {
+                          if (!mounted) return;
+                          setState(() {
+                            _pdfPage = page;
+                            // Oxirgi sahifaga yetdi → hujjat ko'rib chiqildi.
+                            if (_pdfPages > 0 && page >= _pdfPages) {
+                              _read = true;
+                            }
+                          });
+                        },
+                        builders: PdfViewPinchBuilders<DefaultBuilderOptions>(
+                          options: const DefaultBuilderOptions(),
+                          documentLoaderBuilder: (_) =>
+                              const Center(child: CircularProgressIndicator()),
+                          pageLoaderBuilder: (_) =>
+                              const Center(child: CircularProgressIndicator()),
+                        ),
+                      )
+                    : ListView(
                     controller: _scrollCtrl,
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
                     children: [
+                      // Oferta PDF'i bor edi, lekin ochib bo'lmadi — buni
+                      // yashirmaymiz: foydalanuvchi qaysi hujjatga rozilik
+                      // berayotganini bilishi kerak.
+                      if (_pdfFailed)
+                        Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF4E5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            _S.pdfFailed(l),
+                            style: const TextStyle(
+                              fontFamily: 'MTSText',
+                              fontSize: 12.5,
+                              color: Color(0xFF8A5A00),
+                            ),
+                          ),
+                        ),
                       if (_offline) ...[
                         for (final p in _S.paragraphs(l))
                           Padding(
@@ -339,6 +449,20 @@ class _TermsSheetState extends State<_TermsSheet> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (widget.acceptMode && !_loading) ...[
+                  // PDF sahifa hisoblagichi — foydalanuvchi qancha qolganini
+                  // ko'rib tursin (gate oxirgi sahifada ochiladi).
+                  if (_hasPdf && _pdfPages > 0) ...[
+                    Text(
+                      '$_pdfPage / $_pdfPages',
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12.5,
+                        color: _read ? AppColors.splashGreen : muted,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
                   _ConsentCheck(
                     value: _okTerms,
                     enabled: _read,
@@ -355,7 +479,9 @@ class _TermsSheetState extends State<_TermsSheet> {
                   if (!_canAccept) ...[
                     const SizedBox(height: 10),
                     Text(
-                      _read ? _S.checkHint(l) : _S.scrollHint(l),
+                      _read
+                          ? _S.checkHint(l)
+                          : (_hasPdf ? _S.readPdfHint(l) : _S.scrollHint(l)),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'MTSText',
@@ -515,6 +641,12 @@ class _S {
 
   static String checkHint(Locale l) =>
       tr(l, 'services.widget.terms.check_hint');
+
+  static String readPdfHint(Locale l) =>
+      tr(l, 'services.widget.terms.read_pdf_hint');
+
+  static String pdfFailed(Locale l) =>
+      tr(l, 'services.widget.terms.pdf_failed');
 
   static List<String> paragraphs(Locale l) => [
         tr(l, 'services.widget.terms.para1'),
