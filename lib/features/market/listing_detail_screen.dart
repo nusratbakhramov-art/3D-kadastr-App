@@ -3,8 +3,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/i18n/app_translations.dart';
@@ -15,6 +15,7 @@ import '../auth/widgets/login_required_sheet.dart';
 import '../home/user_profile.dart' show paymentsHidden;
 import '../settings/settings_state.dart';
 import 'api_marketplace_service.dart';
+import 'downloads_store.dart';
 import 'listing_3d_viewer_screen.dart';
 import 'models/market_listing.dart';
 import 'widgets/listing_cta_button.dart';
@@ -46,6 +47,26 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
   late MarketListing _listing = widget.listing;
   int? _downloadingFileId;
 
+  /// Shu model bo'yicha allaqachon yuklab olingan fayllar (fileId → yozuv).
+  Map<int, MarketDownload> _downloads = const {};
+
+  /// Joriy yuklab olishning bajarilgan ulushi (0..1). Server `Content-Length`
+  /// bermasa `null` — qator aylanma indikator ko'rsatadi.
+  double? _downloadProgress;
+
+  /// Joriy yuklab olish klienti — bekor qilish uchun saqlanadi: `close()`
+  /// oqimni uzadi va `saveStream` chala `.part` faylni o'chirib tashlaydi.
+  http.Client? _downloadClient;
+
+  /// Uzilish foydalanuvchi tomonidan bo'ldimi — shunda xato toast'i
+  /// ko'rsatilmaydi.
+  bool _downloadCancelled = false;
+
+  void _cancelDownload() {
+    _downloadCancelled = true;
+    _downloadClient?.close();
+  }
+
   /// Bepul yoki sotib olingan — yuklab olish/3D ochiq. Aks holda — locked
   /// (formatlar ko'rinadi, lekin bosilganda sotib olishga yo'naltiradi).
   bool get _unlocked => _listing.isFree || _listing.isOwned;
@@ -58,6 +79,16 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
     // Egalik holatini (is_owned) va fayllarni serverdan yangilab olamiz —
     // ro'yxatdan kelgan keshlangan nusxa eskirgan bo'lishi mumkin.
     unawaited(_refresh());
+    unawaited(_loadDownloads());
+  }
+
+  /// Yuklab olingan fayllar indeksini o'qiydi — chip qaysi holatda
+  /// ko'rsatilishini shu belgilaydi (yuklab olish / ochish).
+  Future<void> _loadDownloads() async {
+    final id = widget.listing.backendId;
+    if (id == null) return;
+    final saved = await MarketDownloads.forModel(id);
+    if (mounted) setState(() => _downloads = saved);
   }
 
   @override
@@ -145,11 +176,48 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
     final origin = box != null
         ? box.localToGlobal(Offset.zero) & box.size
         : null;
+    // Havola bilan ulashamiz: (1) qabul qiluvchi bosib ochadi — ilova
+    // o'rnatilgan bo'lsa Universal Link uni to'g'ridan-to'g'ri shu e'longa olib
+    // keladi, (2) matn emas, URL ulashilgani uchun iOS share oynasida Telegram,
+    // WhatsApp va boshqa ilovalar chiqadi (fayl ulashishda ular chiqmasdi).
+    final link = marketListingLink(l.backendId);
+    // Tuman/maydon har doim ham to'ldirilmagan — bo'shini qo'shsak matn
+    // " · 0 m²" bo'lib chiqadi, shuning uchun faqat mavjudlarini yig'amiz.
+    final meta = [
+      if (l.district.trim().isNotEmpty) l.district.trim(),
+      if (l.areaM2 > 0) '${l.areaM2} m²',
+    ].join(' · ');
     Share.share(
-      '${l.title}\n${l.district} · ${l.areaM2} m²',
+      [
+        l.title,
+        if (meta.isNotEmpty) meta,
+        ?link,
+      ].join('\n'),
       subject: l.title,
       sharePositionOrigin: origin,
     );
+  }
+
+  /// Chip bosilganda: yuklab olingan bo'lsa — amallar oynasi, aks holda yuklab
+  /// olish.
+  Future<void> _onFileTap(MarketListingFile file) async {
+    // Shu fayl hozir yuklanmoqda — bosilishi bekor qilish demak.
+    if (_downloadingFileId == file.id) {
+      _cancelDownload();
+      return;
+    }
+    // Boshqa fayl yuklanayotgan bo'lsa — ikkinchisini boshlamaymiz.
+    if (_downloadingFileId != null) return;
+    if (!_unlocked) {
+      await _onBuy();
+      return;
+    }
+    final existing = _downloads[file.id];
+    if (existing != null) {
+      await _showDownloadedSheet(file, existing);
+      return;
+    }
+    await _downloadFormat(file);
   }
 
   Future<void> _downloadFormat(MarketListingFile file) async {
@@ -180,61 +248,272 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
     final session = await widget.authStorage.loadSession();
     final token = session.token;
     if (token == null) return;
-    setState(() => _downloadingFileId = file.id);
+    setState(() {
+      _downloadingFileId = file.id;
+      _downloadProgress = null;
+      _downloadCancelled = false;
+    });
     try {
       final info = await _api.getDownloadUrl(
         modelId: id,
         fileId: file.id,
         token: token,
       );
-      final bytes = await _bytesFor(info.url);
-      final dir = await getTemporaryDirectory();
-      final safeTitle = _listing.title
-          .replaceAll(RegExp(r'[^A-Za-z0-9_\- ]'), '')
-          .replaceAll(' ', '_');
-      final ext = file.format.toLowerCase();
-      final filename = '${safeTitle.isEmpty ? 'model' : safeTitle}.$ext';
-      final outFile = File('${dir.path}/$filename');
-      await outFile.writeAsBytes(bytes, flush: true);
+      // `Documents/Yuklamalar` ichiga — vaqtinchalik papkaga emas: iOS `tmp`ni
+      // istalgan vaqtda tozalaydi, ya'ni 1.5 GB `.max` fayl yo'qolib, keyingi
+      // safar qaytadan yuklab olinardi.
+      final rec = await _saveStreamed(id, file, info.url);
 
       if (!mounted) return;
-      final box = context.findRenderObject() as RenderBox?;
-      final origin = box != null
-          ? box.localToGlobal(Offset.zero) & box.size
-          : null;
-      await Share.shareXFiles(
-        [XFile(outFile.path, name: filename)],
-        subject: _listing.title,
-        sharePositionOrigin: origin,
-      );
-      if (!mounted) return;
+      setState(() => _downloads = {..._downloads, rec.fileId: rec});
       AppToast.success(
         context,
-        '$filename ${tr(localeNotifier.value, 'market.listing.file_ready')}',
+        '${rec.fileName} — ${tr(localeNotifier.value, 'market.download.saved')}',
       );
     } catch (e) {
       if (!mounted) return;
-      AppToast.error(
-        context,
-        '${tr(localeNotifier.value, 'market.listing.download_error')}: $e',
-      );
+      // Foydalanuvchi o'zi bekor qildi — bu xato emas.
+      if (!_downloadCancelled) {
+        AppToast.error(
+          context,
+          '${tr(localeNotifier.value, 'market.listing.download_error')}: $e',
+        );
+      }
     } finally {
-      if (mounted) setState(() => _downloadingFileId = null);
+      if (mounted) {
+        setState(() {
+          _downloadingFileId = null;
+          _downloadProgress = null;
+          _downloadCancelled = false;
+        });
+      }
     }
   }
 
-  Future<List<int>> _bytesFor(String src) async {
+  /// Allaqachon yuklab olingan fayl uchun amallar oynasi.
+  ///
+  /// `.max` / `.dwg` / `.cdr` fayllarini iOS'ning o'zi ocholmaydi (mos ilova
+  /// Allaqachon yuklab olingan fayl uchun amallar oynasi.
+  ///
+  /// Bitta yaxlit drawer: to'liq enlikdagi panel, yuqori burchaklari yumaloq,
+  /// ichida sarlavha va qatorlar. Ilgari bu ikkita suzuvchi karta edi — ular
+  /// orasidagi tirqishdan sahifa matni ko'rinib turardi va oyna fonsiz, chala
+  /// ko'rinardi.
+  ///
+  /// `.max` / `.dwg` / `.cdr` fayllarini iOS o'zi ocholmaydi (mos ilova yo'q),
+  /// shuning uchun "ochish" tizim oynasini chaqiradi — u yerdan foydalanuvchi
+  /// Files'ga saqlaydi yoki mos ilovada ochadi.
+  Future<void> _showDownloadedSheet(
+    MarketListingFile file,
+    MarketDownload rec,
+  ) async {
+    final locale = Localizations.localeOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final panel = isDark ? const Color(0xFF15191B) : Colors.white;
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+    final sep = isDark ? const Color(0xFF262C2F) : const Color(0xFFECEDEF);
+    final size = ListingFormatsCard.sizeLabel(rec.sizeBytes);
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.45),
+      builder: (sheetContext) => Container(
+        // Drawer'ning O'Z foni — pastki xavfsiz zonagacha to'ldiradi, aks holda
+        // home-indicator yo'lagi ostidan scrim ko'rinib qolardi.
+        decoration: BoxDecoration(
+          color: panel,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF2C3133)
+                      : const Color(0xFFE3E5E8),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 14),
+                child: Column(
+                  children: [
+                    Text(
+                      rec.fileName,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: fg,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      [
+                        if (size.isNotEmpty) size,
+                        tr(locale, 'market.download.location'),
+                      ].join(' · '),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontSize: 13,
+                        height: 1.35,
+                        color: muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              _ActionRow(
+                label: tr(locale, 'market.download.open'),
+                asset: 'assets/icons/share.svg',
+                fg: fg,
+                separator: sep,
+                onTap: () => Navigator.of(sheetContext).pop('open'),
+              ),
+              _ActionRow(
+                label: tr(locale, 'market.download.redownload'),
+                asset: 'assets/icons/rotate.svg',
+                fg: fg,
+                separator: sep,
+                onTap: () => Navigator.of(sheetContext).pop('redownload'),
+              ),
+              _ActionRow(
+                label: tr(locale, 'market.download.delete'),
+                asset: 'assets/icons/trash.svg',
+                fg: const Color(0xFFD63A31),
+                separator: sep,
+                onTap: () => Navigator.of(sheetContext).pop('delete'),
+              ),
+              // Bekor qilish — shu panel ichida, qolgan qatorlar bilan bir xil
+              // ingichka ajratgich orqali. Uni qalin kulrang yo'l bilan
+              // ajratish oq panel ichida adashib qolgan chiziqdek ko'rinardi;
+              // qalin shrift o'zi yetarli farq beradi.
+              InkWell(
+                onTap: () => Navigator.of(sheetContext).pop(),
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border(top: BorderSide(color: sep, width: 0.5)),
+                  ),
+                  height: 56,
+                  width: double.infinity,
+                  child: Center(
+                    child: Text(
+                      tr(locale, 'market.download.cancel'),
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        color: fg,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+
+    switch (action) {
+      case 'open':
+        final f = await MarketDownloads.fileFor(rec);
+        if (!mounted) return;
+        if (!await f.exists()) {
+          // Foydalanuvchi Files'dan o'chirib yuborgan — indeksni tozalab,
+          // chipni yana "yuklab olish" holatiga qaytaramiz.
+          await MarketDownloads.remove(rec.fileId);
+          if (!mounted) return;
+          setState(() => _downloads = {..._downloads}..remove(rec.fileId));
+          return;
+        }
+        if (!mounted) return;
+        final box = context.findRenderObject() as RenderBox?;
+        await Share.shareXFiles(
+          [XFile(f.path, name: rec.fileName)],
+          subject: _listing.title,
+          sharePositionOrigin: box != null
+              ? box.localToGlobal(Offset.zero) & box.size
+              : null,
+        );
+      case 'redownload':
+        setState(() => _downloads = {..._downloads}..remove(rec.fileId));
+        await _downloadFormat(file);
+      case 'delete':
+        await MarketDownloads.remove(rec.fileId);
+        if (!mounted) return;
+        setState(() => _downloads = {..._downloads}..remove(rec.fileId));
+        AppToast.success(context, tr(locale, 'market.download.deleted'));
+    }
+  }
+
+  /// Faylni oqim bilan yuklab, `Documents/Yuklamalar`ga yozadi.
+  ///
+  /// Butun javobni xotiraga yig'maymiz — `.max` fayllar 1.5 GB'gacha bo'ladi,
+  /// bunday hajm qurilmada ilovani o'ldiradi.
+  Future<MarketDownload> _saveStreamed(
+    int modelId,
+    MarketListingFile file,
+    String src,
+  ) async {
+    Future<MarketDownload> saveFrom(
+      Stream<List<int>> stream, {
+      int totalBytes = 0,
+    }) {
+      var lastPercent = -1;
+      return MarketDownloads.saveStream(
+        fileId: file.id,
+        modelId: modelId,
+        title: _listing.title,
+        format: file.format,
+        stream: stream,
+        onProgress: totalBytes <= 0
+            ? null
+            : (received) {
+                // Har chunkda emas, foiz o'zgargandagina qayta chizamiz.
+                final percent = (received * 100 ~/ totalBytes).clamp(0, 100);
+                if (percent == lastPercent || !mounted) return;
+                lastPercent = percent;
+                setState(() => _downloadProgress = percent / 100);
+              },
+      );
+    }
+
     if (src.startsWith('http://') || src.startsWith('https://')) {
-      final res = await http
-          .get(Uri.parse(src))
-          .timeout(const Duration(seconds: 60));
-      if (res.statusCode != 200) {
-        throw HttpException('HTTP ${res.statusCode}', uri: Uri.parse(src));
+      final client = http.Client();
+      _downloadClient = client;
+      try {
+        final res = await client
+            .send(http.Request('GET', Uri.parse(src)))
+            .timeout(const Duration(seconds: 60));
+        if (res.statusCode != 200) {
+          throw HttpException('HTTP ${res.statusCode}', uri: Uri.parse(src));
+        }
+        return await saveFrom(
+          res.stream,
+          totalBytes: res.contentLength ?? file.fileSize,
+        );
+      } finally {
+        client.close();
+        _downloadClient = null;
       }
-      return res.bodyBytes;
     }
     if (src.startsWith('file://')) {
-      return await File.fromUri(Uri.parse(src)).readAsBytes();
+      return saveFrom(File.fromUri(Uri.parse(src)).openRead());
     }
     throw StateError('Unknown source: $src');
   }
@@ -304,8 +583,10 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
                 child: ListingFormatsCard(
                   files: listing.files,
                   downloadingFileId: _downloadingFileId,
+                  downloadProgress: _downloadProgress,
+                  downloadedFileIds: _downloads.keys.toSet(),
                   locked: !unlocked,
-                  onTap: _downloadFormat,
+                  onTap: _onFileTap,
                 ),
               ),
             ],
@@ -322,6 +603,70 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
               ),
             ],
             const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Ulashiladigan (va ilovaga qaytadigan) e'lon havolasi.
+///
+/// `api.3dkadastr.uz` allaqachon `Runner.entitlements`da associated-domain
+/// sifatida ro'yxatdan o'tgan (Payme `pay-return` uchun), shuning uchun bu
+/// havola iOS'da ilovani ochadi — qo'shimcha sozlash kerak emas.
+String? marketListingLink(int? backendId) =>
+    backendId == null ? null : 'https://api.3dkadastr.uz/market/$backendId';
+
+/// iOS action-sheet qatori: chapda yorliq, o'ngda belgi, tepasida ingichka
+/// ajratgich.
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.label,
+    required this.asset,
+    required this.fg,
+    required this.separator,
+    required this.onTap,
+  });
+
+  final String label;
+  final String asset;
+  final Color fg;
+  final Color separator;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: separator, width: 0.5)),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        height: 56,
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w500,
+                  fontSize: 16,
+                  color: fg,
+                ),
+              ),
+            ),
+            SvgPicture.asset(
+              asset,
+              width: 20,
+              height: 20,
+              colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+            ),
           ],
         ),
       ),

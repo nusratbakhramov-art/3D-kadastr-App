@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 
+import '../features/market/api_marketplace_service.dart';
+import '../features/market/listing_detail_screen.dart';
 import '../features/payments/payment_result_screen.dart';
 
 /// MaterialApp navigatorKey — deep-link'dan (context'siz) navigatsiya uchun.
@@ -44,6 +46,24 @@ class PaymentDeepLinks {
 
   static void _handle(Uri uri) {
     final seg = uri.pathSegments;
+    // Marketplace e'loni: https://api.3dkadastr.uz/market/{id} yoki
+    // kadastr3d://market/{id} — ulashilgan havolani bosgan foydalanuvchi
+    // to'g'ridan-to'g'ri shu e'lon sahifasiga tushadi.
+    final m = seg.indexOf('market');
+    if (m >= 0 && m + 1 < seg.length) {
+      final modelId = int.tryParse(seg[m + 1]);
+      if (modelId != null) {
+        openMarketListing(modelId);
+        return;
+      }
+    } else if (uri.host == 'market' && seg.isNotEmpty) {
+      final modelId = int.tryParse(seg.first);
+      if (modelId != null) {
+        openMarketListing(modelId);
+        return;
+      }
+    }
+
     int? id;
     // Universal Link: https://api.3dkadastr.uz/pay-return/{id}
     //   → pathSegments = [pay-return, {id}]
@@ -57,6 +77,32 @@ class PaymentDeepLinks {
     }
     if (id != null) openResult(id);
   }
+
+  /// Ulashilgan havoladan marketplace e'lonini ochadi.
+  ///
+  /// E'lon ma'lumoti havolada bo'lmagani uchun avval backenddan olinadi;
+  /// olinmasa (o'chirilgan e'lon, tarmoq yo'q) — jimgina e'tiborsiz
+  /// qoldiriladi, ilova baribir odatdagidek ochilaveradi.
+  static Future<void> openMarketListing(int modelId) async {
+    if (_activeListingId == modelId) return; // allaqachon ochilyapti
+    _activeListingId = modelId;
+    try {
+      final listing = await MarketplaceApiService().getModel(modelId);
+      final nav = rootNavigatorKey.currentState;
+      if (nav == null) return;
+      await nav.push(
+        MaterialPageRoute<void>(
+          builder: (_) => ListingDetailScreen(listing: listing),
+        ),
+      );
+    } catch (_) {
+      // e'lon topilmadi / tarmoq xatosi — havola shunchaki ilovani ochadi
+    } finally {
+      _activeListingId = null;
+    }
+  }
+
+  static int? _activeListingId;
 
   /// Natija ekranini ochadi (dedupe). pendingPaymentId tozalanadi.
   static void openResult(int id) {

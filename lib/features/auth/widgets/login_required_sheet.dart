@@ -14,6 +14,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/sheet_button.dart';
 import '../auth_flow_screen.dart';
 import '../auth_storage.dart';
 
@@ -135,7 +136,7 @@ class _LoginRequiredSheet extends StatelessWidget {
             const SizedBox(height: 24),
             // Primary + secondary as a matched pair: same height/radius, the
             // brand green filled and a quiet tonal "cancel" beneath it.
-            _SheetButton(
+            SheetButton(
               label: tr(l, 'auth.login_required.sign_in'),
               filled: true,
               isDark: isDark,
@@ -145,67 +146,13 @@ class _LoginRequiredSheet extends StatelessWidget {
               },
             ),
             const SizedBox(height: 10),
-            _SheetButton(
+            SheetButton(
               label: tr(l, 'auth.login_required.cancel'),
               filled: false,
               isDark: isDark,
               onTap: () => Navigator.of(context).pop(false),
             ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// One full-width pill button used in the sheet. `filled` = brand-green
-/// primary; otherwise a quiet tonal secondary that pairs with it (same height
-/// and radius, so the two read as an intentional pair rather than a loud pill
-/// over a bare text link).
-class _SheetButton extends StatelessWidget {
-  const _SheetButton({
-    required this.label,
-    required this.filled,
-    required this.isDark,
-    required this.onTap,
-  });
-
-  final String label;
-  final bool filled;
-  final bool isDark;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final Color bg = filled
-        ? AppColors.splashGreen
-        : (isDark ? Colors.white.withValues(alpha: 0.07)
-                  : const Color(0xFFF1F2F4));
-    final Color fg = filled
-        ? AppColors.buttonTextBlack
-        : (isDark ? Colors.white.withValues(alpha: 0.85)
-                  : const Color(0xFF6C7278));
-
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(16),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: SizedBox(
-          height: 54,
-          width: double.infinity,
-          child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: filled ? FontWeight.w700 : FontWeight.w600,
-                fontSize: 16,
-                color: fg,
-              ),
-            ),
           ),
         ),
       ),
