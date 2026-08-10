@@ -55,6 +55,15 @@
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="kadastr3d" android:host="pay-return"/>
             </intent-filter>
+            <!-- Ulashilgan e'lon havolasi: `kadastr3d://market/{id}`. Host
+                 alohida ko'rsatilishi shart — yuqoridagi filtr faqat
+                 `pay-return` hostini ushlaydi. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="kadastr3d" android:host="market"/>
+            </intent-filter>
         </activity>
         <!-- FCM: app fonда kelgan push qaysi kanalga tushishini belgilaydi
              (PushNotifications._channel bilan bir xil id). -->
