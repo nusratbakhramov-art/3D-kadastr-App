@@ -180,23 +180,35 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
     // o'rnatilgan bo'lsa Universal Link uni to'g'ridan-to'g'ri shu e'longa olib
     // keladi, (2) matn emas, URL ulashilgani uchun iOS share oynasida Telegram,
     // WhatsApp va boshqa ilovalar chiqadi (fayl ulashishda ular chiqmasdi).
+    final locale = localeNotifier.value;
     final link = marketListingLink(l.backendId);
-    // Tuman/maydon har doim ham to'ldirilmagan — bo'shini qo'shsak matn
+    // Tuman/maydon/narx har doim ham to'ldirilmagan — bo'shini qo'shsak matn
     // " · 0 m²" bo'lib chiqadi, shuning uchun faqat mavjudlarini yig'amiz.
     final meta = [
       if (l.district.trim().isNotEmpty) l.district.trim(),
       if (l.areaM2 > 0) '${l.areaM2} m²',
+      if (l.isFree)
+        tr(locale, 'market.listing.free')
+      else if (l.priceUzs > 0)
+        '${marketGroupDigits(l.priceUzs)} ${tr(locale, 'market.pay_sheet.soum')}',
     ].join(' · ');
     Share.share(
       [
         l.title,
         if (meta.isNotEmpty) meta,
+        // E'lonning o'z tavsifi — ulashilgan xabar quruq sarlavha va havola
+        // bo'lib qolmasin. Uzun tavsif xabarni bosib ketadi, shuning uchun
+        // qisqartiriladi.
+        ?marketShareDescription(l.description),
+        '',
+        tr(locale, 'market.share.cta'),
         ?link,
       ].join('\n'),
       subject: l.title,
       sharePositionOrigin: origin,
     );
   }
+
 
   /// Chip bosilganda: yuklab olingan bo'lsa — amallar oynasi, aks holda yuklab
   /// olish.
@@ -608,6 +620,33 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
       ),
     );
   }
+}
+
+/// Ulashish matni uchun tavsifni bir xatboshiga qisqartiradi.
+///
+/// Xabar quruq sarlavha va havoladan iborat bo'lib qolmasligi uchun e'lon
+/// tavsifi ham qo'shiladi, lekin to'liq tavsif xabarni bosib ketadi — 180
+/// belgidan uzuni so'z chegarasida kesiladi. Bo'sh tavsifda `null` qaytadi,
+/// shunda qatorning o'zi umuman qo'shilmaydi.
+String? marketShareDescription(String? raw) {
+  final text = (raw ?? '').replaceAll(RegExp(r'\s+'), ' ').trim();
+  if (text.isEmpty) return null;
+  if (text.length <= 180) return text;
+  final cut = text.substring(0, 180);
+  final lastSpace = cut.lastIndexOf(' ');
+  return '${cut.substring(0, lastSpace > 120 ? lastSpace : 180).trimRight()}…';
+}
+
+/// 12500000 → "12 500 000" (`ListingInfoCard` bilan bir xil ko'rinish).
+String marketGroupDigits(int v) {
+  final s = v.toString();
+  final buf = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    buf.write(s[i]);
+    final remaining = s.length - i - 1;
+    if (remaining > 0 && remaining % 3 == 0) buf.write(' ');
+  }
+  return buf.toString();
 }
 
 /// Ulashiladigan (va ilovaga qaytadigan) e'lon havolasi.
