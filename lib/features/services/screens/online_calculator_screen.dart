@@ -5,6 +5,7 @@ import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/calculator_draft.dart';
 import '../widgets/service_app_bar.dart';
+import '../widgets/service_group_card.dart';
 import 'calculator/arxitektura_form_screen.dart';
 import 'calculator/baholash_form_screen.dart';
 import 'calculator/buxgalteriya_screen.dart';
@@ -104,18 +105,15 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
                           ),
                           const SizedBox(height: 18),
                           for (var i = 0;
-                              i < CalculatorCategory.listed.length;
+                              i < CalculatorCategory.listedGroups.length;
                               i++) ...[
                             _StaggeredEntry(
                               controller: _controller,
                               index: i + 1,
-                              child: _CategoryCard(
-                                category: CalculatorCategory.listed[i],
-                                locale: locale,
-                                onTap: () => _open(
-                                  context,
-                                  CalculatorCategory.listed[i],
-                                ),
+                              child: _groupCard(
+                                context,
+                                CalculatorCategory.listedGroups[i],
+                                locale,
                               ),
                             ),
                             const SizedBox(height: 10),
@@ -130,6 +128,49 @@ class _OnlineCalculatorScreenState extends State<OnlineCalculatorScreen>
           },
         ),
       ),
+    );
+  }
+
+  /// Bitta xizmat — oddiy karta; bir nechtasi — akkordeon (kadastr guruhi).
+  Widget _groupCard(
+    BuildContext context,
+    List<CalculatorCategory> group,
+    Locale locale,
+  ) {
+    if (group.length == 1) {
+      return _CategoryCard(
+        category: group.first,
+        locale: locale,
+        onTap: () => _open(context, group.first),
+      );
+    }
+    final head = group.first;
+    final chevronColor = Theme.of(context).brightness == Brightness.dark
+        ? Colors.white.withValues(alpha: 0.4)
+        : const Color(0xFFB4B9BF);
+    return ServiceGroupCard(
+      title: kadastrGroupTitle(locale),
+      subtitle: kadastrGroupSubtitle(locale),
+      assetIcon: head.assetIcon,
+      iconScale: head.iconScale,
+      fallbackIcon: head.icon,
+      accent: head.accent,
+      rows: [
+        for (final c in group)
+          ServiceGroupRow(
+            title: c.rowTitle(locale),
+            subtitle: c.rowSubtitle(locale),
+            assetIcon: c.rowAssetIcon,
+            iconScale: c.iconScale,
+            fallbackIcon: c.icon,
+            trailing: Icon(
+              Icons.chevron_right_rounded,
+              color: chevronColor,
+              size: 20,
+            ),
+            onTap: () => _open(context, c),
+          ),
+      ],
     );
   }
 

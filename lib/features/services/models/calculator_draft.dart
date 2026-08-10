@@ -56,6 +56,19 @@ enum CalculatorCategory {
     buxgalteriya,
   ];
 
+  /// Ro'yxat kartalari: har bir element bitta karta. Uzunligi 1 bo'lsa —
+  /// oddiy karta, 1 dan katta bo'lsa — akkordeon (ichida shu xizmatlar).
+  /// Kadastr va 3D kadastr bitta "Kadastr hujjatlari" guruhida ko'rsatiladi.
+  static const List<List<CalculatorCategory>> listedGroups = [
+    [arxitektura],
+    [kadastr, kadastr3d],
+    [dizayn],
+    [baholash],
+    [tamirlash],
+    [yuridik],
+    [buxgalteriya],
+  ];
+
   String title(Locale l) => switch (this) {
     CalculatorCategory.arxitektura =>
       tr(l, 'services.model.cat.arxitektura.title'),
@@ -91,6 +104,24 @@ enum CalculatorCategory {
     CalculatorCategory.yuridik => tr(l, 'services.model.cat.yuridik.subtitle'),
   };
 
+  /// Akkordeon ichidagi qator sarlavhasi — guruhda turgani uchun kadastr
+  /// xizmatlari "oddiy" / "3D" deb ajratiladi; qolganlari [title] bilan bir xil.
+  String rowTitle(Locale l) => switch (this) {
+    CalculatorCategory.kadastr =>
+      tr(l, 'services.model.cat.kadastr.plain.title'),
+    CalculatorCategory.kadastr3d =>
+      tr(l, 'services.model.cat.kadastr3d.premium.title'),
+    _ => title(l),
+  };
+
+  String rowSubtitle(Locale l) => switch (this) {
+    CalculatorCategory.kadastr =>
+      tr(l, 'services.model.cat.kadastr.plain.subtitle'),
+    CalculatorCategory.kadastr3d =>
+      tr(l, 'services.model.cat.kadastr3d.premium.subtitle'),
+    _ => subtitle(l),
+  };
+
   IconData get icon => switch (this) {
     CalculatorCategory.arxitektura => Icons.architecture_rounded,
     CalculatorCategory.kadastr => Icons.description_outlined,
@@ -103,12 +134,14 @@ enum CalculatorCategory {
   };
 
   /// 3D image icon for the service tile. Null → fall back to [icon].
-  /// (kadastr3d keeps the AR glyph — no 3D image supplied for it.)
   String? get assetIcon => switch (this) {
     CalculatorCategory.arxitektura =>
       'assets/images/services/architecture.webp',
-    CalculatorCategory.kadastr => 'assets/images/services/kadastr-docs.webp',
-    CalculatorCategory.kadastr3d => 'assets/images/services/kadastr3d.png',
+    // Guruh sarlavhasi ("Kadastr hujjatlari") shu ikonkani oladi.
+    CalculatorCategory.kadastr =>
+      'assets/images/services/kadastr-docs-plain.png',
+    CalculatorCategory.kadastr3d =>
+      'assets/images/services/kadastr3d-docs.png',
     CalculatorCategory.baholash =>
       'assets/images/services/property-value.webp',
     CalculatorCategory.dizayn => 'assets/images/services/design.webp',
@@ -117,11 +150,18 @@ enum CalculatorCategory {
     CalculatorCategory.yuridik => 'assets/images/services/legal.webp',
   };
 
+  /// Akkordeon ichidagi qator ikonkasi. Kadastr guruhining sarlavhasi
+  /// [CalculatorCategory.kadastr] ikonkasini oladi, shuning uchun "oddiy"
+  /// qatoriga alohida asset — aks holda qator sarlavha bilan bir xil ko'rinadi.
+  String? get rowAssetIcon => switch (this) {
+    CalculatorCategory.kadastr => 'assets/images/services/kadastr-docs.webp',
+    _ => assetIcon,
+  };
+
   /// Ikonka kattaligini tekislash — asset'larning ichki shaffof hoshiyasi har
   /// xil, shuning uchun ba'zilari 44pt plitkada kichikroq ko'rinadi.
   /// 1.0 = asl o'lcham.
   double get iconScale => switch (this) {
-    CalculatorCategory.kadastr3d => 1.2,
     CalculatorCategory.dizayn => 1.2,
     _ => 1.0,
   };
@@ -137,6 +177,13 @@ enum CalculatorCategory {
     CalculatorCategory.yuridik => const Color(0xFF64748B),
   };
 }
+
+/// "Kadastr hujjatlari" akkordeonining sarlavhasi (ichida oddiy + 3D).
+String kadastrGroupTitle(Locale l) =>
+    tr(l, 'services.model.cat.kadastr.group.title');
+
+String kadastrGroupSubtitle(Locale l) =>
+    tr(l, 'services.model.cat.kadastr.group.subtitle');
 
 // ────────────────────────────────────────────────────────────────────────
 // Arxitektura va qurilish loyihasi

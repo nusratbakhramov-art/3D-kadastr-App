@@ -12,10 +12,10 @@
 library;
 
 /// Marketing version — keep in sync with pubspec `version:` (before the `+`).
-const String kAppVersion = '1.0.3';
+const String kAppVersion = '1.0.4';
 
 /// Build number — the part after the `+` in pubspec `version:`.
-const String kAppBuild = '25';
+const String kAppBuild = '26';
 
 /// "1.0.3 (25)" — what both About and Settings display.
 const String kAppVersionFull = '$kAppVersion ($kAppBuild)';

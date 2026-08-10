@@ -71,7 +71,9 @@ class _KadastrAreaScreenState extends State<KadastrAreaScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                      title: tr(l, 'services.kadastr.flow.appbar')),
+                      // Yangi kalit — eskisi prod bundle'ida "3D kadastr"ga
+                      // o'zgartirilgan, bu oqim esa kalkulyator oqimi.
+                      title: tr(l, 'services.kadastr.flow.appbar.calc')),
                 ),
                 Expanded(
                   child: ListView(

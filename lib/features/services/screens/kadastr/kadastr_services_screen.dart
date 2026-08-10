@@ -15,6 +15,7 @@ import '../../models/calculator_draft.dart';
 import '../../models/calculator_pricing.dart';
 import '../../models/kadastr_estimate.dart';
 import '../../widgets/service_app_bar.dart';
+import '../../widgets/service_group_card.dart';
 import 'kadastr_estimate_screen.dart';
 
 class KadastrServicesScreen extends StatefulWidget {
@@ -54,6 +55,53 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
     );
   }
 
+  /// Bitta xizmat — oddiy tanlanadigan karta; bir nechtasi — akkordeon
+  /// (kadastr guruhi: oddiy + 3D). Tanlov baribir alohida xizmat darajasida.
+  Widget _groupCard(List<CalculatorCategory> group, Locale l) {
+    if (group.length == 1) {
+      final c = group.first;
+      return _SelectableServiceCard(
+        category: c,
+        locale: l,
+        selected: _selected.contains(c),
+        onTap: () => _toggle(c),
+      );
+    }
+    final head = group.first;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final unselectedBorder =
+        isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final chosen = group.where(_selected.contains).length;
+    return ServiceGroupCard(
+      title: kadastrGroupTitle(l),
+      subtitle: kadastrGroupSubtitle(l),
+      assetIcon: head.assetIcon,
+      iconScale: head.iconScale,
+      fallbackIcon: head.icon,
+      accent: head.accent,
+      badgeCount: chosen,
+      // Guruhda allaqachon tanlov bo'lsa ochiq tursin (masalan orqaga
+      // qaytganda) — aks holda tanlangan xizmat ko'rinmay qoladi.
+      initiallyExpanded: chosen > 0,
+      rows: [
+        for (final c in group)
+          ServiceGroupRow(
+            title: c.rowTitle(l),
+            subtitle: c.rowSubtitle(l),
+            assetIcon: c.rowAssetIcon,
+            iconScale: c.iconScale,
+            fallbackIcon: c.icon,
+            selected: _selected.contains(c),
+            trailing: _CheckDot(
+              selected: _selected.contains(c),
+              unselectedBorder: unselectedBorder,
+            ),
+            onTap: () => _toggle(c),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = Localizations.localeOf(context);
@@ -78,7 +126,11 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
                   child: ServiceAppBar(
-                    title: tr(l, 'services.kadastr.flow.appbar'),
+                    // Bu oqim "Calculator Ai" kartasidan ochiladi. Eski
+                    // `services.kadastr.flow.appbar` prod bundle'ida "3D
+                    // kadastr"ga o'zgartirilgan (backend seed'ni yengadi),
+                    // shuning uchun sarlavha yangi kalitda.
+                    title: tr(l, 'services.kadastr.flow.appbar.calc'),
                     subtitle: '${_fmtArea(widget.areaM2)} m²',
                   ),
                 ),
@@ -107,13 +159,8 @@ class _KadastrServicesScreenState extends State<KadastrServicesScreen> {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      for (final c in CalculatorCategory.listed) ...[
-                        _SelectableServiceCard(
-                          category: c,
-                          locale: l,
-                          selected: _selected.contains(c),
-                          onTap: () => _toggle(c),
-                        ),
+                      for (final group in CalculatorCategory.listedGroups) ...[
+                        _groupCard(group, l),
                         const SizedBox(height: 10),
                       ],
                     ],
