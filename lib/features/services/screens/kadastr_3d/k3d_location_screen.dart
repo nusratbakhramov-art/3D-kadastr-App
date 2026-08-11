@@ -1,4 +1,4 @@
-/// Step 2 of 3D Kadastr — pick the property's location on a map.
+/// Step 2 of 3D kadastr — pick the property's location on a map.
 ///
 /// Identical UX to AI Baholash's location step (`ai_location_screen.dart`):
 ///   - Pin always at the map center; panning updates lat/lng.

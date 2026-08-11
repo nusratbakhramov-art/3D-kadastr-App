@@ -1,4 +1,4 @@
-/// Step 6 of 3D Kadastr — submit + confirmation.
+/// Step 6 of 3D kadastr — submit + confirmation.
 ///
 /// On open it POSTs the bundle to `/3d-kadastr-jobs` and shows a confirmation.
 /// Unlike AI Baholash there is no pricing pipeline to poll — the request is

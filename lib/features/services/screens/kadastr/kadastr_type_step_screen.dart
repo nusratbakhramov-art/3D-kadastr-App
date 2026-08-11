@@ -1,7 +1,7 @@
 /// Kadastr combined calculator — per-service object-type steps.
 ///
 /// Runs after the service multi-select, once per selected service whose price
-/// depends on an object type (Arxitektura, Kadastr, 3D Kadastr, Baholash) or a
+/// depends on an object type (Arxitektura, Kadastr, 3D kadastr, Baholash) or a
 /// service type (Ta'mirlash: repair vs build). Dizayn (area-only) and Yuridik
 /// (quote) are skipped. Each pick is written into the shared
 /// [CalculatorServiceChoice]; the last step continues to the estimate.

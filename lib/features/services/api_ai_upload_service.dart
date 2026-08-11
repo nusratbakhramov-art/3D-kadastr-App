@@ -83,7 +83,7 @@ MediaType? _mediaTypeFor(String path) {
 
 /// Upload categories — must match the backend `_UPLOAD_CATEGORIES` keys.
 /// `passport`/`document` belong to AI Baholash; `scan3d` belongs to the
-/// 3D Kadastr flow (LiDAR mesh uploads).
+/// 3D kadastr flow (LiDAR mesh uploads).
 enum UploadCategory {
   kadastr('kadastr'),
   propertyPhoto('property_photo'),
@@ -118,7 +118,7 @@ class AiUploadService {
   /// (in the same order, best-effort). Throws [AiUploadException] on failure.
   ///
   /// [endpoint] selects the backend upload route (relative to the API base):
-  /// AI Baholash uses `/ai-valuations/upload` (default), 3D Kadastr passes
+  /// AI Baholash uses `/ai-valuations/upload` (default), 3D kadastr passes
   /// `/3d-kadastr-jobs/upload`.
   Future<List<String>> upload({
     required UploadCategory category,

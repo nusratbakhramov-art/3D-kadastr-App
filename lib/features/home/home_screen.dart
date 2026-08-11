@@ -513,7 +513,7 @@ class _HomePatternBackground extends StatelessWidget {
 }
 
 /// The Home service grid — the rich dark cards brought over from the (removed)
-/// Services page: two square cards (AI Baholash, 3D Kadastr) + one wide card
+/// Services page: two square cards (AI Baholash, 3D kadastr) + one wide card
 /// (Kalkulyator), each with an accent glow and a 3D image. Market lives in the
 /// bottom tab + "Top modellar", so it's not a card here.
 class _CardsGrid extends StatelessWidget {

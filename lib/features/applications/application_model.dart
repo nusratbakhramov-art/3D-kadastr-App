@@ -103,12 +103,12 @@ class ApplicationItem {
   /// kartasi ko'rsatiladi (`/ai-valuations/{id}/report`). Aks holda null.
   final int? aiReportJobId;
 
-  /// 3D Kadastr job id — set for every 3D item. Lets the detail screen fetch the
+  /// 3D kadastr job id — set for every 3D item. Lets the detail screen fetch the
   /// FULL job snapshot (request_payload) and render all the data the user gave,
   /// not just the lightweight list summary (mirrors [aiJobId] for AI Baholash).
   final int? k3dJobId;
 
-  /// 3D Kadastr arizasi COMPLETED bo'lib, mutaxassis yetkazgan deliverable'lar:
+  /// 3D kadastr arizasi COMPLETED bo'lib, mutaxassis yetkazgan deliverable'lar:
   ///   • k3dReportJobId — xulosa PDF mavjud (`/3d-kadastr-jobs/{id}/report`)
   ///   • k3dModelJobId  — 3D model mavjud (`/3d-kadastr-jobs/{id}/model`)
   ///   • k3dModelExt    — model kengaytmasi (glb/usdz) — to'g'ri viewer tanlash uchun
@@ -159,7 +159,7 @@ class ApplicationServiceChip {
 
 const List<ApplicationServiceChip> applicationServiceChips = [
   ApplicationServiceChip(id: 'all', label: 'Barchasi'),
-  ApplicationServiceChip(id: 'kad_3d', label: '3D Kadastr'),
+  ApplicationServiceChip(id: 'kad_3d', label: '3D kadastr'),
   ApplicationServiceChip(id: 'ai_eval', label: 'AI Baholash'),
   ApplicationServiceChip(id: 'calc', label: 'Kalkulyator'),
 ];

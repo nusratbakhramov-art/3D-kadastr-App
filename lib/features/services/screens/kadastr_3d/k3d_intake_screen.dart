@@ -1,4 +1,4 @@
-/// Step 4 of 3D Kadastr — intake (hujjat va rasmlar).
+/// Step 4 of 3D kadastr — intake (hujjat va rasmlar).
 ///
 /// Mirrors the AI Baholash intake (`ai_intake_screen.dart`) **without** the
 /// owner passport/ID section. Three sections on one scrollable screen:
@@ -34,7 +34,7 @@ import '../../widgets/service_app_bar.dart';
 import '../../widgets/step_progress_bar.dart';
 import '../scan_lidar_screen.dart';
 
-/// Backend route for 3D Kadastr uploads (vs AI Baholash's default).
+/// Backend route for 3D kadastr uploads (vs AI Baholash's default).
 const String _kUploadEndpoint = '/3d-kadastr-jobs/upload';
 
 class K3dIntakeScreen extends StatefulWidget {

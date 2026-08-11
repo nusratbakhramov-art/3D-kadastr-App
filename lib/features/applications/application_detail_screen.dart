@@ -469,7 +469,7 @@ class _AboutTab extends StatelessWidget {
             jobId: item.aiJobId!,
             fallback: _flatRowsCard(context, lang, rows),
           )
-        // 3D Kadastr — to'liq job snapshot'ini (so'rov payload) olib, BARCHA
+        // 3D kadastr — to'liq job snapshot'ini (so'rov payload) olib, BARCHA
         // maydonlarni bo'limlarga ajratib ko'rsatamiz (obyekt, buyurtmachi,
         // joylashuv, qavat, xonalar). Yuklanmasa yengil ro'yxatga qaytadi.
         else if (item.k3dJobId != null)
@@ -508,7 +508,7 @@ class _AboutTab extends StatelessWidget {
           _AiOrderCard(jobId: item.aiReportJobId!),
         ],
         // AI Baholash arizasiga biriktirilgan teksturali 3D (USDZ) skan —
-        // har qanday statusda (skan submit paytida yuklanadi). "3D Kadastr"
+        // har qanday statusda (skan submit paytida yuklanadi). "3D kadastr"
         // ariza detali bilan bir xil ko‘rinish: "3D model → Ochish" karta +
         // pastda "AR orqali ko‘rish" yashil tugmasi.
         if (item.aiScanJobId != null) ...[
@@ -518,7 +518,7 @@ class _AboutTab extends StatelessWidget {
           // arizalarda rasm bo'lmasa, kartani o'zi yashiradi.
           _AiScanFramesGallery(jobId: item.aiScanJobId!),
         ],
-        // 3D Kadastr — specialist-delivered conclusion PDF + 3D model, shown
+        // 3D kadastr — specialist-delivered conclusion PDF + 3D model, shown
         // once the ariza is COMPLETED (cards appear only for the files present).
         if (item.k3dReportJobId != null) ...[
           const SizedBox(height: 14),
@@ -913,7 +913,7 @@ List<(String, List<(String, String)>)> _buildAiSections(
   return sections;
 }
 
-// ── 3D Kadastr full detail ───────────────────────────────────────────────
+// ── 3D kadastr full detail ───────────────────────────────────────────────
 // Fetches the FULL job (`GET /3d-kadastr-jobs/{id}`) and renders every field
 // the user submitted, grouped into sections — same look as the AI Baholash
 // detail. Falls back to the lightweight rows on load failure.
@@ -1007,7 +1007,7 @@ String _k3dObjectType(String lang, String? wire) => switch (wire) {
   _ => wire ?? '',
 };
 
-/// Build the grouped (sectionTitle, rows) list from a 3D Kadastr request
+/// Build the grouped (sectionTitle, rows) list from a 3D kadastr request
 /// payload. Only non-empty fields/sections are included.
 List<(String, List<(String, String)>)> _buildKadastr3dSections(
   String lang,
@@ -2030,7 +2030,7 @@ class _AiOrderCardState extends State<_AiOrderCard> {
   }
 }
 
-/// 3D Kadastr — specialist-delivered conclusion PDF. Mirrors `_AiXulosaCard`
+/// 3D kadastr — specialist-delivered conclusion PDF. Mirrors `_AiXulosaCard`
 /// but downloads from `/3d-kadastr-jobs/{id}/report`.
 class _K3dReportCard extends StatefulWidget {
   const _K3dReportCard({required this.jobId});
@@ -2207,7 +2207,7 @@ class _K3dReportCardState extends State<_K3dReportCard> {
   }
 }
 
-/// 3D Kadastr — specialist-delivered 3D model (.glb/.usdz). Mirrors
+/// 3D kadastr — specialist-delivered 3D model (.glb/.usdz). Mirrors
 /// `_AiScanCard` but downloads from `/3d-kadastr-jobs/{id}/model` and uses the
 /// known extension to cache + open with the right viewer.
 class _K3dModelCard extends StatefulWidget {

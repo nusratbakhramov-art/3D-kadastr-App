@@ -18,7 +18,7 @@ import '../widgets/step_progress_bar.dart';
 import 'scan_diagnostics_screen.dart';
 import 'kadastr_3d/k3d_status_screen.dart';
 
-/// Backend route for 3D Kadastr uploads.
+/// Backend route for 3D kadastr uploads.
 const String _kUploadEndpoint = '/3d-kadastr-jobs/upload';
 
 class ScanLidarScreen extends StatefulWidget {

@@ -15,7 +15,7 @@ import '../api_chat_service.dart';
 import '../data/chat_suggestions_store.dart';
 import '../models/chat_message.dart';
 
-/// 3D Kadastr yordamchi bot ekrani — streaming FAQ chat.
+/// 3D kadastr yordamchi bot ekrani — streaming FAQ chat.
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key, this.locale = const Locale('uz')});
 

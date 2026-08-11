@@ -1,5 +1,5 @@
 /// In-app PDF viewer for the report deliverables (Baholash Xulosa, Narxlash
-/// Orderi, 3D Kadastr xulosa). Renders a local file with PDFium (via pdfx) so
+/// Orderi, 3D kadastr xulosa). Renders a local file with PDFium (via pdfx) so
 /// the user can actually READ the report in-app — not just share/save it. A
 /// share action stays in the app bar.
 ///

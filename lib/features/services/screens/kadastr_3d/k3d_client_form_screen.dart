@@ -1,4 +1,4 @@
-/// Step 1 of 3D Kadastr — client info form (buyurtmachi).
+/// Step 1 of 3D kadastr — client info form (buyurtmachi).
 ///
 /// Mirrors the AI Baholash client form (`ai_client_form_screen.dart`).
 /// Validators match server-side `ClientInput`:

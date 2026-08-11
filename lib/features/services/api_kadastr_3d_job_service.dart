@@ -1,6 +1,6 @@
 /// HTTP client for the `/api/v1/3d-kadastr-jobs` endpoints.
 ///
-/// Pairs with `app/api/v1/kadastr_3d.py` on the backend. The 3D Kadastr
+/// Pairs with `app/api/v1/kadastr_3d.py` on the backend. The 3D kadastr
 /// status screen creates a job and shows a confirmation; there is no pipeline
 /// polling yet (the job stays `submitted` until a specialist acts on it).
 library;
@@ -147,7 +147,7 @@ class Kadastr3dJobService {
     return body['id'] as int;
   }
 
-  /// Current user's 3D Kadastr jobs, newest-first.
+  /// Current user's 3D kadastr jobs, newest-first.
   Future<List<Kadastr3dJobSummary>> list({
     required String token,
     int limit = 100,

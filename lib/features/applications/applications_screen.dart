@@ -335,7 +335,7 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
         )
         .catchError((_) => <ApplicationItem>[]);
 
-    // 3D Kadastr arizalari (`GET /3d-kadastr-jobs`).
+    // 3D kadastr arizalari (`GET /3d-kadastr-jobs`).
     final kadastr3dFuture = Kadastr3dJobService()
         .list(token: token)
         .then(

@@ -29,7 +29,7 @@ String _pick(Locale l, {required String uz, required String ru, required String 
 // ────────────────────────────────────────────────────────────────────────
 
 /// Declaration order IS the display order — both the Onlayn kalkulyator grid
-/// and the 3D Kadastr "Xizmatlarni tanlang" list iterate [values].
+/// and the 3D kadastr "Xizmatlarni tanlang" list iterate [values].
 /// `name` is the stable wire key the backend files orders under, so members may
 /// be reordered but never renamed.
 enum CalculatorCategory {
@@ -43,7 +43,7 @@ enum CalculatorCategory {
   tamirlash;
 
   /// The services actually offered, in display order. Both the Onlayn
-  /// kalkulyator grid and the 3D Kadastr "Xizmatlarni tanlang" list use this —
+  /// kalkulyator grid and the 3D kadastr "Xizmatlarni tanlang" list use this —
   /// never [values], which still carries retired categories.
   static const List<CalculatorCategory> listed = [
     arxitektura,

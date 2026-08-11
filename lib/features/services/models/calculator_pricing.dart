@@ -235,7 +235,7 @@ const Map<String, num> _defaultRates = {
   'kadastr.yakka.le5000': 24900000,
   'kadastr.yakka.gt5000': 29900000,
   'kadastr.kop_kvartirali.per_m2': 7500,
-  // 3D Kadastr
+  // 3D kadastr
   'kadastr3d.xonadon': 9800000,
   'kadastr3d.yakka.le300': 9800000,
   'kadastr3d.yakka.le500': 19800000,

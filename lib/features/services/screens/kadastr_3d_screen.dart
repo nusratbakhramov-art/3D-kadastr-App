@@ -160,7 +160,7 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
   void _continue() {
     if (_status != _LoadStatus.loaded || _info == null) return;
     HapticFeedback.lightImpact();
-    // 3D Kadastr wizard mirrors AI Baholash's intake steps (minus purpose and
+    // 3D kadastr wizard mirrors AI Baholash's intake steps (minus purpose and
     // owner documents) plus the 3D-specific location/object-type/LiDAR steps:
     // kadastr → buyurtmachi → joylashuv → obyekt turi → hujjatlar → 3D skan.
     final bundle = Kadastr3dBundle(kadastr: _info!);

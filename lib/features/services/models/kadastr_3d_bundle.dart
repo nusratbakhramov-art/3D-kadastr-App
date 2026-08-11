@@ -1,4 +1,4 @@
-/// In-memory bundle shared across the 3D Kadastr wizard steps
+/// In-memory bundle shared across the 3D kadastr wizard steps
 /// (kadastr → client → location → object type → intake → LiDAR scan → submit).
 ///
 /// Mirrors [AiBaholashBundle] but drops `purpose` and the owner/passport
