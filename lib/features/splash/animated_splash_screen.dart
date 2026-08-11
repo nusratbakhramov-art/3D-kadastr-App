@@ -22,23 +22,32 @@ class AnimatedSplashScreen extends StatefulWidget {
 
 class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     with SingleTickerProviderStateMixin {
-  static const int _frameCount = 36;
-  static const int _decodeWidth = 420; // retina (~176px ekran)
-  static const double _logoBox = 176;
-  static const double _textFontSize = 30;
-  static const double _logoRiseFromY = 300; // pastdan shu balandlikda paydo
-  static const double _logoEndOffsetX = -82; // REVEAL: chapga
-  static const double _textStartOffsetX = 0;
-  static const double _textEndOffsetX = 74; // REVEAL: o'ngga (+12px nudge)
+  // DEBUG: splashni tekshirish uchun — true bo'lsa animatsiya tugagach uyga
+  // o'tmasdan qayta-qayta o'ynaydi. Yakunda `false` ga qaytar.
+  static const bool _loopForTesting = false;
 
-  static const Cubic _riseCurve = Cubic(0.16, 1.0, 0.3, 1.0);
+  static const int _frameCount = 90; // loopable 360° aylanish, ~4°/kadr (silliq)
+  static const int _spinTurns = 1;   // ko'tarilishda bitta to'liq 360° aylanish
+  static const int _decodeWidth = 700; // manba 780px; katta logo uchun tiniqroq
+  static const double _logoBox = 264;
+  static const double _textFontSize = 46;
+  static const double _logoRiseFromY = 300; // pastdan shu balandlikda paydo
+  static const double _logoEndOffsetX = -118; // REVEAL: chapga (logo bilan matn orasida masofa)
+  static const double _textStartOffsetX = 0;
+  static const double _textEndOffsetX = 72; // REVEAL: o'ngga
+
   static const Cubic _emphasizedMove = Cubic(0.22, 1.0, 0.36, 1.0);
-  static const Cubic _gentleOvershoot = Cubic(0.34, 1.12, 0.64, 1.0);
   static const Cubic _crispOut = Cubic(0.16, 1.0, 0.3, 1.0);
+
+  // The upward MOVE springs — rises to the top with a soft overshoot, then
+  // settles. Rotation + scale ride this SAME value (clamped) in build(), so they
+  // finish exactly as the logo first reaches the top and never spin in place.
+  // The wordmark keeps its own snappier spring.
+  final Curve _riseSpring = const _OvershootCurve(1.0);
+  final Curve _textSpring = const _OvershootCurve(1.6);
 
   late final AnimationController _controller;
   late final Animation<double> _riseT;
-  late final Animation<double> _spinT;
   late final Animation<double> _logoSlideT;
   late final Animation<double> _textSlideT;
   late final Animation<double> _textOpacityT;
@@ -51,10 +60,14 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   // Haptics land on the two moments the animation *arrives* somewhere, not on
   // the motion itself — buzzing through a move feels like a rattle, a tap at
   // the end of one feels like weight. Flags because the tick fires every frame.
-  static const double _tLanded = 0.40; // rise+spin ends: the logo touches down
-  static const double _tRevealed = 0.675; // the wordmark springs in
-  bool _hapticLanded = false;
-  bool _hapticRevealed = false;
+  // Two beats only — restraint reads cleaner than a sequence and survives cheap
+  // Android motors: a MEDIUM tap when the logo lands at the top, then a LIGHT
+  // tap as the wordmark appears. Fired in order, once each, reset on loop.
+  static const List<double> _hapticTimes = [
+    0.24, // landed at the top (medium)
+    0.52, // wordmark appears (light)
+  ];
+  int _hapticI = 0;
 
   static String _framePath(int i) =>
       'assets/branding/logo-frames/frame_${i.toString().padLeft(3, '0')}.webp';
@@ -69,31 +82,31 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
     //3460 –3800ms  SETTLE
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3800),
+      duration: const Duration(milliseconds: 2800),
     );
+    // The upward move springs (soft overshoot at the top, then settle). Rotation
+    // and scale are derived from this SAME value (clamped) in build(), so they
+    // finish exactly as the logo first reaches the top — never spinning in place.
     _riseT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.0, 0.40, curve: _riseCurve),
+      curve: Interval(0.0, 0.42, curve: _riseSpring),
     );
-    _spinT = CurvedAnimation(
-      parent: _controller,
-      curve: const Interval(0.0, 0.40, curve: Curves.easeInOut),
-    );
+    // Reveal starts the instant the rise lands (0.42) — no dead dwell.
     _logoSlideT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.645, 0.91, curve: _emphasizedMove),
+      curve: const Interval(0.42, 0.72, curve: _emphasizedMove),
     );
     _textSlideT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.675, 0.91, curve: _gentleOvershoot),
+      curve: Interval(0.45, 0.80, curve: _textSpring),
     );
     _textOpacityT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.70, 0.88, curve: Curves.easeOutQuart),
+      curve: const Interval(0.48, 0.66, curve: Curves.easeOutQuart),
     );
     _textScaleT = CurvedAnimation(
       parent: _controller,
-      curve: const Interval(0.675, 0.90, curve: _crispOut),
+      curve: const Interval(0.45, 0.76, curve: _crispOut),
     );
     _controller.addStatusListener(_handleStatus);
     _controller.addListener(_handleHaptics);
@@ -108,13 +121,16 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   /// to appear.
   void _handleHaptics() {
     final v = _controller.value;
-    if (!_hapticLanded && v >= _tLanded) {
-      _hapticLanded = true;
-      HapticFeedback.mediumImpact();
-    }
-    if (!_hapticRevealed && v >= _tRevealed) {
-      _hapticRevealed = true;
-      HapticFeedback.lightImpact();
+    while (_hapticI < _hapticTimes.length && v >= _hapticTimes[_hapticI]) {
+      switch (_hapticI) {
+        case 0: // logo lands at the top
+          HapticFeedback.mediumImpact();
+          break;
+        case 1: // wordmark appears
+          HapticFeedback.lightImpact();
+          break;
+      }
+      _hapticI++;
     }
   }
 
@@ -142,7 +158,19 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
   }
 
   void _handleStatus(AnimationStatus status) {
-    if (status == AnimationStatus.completed && !_completed) {
+    if (status != AnimationStatus.completed) return;
+    if (_loopForTesting) {
+      // Yakuniy holatni bir lahza ko'rsatib, keyin boshidan qayta o'ynaymiz.
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        _hapticI = 0;
+        _controller
+          ..reset()
+          ..forward();
+      });
+      return;
+    }
+    if (!_completed) {
       _completed = true;
       Future.delayed(const Duration(milliseconds: 350), () {
         if (mounted) widget.onComplete();
@@ -163,6 +191,15 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Responsive scale: the lockup is designed for a ~440pt-wide screen (Pro Max).
+    // On narrower phones everything scales down so the logo + wordmark still fit.
+    final screenW = MediaQuery.of(context).size.width;
+    final scale = (screenW / 440.0).clamp(0.6, 1.05);
+    final logoBox = _logoBox * scale;
+    final logoEndX = _logoEndOffsetX * scale;
+    final textEndX = _textEndOffsetX * scale;
+    final riseFromY = _logoRiseFromY * scale;
+    final fontSize = _textFontSize * scale;
     return Scaffold(
       backgroundColor: AppColors.splashGreen,
       body: Stack(
@@ -173,23 +210,29 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
               animation: _controller,
               builder: (context, _) {
                 final riseDy = ui.lerpDouble(
-                  _logoRiseFromY,
+                  riseFromY,
                   0.0,
                   _riseT.value,
                 )!;
+                // Rotation + scale ride the rise value CLAMPED to [0,1] so they
+                // complete the instant the logo first reaches the top and then
+                // hold through the spring's post-arrival bounce (position only).
+                final spinProg = _riseT.value.clamp(0.0, 1.0).toDouble();
+                final logoScale = ui.lerpDouble(0.6, 1.0, spinProg)!;
+                // Loopable 360° frames: _spinTurns full turn(s) across the
+                // ascent, landing on frame 0 (rest pose) at arrival.
                 final frameIdx = _frames.isEmpty
                     ? 0
-                    : (_spinT.value * (_frameCount - 1))
-                        .round()
-                        .clamp(0, _frameCount - 1);
+                    : (spinProg * _frames.length * _spinTurns).round() %
+                        _frames.length;
                 final logoDx = ui.lerpDouble(
                   0.0,
-                  _logoEndOffsetX,
+                  logoEndX,
                   _logoSlideT.value,
                 )!;
                 final textDx = ui.lerpDouble(
                   _textStartOffsetX,
-                  _textEndOffsetX,
+                  textEndX,
                   _textSlideT.value,
                 )!;
                 final textOpacity = _textOpacityT.value.clamp(0.0, 1.0);
@@ -207,23 +250,26 @@ class _AnimatedSplashScreenState extends State<AnimatedSplashScreen>
                         child: Transform.scale(
                           scale: textScale,
                           alignment: Alignment.centerLeft,
-                          child: const _BrandText(),
+                          child: _BrandText(fontSize: fontSize),
                         ),
                       ),
                     ),
                     // 3D logo kadri — pastdan ko'tariladi, yon→yuz, keyin chapga.
                     Transform.translate(
                       offset: Offset(logoDx, riseDy),
-                      child: SizedBox(
-                        width: _logoBox,
-                        height: _logoBox,
-                        child: _frames.isEmpty
-                            ? const SizedBox.shrink()
-                            : RawImage(
-                                image: _frames[frameIdx],
-                                fit: BoxFit.contain,
-                                filterQuality: FilterQuality.medium,
-                              ),
+                      child: Transform.scale(
+                        scale: logoScale,
+                        child: SizedBox(
+                          width: logoBox,
+                          height: logoBox,
+                          child: _frames.isEmpty
+                              ? const SizedBox.shrink()
+                              : RawImage(
+                                  image: _frames[frameIdx],
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.medium,
+                                ),
+                        ),
                       ),
                     ),
                   ],
@@ -279,7 +325,9 @@ class _SplashPatternBackground extends StatelessWidget {
 }
 
 class _BrandText extends StatelessWidget {
-  const _BrandText();
+  const _BrandText({required this.fontSize});
+
+  final double fontSize;
 
   @override
   Widget build(BuildContext context) {
@@ -288,13 +336,30 @@ class _BrandText extends StatelessWidget {
     // would flash raw. It's a fixed brand mark anyway.
     return Text(
       '3D kadastr',
-      style: const TextStyle(
+      style: TextStyle(
         fontFamily: 'MTSCompact',
-        fontWeight: FontWeight.w900,
-        fontSize: _AnimatedSplashScreenState._textFontSize,
-        color: Color(0xFF011606),
+        fontWeight: FontWeight.w600,
+        fontSize: fontSize,
+        color: const Color(0xFF011606),
         letterSpacing: -0.5,
       ),
     );
+  }
+}
+
+/// A "back-out" overshoot curve (like [Curves.easeOutBack] but with a tunable
+/// [tension]): eases toward the target, overshoots past it, then settles back to
+/// EXACTLY 1 at t == 1. Crucially it ARRIVES at the end of its interval — no
+/// early float — so nothing hangs waiting before the next beat. Values exceed 1
+/// mid-way (that overshoot IS the spring). Higher [tension] = a bigger pop.
+class _OvershootCurve extends Curve {
+  const _OvershootCurve(this.tension);
+
+  final double tension;
+
+  @override
+  double transformInternal(double t) {
+    t -= 1.0;
+    return t * t * ((tension + 1) * t + tension) + 1;
   }
 }
