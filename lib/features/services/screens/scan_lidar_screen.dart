@@ -12,6 +12,7 @@ import '../api_ai_upload_service.dart';
 import '../data/room_plan_scanner.dart';
 import '../models/kadastr_3d_bundle.dart';
 import '../widgets/scan_camera_card.dart';
+import '../widgets/scan_skip_button.dart';
 import '../widgets/scan_tips_card.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -127,6 +128,19 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
     }
   }
 
+  /// Proceeds to the status step without a 3D scan — for users who can't or
+  /// don't want to scan (e.g. no LiDAR). The bundle already carries the intake
+  /// photos and documents; [scanKeys] simply stays empty.
+  void _skipScan() {
+    if (_state == ScanCardState.scanning || _uploading) return;
+    HapticFeedback.lightImpact();
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => K3dStatusScreen(bundle: widget.bundle),
+      ),
+    );
+  }
+
   void _continue() {
     if (_state != ScanCardState.done) return;
     if (widget.bundle.scanKeys.isEmpty) {
@@ -237,17 +251,32 @@ class _ScanLidarScreenState extends State<ScanLidarScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: ListingCtaButton(
-                        label: _uploading
-                            ? _ScanLidarStrings.uploading(locale)
-                            : (_state == ScanCardState.done
-                                  ? _ScanLidarStrings.ctaContinue(locale)
-                                  : _ScanLidarStrings.ctaStart(locale)),
-                        enabled:
-                            _state != ScanCardState.scanning && !_uploading,
-                        onTap: _state == ScanCardState.done
-                            ? _continue
-                            : _startScan,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          ListingCtaButton(
+                            label: _uploading
+                                ? _ScanLidarStrings.uploading(locale)
+                                : (_state == ScanCardState.done
+                                      ? _ScanLidarStrings.ctaContinue(locale)
+                                      : _ScanLidarStrings.ctaStart(locale)),
+                            enabled:
+                                _state != ScanCardState.scanning && !_uploading,
+                            onTap: _state == ScanCardState.done
+                                ? _continue
+                                : _startScan,
+                          ),
+                          // Continue without a scan (no LiDAR, or user choice).
+                          if (_state != ScanCardState.done) ...[
+                            const SizedBox(height: 10),
+                            ScanSkipButton(
+                              label: _ScanLidarStrings.ctaSkip(locale),
+                              enabled: _state != ScanCardState.scanning &&
+                                  !_uploading,
+                              onTap: _skipScan,
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
@@ -367,6 +396,8 @@ class _ScanLidarStrings {
   ];
   static String ctaStart(Locale locale) =>
       _t(locale, 'scan.lidar.cta_start');
+  static String ctaSkip(Locale locale) =>
+      _t(locale, 'scan.lidar.cta_skip');
   static String ctaContinue(Locale locale) =>
       _t(locale, 'common.continue');
 

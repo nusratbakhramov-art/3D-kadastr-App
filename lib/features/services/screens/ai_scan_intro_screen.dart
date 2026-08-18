@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../../../core/app_env.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
 import '../data/room_plan_scanner.dart';
+import '../widgets/scan_skip_button.dart';
 import '../widgets/service_app_bar.dart';
 import 'ai_cadastre_screen.dart';
 import 'ai_scan_process_screen.dart';
@@ -41,10 +41,9 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
     setState(() => _supported = ok);
   }
 
-  /// Dev-only: jumps to the cadastre step with no scan, so the rest of the
-  /// wizard can be exercised on a device without LiDAR. Gated on [AppEnv.isAdmin]
-  /// — never reachable in production. The draft is created by the cadastre step,
-  /// which covers the missing scan upload.
+  /// Continues to the cadastre step without a 3D scan — for users who can't or
+  /// don't want to scan (e.g. no LiDAR). The draft is created by the cadastre
+  /// step, which covers the missing scan upload.
   void _skipScan() {
     if (_scanning) return;
     HapticFeedback.lightImpact();
@@ -187,21 +186,13 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
                               enabled: _supported == true,
                               onTap: _startScan,
                             ),
-                      // Dev-only escape hatch (.env admin=true + debug build):
-                      // continue without a scan on a device that has no LiDAR.
-                      if (AppEnv.isAdmin)
-                        TextButton(
-                          onPressed: _scanning ? null : _skipScan,
-                          child: Text(
-                            _S.skipScanDev(l),
-                            style: TextStyle(
-                              fontFamily: 'MTSText',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: subColor,
-                            ),
-                          ),
-                        ),
+                      // Continue without a scan (no LiDAR, or user choice).
+                      const SizedBox(height: 10),
+                      ScanSkipButton(
+                        label: _S.skipScan(l),
+                        enabled: !_scanning,
+                        onTap: _skipScan,
+                      ),
                     ],
                   ),
                 ),
@@ -401,8 +392,8 @@ class _S {
 
   static String startScan(Locale l) => tr(l, 'services.ai.scan_intro.start_scan');
 
-  static String skipScanDev(Locale l) =>
-      tr(l, 'services.ai.scan_intro.skip_scan_dev');
+  static String skipScan(Locale l) =>
+      tr(l, 'services.ai.scan_intro.skip_scan');
 
   static String checking(Locale l) => tr(l, 'services.ai.scan_intro.checking');
 
