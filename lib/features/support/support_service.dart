@@ -54,8 +54,9 @@ class SupportService {
 
   static const Duration _timeout = Duration(seconds: 10);
 
-  /// Backend yetib bo'lmasa ishlatiladigan zaxira raqam.
-  static const String fallbackPhone = '+998774441444';
+  /// Backend yetib bo'lmasa ishlatiladigan zaxira raqam — aloqa markazining
+  /// qisqa raqami (backenddagi `support_contact.DEFAULT_CONTACT` bilan bir xil).
+  static const String fallbackPhone = '1269';
 
   static SupportInfo? _cache;
 

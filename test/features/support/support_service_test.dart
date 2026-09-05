@@ -45,7 +45,7 @@ void main() {
         (req) async {
           expect(req.url.path, endsWith('/support/info'));
           return http.Response(
-            jsonEncode({'phone': '+998774441444', 'email': null}),
+            jsonEncode({'phone': '1269', 'email': null}),
             200,
             headers: {'content-type': 'application/json'},
           );
@@ -53,7 +53,7 @@ void main() {
       );
       final info =
           await SupportService(client: client).fetchInfo(forceRefresh: true);
-      expect(info.phone, '+998774441444');
+      expect(info.phone, '1269');
     });
   });
 }
