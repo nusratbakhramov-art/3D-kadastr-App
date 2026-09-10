@@ -1,13 +1,10 @@
 name: kadastr
 description: "Kadastr — Flutter starter."
 publish_to: 'none'
-version: 1.0.5+40
+version: 1.0.5+39
 
 environment:
-  # ^3.11.0 (^3.10.1 EMAS): `dchs_motion_sensors 2.0.2` `sdk >=3.11.0` talab
-  # qiladi. Eski pol bilan hozirgi mashinada `pub get` ishlardi, lekin Dart
-  # 3.10.x li CI'da yiqilardi — ya'ni yashirin ziddiyat edi.
-  sdk: ^3.11.0
+  sdk: ^3.10.1
 
 dependencies:
   flutter:
@@ -48,28 +45,11 @@ dependencies:
   # Splash intro roligi (assets/branding/splash/intro.mp4) — ovoz bilan.
   video_player: ^2.9.2
 
-  # ── 360° panorama (docs/panorama-360-plan.md) ─────────────────────────────
-  # Capture ekrani jonli preview + `takePicture()` talab qiladi. Ilovaning
-  # mavjud `kadastr/video_capture` native kanali FAQAT tugallangan videoni
-  # qaytaradi, ya'ni overlay uchun preview manbai yo'q.
-  # ⚠️ Bu plagin Android'da CameraX'ni 1.4.2 → 1.6.0 ga ko'taradi va manifestga
-  #    RECORD_AUDIO qo'shadi — ikkalasi ham 5-qadamda hal qilinadi.
-  # ⚠️ iOS'da kameraga uch egasi bo'ladi (bu, VideoCaptureRecorder.swift,
-  #    PCScanKit ARSession) — `CameraGuard` 6-qadamda.
-  camera: ^0.12.0+2
-  # Kadr burchagi (yaw/pitch/roll) — tikish ham, nishon overlay ham shunga
-  # tayanadi. `sensors_plus` EMAS: bizga tayyor rotatsiya kvaternioni kerak,
-  # xom akselerometr emas.
-  dchs_motion_sensors: ^2.0.2
+  # ── 360° panorama tikish quvuri (docs/panorama-360-plan.md) ──────────────
   # JPEG dekod/enkod va piksel ustida ishlash — OpenCV O'RNIGA.
-  # ⚠️ `opencv_dart` ATAYLAB QO'SHILMAYDI: sof Dart quvuri qurilyapti.
+  # SOF DART: platformaga (Android manifest, Gradle, iOS plist) TEGMAYDI.
+  # ⚠️ `opencv_dart` ATAYLAB QO'SHILMAYDI — sof Dart quvuri qurilyapti.
   image: ^4.5.4
-  # Sfera geometriyasi (rotatsiya matritsalari, vektorlar).
-  vector_math: ^2.2.0
-  # Tikilgan equirect'ni sferada ko'rsatish (pan/zoom/gyro).
-  # ⚠️ Uning renderer'i `flutter_cube 0.1.1` — Dart 2 davri paketi,
-  #    ta'mirlanmaydi. 20-qadamda zaxira variant baholanadi.
-  panorama_viewer: ^2.0.7
 
 dev_dependencies:
   flutter_test:

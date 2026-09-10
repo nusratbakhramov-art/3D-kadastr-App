@@ -98,25 +98,14 @@
 			</dict>
 		</dict>
 	</dict>
-	<!-- Kameraga uch iste'molchi bor: PCScanKit (LiDAR skan),
-	     VideoCaptureRecorder (video yozuv) va 360° panorama capture. iOS
-	     ruxsat oynasini bir marta ko'rsatadi, shuning uchun matn UCHALASINI
-	     ham qamrashi kerak — aks holda foydalanuvchi panorama ekranida
-	     "LiDAR skan" deb yozilgan so'rovni ko'radi. -->
 	<key>NSCameraUsageDescription</key>
-	<string>3D kadastr skanini olish, obyekt videosini yozish va 360° panorama suratga olish uchun kamera va LiDAR sensori kerak.</string>
+	<string>3D kadastr skanini olish uchun kamera va LiDAR sensori kerak.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Ilova lokal tarmoqdagi server bilan bog'lanadi (test rejimi).</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>Xaritada obyekt joylashuvini avtomatik aniqlash uchun joriy joylashuv kerak.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Xaritada obyekt joylashuvini avtomatik aniqlash uchun joriy joylashuv kerak.</string>
-	<!-- `dchs_motion_sensors` CMMotionManager orqali giroskop/akselerometrni
-	     o'qiydi — panorama capture kadr burchagini (yaw/pitch/roll) shundan
-	     oladi. Bu kalit bo'lmasa iOS ilovani harakat ma'lumotiga birinchi
-	     murojaatda O'LDIRADI (crash, ruxsat so'ramaydi). -->
-	<key>NSMotionUsageDescription</key>
-	<string>360° panorama suratga olishda telefon burilishini kuzatish uchun harakat sensorlari (giroskop) kerak.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Hisobot va skan natijalarini foto galereyaga saqlash uchun ruxsat kerak.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

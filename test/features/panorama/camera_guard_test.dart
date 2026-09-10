@@ -1,11 +1,7 @@
-import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kadastr/features/panorama/data/camera_guard.dart';
-import 'package:kadastr/features/services/data/room_plan_scanner.dart';
-import 'package:kadastr/features/services/data/video_capture.dart';
 
 /// [CameraGuard] — kameraning yagona egaligi.
 ///
@@ -204,174 +200,19 @@ void main() {
     },
   );
 
-  // ── `VideoCapture` ning guard ostidagi xatti-harakati ────────────────────
+  // ⚠️ AI BAHOLASH FAYLLARIGA TEGILMAYDI.
   //
-  // Mavjud yagona chaqiruvchi (`ai_start_screen.dart`) faqat
-  // [VideoCaptureException] ni ushlaydi, boshqa istisno esa uning `_busy`
-  // bayrog'ini tozalanmagan qoldirib ekranni qotirib qo'yadi. Shuning uchun
-  // guard xatosi ham AYNAN shu turga o'giriladi.
-  group('VideoCapture + CameraGuard', () {
-    const channel = MethodChannel('kadastr/video_capture');
-    late List<String> calls;
-
-    setUp(() {
-      calls = <String>[];
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-        calls.add(call.method);
-        return <dynamic, dynamic>{'path': '/tmp/a.mp4', 'sizeBytes': 1024};
-      });
-    });
-
-    tearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null);
-    });
-
-    test('guard bo\'sh bo\'lsa hammasi avvalgidek ishlaydi', () async {
-      final result = await VideoCapture.capture();
-      expect(result?.path, '/tmp/a.mp4');
-      expect(calls, isNotEmpty, reason: 'native kanal chaqirilishi kerak');
-      expect(CameraGuard.isFree, isTrue, reason: 'ijara bo\'shashi kerak');
-    });
-
-    test('panorama ushlab turganda kanalga UMUMAN bormaydi', () async {
-      expect(CameraGuard.acquire(CameraGuard.panorama), isTrue);
-      await expectLater(
-        VideoCapture.capture(),
-        throwsA(isA<VideoCaptureException>().having(
-          (e) => e.code,
-          'code',
-          VideoCapture.busyCode,
-        )),
-      );
-      expect(calls, isEmpty);
-      expect(CameraGuard.holder, CameraGuard.panorama);
-    });
-
-    test('native xatodan keyin ham ijara bo\'shaydi', () async {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) async {
-        throw PlatformException(code: 'REC_FAIL', message: 'yozib bo\'lmadi');
-      });
-      await expectLater(
-        VideoCapture.record(),
-        throwsA(isA<VideoCaptureException>()),
-      );
-      expect(CameraGuard.isFree, isTrue);
-    });
-  });
-
-  // ── LiDAR (`kadastr/room_plan_scanner`) ────────────────────────────────────
+  // Dastlab `video_capture.dart` va `room_plan_scanner.dart` ham
+  // `CameraGuard` ga o'ralgan edi va bu yerda ular bilan integratsiya
+  // testlari turardi. Ular OLIB TASHLANDI: 360° Bozor e'lon sehrgari
+  // uchun so'ralgan, AI Baholash kamerasini qayta qurish uchun emas.
   //
-  // Uchinchi ega. U guard'ga ENG OXIRI qo'shildi va shu sababli eng muhim
-  // da'vo bu yerda TESKARI yo'nalishda tekshiriladi: skan ketayotganda
-  // panorama va video RAD ETILISHI kerak. Faqat «band bo'lsa skan
-  // boshlanmaydi» ni tekshirish yetmasdi — lidar ijarani UMUMAN olmasa ham
-  // o'sha test yashil qolardi.
-  group('RoomPlanScanner + CameraGuard', () {
-    const channel = MethodChannel('kadastr/room_plan_scanner');
-    late List<String> calls;
-
-    void mock(Future<Object?> Function(MethodCall) handler) {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (call) {
-        calls.add(call.method);
-        return handler(call);
-      });
-    }
-
-    setUp(() {
-      calls = <String>[];
-      mock((call) async => <dynamic, dynamic>{'filePath': '/tmp/a.usdz'});
-    });
-
-    tearDown(() {
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, null);
-    });
-
-    test('guard bo\'sh bo\'lsa hammasi avvalgidek ishlaydi', () async {
-      final r = await RoomPlanScanner.startScan();
-      expect(r?.filePath, '/tmp/a.usdz');
-      expect(calls, ['startScan']);
-      expect(CameraGuard.isFree, isTrue, reason: 'ijara bo\'shashi kerak');
-    });
-
-    test('skan KETAYOTGANDA panorama va video rad etiladi', () async {
-      // Eng muhim test: lidar ijarani HAQIQATAN oladimi.
-      final native = Completer<Object?>();
-      mock((call) => native.future);
-
-      final scan = RoomPlanScanner.startScan();
-      await pumpEventQueue();
-
-      expect(CameraGuard.holder, CameraGuard.lidar);
-      expect(CameraGuard.acquire(CameraGuard.panorama), isFalse);
-      expect(CameraGuard.acquire(CameraGuard.video), isFalse);
-
-      native.complete(<dynamic, dynamic>{'filePath': '/tmp/a.usdz'});
-      await scan;
-      expect(CameraGuard.isFree, isTrue);
-    });
-
-    test('panorama ushlab turganda kanalga UMUMAN bormaydi', () async {
-      expect(CameraGuard.acquire(CameraGuard.panorama), isTrue);
-      await expectLater(
-        RoomPlanScanner.startScan(),
-        throwsA(isA<RoomPlanScannerException>().having(
-          (e) => e.code,
-          'code',
-          RoomPlanScanner.busyCode,
-        )),
-      );
-      expect(calls, isEmpty);
-      expect(CameraGuard.holder, CameraGuard.panorama);
-    });
-
-    test('HAMMA skan yo\'li guard ostida', () async {
-      // Bittasi o'ralmay qolsa shu test uni ushlaydi.
-      expect(CameraGuard.acquire(CameraGuard.video), isTrue);
-      final starts = <String, Future<Object?>>{
-        'startScan': RoomPlanScanner.startScan(),
-        'startTexturedScan': RoomPlanScanner.startTexturedScan(),
-        'startTexturedRoomPlan': RoomPlanScanner.startTexturedRoomPlan(),
-        'startObjectCapture': RoomPlanScanner.startObjectCapture(),
-        'startHybridScan':
-            RoomPlanScanner.startHybridScan(baseUrl: 'x', token: 'y'),
-      };
-      for (final e in starts.entries) {
-        await expectLater(
-          e.value,
-          throwsA(isA<RoomPlanScannerException>()
-              .having((x) => x.code, 'code', RoomPlanScanner.busyCode)),
-          reason: '${e.key} guard ostida emas',
-        );
-      }
-      expect(calls, isEmpty, reason: 'hech biri kanalga bormasligi kerak');
-    });
-
-    test('native xatodan keyin ham ijara bo\'shaydi', () async {
-      mock((call) async =>
-          throw PlatformException(code: 'SCAN_FAIL', message: 'yiqildi'));
-      await expectLater(
-        RoomPlanScanner.startTexturedScan(),
-        throwsA(isA<RoomPlanScannerException>()
-            .having((e) => e.code, 'code', 'SCAN_FAIL')),
-      );
-      expect(CameraGuard.isFree, isTrue);
-    });
-
-    test('`isSupported` va `preview` ATAYLAB guard ostida EMAS', () async {
-      // `isSupported` faqat qobiliyat so'raydi, `previewModel` esa QuickLook
-      // ni ochadi — ikkalasi ham kamerani ochmaydi. Ularni guard'lash
-      // panorama ketayotganda natijani ko'rsatishni bloklab qo'yardi.
-      expect(CameraGuard.acquire(CameraGuard.panorama), isTrue);
-      mock((call) async => call.method == 'isSupported' ? true : null);
-      expect(await RoomPlanScanner.isSupported(), isTrue);
-      await RoomPlanScanner.preview('/tmp/a.usdz');
-      expect(calls, ['isSupported', 'previewModel']);
-      expect(CameraGuard.holder, CameraGuard.panorama);
-    });
-  });
+  // Ziddiyat hozir YUZAGA KELMAYDI ham — panorama capture ekrani
+  // (19-qadam) hali yozilmagan, ya'ni kamerani ochadigan ikkinchi
+  // egasi yo'q va qulf hech narsadan himoya qilmasdi.
+  //
+  // 19-qadamda ziddiyat haqiqiy bo'ladi. O'shanda MAVJUD kodga
+  // tegishdan oldin so'raladi; birinchi ko'riladigan muqobil —
+  // panorama ekrani o'zi ochilishdan oldin bandlikni tekshirsin, ya'ni
+  // AI Baholash fayllariga umuman tegilmasin.
 }
