@@ -73,6 +73,17 @@ dependencies:
   # ⚠️ `sdk >=3.11.0` talab qiladi — pastdagi `environment` shu sababli.
   dchs_motion_sensors: ^2.0.2
 
+  # Kvaternion kompozitsiyasi (`heading_source.dart`). SOF DART, platformaga
+  # tegmaydi va Flutter SDK orqali ALLAQACHON transitive bog'liqlik — ochiq
+  # e'lon qilish qo'shimcha kod olib kelmaydi.
+  #
+  # ⚠️ `rotation.dart` da `vector_math` ATAYLAB ishlatilmaydi (u yerda
+  # kerak bo'lgani 3x3 ko'paytma, `Matrix3` esa USTUN-major va manbadagi
+  # indekslar QATOR-major). Bu yerda esa `Quaternion.euler` va
+  # `Quaternion.axisAngle` kerak — ularni qo'lda yozish belgi xatolariga
+  # eng qulay joy bo'lardi.
+  vector_math: ^2.1.4
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
