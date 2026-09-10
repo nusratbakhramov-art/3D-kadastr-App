@@ -83,18 +83,48 @@ class _BozorParamsStepScreenState extends State<BozorParamsStepScreen> {
   /// Qadam to'ldirilganmi: ixtiyoriy emas va ko'rinib turgan maydonlar bo'sh
   /// bo'lmasligi kerak. Faqat 3/7 dagi qisqa ro'yxat tekshiriladi — to'liq
   /// ro'yxatdagi qo'shimchalar ixtiyoriy.
-  bool _isComplete(PropertyType type) {
-    final shown = visibleParams(type.stepParamFields, _values);
-    for (final f in shown) {
-      if (f.optional) continue;
-      // Toggle har doim qiymatga ega (yoqilgan/o'chirilgan) — tekshirilmaydi.
-      if (f.control == ParamControl.toggle) continue;
-      final v = _values[f.key];
-      if (v == null) return false;
-      if (v is String && v.trim().isEmpty) return false;
-      if (v is List && v.isEmpty) return false;
-    }
-    return true;
+  /// To'ldirilmagan MAJBURIY maydonlar — qadam ekranidagilar VA "Barcha
+  /// parametrlar" ekranidagilar.
+  ///
+  /// ⚠️ Ilgari faqat `type.stepParamFields` tekshirilardi, ya'ni qadamda
+  /// KO'RINMAYDIGAN majburiy maydonlar (kvartirada `living_area`, `parking`;
+  /// uyda `bathroom_type`; tijoratda oltitasi) hech qachon tekshirilmasdi.
+  /// Foydalanuvchi 3-qadamdan o'tib ketardi, yetti qadam to'ldirardi va
+  /// OXIRIDA `POST /listings/` dan tushunarsiz 400 olardi
+  /// (`'bathroom_type' toʻldirilishi shart`). Backend sxemasi bilan
+  /// nomuvofiqlik EMAS — ikkalasi ham majburiy deb belgilagan; muammo
+  /// tekshiruv qamrovida edi.
+  List<ParamField> _missingRequired(PropertyType type) {
+    final shown = visibleParams(type.paramFields, _values);
+    return [
+      for (final f in shown)
+        if (!f.optional &&
+            // Toggle har doim qiymatga ega (yoqilgan/o'chirilgan).
+            f.control != ParamControl.toggle &&
+            _isEmpty(_values[f.key]))
+          f,
+    ];
+  }
+
+  static bool _isEmpty(Object? v) {
+    if (v == null) return true;
+    if (v is String) return v.trim().isEmpty;
+    if (v is List) return v.isEmpty;
+    return false;
+  }
+
+  bool _isComplete(PropertyType type) => _missingRequired(type).isEmpty;
+
+  /// Bloklangan "Далее" bosilganda — QAYSI maydon yetishmayotganini aytadi.
+  ///
+  /// Shunchaki "maydonlarni to'ldiring" deyish yetmaydi: yetishmayotgan
+  /// maydon boshqa ekranda bo'lishi mumkin va foydalanuvchi uni topa olmaydi.
+  void _explainMissing(PropertyType type, Locale l) {
+    final missing = _missingRequired(type);
+    if (missing.isEmpty) return;
+    final names = missing.take(3).map((f) => tr(l, f.labelKey)).join(', ');
+    final more = missing.length > 3 ? ' +${missing.length - 3}' : '';
+    AppToast.error(context, '${tr(l, 'bozor.common.fill_required')}: $names$more');
   }
 
   @override
@@ -152,6 +182,13 @@ class _BozorParamsStepScreenState extends State<BozorParamsStepScreen> {
                           if (type.hasAllParamsScreen)
                             _AllParamsRow(
                               label: tr(l, 'bozor.params.all'),
+                              // Yetishmayotgan maydon SHU ekranda bo'lsa,
+                              // foydalanuvchi uni ochishi kerakligini bilishi
+                              // shart — aks holda "Далее" nega o'chiq turgani
+                              // umuman ko'rinmaydi.
+                              missingCount: _missingRequired(type)
+                                  .where((f) => !f.inStep)
+                                  .length,
                               onTap: () => _openAllParams(type),
                             ),
                         ],
@@ -164,10 +201,7 @@ class _BozorParamsStepScreenState extends State<BozorParamsStepScreen> {
                         continueLabel: tr(l, 'bozor.common.next'),
                         continueEnabled: complete,
                         onContinue: _openPrice,
-                        onBlockedTap: () => AppToast.error(
-                          context,
-                          tr(l, 'bozor.common.fill_required'),
-                        ),
+                        onBlockedTap: () => _explainMissing(type, l),
                       ),
                     ),
                   ],
@@ -184,10 +218,17 @@ class _BozorParamsStepScreenState extends State<BozorParamsStepScreen> {
 /// "Barcha parametrlar" — to'liq ro'yxatga o'tadigan qator. Dizaynda ko'k
 /// matn + o'ng shevron; bizda brend yashili.
 class _AllParamsRow extends StatelessWidget {
-  const _AllParamsRow({required this.label, required this.onTap});
+  const _AllParamsRow({
+    required this.label,
+    required this.onTap,
+    this.missingCount = 0,
+  });
 
   final String label;
   final VoidCallback onTap;
+
+  /// Shu ekranda to'ldirilmagan majburiy maydonlar soni. 0 bo'lsa nishon yo'q.
+  final int missingCount;
 
   @override
   Widget build(BuildContext context) {
@@ -221,6 +262,28 @@ class _AllParamsRow extends StatelessWidget {
                   ),
                 ),
               ),
+              if (missingCount > 0) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE0492A).withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '$missingCount',
+                    style: const TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                      color: Color(0xFFE0492A),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
               const Icon(
                 Icons.chevron_right_rounded,
                 size: 22,
