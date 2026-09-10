@@ -4,7 +4,10 @@ publish_to: 'none'
 version: 1.0.5+39
 
 environment:
-  sdk: ^3.10.1
+  # ^3.11.0 (^3.10.1 EMAS): `dchs_motion_sensors 2.0.2` shuni talab qiladi.
+  # Eski pol bilan bu mashinada `pub get` ishlardi, lekin Dart 3.10.x li
+  # CI'da yiqilardi — ya'ni yashirin ziddiyat bo'lardi.
+  sdk: ^3.11.0
 
 dependencies:
   flutter:
@@ -45,11 +48,30 @@ dependencies:
   # Splash intro roligi (assets/branding/splash/intro.mp4) — ovoz bilan.
   video_player: ^2.9.2
 
-  # ── 360° panorama tikish quvuri (docs/panorama-360-plan.md) ──────────────
-  # JPEG dekod/enkod va piksel ustida ishlash — OpenCV O'RNIGA.
-  # SOF DART: platformaga (Android manifest, Gradle, iOS plist) TEGMAYDI.
+  # ── 360° panorama (docs/panorama-360-plan.md) ────────────────────────────
+  # JPEG dekod/enkod va piksel ustida ishlash — OpenCV O'RNIGA. Sof Dart.
   # ⚠️ `opencv_dart` ATAYLAB QO'SHILMAYDI — sof Dart quvuri qurilyapti.
   image: ^4.5.4
+
+  # Capture ekrani jonli preview + `takePicture()` talab qiladi. Ilovaning
+  # mavjud `kadastr/video_capture` native kanali FAQAT tugallangan videoni
+  # qaytaradi, ya'ni nishon overlay uchun preview manbai yo'q.
+  #
+  # ⚠️ PLATFORMAGA TEGADI va bu foydalanuvchi bilan kelishilgan:
+  #    Android — CameraX 1.4.2 → 1.6.0, manifestga `RECORD_AUDIO` va
+  #    majburiy `camera.any` qo'shiladi. Ikkalasi ham `AndroidManifest.xml`
+  #    va `build.gradle.kts` da hal qilinadi.
+  camera: ^0.12.0+2
+
+  # Kadr burchagi (yaw/pitch/roll) — tikish ham, nishon overlay ham shunga
+  # tayanadi. `sensors_plus` EMAS: bizga tayyor rotatsiya kvaternioni
+  # kerak, u esa `sensors_plus` da yo'q (faqat xom gyro/akselerometr).
+  #
+  # ⚠️ iOS'da `NSMotionUsageDescription` MAJBURIY — usiz iOS ilovani
+  #    harakat ma'lumotiga birinchi murojaatda ruxsat so'ramasdan
+  #    O'LDIRADI.
+  # ⚠️ `sdk >=3.11.0` talab qiladi — pastdagi `environment` shu sababli.
+  dchs_motion_sensors: ^2.0.2
 
 dev_dependencies:
   flutter_test:

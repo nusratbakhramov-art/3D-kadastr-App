@@ -83,13 +83,25 @@ flutter {
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 
-    // CameraX — debug-only video capture (VideoCaptureActivity). Eng past
-    // zoom (0.5x / 0.6x — qurilmada nima bo'lsa) + HD sifat uchun kerak.
-    val cameraxVersion = "1.4.2"
+    // ── CameraX va guava: BITTA versiya, ikki iste'molchi ────────────────────
+    // :app ning o'z kodi (VideoCaptureActivity — debug-only video yozuv, eng
+    // past zoom 0.5x/0.6x + HD) va `camera_android_camerax` plagini (360°
+    // panorama capture ekrani, docs/panorama-360-plan.md) BIR XIL CameraX
+    // sinflarini yuklaydi. Ikki xil versiya e'lon qilinsa Gradle baribir
+    // eng yuqorisini tanlaydi, lekin :app pastroq versiyaga qarab
+    // kompilyatsiya bo'lardi — runtime'da `NoSuchMethodError` xavfi.
+    // Shuning uchun versiya SHU YERDA, bitta joyda qotiriladi.
+    //
+    // NEGA 1.4.2 → 1.6.0: `camera_android_camerax 0.7.2` o'z build faylida
+    // `cameraxVersion = "1.6.0"` deb e'lon qiladi. Uni pastga tushirib
+    // bo'lmaydi (plagin 1.6 API'siga tayanadi), demak :app ko'tariladi.
+    val cameraxVersion = "1.6.0"
     implementation("androidx.camera:camera-core:$cameraxVersion")
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-video:$cameraxVersion")
+    // camera-view'ni faqat :app ishlatadi (PreviewView), plaginda yo'q —
+    // lekin u ham camera-core bilan bir xil versiyada bo'lishi SHART.
     implementation("androidx.camera:camera-view:$cameraxVersion")
     implementation("androidx.activity:activity-ktx:1.9.3")
 
@@ -99,7 +111,12 @@ dependencies {
     // `com.google.guava:listenablefuture` ni BO'SH artefaktga
     // (9999.0-empty-to-avoid-conflict-with-guava) ko'taradi. Natijada
     // VideoCaptureActivity.kt "Cannot access class 'ListenableFuture'" deb
-    // kompilyatsiya bo'lmay qolardi. Guava'ni ochiq qo'shib sinfni qaytaramiz;
-    // versiya media3 talab qilgani bilan bir xil — ikkinchi konflikt bo'lmasin.
-    implementation("com.google.guava:guava:33.3.1-android")
+    // kompilyatsiya bo'lmay qolardi. Guava'ni ochiq qo'shib sinfni qaytaramiz.
+    //
+    // NEGA 33.3.1 → 33.5.0: ilgari versiya media3 talab qilgani bilan bir xil
+    // ushlab turilgandi. Endi `camera_android_camerax 0.7.2` guava:33.5.0-android
+    // ni tortadi va u media3'nikidan yuqori — Gradle grafda baribir 33.5.0 ga
+    // ko'tarilgan bo'lardi. media3 uchun bu xavfsiz: u guava'dan faqat
+    // `ListenableFuture`/`Futures` ni oladi, ular 33.x ichida barqaror.
+    implementation("com.google.guava:guava:33.5.0-android")
 }
