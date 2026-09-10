@@ -332,7 +332,7 @@ timeout bilan yakunlanadi. Skript uni chetlab o'tadi.
 | 12 | project: winner-take-all proyeksiya + isolate bo'laklari | `lib/features/panorama/stitch/project.dart`, `test/features/panorama/project_test.dart` |
 | 13 | MIL-1 ⭐⭐ 8 KADRNI TIKIB VAQTNI O'LCHASH (butun yondashuv qarori) | `lib/features/panorama/stitch/dart_stitcher.dart`, `lib/features/panorama/models/pano_progress.dart` |
 | 14 | gains: ekspozitsiya tenglashtirish (Gauss-Seidel) | `lib/features/panorama/stitch/gains.dart`, `test/features/panorama/gains_test.dart` |
-| 15 | ~~seam routing~~ **BEKOR QILINDI** — pastdagi izohga qarang | — |
+| 15 | seam routing: YORQINLIK bo'yicha DP (`f649593`) | `lib/features/panorama/stitch/seam.dart`, `test/features/panorama/seam_test.dart` |
 | 16 | multiband blend + restoreDetail + to'liq quvur (76 kadr) | `lib/features/panorama/stitch/multiband.dart`, `lib/features/panorama/stitch/dart_stitcher.dart` |
 | 17 | Capture UX widgetlari: nishon overlay, banner, RingDial | `lib/features/panorama/widgets/target_overlay.dart`, `lib/features/panorama/widgets/capture_banner.dart` |
 | 18 | HeadingSource: sensor → yaw/pitch/roll (30 Hz) | `lib/features/panorama/data/heading_source.dart`, `test/features/panorama/heading_source_test.dart` |
@@ -341,37 +341,6 @@ timeout bilan yakunlanadi. Skript uni chetlab o'tadi.
 | 21 | Bozor sehrgari: «360 фото» qatorini capture'ga ulash | `lib/features/bozor/widgets/pano_source_sheet.dart`, `lib/features/bozor/screens/bozor_description_step_screen.dart` |
 | 22 | E'lon detalida 360 ko'rinishi | `lib/features/bozor/models/bozor_listing.dart`, `lib/features/bozor/feed/bozor_listing_detail_screen.dart` |
 | 23 | Regressiya yakuni + uslub va sifat tekshiruvi | `tool/pano/baseline.sh`, `tool/pano/README.md` |
-
-### ⚠️ 15-qadam BEKOR QILINDI (2026-09-11)
-
-Chok yo'naltiruvchisi (`_routeSeams`, yorug'lik bo'yicha DP) **ko'chirilmaydi**.
-
-Sabab manbaning o'z tarixida yozilgan (`f85cacd`, «Turn off the deformation
-and seam routing that made panoramas worse»):
-
-> The seam router **deletes objects**. Scoring seams on high-frequency detail
-> was meant to ignore shading, which blending removes anyway. But a white
-> plant pot on a white floor has no high frequencies, so cutting through it
-> costs nothing by that measure. The router ran the seam through the pot and
-> filled it with the floor behind. **The pot vanished.**
-
-Bu sozlash masalasi emas — yuqori chastota bo'yicha baholashning o'zi
-noto'g'ri. Manbada u `routeSeams = false` bilan **o'chirilgan** va HEAD'da
-hech qachon chaqirilmaydi.
-
-Nega dastlab sezilmagan (o'sha commitdan): har o'lchov panoramani TEKIS
-tasvir sifatida olgan, u esa 4096 enda o'zining 2× kichraytirilgani.
-Ko'ruvchi esa ekranga 75° soladi — o'sha piksellarning 2× kattalashtirilgani.
-Birinchisida o'rtachalanib yo'qoladigan surtish ikkinchisida ochiq ko'rinadi.
-
-**Chok muammosi 16-qadamda hal qilinadi** — ko'p bandli aralashtirish buni
-to'g'ri, oktava bo'yicha bajaradi va u manbada YOQILGAN (`_multiBand`
-shartsiz chaqiriladi).
-
-Shu bilan §4.3 dagi «`_routeOne` dagi `index(u, −1)` bug'i tuzatiladi» degan
-qaror ham kuchini yo'qotadi — tuzatiladigan kod ko'chirilmaydi.
-
----
 
 ### ⚠️ MANBA: port `1.0.2` ni kuzatadi, `1.0.1` ni EMAS (2026-09-11)
 
@@ -434,7 +403,7 @@ KUCHIDA qoladi.
 | **MIL-B** | 5–6 | **Kamera ziddiyati yopilgan** — bitta CameraX, mavjud video capture ishlashda davom etadi |
 | **MIL-C** | 7–10 | Butun geometriya **telefonsiz** tekshirilgan |
 | **MIL-1** ⭐⭐ | 13 | **8 kadr telefonda tikildi, vaqt o'lchandi** — butun yondashuv qarori |
-| **MIL-D** | 14, 16 | To'liq sifatli tikish ishlaydi (76 kadr). 15 bekor. |
+| **MIL-D** | 14–16 | To'liq sifatli tikish ishlaydi (76 kadr) |
 | **MIL-E** | 17–19 | Capture ekrani qurilmada ishlaydi |
 | **MIL-F** | 20 | **Uchidan-uchgacha oqim** — suratga olish → sferada ko'rish |
 | **MIL-G** | 21–22 | Bozor oqimi to'liq |
