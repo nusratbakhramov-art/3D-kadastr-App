@@ -144,9 +144,13 @@ void main() {
         for (final e in sets.entries)
           e.key: e.value.where((k) => k.startsWith('bozor.pano.')).toSet(),
       };
+      // ASOSIY da'vo: uchala til bir xil kalit to'plamiga ega. Bittasida
+      // kalit yetishmasa o'sha tilda XOM KALIT ko'rinardi.
       expect(pano['uz'], pano['ru']);
       expect(pano['uz'], pano['en']);
-      expect(pano['uz'], hasLength(20));
+      // Son o'zgarishi NORMAL, lekin O'YLAMASDAN o'zgarmasligi kerak —
+      // yangi kalit qo'shilsa uchala tilga ham qo'shilgani tekshirilsin.
+      expect(pano['uz'], hasLength(25));
     });
 
     test('tarjimalar BO‘SH emas va kalitning o‘zi emas', () {

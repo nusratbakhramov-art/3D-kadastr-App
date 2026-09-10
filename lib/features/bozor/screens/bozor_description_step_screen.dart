@@ -10,6 +10,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../widgets/pano_source_sheet.dart';
+
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
@@ -88,6 +90,29 @@ class _BozorDescriptionStepScreenState
           ];
     if (!mounted || picked.isEmpty) return;
     setState(() => into.addAll(picked.map((x) => x.path)));
+  }
+
+  /// 360° foto: SURATGA OLISH yoki galereyadan.
+  ///
+  /// Ikkala yo'l ham haqiqiy — foydalanuvchi joyida bo'lsa panoramani
+  /// shu yerda oladi, boshqa ilovada yasagan bo'lsa yuklaydi.
+  Future<void> _add360() async {
+    final l = Localizations.localeOf(context);
+    if (_d.panoramas.length >= _maxPhotos) {
+      AppToast.error(context, _S.tooMany(l, _maxPhotos));
+      return;
+    }
+    final source = await showPanoSourceSheet(context);
+    if (!mounted || source == null) return;
+
+    switch (source) {
+      case PanoSource.gallery:
+        await _pick(_d.panoramas, multiple: false);
+      case PanoSource.capture:
+        final path = await openPanoCapture(context);
+        if (!mounted || path == null) return;
+        setState(() => _d.panoramas.add(path));
+    }
   }
 
   Future<void> _openContacts() async {
@@ -195,8 +220,7 @@ class _BozorDescriptionStepScreenState
                             label: _S.add360(l),
                             iconAsset: 'assets/icons/upload-360.svg',
                             paths: _d.panoramas,
-                            onAdd: () =>
-                                _pick(_d.panoramas, multiple: false),
+                            onAdd: _add360,
                             onRemove: (i) =>
                                 setState(() => _d.panoramas.removeAt(i)),
                           ),
