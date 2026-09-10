@@ -8,6 +8,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../panorama/data/camera_guard.dart';
+
 String _pick(
   Locale l, {
   required String uz,
@@ -112,6 +114,48 @@ class RoomPlanScanner {
 
   static const _channel = MethodChannel('kadastr/room_plan_scanner');
 
+  /// Kamera band bo'lganda chiqadigan xato kodi — chaqiruvchilar buni boshqa
+  /// nosozliklardan ajratib, foydalanuvchiga «avval joriy skanni yoping» deb
+  /// ayta oladi.
+  static const String busyCode = 'CAMERA_BUSY';
+
+  /// LiDAR yo'lini [CameraGuard] ostiga oladi.
+  ///
+  /// NEGA. Bu kanal PCScanKit ning `ARSession` ini ochadi, ya'ni kameraning
+  /// uchinchi mustaqil egasi. 360° panorama (`camera` plagini) yoki AI
+  /// Baholash videosi (`kadastr/video_capture`) bilan bir vaqtda ochilsa
+  /// iOS'da sessiya `AVCaptureSessionWasInterrupted` bilan qotadi, Android'da
+  /// esa `CameraAccessException` chiqadi. Guard ikkinchi ochilishni kamera
+  /// qatlamiga YETIB BORMASDAN to'xtatadi.
+  ///
+  /// [CameraBusyException] ATAYLAB [RoomPlanScannerException] ga
+  /// aylantiriladi: uchala chaqiruvchi ekran (`ai_scan_intro_screen`,
+  /// `ai_scan_screen`, `scan_lidar_screen`) faqat shu turni ushlaydi va
+  /// boshqa istisno ularning `_busy`/`_scanning` bayrog'ini tozalanmagan
+  /// holda qoldirib ketardi — ya'ni ekran qotib qolardi.
+  ///
+  /// Guard bo'sh bo'lganda bu funksiya hech nimani o'zgartirmaydi: [action]
+  /// aynan avvalgidek chaqiriladi va natijasi/istisnosi o'zgarmasdan o'tadi.
+  ///
+  /// [timeout] BERILMAYDI — skan qancha davom etishini foydalanuvchi hal
+  /// qiladi. «Hech qachon qaytmaydi» holati uchun `CameraGuard.leaseTimeout`
+  /// javob beradi.
+  static Future<T> _guarded<T>(Locale l, Future<T> Function() action) async {
+    try {
+      return await CameraGuard.run(CameraGuard.lidar, action);
+    } on CameraBusyException catch (e) {
+      throw RoomPlanScannerException(
+        busyCode,
+        _pick(
+          l,
+          uz: 'Kamera hozir band (${e.holder}) — avval uni yoping',
+          ru: 'Камера сейчас занята (${e.holder}) — сначала закройте её',
+          en: 'Camera is busy (${e.holder}) — close it first',
+        ),
+      );
+    }
+  }
+
   /// Qurilma RoomPlan'ni qo'llay oladimi tekshirish.
   /// iOS 16+ Pro qurilmalar (LiDAR) → true.
   static Future<bool> isSupported() async {
@@ -128,24 +172,26 @@ class RoomPlanScanner {
   /// "Bekor qilish" bosilsa `null` qaytadi.
   static Future<RoomScanResult?> startScan({Locale? locale}) async {
     final l = locale ?? const Locale('uz');
-    try {
-      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'startScan',
-      );
-      if (raw == null) return null; // cancelled
-      return RoomScanResult.fromMap(raw);
-    } on PlatformException catch (e) {
-      throw RoomPlanScannerException(
-        e.code,
-        e.message ??
-            _pick(
-              l,
-              uz: 'Skan muvaffaqiyatsiz',
-              ru: 'Сканирование не удалось',
-              en: 'Scan failed',
-            ),
-      );
-    }
+    return _guarded<RoomScanResult?>(l, () async {
+      try {
+        final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+          'startScan',
+        );
+        if (raw == null) return null; // cancelled
+        return RoomScanResult.fromMap(raw);
+      } on PlatformException catch (e) {
+        throw RoomPlanScannerException(
+          e.code,
+          e.message ??
+              _pick(
+                l,
+                uz: 'Skan muvaffaqiyatsiz',
+                ru: 'Сканирование не удалось',
+                en: 'Scan failed',
+              ),
+        );
+      }
+    });
   }
 
   /// ARKit + LiDAR mesh + kamera frame'lardan vertex coloring orqali
@@ -153,24 +199,26 @@ class RoomPlanScanner {
   /// xona ko'rinishini saqlaydi.
   static Future<RoomScanResult?> startTexturedScan({Locale? locale}) async {
     final l = locale ?? const Locale('uz');
-    try {
-      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'startTexturedScan',
-      );
-      if (raw == null) return null;
-      return RoomScanResult.fromMap(raw);
-    } on PlatformException catch (e) {
-      throw RoomPlanScannerException(
-        e.code,
-        e.message ??
-            _pick(
-              l,
-              uz: 'Rangli skan muvaffaqiyatsiz',
-              ru: 'Текстурированное сканирование не удалось',
-              en: 'Textured scan failed',
-            ),
-      );
-    }
+    return _guarded<RoomScanResult?>(l, () async {
+      try {
+        final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+          'startTexturedScan',
+        );
+        if (raw == null) return null;
+        return RoomScanResult.fromMap(raw);
+      } on PlatformException catch (e) {
+        throw RoomPlanScannerException(
+          e.code,
+          e.message ??
+              _pick(
+                l,
+                uz: 'Rangli skan muvaffaqiyatsiz',
+                ru: 'Текстурированное сканирование не удалось',
+                en: 'Textured scan failed',
+              ),
+        );
+      }
+    });
   }
 
   /// Textured RoomPlan (iOS 16+) — RoomPlan strukturasi + ARKit foto
@@ -179,24 +227,26 @@ class RoomPlanScanner {
   /// On-device, server kerak emas.
   static Future<RoomScanResult?> startTexturedRoomPlan({Locale? locale}) async {
     final l = locale ?? const Locale('uz');
-    try {
-      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'startTexturedRoomPlan',
-      );
-      if (raw == null) return null;
-      return RoomScanResult.fromMap(raw);
-    } on PlatformException catch (e) {
-      throw RoomPlanScannerException(
-        e.code,
-        e.message ??
-            _pick(
-              l,
-              uz: 'Textured RoomPlan muvaffaqiyatsiz',
-              ru: 'Textured RoomPlan не удалось',
-              en: 'Textured RoomPlan failed',
-            ),
-      );
-    }
+    return _guarded<RoomScanResult?>(l, () async {
+      try {
+        final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+          'startTexturedRoomPlan',
+        );
+        if (raw == null) return null;
+        return RoomScanResult.fromMap(raw);
+      } on PlatformException catch (e) {
+        throw RoomPlanScannerException(
+          e.code,
+          e.message ??
+              _pick(
+                l,
+                uz: 'Textured RoomPlan muvaffaqiyatsiz',
+                ru: 'Textured RoomPlan не удалось',
+                en: 'Textured RoomPlan failed',
+              ),
+        );
+      }
+    });
   }
 
   /// Apple Object Capture (iOS 17+) — yo'naltirilgan capture, 50-200 foto
@@ -204,24 +254,26 @@ class RoomPlanScanner {
   /// Polycam'ga eng yaqin on-device variant.
   static Future<RoomScanResult?> startObjectCapture({Locale? locale}) async {
     final l = locale ?? const Locale('uz');
-    try {
-      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'startObjectCapture',
-      );
-      if (raw == null) return null;
-      return RoomScanResult.fromMap(raw);
-    } on PlatformException catch (e) {
-      throw RoomPlanScannerException(
-        e.code,
-        e.message ??
-            _pick(
-              l,
-              uz: 'Object Capture muvaffaqiyatsiz',
-              ru: 'Object Capture не удалось',
-              en: 'Object Capture failed',
-            ),
-      );
-    }
+    return _guarded<RoomScanResult?>(l, () async {
+      try {
+        final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+          'startObjectCapture',
+        );
+        if (raw == null) return null;
+        return RoomScanResult.fromMap(raw);
+      } on PlatformException catch (e) {
+        throw RoomPlanScannerException(
+          e.code,
+          e.message ??
+              _pick(
+                l,
+                uz: 'Object Capture muvaffaqiyatsiz',
+                ru: 'Object Capture не удалось',
+                en: 'Object Capture failed',
+              ),
+        );
+      }
+    });
   }
 
   /// Hybrid photogrammetry — iPhone capture, server processing.
@@ -254,31 +306,33 @@ class RoomPlanScanner {
     Locale? locale,
   }) async {
     final l = locale ?? const Locale('uz');
-    try {
-      final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
-        'startHybridScan',
-        {
-          'baseUrl': baseUrl,
-          'token': token,
-          'provider': provider,
-          'algorithm': algorithm,
-          'quality': quality,
-        },
-      );
-      if (raw == null) return null;
-      return HybridScanResult.fromMap(raw);
-    } on PlatformException catch (e) {
-      throw RoomPlanScannerException(
-        e.code,
-        e.message ??
-            _pick(
-              l,
-              uz: 'Hybrid skan muvaffaqiyatsiz',
-              ru: 'Гибридное сканирование не удалось',
-              en: 'Hybrid scan failed',
-            ),
-      );
-    }
+    return _guarded<HybridScanResult?>(l, () async {
+      try {
+        final raw = await _channel.invokeMethod<Map<dynamic, dynamic>>(
+          'startHybridScan',
+          {
+            'baseUrl': baseUrl,
+            'token': token,
+            'provider': provider,
+            'algorithm': algorithm,
+            'quality': quality,
+          },
+        );
+        if (raw == null) return null;
+        return HybridScanResult.fromMap(raw);
+      } on PlatformException catch (e) {
+        throw RoomPlanScannerException(
+          e.code,
+          e.message ??
+              _pick(
+                l,
+                uz: 'Hybrid skan muvaffaqiyatsiz',
+                ru: 'Гибридное сканирование не удалось',
+                en: 'Hybrid scan failed',
+              ),
+        );
+      }
+    });
   }
 
   /// USDZ faylni Apple QuickLook orqali ko'rsatish — rotate/zoom/AR mode

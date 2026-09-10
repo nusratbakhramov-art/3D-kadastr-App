@@ -15,6 +15,12 @@
 /// Odatda [VideoCapture.capture] chaqiriladi — u platformaga qarab
 /// yuqoridagi ikkitasidan mosini tanlaydi. AI Baholashning 1-qadami
 /// (`ai_start_screen.dart`) shuni ishlatadi.
+///
+/// Uchala ommaviy yo'l ham [CameraGuard] ning `video` egaligi ostida ishlaydi:
+/// kamera boshqa egada (`panorama` yoki `lidar`) bo'lsa chaqiruv native
+/// qatlamga umuman yetib bormaydi va [CameraBusyException] tashlanadi. Guard
+/// bo'sh bo'lganda esa hech nima o'zgarmaydi — natija ham, istisnolar ham
+/// avvalgidek.
 library;
 
 import 'dart:io';
@@ -22,6 +28,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+
+import '../../panorama/data/camera_guard.dart';
 
 class VideoCaptureException implements Exception {
   const VideoCaptureException(this.code, this.message);
@@ -170,18 +178,53 @@ class VideoCapture {
   /// - iOS — o'zimizning AVFoundation recorder'i, chunki Camera.app'ni ochib
   ///   faylni qaytarib olish API'si yo'q, galereya importi esa foydalanuvchi
   ///   uchun ikki qadamli qo'l ishi.
-  static Future<VideoCaptureResult?> capture() =>
-      defaultTargetPlatform == TargetPlatform.android
-          ? recordSystem()
-          : record();
+  static Future<VideoCaptureResult?> capture() => _guarded(_capture);
 
   /// O'z recorder'imiz — eng past zoom + eng yuqori sifat, dasturiy nazorat.
   /// Bekor qilinsa `null`.
-  static Future<VideoCaptureResult?> record() => _invoke('record');
+  static Future<VideoCaptureResult?> record() => _guarded(_record);
 
   /// Qurilmaning o'z kamera ilovasi (Android) / galereyadan import (iOS).
   /// Zoom va sifat foydalanuvchi qo'lida — lekin OEM sifati eng yuqorisi.
-  static Future<VideoCaptureResult?> recordSystem() async {
+  static Future<VideoCaptureResult?> recordSystem() => _guarded(_recordSystem);
+
+  /// Kamera band bo'lganda chiqadigan xato kodi — `capture` chaqiruvchilari
+  /// buni boshqa nosozliklardan ajratib, foydalanuvchiga «avval joriy skanni
+  /// yoping» deb ayta oladi.
+  static const String busyCode = 'CAMERA_BUSY';
+
+  /// Guard'ni o'rash. [CameraBusyException] ATAYLAB [VideoCaptureException]
+  /// ga aylantiriladi: mavjud chaqiruvchilar (`ai_start_screen.dart`) faqat
+  /// shu turni ushlaydi va boshqa istisno ularning `_busy` bayrog'ini
+  /// tozalanmagan holda qoldirib ketardi — ya'ni ekran qotib qolardi.
+  /// Guard bo'sh bo'lganda bu funksiya hech nimani o'zgartirmaydi.
+  static Future<VideoCaptureResult?> _guarded(
+    Future<VideoCaptureResult?> Function() action,
+  ) async {
+    try {
+      return await CameraGuard.run(CameraGuard.video, action);
+    } on CameraBusyException catch (e) {
+      throw VideoCaptureException(
+        busyCode,
+        'Kamera hozir band (${e.holder}) — avval uni yoping',
+      );
+    }
+  }
+
+  // ── Guard'siz ichki yo'llar ───────────────────────────────────────────────
+  // [capture] ichkarida [_record]/[_recordSystem] ni chaqiradi. Agar u ommaviy
+  // (guard'langan) metodlarni chaqirsa, ijara IKKI marta so'ralgan bo'lardi va
+  // guard o'z-o'zini bloklab qo'yardi — `acquire` bir egaga takroran `false`
+  // qaytaradi. Shu sababli ichki chaqiruvlar guard'dan o'tmaydi.
+
+  static Future<VideoCaptureResult?> _capture() =>
+      defaultTargetPlatform == TargetPlatform.android
+          ? _recordSystem()
+          : _record();
+
+  static Future<VideoCaptureResult?> _record() => _invoke('record');
+
+  static Future<VideoCaptureResult?> _recordSystem() async {
     if (defaultTargetPlatform == TargetPlatform.android) {
       return _invoke('recordSystem');
     }

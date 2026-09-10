@@ -107,3 +107,232 @@ Test fayllari ro'yxati **har safar qayta** tuziladi (`find test -name
 
 `analyze` da **error bo'lsa** skript `1` bilan chiqadi va xatolarni ko'rsatadi.
 Warning va info faqat sanaladi — ular yuqoridagi baza bilan solishtiriladi.
+
+---
+
+## Probe ekrani — kamera ziddiyati (6-qadam, QURILMA KERAK)
+
+`lib/features/panorama/screens/pano_camera_probe_screen.dart` — DEV-only
+ekran. Uch savolga javob beradi: `camera` plagini yolg'iz ishlaydimi, mavjud
+`kadastr/video_capture` yo'li buzilmadimi, va ikkalasi bir vaqtda so'ralganda
+`CameraGuard` ziddiyatni yiqilishsiz to'xtatadimi.
+
+Simulyator/emulyatorda ma'nosi yo'q — orqa kamera yo'q. **Haqiqiy telefon
+kerak** (iOS ham, Android ham alohida).
+
+### 1. Ochish (vaqtincha, commit QILINMAYDI)
+
+Ekran hech qayerdan bog'lanmagan. `.env` da `admin=true` bo'lsin, so'ng
+`lib/main.dart` da IKKI qatorni vaqtincha o'zgartiring:
+
+```dart
+// import'lar orasiga:
+import 'features/panorama/screens/pano_camera_probe_screen.dart';
+
+// MaterialApp ichida `home: _AppRoot(...)` o'rniga:
+home: const PanoCameraProbeScreen(),
+```
+
+Sinovdan keyin `git checkout lib/main.dart`.
+
+```bash
+flutter run --debug -d <device-id>
+```
+
+### 2. Uch sinov
+
+Yuqoridagi yashil/qizil «pill» — `CameraGuard` holati. Pastdagi ro'yxat —
+natijalar jurnali (yangi qator eng tepada).
+
+| # | Tugma | KUTILGAN natija |
+|---|---|---|
+| 1 | `1 · Panorama preview — OCH` | Qora maydonda jonli tasvir. Pill qizil: `CameraGuard: panorama (Ns)`. Jurnalda `panorama: OCHILDI (WxH)`. Yana bosilsa preview yopiladi va pill yashil (`bo'sh`). |
+| 2 | `2 · Video capture` (preview YOPIQ holda) | Android — tizim kamerasi ochiladi; iOS — bizning recorder. Yozib tugatilsa jurnalda `video: OK 0.5x · 3840x2160@30fps · 00:05 · 12.3 MB`. Bekor qilinsa `video: bekor qilindi (null)`. Ikkalasidan keyin ham pill YANA YASHIL bo'lishi shart. |
+| 3 | `3 · Ikkalasi birga (ziddiyat)` | Preview ochiladi, so'ng video capture so'raladi. Jurnalda **`✅ KUTILGANDEK: panorama ushlab turibdi, video rad etildi`**. Ilova YIQILMASLIGI va preview qotib qolmasligi kerak. |
+
+⚠️ **Yiqilish mezoni.** Agar 3-sinovda `⚠️ video guard'dan O'TDI` chiqsa —
+guard ishlamayapti. Agar ilova yiqilsa yoki preview qora bo'lib qotsa —
+ziddiyat guard'dan oldinroq, native qatlamda sodir bo'lgan.
+
+### 3. Nima qidiriladi log'da
+
+`CameraGuard` har bir hodisani `debugPrint` bilan yozadi, prefiksi
+`[CameraGuard]`. Kutilgan ketma-ketlik 3-sinovda:
+
+```
+[CameraGuard] TAKE   panorama
+[CameraGuard] DENY   video (band: panorama)
+```
+
+**Android:**
+
+```bash
+adb logcat -c && adb logcat | grep -E "CameraGuard|CameraX|Camera2|VideoCaptureActivity|AndroidRuntime"
+```
+
+- `DENY   video (band: panorama)` — guard ishladi;
+- `CameraAccessException`, `ERROR_CAMERA_IN_USE`, `CAMERA_DISABLED` —
+  ziddiyat guard'dan o'tib ketgan;
+- `Camera 0 is now unavailable` ketma-ket ikki marta — ikki egalik.
+
+**iOS (Xcode → Window ▸ Devices and Simulators ▸ Open Console, yoki
+`flutter run` konsoli):**
+
+- `[CameraGuard] DENY   video (band: panorama)` — guard ishladi;
+- `AVCaptureSessionWasInterruptedNotification` /
+  `AVCaptureSessionInterruptionReasonVideoDeviceInUseByAnotherClient` —
+  ziddiyat guard'dan o'tgan;
+- `Multiple audio/video capture sessions` yoki `-11803` — o'sha.
+
+### 4. Ijara qotib qolmaydimi (eng muhim tekshiruv)
+
+`CameraGuard` ning eng xavfli nosozligi — ijara abadiy band qolishi. Uni
+qo'lda sinash:
+
+1. `1 · Panorama preview — OCH` bosing (pill qizil bo'ladi);
+2. telefonda **Home** tugmasini bosib ilovani fonga tushiring, so'ng qaytib
+   kiring;
+3. pill **YASHIL** (`bo'sh`) bo'lishi va log'da
+   `[CameraGuard] LIFECYCLE panorama (fondan qaytishda bo'shatildi)`
+   chiqishi kerak;
+4. shundan keyin `2 · Video capture` ishlashi SHART.
+
+Xuddi shu tarzda: 2-sinov davomida kamera ilovasidan bekor qilib chiqing —
+`FREE   video` chiqishi va keyingi urinish ishlashi kerak.
+
+### 5. ⚠️ Hali qoplanmagan uchinchi ega — `lidar`
+
+`CameraGuard` da `lidar` egasi e'lon qilingan, lekin PCScanKit chaqiruvlari
+(`lib/features/services/data/room_plan_scanner.dart` — `kadastr/room_plan_scanner`
+kanali, `startScan` / `startTexturedScan` / `startTexturedRoomPlan` /
+`startObjectCapture` / `startHybridScan`) HALI guard ostiga OLINMAGAN — o'sha
+fayl 6-qadamning fayl ro'yxatiga kirmagan. Ya'ni hozir probe faqat
+`panorama ↔ video` ziddiyatini o'lchaydi; `ARSession ↔ camera` ziddiyati
+ochiq qolgan.
+
+Qoplash bir qatorlik: har bir `invokeMethod` ni
+
+```dart
+CameraGuard.run(CameraGuard.lidar, () async { /* mavjud tana */ });
+```
+
+ichiga olish (guard bo'sh bo'lganda xatti-harakat o'zgarmaydi).
+
+---
+
+# 3-qadam (MIL-0) — JPEG dekod/resize benchmark
+
+**Savol:** 76 ta 4K kadrni **sof Dart** (`package:image`) bilan dekodlash
+telefonda amaliymi? Javob 4-qadam (native `kadastr/pano_codec` kanali)
+qilinadimi yoki yo'qmi degan qarorni belgilaydi.
+
+## Bitta buyruq
+
+```bash
+bash tool/pano/bench_decode.sh
+```
+
+Skript o'zi: qurilmalar ro'yxatini ko'rsatadi → haqiqiy telefonni tanlaydi →
+`flutter drive --profile` bilan `integration_test/pano_decode_bench_test.dart`
+ni yurgizadi → logdan `PANOBENCH ...` qatorini ajratib chiqaradi va qarorni
+aytadi.
+
+Variantlari:
+
+```bash
+bash tool/pano/bench_decode.sh -d <device-id>          # qurilmani qo'lda tanlash
+bash tool/pano/bench_decode.sh -j /tmp/foto.jpg        # haqiqiy 4K foto (Android: adb push)
+bash tool/pano/bench_decode.sh --device-jpeg /var/.../pano_bench.jpg   # foto allaqachon qurilmada
+bash tool/pano/bench_decode.sh --debug                 # faqat "yuradimi?" (RAQAMLARI YAROQSIZ)
+```
+
+## ⚠️ Uchta shart — buzilsa raqam yolg'on
+
+1. **HAQIQIY TELEFON.** Simulyator/emulyator host protsessorining tezligini
+   ko'rsatadi (Mac'da dekod ~270 ms, telefonda 3–5× ko'p), ustiga profile
+   rejimi ularda umuman qo'llab-quvvatlanmaydi.
+2. **AOT (`--profile`).** `flutter test integration_test/...` ilovani DEBUG
+   (JIT) da yig'adi va `--profile` bayrog'ini QABUL QILMAYDI — shu sababli
+   skript `flutter drive` ishlatadi (`integration_test/pano_bench_driver.dart`).
+   Rejim chiqishda `mode=` bilan ko'rinadi; `mode=debug` bo'lsa raqamni
+   tashlang.
+3. **Manba kadr.** Foto berilmasa test sintetik kadr yasaydi
+   (`tool/pano/gen_test_jpeg.dart`) — u ataylab shovqinli, ya'ni dekod
+   **PESSIMISTIK** (yuqori chegara). Haqiqiy 4K kamera kadri TAVSIYA etiladi.
+
+Sintetik kadrni qo'lda yasash:
+
+```bash
+dart run tool/pano/gen_test_jpeg.dart /tmp/pano_bench.jpg
+# 3840x2160, ~2.7 MB
+```
+
+## Nima o'lchanadi
+
+Har biri **10 takror** (+1 isitish), natija — **MEDIANA** (o'rtacha emas:
+termal throttling va GC bitta-ikkita takrorni ikki barobar cho'zadi).
+
+| O'lchov | Nima uchun |
+|---|---|
+| `decodeJpg(3840×2160)` | quvurdagi eng og'ir takrorlanuvchi qadam (×76) |
+| `copyResize(3840×2160 → 702×1248, AREA)` | reja §5.2 dagi kadr keshini tayyorlash |
+| `encodeJpg(3072×1536, q90)` | yakuniy equirect'ni saqlash (§10.1) |
+| `peakRss` MB | §5.2 dagi xotira byudjeti haqiqatga to'g'ri keladimi |
+
+Chiqish (mashina o'qiy oladigan qator):
+
+```
+PANOBENCH decodeJpg_ms=NNN resizeArea_ms=NN encodeJpg_ms=NNN peakRss_mb=NNN
+```
+
+## QAROR jadvali
+
+| median `decodeJpg` | Qaror |
+|---|---|
+| **≤ 1200 ms** | sof Dart dekod **QOLADI**, 4-qadam **O'TKAZILADI** (native kanal qurilmaydi) |
+| **> 1200 ms** | 4-qadam **MAJBURIY** — native `kadastr/pano_codec` kanali |
+
+1200 ms qayerdan: 76 kadr × 1.2 s ≈ **91 s** bitta yadroda, 4 isolate'da
+≈ 23 s. Undan yuqorisi 76 kadrli oqimni foydalanuvchi kutolmaydigan
+darajaga olib chiqadi.
+
+⚠️ Chegaraga **sintetik** kadr bilan yiqilgan bo'lsa — qaror qilishdan oldin
+haqiqiy foto bilan qayta o'lchang: sintetika 1.3–2× jarima qo'shishi mumkin.
+
+## Natija — QURILMADA O'LCHANADI (bo'sh)
+
+O'lchagandan keyin shu jadvalni to'ldiring:
+
+```
+sana        :
+qurilma     :                     (model, iOS/Android versiyasi)
+rejim       :                     (profile bo'lishi SHART)
+manba kadr  :                     (haqiqiy foto / sintetik)
+```
+
+| O'lchov | Mediana | min | max |
+|---|---|---|---|
+| `decodeJpg_ms` |  |  |  |
+| `resizeArea_ms` |  |  |  |
+| `encodeJpg_ms` |  |  |  |
+| `peakRss_mb` |  | — | — |
+
+**QAROR:** ☐ sof Dart qoladi (4-qadam o'tkaziladi) ☐ 4-qadam majburiy
+
+**Izoh:**
+
+---
+
+### Ma'lumot uchun: host raqamlari (QAROR UCHUN YARAMAYDI)
+
+Solishtirish uchun, 2026-09-10, MacBook (darwin arm64), sintetik kadr:
+
+| | JIT (`dart run`, host) | iPhone 16 Pro **simulyatori**, debug |
+|---|---|---|
+| `decodeJpg` | 293 ms | 271 ms |
+| `copyResize` | 66 ms | 94 ms |
+| `encodeJpg` | 201 ms | 183 ms |
+| `peakRss` | 539 MB | 629 MB |
+
+Bu raqamlar Mac protsessorining tezligi — telefonniki EMAS. Ular faqat
+harness ishlayotganini ko'rsatadi.
