@@ -40,12 +40,11 @@ class _ListingGalleryPagerState extends State<ListingGalleryPager> {
         ? Colors.white.withValues(alpha: 0.04)
         : Colors.black.withValues(alpha: 0.04);
 
-    if (widget.images.isEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: SizedBox(
-          height: widget.height,
-          child: ColoredBox(
+    // Rasmsiz holat ham SHU Stack ichida chiziladi, alohida `return` bilan
+    // emas: aks holda rasmi yo'q e'londa yopish va ulashish tugmalari
+    // yo'qolib qolardi (ekrandan chiqishning tugmasi qolmasdi).
+    final Widget content = widget.images.isEmpty
+        ? ColoredBox(
             color: bg,
             child: Center(
               child: Icon(
@@ -56,10 +55,25 @@ class _ListingGalleryPagerState extends State<ListingGalleryPager> {
                 ),
               ),
             ),
-          ),
-        ),
-      );
-    }
+          )
+        : PageView.builder(
+            controller: _controller,
+            itemCount: widget.images.length,
+            onPageChanged: (i) => setState(() => _index = i),
+            itemBuilder: (context, i) {
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  openFullscreenGallery(
+                    context,
+                    images: widget.images,
+                    initialIndex: i,
+                  );
+                },
+                child: RemoteImage(url: widget.images[i], memCacheWidth: 1200),
+              );
+            },
+          );
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
@@ -67,29 +81,7 @@ class _ListingGalleryPagerState extends State<ListingGalleryPager> {
         height: widget.height,
         child: Stack(
           children: [
-            Positioned.fill(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: widget.images.length,
-                onPageChanged: (i) => setState(() => _index = i),
-                itemBuilder: (context, i) {
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      openFullscreenGallery(
-                        context,
-                        images: widget.images,
-                        initialIndex: i,
-                      );
-                    },
-                    child: RemoteImage(
-                      url: widget.images[i],
-                      memCacheWidth: 1200,
-                    ),
-                  );
-                },
-              ),
-            ),
+            Positioned.fill(child: content),
             if (widget.onShare != null)
               Positioned(
                 top: 12,

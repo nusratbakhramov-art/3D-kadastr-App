@@ -257,14 +257,14 @@ class BozorListing {
 
   /// "4 500 000 so'm/oy" — kartadagi va detaldagi asosiy narx qatori.
   String formattedPrice(Locale l) =>
-      '${_formatAmount(priceAmount)} ${_currencyLabel(l, priceCurrency)}'
+      '${formatBozorAmount(priceAmount)} ${_currencyLabel(l, priceCurrency)}'
       '${_periodSuffix(l, pricePeriod)}';
 
   /// Sutkalik narx — faqat ijarada va faqat kiritilgan bo'lsa.
   String? formattedDailyPrice(Locale l) {
     final amount = dailyAmount;
     if (amount == null) return null;
-    return '${_formatAmount(amount)} '
+    return '${formatBozorAmount(amount)} '
         '${_currencyLabel(l, dailyCurrency ?? priceCurrency)}'
         '${_periodSuffix(l, 'day')}';
   }
@@ -274,7 +274,7 @@ class BozorListing {
   String? roomsAreaLine(Locale l) {
     final parts = <String>[
       if (rooms != null && rooms! > 0) '$rooms ${tr(l, 'bozor.listing.rooms_short')}',
-      if (areaSqm != null) '${_formatAmount(areaSqm!)} ${tr(l, 'bozor.unit.m²')}',
+      if (areaSqm != null) '${formatBozorAmount(areaSqm!)} ${tr(l, 'bozor.unit.m²')}',
     ];
     return parts.isEmpty ? null : parts.join(' · ');
   }
@@ -423,8 +423,13 @@ DateTime? _toDate(Object? v) {
   return DateTime.tryParse(v.toString())?.toLocal();
 }
 
-/// "4 500 000" — mingliklar ajratilgan, keraksiz nollar olib tashlangan.
-String _formatAmount(double value) {
+/// "4 500 000" / "78,5" — mingliklar ajratilgan, keraksiz nollar olib
+/// tashlangan.
+///
+/// OMMAVIY: detal ekrani ham (maydon nishoni, sonli parametrlar) SHU
+/// funksiyani ishlatadi. Ilgari u yerda aynan nusxasi turardi — ikkita
+/// mustaqil formatlovchi vaqt o'tib ajralib ketadi.
+String formatBozorAmount(num value) {
   final negative = value < 0;
   final abs = value.abs();
   final whole = abs.truncate();
