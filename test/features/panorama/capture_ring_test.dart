@@ -156,11 +156,30 @@ void main() {
       expect(ring.dueAt(0, 90), isNull, reason: 'qutb qatori tugadi');
     });
 
-    test('capture tugagach hech narsa otilmaydi', () {
+    test('MAJBURIY kadrlar tugagach QUTB kadrlari hali otiladi', () {
+      // ⚠️ MANBADAGI XATONING TESTI. Manbada to'siq `isComplete` edi,
+      // ya'ni 70 kadrdan keyin zatvor BUTUNLAY to'xtardi va ixtiyoriy
+      // qutb qatorlarini olishning iloji qolmasdi.
       final ring = _filledRequired();
-      expect(ring.isComplete, isTrue);
+      expect(ring.isComplete, isTrue, reason: 'majburiylari tugadi');
+      expect(ring.isFullyComplete, isFalse, reason: 'qutblar qoldi');
+
+      // Zenitga qaratilsa kadr hali ham so'raladi.
+      expect(ring.dueAt(0, 90), const ShotId(3, 0));
+      expect(ring.nextTarget(0, 90), isNotNull);
+    });
+
+    test('HAMMA kadr tugagach hech narsa otilmaydi', () {
+      final ring = _filledRequired();
+      for (final r in <int>[3, 4]) {
+        for (var c = 0; c < 3; c++) {
+          ring.record(ShotId(r, c), c * 120);
+        }
+      }
+      expect(ring.isFullyComplete, isTrue);
+      expect(ring.dueAt(0, 90), isNull);
+      expect(ring.nextTarget(0, 90), isNull);
       expect(ring.dueAt(0, 0), isNull);
-      expect(ring.nextTarget(0, 0), isNull);
     });
   });
 

@@ -240,8 +240,26 @@ class CaptureRing {
   double yawOf(ShotId shot) => shot.column * rows[shot.row].stepDeg;
 
   /// Hozir otilishi kerak bo'lgan kadr, yoki hech biri bo'lmasa `null`.
+  ///
+  /// ⚠️ To'siq [isFullyComplete], [isComplete] EMAS — va bu manbadagi
+  /// XATONING TUZATILISHI.
+  ///
+  /// Manbada `if (isComplete) return null;` yozilgan edi. `isComplete`
+  /// 70 ta MAJBURIY kadr olingach rost bo'ladi, ya'ni zatvor o'sha
+  /// lahzada BUTUNLAY to'xtardi va ixtiyoriy qutb qatorlarini
+  /// (`optional: true`, 6 kadr) olishning iloji QOLMASDI — foydalanuvchi
+  /// gorizont va ±45 qatorlarini tugatishdan OLDIN shiftga qaragan
+  /// bo'lsagina ular tushardi.
+  ///
+  /// Bu butun bir sinf o'lik kodni ham keltirib chiqargandi: «zenit/nadir
+  /// qo'shildi» matni hech qachon chiqmasdi, `isFullyComplete` esa oddiy
+  /// capture'da erishib bo'lmaydigan holat edi.
+  ///
+  /// [isComplete] o'z ma'nosini SAQLAYDI — u progress va «tugatish»
+  /// tugmasi uchun: 70 kadrdan keyin capture yuborishga TAYYOR, lekin
+  /// xohlasa davom etishi mumkin.
   ShotId? dueAt(double yawDeg, double pitchDeg) {
-    if (isComplete) return null;
+    if (isFullyComplete) return null;
     final int? row = rowAt(pitchDeg);
     if (row == null) return null;
 
@@ -280,7 +298,10 @@ class CaptureRing {
     double yawDeg,
     double pitchDeg,
   ) {
-    if (isComplete) return null;
+    // [dueAt] bilan bir xil sabab: [isComplete] da to'xtash qutb
+    // qatorlarini mo'ljalsiz qoldirardi — nishon overlay ham yo'qolardi
+    // va ekran «endi nima qilay» degan savolga javob bermasdi.
+    if (isFullyComplete) return null;
     if (!isAnchored) {
       return (shot: const ShotId(0, 0), turnDeg: 0, tiltDeg: -pitchDeg);
     }
