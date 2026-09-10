@@ -5,14 +5,9 @@ import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../../widgets/app_toast.dart';
+import '../ai_draft_resume.dart';
 import '../api_ai_valuation_job_service.dart';
-import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
-import 'ai_cadastre_screen.dart';
-import 'ai_client_form_screen.dart';
-import 'ai_intake_screen.dart';
-import 'ai_location_screen.dart';
-import 'ai_purpose_screen.dart';
 
 /// "Mening arizalarim" — tugallanmagan (DRAFT) AI Baholash arizalari.
 /// Tap → qolgan qadamdan davom (resume). Backend `GET /ai-valuations/drafts`.
@@ -78,21 +73,11 @@ class _AiDraftsScreenState extends State<AiDraftsScreen> {
     final token = session.token;
     if (token == null) return;
     try {
-      final snap = await _service.get(d.id, token: token);
+      // Umumiy tiklash (`ai_draft_resume.dart`): saqlangan qadamgacha bo'lgan
+      // ekranlar STEKI quriladi, ya'ni Orqaga tugmasi oldingi qadamlarga —
+      // jumladan video qadamiga — olib boradi, Arizalar ro'yxatiga emas.
       if (!mounted) return;
-      final bundle =
-          AiBaholashBundle.fromJson(snap.requestPayload, draftId: snap.id);
-      // Resume SAQLANGAN qadamdan boshlanadi. Skan qilingan bo'lsa (scan_usdz_key
-      // bor), saqlangan qadamda "3D modelni ko'rish" tugmasi chiqadi.
-      final scanJobId =
-          (snap.scanUsdzKey != null && snap.scanUsdzKey!.isNotEmpty)
-              ? snap.id
-              : null;
-      await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => _stepScreen(bundle, snap.currentStep, scanJobId),
-        ),
-      );
+      await resumeAiDraft(context, d.id, service: _service);
       if (mounted) _load(); // qaytib kelganda ro'yxatni yangilash
     } catch (e) {
       if (!mounted) return;
@@ -100,31 +85,6 @@ class _AiDraftsScreenState extends State<AiDraftsScreen> {
     }
   }
 
-  /// Saqlangan qadam nomidan mos wizard ekranini quradi (skan qadamidan
-  /// keyingi qadamlar). `scanJobId` — skan bor bo'lsa, cadastre qadamida
-  /// "3D modelni ko'rish" tugmasi chiqadi.
-  Widget _stepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
-    switch (step) {
-      // Legacy 'area' drafts resume into the cadastre step (falls through to
-      // default), which now owns the object area.
-      case 'client':
-        return AiClientFormScreen(bundle: bundle);
-      case 'location':
-        return AiLocationScreen(bundle: bundle);
-      case 'purpose':
-        return AiPurposeScreen(bundle: bundle);
-      case 'intake':
-      case 'payment':
-        return AiIntakeScreen(bundle: bundle);
-      default: // 'cadastre' yoki noma'lum — kadastr qadamidan
-        return AiCadastreScreen(
-          scan: bundle.scan,
-          draftId: bundle.draftId,
-          scanJobId: scanJobId,
-          areaM2: bundle.areaM2,
-        );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -388,6 +348,7 @@ class _S {
 
   static String stepLabel(Locale l, String? step) {
     final name = switch (step) {
+      'video' => tr(l, 'services.ai.drafts.step.video'),
       'cadastre' => tr(l, 'services.ai.drafts.step.cadastre'),
       'client' => tr(l, 'services.ai.drafts.step.client'),
       'location' => tr(l, 'services.ai.drafts.step.location'),

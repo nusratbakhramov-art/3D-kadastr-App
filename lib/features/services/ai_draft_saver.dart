@@ -66,3 +66,35 @@ Future<void> saveAiDraftStep(AiBaholashBundle bundle, String nextStep) async {
     service.dispose();
   }
 }
+
+/// Bundle hali qurilmagan qadam (video) uchun — faqat `current_step` ni
+/// saqlaydi. Fire-and-forget, [saveAiDraftStepInBackground] kabi.
+void saveAiDraftStepOnlyInBackground(int draftId, String nextStep) {
+  unawaited(saveAiDraftStepOnly(draftId, nextStep));
+}
+
+/// Draftning faqat qadamini yangilaydi, payload'ga TEGMASDAN.
+///
+/// `updateDraft` payloadni butunlay ALMASHTIRADI, shu sababli avval joriy
+/// snapshot o'qiladi va o'sha payload qaytarib yuboriladi. Bo'sh payload
+/// yuborish mumkin emas: foydalanuvchi video qadamiga keyingi qadamlardan
+/// Orqaga qaytib kelgan bo'lsa, to'ldirilgan ma'lumot o'chib ketardi.
+Future<void> saveAiDraftStepOnly(int draftId, String nextStep) async {
+  final session = await const AuthStorage().loadSession();
+  final token = session.token;
+  if (token == null || token.isEmpty) return;
+  final service = AiValuationJobService();
+  try {
+    final snap = await service.get(draftId, token: token);
+    await service.updateDraft(
+      draftId,
+      payload: snap.requestPayload,
+      currentStep: nextStep,
+      token: token,
+    );
+  } catch (_) {
+    // jim — keyin retry
+  } finally {
+    service.dispose();
+  }
+}

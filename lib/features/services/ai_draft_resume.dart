@@ -8,6 +8,7 @@ import 'screens/ai_client_form_screen.dart';
 import 'screens/ai_intake_screen.dart';
 import 'screens/ai_location_screen.dart';
 import 'screens/ai_purpose_screen.dart';
+import 'screens/ai_start_screen.dart';
 
 /// Saqlangan qadam nomidan mos wizard ekranini quradi (skan qadamidan keyingi
 /// qadamlar). `scanJobId` — skan bor bo'lsa, cadastre qadamida "3D modelni
@@ -17,6 +18,17 @@ import 'screens/ai_purpose_screen.dart';
 /// resume mantig'i bir joyda.
 Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
   switch (step) {
+    // Xonalarni videoga olish qadami — ro'yxat ariza id bo'yicha SERVERDAN
+    // tiklanadi, ya'ni ilova yopilgan bo'lsa ham tayyor modellar ko'rinadi.
+    case 'video':
+      return AiStartScreen(
+        scan: bundle.scan,
+        draftId: bundle.draftId,
+        scanJobId: scanJobId,
+        // Bundle ham o'tadi: video qadamidan "Davom etish" bosilganda
+        // saqlangan kadastr/mijoz/joylashuv ma'lumotlari yo'qolmasin.
+        resumeBundle: bundle,
+      );
     // Legacy drafts saved at the removed 'area' step resume straight into the
     // cadastre step (which now owns the area, sourced from davreestr).
     case 'client':
@@ -44,10 +56,15 @@ Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
 }
 
 /// Wizard steps, in order. On resume we stack them up to the saved step so Back
-/// walks all the way to the first step (`cadastre`) instead of exiting to
+/// walks all the way to the first step (`video`) instead of exiting to
 /// Arizalar. Every screen rebuilds from the saved bundle: `cadastre` shows the
 /// saved davreestr result without a re-lookup (and owns the object area).
+///
+/// The `video` step is optional, so a draft can legitimately sit at a later
+/// step with no room video attached — resume follows the saved step and does
+/// not second-guess it against the 3DGS server.
 const List<String> _resumableChain = [
+  'video',
   'cadastre',
   'client',
   'location',

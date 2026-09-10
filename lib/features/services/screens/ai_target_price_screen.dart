@@ -19,12 +19,12 @@ import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../settings/settings_state.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../api_ai_upload_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/choice_tile.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import '../widgets/wizard_nav_bar.dart';
 import 'ai_status_screen.dart';
 
 enum _UpStatus { uploading, done, failed }
@@ -228,12 +228,15 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
                   child: ServiceAppBar(
                     title: _S.appBar(l),
                     subtitle: _S.appBarSub(l),
+                    // Bu tugma butun oqimni yopadi — bitta qadam
+                    // orqaga EMAS. Qadamma-qadam qaytish pastda.
+                    onBack: () => closeAiWizard(context),
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 7, activeIndex: 6),
+                  child: StepProgressBar(count: 8, activeIndex: 7),
                 ),
                 const SizedBox(height: 12),
                 Expanded(
@@ -335,11 +338,12 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                  child: ListingCtaButton(
-                    label: _S.continueLabel(l),
+                  child: WizardNavBar(
+                    onBack: () => Navigator.of(context).maybePop(),
+                    onContinue: _continue,
+                    continueLabel: _S.continueLabel(l),
                     // Tanlov qilinishi shart; hujjatlar yuklanayotgan bo'lsa kutamiz.
-                    enabled: _hasSmeta != null && !uploading,
-                    onTap: _continue,
+                    continueEnabled: _hasSmeta != null && !uploading,
                   ),
                 ),
               ],

@@ -13,16 +13,176 @@
 ///   5. Parse HTML for address / total_area / living_area / cadastre_value
 ///
 /// Wrong captcha → loop up to [maxCaptchaRetries] times.
+///
+/// ## Failure reporting
+///
+/// Because all of the above runs on the phone, a failure used to be rendered
+/// on screen and thrown away — the backend saw nothing, and support got
+/// "Ma'lumot olib bo'lmadi" screenshots with no way to tell a wrong captcha
+/// from a rejected form from a stale parser. So every failed attempt of a
+/// lookup is collected (stage, request, response, status, timing) and, IF the
+/// lookup ends without usable data, POSTed to
+/// [POST /api/v1/davreestr/logs]. The admin panel shows it under
+/// "Loglar → Davreestr xatolari", per user.
+///
+/// A lookup that recovers on a later captcha retry reports NOTHING: the user
+/// got their data, so there is nothing to investigate. Reporting is
+/// fire-and-forget — it can never fail or delay the lookup it is describing.
 library;
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
+import '../../../core/app_version.dart';
 import '../../auth/auth_http_client.dart';
+
+/// One davreestr.uz response — status and headers included.
+///
+/// The helpers used to return just the body, which is why a `302` (how
+/// davreestr answers a REJECTED search form) was indistinguishable from a
+/// real result page. Now the status travels with the body so it can be both
+/// classified and logged.
+class _HttpResult {
+  const _HttpResult({
+    required this.statusCode,
+    required this.headers,
+    required this.body,
+  });
+
+  final int statusCode;
+  final Map<String, String> headers;
+  final String body;
+
+  bool get isRedirect => statusCode >= 300 && statusCode < 400;
+}
+
+/// Failure kinds — must match `DavreestrErrorKind` in the backend
+/// (`app/models/davreestr_log.py`). Unknown values are still accepted there,
+/// so a new one can ship from the app first.
+class _Kind {
+  static const httpRedirect = 'http_redirect';
+  static const httpError = 'http_error';
+  static const captchaWrong = 'captcha_wrong';
+  static const ocrFailed = 'ocr_failed';
+  static const rateLimited = 'rate_limited';
+  static const notFound = 'not_found';
+  static const parseEmpty = 'parse_empty';
+  static const csrfMissing = 'csrf_missing';
+  static const network = 'network';
+  static const timeout = 'timeout';
+  static const captchaExhausted = 'captcha_exhausted';
+  static const unknown = 'unknown';
+}
+
+/// The 5 pipeline steps — matches `DavreestrLogStage` in the backend.
+class _Stage {
+  static const home = 'home';
+  static const captchaImage = 'captcha_image';
+  static const captchaOcr = 'captcha_ocr';
+  static const search = 'search';
+  static const parse = 'parse';
+}
+
+/// Everything that went wrong during ONE lookup, held until we know whether
+/// the lookup as a whole failed.
+class _FailureReport {
+  _FailureReport(this.cadastreNumber);
+
+  final String cadastreNumber;
+
+  /// Ties every attempt of this lookup together, so the admin panel shows one
+  /// story ("burned 8 captchas, then gave up") instead of 8 unrelated rows.
+  final String correlationId = _newCorrelationId();
+
+  final List<Map<String, dynamic>> entries = [];
+
+  /// The backend rejects a batch over 20 (`DavreestrLogReport`). A lookup can
+  /// legitimately produce 17 (1 home + 8 OCR + 8 search), so this only bites
+  /// on something pathological — and then the first 20 are the useful ones.
+  static const _maxEntries = 20;
+
+  /// davreestr's own pages run to 65 KB and say nothing new; the interesting
+  /// bodies (the 302 stub, an error alert) are a few hundred bytes. The
+  /// backend clips to 8 KB anyway, so send that much and no more.
+  static const _maxBody = 8000;
+
+  static String _newCorrelationId() {
+    final rnd = Random.secure();
+    return List.generate(
+      16,
+      (_) => rnd.nextInt(16).toRadixString(16),
+    ).join();
+  }
+
+  static String? _clip(String? text) {
+    if (text == null || text.isEmpty) return null;
+    return text.length <= _maxBody ? text : text.substring(0, _maxBody);
+  }
+
+  /// The form body with the CSRF token stripped. The backend redacts it too,
+  /// but there is no reason to put a session token on the wire at all. The
+  /// captcha CODE is deliberately kept — "which digits did OCR read" is the
+  /// single most useful field here.
+  static String? _redact(String? body) => body?.replaceAll(
+        RegExp(r'(_token=)[^&]*'),
+        r'$1<redacted>',
+      );
+
+  void add({
+    required String stage,
+    required String kind,
+    String? message,
+    int? attempt,
+    String? method,
+    String? url,
+    Map<String, String>? requestHeaders,
+    String? requestBody,
+    int? status,
+    Map<String, String>? responseHeaders,
+    String? responseBody,
+    int? durationMs,
+  }) {
+    if (entries.length >= _maxEntries) return;
+    final entry = <String, dynamic>{
+      'occurred_at': DateTime.now().toUtc().toIso8601String(),
+      'source': 'mobile',
+      'stage': stage,
+      'error_kind': kind,
+      'cadastre_number': cadastreNumber,
+      'correlation_id': correlationId,
+      // Hand-maintained constants (`lib/core/app_version.dart`), guarded
+      // against pubspec by `test/core/app_version_test.dart`. If that test is
+      // red, this field ships a stale version and "which release broke it"
+      // stops being answerable — it is red as of this commit (1.0.4+27 vs
+      // pubspec 1.0.5+37), which is a two-line fix of its own.
+      'app_version': '$kAppVersion+$kAppBuild',
+      'platform': Platform.isIOS ? 'ios' : 'android',
+      'device_info': Platform.operatingSystemVersion,
+    };
+    // Omitted rather than sent as null — the backend leaves absent fields
+    // NULL, and a payload of explicit nulls only makes the log harder to read.
+    void put(String key, Object? value) {
+      if (value != null) entry[key] = value;
+    }
+
+    put('error_message', message);
+    put('attempt', attempt);
+    put('request_method', method);
+    put('request_url', url);
+    put('request_headers', requestHeaders);
+    put('request_body', _redact(_clip(requestBody)));
+    put('response_status', status);
+    put('response_headers', responseHeaders);
+    put('response_body', _clip(responseBody));
+    put('duration_ms', durationMs);
+    entries.add(entry);
+  }
+}
 
 /// Successful davreestr.uz lookup. Shape matches the existing
 /// `CadastreLookupResult` so the rest of the app needs no changes.
@@ -42,6 +202,23 @@ class DavreestrLookupResult {
   final double? totalArea;
   final double? livingArea;
   final double? cadastreValue;
+
+  /// Did the registry actually give us something the wizard can use?
+  ///
+  /// davreestr does not answer "not found" with an error — a rejected form or
+  /// a stale parser both come back as a result with every field empty. So this
+  /// is the test that decides whether the user sees data or
+  /// "Ma'lumot olib bo'lmadi", and therefore also whether the lookup reports
+  /// itself as failed (`lookup`'s `finally`). The two must never disagree.
+  ///
+  /// `ai_cadastre_screen.dart` and `cadastre_lookup_field.dart` apply the same
+  /// rule to their own `CadastreLookupResult`; keep them in step.
+  bool get hasUsableData =>
+      (address?.trim().isNotEmpty ?? false) ||
+      totalArea != null ||
+      livingArea != null ||
+      cadastreValue != null ||
+      (objectTypeHint?.trim().isNotEmpty ?? false);
 }
 
 /// Thrown for every recoverable failure: rate limit, not-found, captcha
@@ -67,6 +244,7 @@ class DavreestrClient {
           RegExp(r'/+$'),
           '',
         ),
+        _injectedClient = backendClient,
         _backendClient = backendClient ?? AuthHttpClient();
 
   /// Backend root (e.g. `https://api.3dkadastr.uz/api/v1`) — used only for
@@ -81,6 +259,10 @@ class DavreestrClient {
   /// Backend OCR client (multipart upload). Davreestr itself uses a raw
   /// `dart:io` HttpClient below because we need fine-grained cookie control.
   final http.Client _backendClient;
+
+  /// The caller-supplied client, or null when we made our own. Only the
+  /// failure reporter needs to tell the difference — see [_reportFailure].
+  final http.Client? _injectedClient;
 
   /// Backend OCR accuracy is ~70% — at 8 tries the success probability is
   /// ~99.94 %. Matches the Python original.
@@ -133,12 +315,49 @@ class DavreestrClient {
     // laravel_session) are critical for the form POST to succeed.
     final cookies = <String, String>{};
 
+    // Everything that goes wrong is collected here and sent to the backend in
+    // the `finally` below — but ONLY if this lookup ends without usable data.
+    final report = _FailureReport(cadastreNumber);
+    var delivered = false;
+    // Which step we are on, so a network error or a timeout — which surface at
+    // the bottom of this method, far from where they happened — are still
+    // logged against the request that actually hung.
+    var stage = _Stage.home;
+    var attemptNo = 0;
+
     try {
       // 1) Home page — collect cookies + CSRF token.
       final homeUri = Uri.parse('$davreestrBaseUrl/uz');
-      final homeBody = await _get(httpClient, homeUri, cookies);
-      var token = _extractCsrf(homeBody);
+      final homeStarted = DateTime.now();
+      final _HttpResult home;
+      try {
+        home = await _get(httpClient, homeUri, cookies);
+      } on DavreestrLookupException catch (e) {
+        report.add(
+          stage: _Stage.home,
+          kind: _Kind.httpError,
+          message: e.message,
+          method: 'GET',
+          url: homeUri.toString(),
+          status: e.statusCode,
+          durationMs: _elapsed(homeStarted),
+        );
+        rethrow;
+      }
+      var token = _extractCsrf(home.body);
       if (token == null) {
+        // Either the site changed its markup or this is not the page we think
+        // it is. The body is the only evidence, so it goes into the log.
+        report.add(
+          stage: _Stage.home,
+          kind: _Kind.csrfMissing,
+          message: 'davreestr.uz: CSRF token topilmadi',
+          method: 'GET',
+          url: homeUri.toString(),
+          status: home.statusCode,
+          responseBody: home.body,
+          durationMs: _elapsed(homeStarted),
+        );
         throw const DavreestrLookupException(
           'davreestr.uz: CSRF token topilmadi',
         );
@@ -147,18 +366,64 @@ class DavreestrClient {
       String? lastError;
 
       for (var attempt = 1; attempt <= maxCaptchaRetries; attempt++) {
+        attemptNo = attempt;
         // 2) Captcha PNG — session-bound, single-use.
+        stage = _Stage.captchaImage;
         final captchaUri = Uri.parse('$davreestrBaseUrl/captcha/default');
-        final captchaBytes = await _getBytes(httpClient, captchaUri, cookies);
+        final Uint8List captchaBytes;
+        try {
+          captchaBytes = await _getBytes(httpClient, captchaUri, cookies);
+        } on DavreestrLookupException catch (e) {
+          report.add(
+            stage: _Stage.captchaImage,
+            kind: _Kind.httpError,
+            message: e.message,
+            attempt: attempt,
+            method: 'GET',
+            url: captchaUri.toString(),
+            status: e.statusCode,
+          );
+          rethrow;
+        }
 
         // 3) Solve via backend OCR.
-        final code = await _solveCaptcha(captchaBytes);
+        stage = _Stage.captchaOcr;
+        final ocrStarted = DateTime.now();
+        final String? code;
+        try {
+          code = await _solveCaptcha(captchaBytes);
+        } on DavreestrLookupException catch (e) {
+          report.add(
+            stage: _Stage.captchaOcr,
+            kind: _Kind.httpError,
+            message: e.message,
+            attempt: attempt,
+            method: 'POST',
+            url: '$_backendRoot/davreestr/solve-captcha',
+            status: e.statusCode,
+            durationMs: _elapsed(ocrStarted),
+          );
+          rethrow;
+        }
         if (code == null) {
-          // OCR fail — server picks a fresh captcha image, try again.
+          // OCR fail — server picks a fresh captcha image, try again. Recorded
+          // but only ever SENT if the whole lookup goes on to fail: on its own
+          // an OCR miss costs the user nothing.
+          report.add(
+            stage: _Stage.captchaOcr,
+            kind: _Kind.ocrFailed,
+            message: "OCR captcha raqamlarini o'qiy olmadi",
+            attempt: attempt,
+            method: 'POST',
+            url: '$_backendRoot/davreestr/solve-captcha',
+            requestBody: 'captcha PNG, ${captchaBytes.length} bayt',
+            durationMs: _elapsed(ocrStarted),
+          );
           continue;
         }
 
         // 4) Submit search form.
+        stage = _Stage.search;
         final form = <String, String>{
           '_token': token!,
           'type': 'cad_num',
@@ -168,24 +433,59 @@ class DavreestrClient {
         };
         final searchUri =
             Uri.parse('$davreestrBaseUrl/data/get-info/search');
-        final searchBody = await _postForm(
+        final searchHeaders = {
+          'X-CSRF-TOKEN': token,
+          HttpHeaders.refererHeader: '$davreestrBaseUrl/uz',
+          HttpHeaders.acceptHeader: 'text/html, */*; q=0.01',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Origin': davreestrBaseUrl,
+        };
+        final searchStarted = DateTime.now();
+        final search = await _postForm(
           httpClient,
           searchUri,
           form,
           cookies,
-          extraHeaders: {
-            'X-CSRF-TOKEN': token,
-            HttpHeaders.refererHeader: '$davreestrBaseUrl/uz',
-            HttpHeaders.acceptHeader: 'text/html, */*; q=0.01',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Origin': davreestrBaseUrl,
-          },
+          extraHeaders: searchHeaders,
         );
+        final searchBody = search.body;
+
+        /// This attempt's request/response, for whichever branch below decides
+        /// it failed. Headers are logged WITHOUT the session cookie value.
+        void logSearch(
+          String kind,
+          String message, {
+          String atStage = _Stage.search,
+        }) =>
+            report.add(
+              stage: atStage,
+              kind: kind,
+              message: message,
+              attempt: attempt,
+              method: 'POST',
+              url: searchUri.toString(),
+              requestHeaders: {
+                ...searchHeaders,
+                'X-CSRF-TOKEN': '<redacted>',
+                if (cookies.isNotEmpty) 'Cookie': '<${cookies.length} cookie>',
+              },
+              requestBody: _encodeForm(form),
+              status: search.statusCode,
+              responseHeaders: search.headers,
+              responseBody: searchBody,
+              durationMs: _elapsed(searchStarted),
+            );
 
         // 5) Classify response.
         final lower = _htmlUnescape(searchBody).toLowerCase();
 
         if (_anyContains(lower, _rateLimitPatterns)) {
+          logSearch(
+            _Kind.rateLimited,
+            "bazaga so'rovlar soni oshib ketdi (yoki sayt shu xabarni har "
+            "qanday rad etishda ko'rsatadi — javob tanasiga qarab ayirish "
+            "kerak)",
+          );
           throw const DavreestrLookupException(
             "davreestr.uz: bazaga so'rovlar soni oshib ketdi, "
             "biroz keyinroq urinib ko'ring",
@@ -195,6 +495,7 @@ class DavreestrClient {
         if (_anyContains(lower, _captchaWrongPatterns)) {
           // Wrong captcha — server rotates token, but session stays.
           lastError = 'Captcha xato';
+          logSearch(_Kind.captchaWrong, 'Captcha kodi rad etildi');
           final refreshed = _extractCsrf(searchBody);
           if (refreshed != null) token = refreshed;
           continue;
@@ -202,6 +503,10 @@ class DavreestrClient {
 
         if (_anyContains(lower, _notFoundPatterns) &&
             !_anyContains(lower, _successHintPatterns)) {
+          logSearch(
+            _Kind.notFound,
+            'Kadastr raqami $cadastreNumber davreestr.uz da topilmadi',
+          );
           throw DavreestrLookupException(
             'Kadastr raqami $cadastreNumber davreestr.uz da topilmadi',
           );
@@ -209,6 +514,29 @@ class DavreestrClient {
 
         // Success path.
         final parsed = _parseResultHtml(searchBody, cadastreNumber);
+        if (parsed.hasUsableData) {
+          delivered = true;
+        } else {
+          // The user sees "Ma'lumot olib bo'lmadi" for this, and until now it
+          // left no trace at all. Two very different causes look identical
+          // here, which is exactly why the response body is logged:
+          //   * a 3xx — davreestr REJECTED the form (it answers every rejected
+          //     search with `302 → /uz` and flashes the reason onto the next
+          //     page load), so this body is a redirect stub, not a result page;
+          //   * a 200 whose markup no longer matches the parser.
+          // NOTE: reporting only. The flow is untouched — the empty result is
+          // still returned exactly as before.
+          logSearch(
+            search.isRedirect ? _Kind.httpRedirect : _Kind.parseEmpty,
+            search.isRedirect
+                ? 'davreestr forma rad etdi: HTTP ${search.statusCode} → '
+                    '${search.headers[HttpHeaders.locationHeader] ?? '?'}'
+                : "Javob 200, lekin natija maydonlari bo'sh — parser "
+                    'eskirgan yoki javob natija sahifasi emas',
+            // A rejected form never reached the parser; an empty 200 did.
+            atStage: search.isRedirect ? _Stage.search : _Stage.parse,
+          );
+        }
         // Cache for next time (fire-and-forget — never block/fail on this).
         // On a forced refresh we deliberately don't write the cache either: the
         // AI Baholash flow must stay cache-free end-to-end (a stale/global entry
@@ -217,21 +545,91 @@ class DavreestrClient {
         return parsed;
       }
 
+      report.add(
+        stage: _Stage.search,
+        kind: _Kind.captchaExhausted,
+        message: '$maxCaptchaRetries urinish ham muvaffaqiyatsiz '
+            "(${lastError ?? 'no result'})",
+        attempt: maxCaptchaRetries,
+      );
       throw DavreestrLookupException(
         "davreestr.uz: captcha yechib bo'lmadi (${lastError ?? 'no result'})",
       );
     } on DavreestrLookupException {
       rethrow;
     } on SocketException catch (e) {
+      report.add(
+        stage: stage,
+        kind: _Kind.network,
+        message: 'SocketException: ${e.message}',
+        attempt: attemptNo > 0 ? attemptNo : null,
+      );
       throw DavreestrLookupException('Tarmoq xatosi: ${e.message}');
     } on TimeoutException {
+      report.add(
+        stage: stage,
+        kind: _Kind.timeout,
+        message: 'davreestr.uz vaqtida javob bermadi '
+            '(${_timeout.inSeconds}s)',
+        attempt: attemptNo > 0 ? attemptNo : null,
+      );
       throw const DavreestrLookupException(
         'davreestr.uz vaqtida javob bermadi',
       );
     } catch (e) {
+      report.add(
+        stage: stage,
+        kind: _Kind.unknown,
+        message: 'Kutilmagan xato: $e',
+        attempt: attemptNo > 0 ? attemptNo : null,
+      );
       throw DavreestrLookupException('Kutilmagan xato: $e');
     } finally {
       httpClient.close(force: true);
+      // The user did not get their data → tell the backend why. Fire-and-forget
+      // and after `return`/`throw` has been decided, so it can neither delay
+      // the lookup nor change its outcome.
+      if (!delivered) unawaited(_reportFailure(report));
+    }
+  }
+
+  static int _elapsed(DateTime since) =>
+      DateTime.now().difference(since).inMilliseconds;
+
+  static String _encodeForm(Map<String, String> form) => form.entries
+      .map((e) =>
+          '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}')
+      .join('&');
+
+  /// Send the collected failures. Never throws, never blocks the caller.
+  ///
+  /// `AuthHttpClient` attaches the session token, and the backend derives the
+  /// user and the IP from it — the payload carries no identity of its own.
+  ///
+  /// Its OWN client, not [_backendClient]: this runs unawaited from `lookup`'s
+  /// `finally`, and the caller disposes the scraper the moment `lookup`
+  /// returns or throws (`CadastreApiService.lookup`). `IOClient.close()`
+  /// closes the underlying HttpClient with `force: true`, which terminates
+  /// requests still in flight — so a shared client would drop precisely the
+  /// reports we care about, the ones from a failed lookup.
+  Future<void> _reportFailure(_FailureReport report) async {
+    if (report.entries.isEmpty) return;
+    final client = _injectedClient ?? AuthHttpClient();
+    try {
+      await client
+          .post(
+            Uri.parse('$_backendRoot/davreestr/logs'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: jsonEncode({'entries': report.entries}),
+          )
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // Diagnostics must never become a second failure for the user.
+    } finally {
+      if (_injectedClient == null) client.close();
     }
   }
 
@@ -296,7 +694,7 @@ class DavreestrClient {
 
   // ─── HTTP helpers ──────────────────────────────────────────────────
 
-  Future<String> _get(
+  Future<_HttpResult> _get(
     HttpClient client,
     Uri uri,
     Map<String, String> cookies,
@@ -312,7 +710,11 @@ class DavreestrClient {
         statusCode: resp.statusCode,
       );
     }
-    return utf8.decode(bodyBytes, allowMalformed: true);
+    return _HttpResult(
+      statusCode: resp.statusCode,
+      headers: _headerMap(resp),
+      body: utf8.decode(bodyBytes, allowMalformed: true),
+    );
   }
 
   Future<Uint8List> _getBytes(
@@ -333,18 +735,14 @@ class DavreestrClient {
     return _collectBytes(resp);
   }
 
-  Future<String> _postForm(
+  Future<_HttpResult> _postForm(
     HttpClient client,
     Uri uri,
     Map<String, String> form,
     Map<String, String> cookies, {
     Map<String, String> extraHeaders = const {},
   }) async {
-    final encoded = form.entries
-        .map((e) =>
-            '${Uri.encodeQueryComponent(e.key)}=${Uri.encodeQueryComponent(e.value)}')
-        .join('&');
-    final bodyBytes = utf8.encode(encoded);
+    final bodyBytes = utf8.encode(_encodeForm(form));
 
     final req = await client.postUrl(uri).timeout(_timeout);
     _applyDefaultHeaders(req, cookies);
@@ -359,7 +757,31 @@ class DavreestrClient {
     final resp = await req.close().timeout(_timeout);
     _absorbCookies(resp, cookies);
     final bytes = await _collectBytes(resp);
-    return utf8.decode(bytes, allowMalformed: true);
+    // Deliberately NOT throwing on a non-2xx: davreestr answers a rejected
+    // search form with `302`, and the caller has to classify that (and log
+    // it) rather than treat it as a transport error.
+    return _HttpResult(
+      statusCode: resp.statusCode,
+      headers: _headerMap(resp),
+      body: utf8.decode(bytes, allowMalformed: true),
+    );
+  }
+
+  /// Response headers as a flat map, minus the session cookie values.
+  ///
+  /// `location` is the interesting one — on a rejected form it points at
+  /// `/uz`, which is what makes a `302` legible in the log.
+  static Map<String, String> _headerMap(HttpClientResponse resp) {
+    final out = <String, String>{};
+    resp.headers.forEach((name, values) {
+      final key = name.toLowerCase();
+      if (key == HttpHeaders.setCookieHeader) {
+        out[key] = '<${values.length} cookie>';
+        return;
+      }
+      out[key] = values.join(', ');
+    });
+    return out;
   }
 
   void _applyDefaultHeaders(

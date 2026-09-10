@@ -9,14 +9,15 @@ import '../../settings/settings_state.dart';
 import '../data/room_plan_scanner.dart';
 import '../widgets/scan_skip_button.dart';
 import '../widgets/service_app_bar.dart';
-import 'ai_cadastre_screen.dart';
 import 'ai_scan_process_screen.dart';
+import 'ai_start_screen.dart';
 
 /// AI Baholashning 1-qadami — 3D LiDAR skan.
 ///
 /// Oqim: bu ekran → mesh ko'rish → USDZ ga ishlash → kadastr raqami → ...
-/// LiDAR yo'q qurilmalarda (simulator / Pro bo'lmagan iPhone) skan
-/// qo'llab-quvvatlanmaydi.
+/// LiDAR yo'q qurilmalarda (simulator / Pro bo'lmagan iPhone, Android) skan
+/// mumkin emas — bu qadam avtomatik o'tkazib yuboriladi va foydalanuvchi
+/// to'g'ridan wizardning birinchi qadamiga tushadi.
 class AiScanIntroScreen extends StatefulWidget {
   const AiScanIntroScreen({super.key});
 
@@ -38,7 +39,26 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
   Future<void> _checkSupport() async {
     final ok = await RoomPlanScanner.isSupported();
     if (!mounted) return;
+    if (!ok) {
+      _skipUnsupported();
+      return;
+    }
     setState(() => _supported = ok);
+  }
+
+  /// Qurilma skanni qo'llamasa bu ekranda ushlab turishning ma'nosi yo'q —
+  /// darhol wizardning birinchi qadamiga (video olish) o'tamiz.
+  /// [Navigator.pushReplacement] — orqaga bosilganda boshi berk ekranga
+  /// qaytmaslik uchun. LiDARsiz qurilmada draft AYNAN o'sha qadamda, birinchi
+  /// video yuklash oldidan yaratiladi: skan yo'qligi oqimni buzmaydi, chunki
+  /// baholash uchun kerakli o'lchov videodan chiqadi.
+  void _skipUnsupported() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        settings: const RouteSettings(name: 'ai/start'),
+        builder: (_) => const AiStartScreen(),
+      ),
+    );
   }
 
   /// Continues to the cadastre step without a 3D scan — for users who can't or
@@ -49,8 +69,8 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
     HapticFeedback.lightImpact();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/cadastre'),
-        builder: (_) => const AiCadastreScreen(),
+        settings: const RouteSettings(name: 'ai/start'),
+        builder: (_) => const AiStartScreen(),
       ),
     );
   }
@@ -81,6 +101,7 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
       // Teksturali natija o'sha yerda "3D modelni ko'rish" orqali ochiladi.
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
+          settings: const RouteSettings(name: 'ai/scan-process'),
           builder: (_) => AiScanProcessScreen(scan: result),
         ),
       );
@@ -104,7 +125,6 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
     final subColor = isDark
         ? Colors.white.withValues(alpha: 0.6)
         : const Color(0xFF8A9097);
-    final unsupported = _supported == false;
 
     return Scaffold(
       backgroundColor: bg,
@@ -165,10 +185,6 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
                       ),
                       const SizedBox(height: 24),
                       _StepsCard(isDark: isDark, locale: l),
-                      if (unsupported) ...[
-                        const SizedBox(height: 16),
-                        _UnsupportedCard(isDark: isDark, locale: l),
-                      ],
                     ],
                   ),
                 ),
@@ -299,64 +315,6 @@ class _StepsCard extends StatelessWidget {
   }
 }
 
-class _UnsupportedCard extends StatelessWidget {
-  const _UnsupportedCard({required this.isDark, required this.locale});
-
-  final bool isDark;
-  final Locale locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final cardBg = isDark ? const Color(0xFF1F2426) : Colors.white;
-    final textColor = isDark ? Colors.white : AppColors.textBlack;
-    final hintColor = isDark
-        ? Colors.white.withValues(alpha: 0.6)
-        : const Color(0xFF8A9097);
-    return Container(
-      decoration: BoxDecoration(
-        color: cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE0A12A)),
-      ),
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.info_outline_rounded,
-              color: Color(0xFFE0A12A), size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _S.unsupportedTitle(locale),
-                  style: TextStyle(
-                    fontFamily: 'MTSCompact',
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15,
-                    color: textColor,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _S.unsupportedBody(locale),
-                  style: TextStyle(
-                    fontFamily: 'MTSText',
-                    fontSize: 13,
-                    height: 1.35,
-                    color: hintColor,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _S {
   const _S._();
 
@@ -396,12 +354,6 @@ class _S {
       tr(l, 'services.ai.scan_intro.skip_scan');
 
   static String checking(Locale l) => tr(l, 'services.ai.scan_intro.checking');
-
-  static String unsupportedTitle(Locale l) =>
-      tr(l, 'services.ai.scan_intro.unsupported_title');
-
-  static String unsupportedBody(Locale l) =>
-      tr(l, 'services.ai.scan_intro.unsupported_body');
 
   static String scanError(Locale l) => tr(l, 'services.ai.scan_intro.scan_error');
 

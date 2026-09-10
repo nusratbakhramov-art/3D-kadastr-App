@@ -25,7 +25,6 @@ import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../../auth/widgets/auth_toast.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../../settings/settings_state.dart';
 import '../ai_draft_saver.dart';
 import '../api_ai_upload_service.dart';
@@ -33,6 +32,7 @@ import '../models/ai_baholash_bundle.dart';
 import '../widgets/file_preview_gallery.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import '../widgets/wizard_nav_bar.dart';
 import 'ai_review_screen.dart';
 
 class AiIntakeScreen extends StatefulWidget {
@@ -414,19 +414,16 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     if (msg != null) _toast(msg);
   }
 
-  // The submit button. When the form isn't ready it stays visually disabled,
-  // but a transparent tap layer reveals the missing items via a toast.
+  // The step's bottom bar: back on the left, submit on the right. When the
+  // form isn't ready the submit stays visually disabled, but a transparent tap
+  // layer reveals the missing items via a toast (WizardNavBar.onBlockedTap).
   Widget _buildSubmit(Locale l) {
-    final button = ListingCtaButton(
-      label: _Strings.continueLabel(l),
-      enabled: _ready,
-      onTap: _continue,
-    );
-    if (_ready) return button;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: _showMissing,
-      child: button,
+    return WizardNavBar(
+      onBack: () => Navigator.of(context).maybePop(),
+      onContinue: _continue,
+      continueLabel: _Strings.continueLabel(l),
+      continueEnabled: _ready,
+      onBlockedTap: _showMissing,
     );
   }
 
@@ -464,12 +461,15 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                   child: ServiceAppBar(
                     title: _Strings.appBarTitle(l),
                     subtitle: _Strings.appBarSubtitle(l),
+                    // Bu tugma butun oqimni yopadi — bitta qadam
+                    // orqaga EMAS. Qadamma-qadam qaytish pastda.
+                    onBack: () => closeAiWizard(context),
                   ),
                 ),
                 const SizedBox(height: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 7, activeIndex: 4),
+                  child: StepProgressBar(count: 8, activeIndex: 5),
                 ),
                 const SizedBox(height: 12),
                 Expanded(

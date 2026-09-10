@@ -8,6 +8,9 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Push xabarnomalar (Android 13+ runtime ruxsat). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Debug-only video capture (VideoCaptureActivity, CameraX). -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!-- Faqat telefonlar uchun: Google Play'da planshet, soat (Wear OS),
          Android TV va Chromebook'larni chiqarib tashlaymiz. Telefon "hardware"
@@ -65,6 +68,26 @@
                 <data android:scheme="kadastr3d" android:host="market"/>
             </intent-filter>
         </activity>
+        <!-- Debug-only video recorder (0.5x/0.6x + HD). Flutter'dagi tugma
+             faqat kDebugMode'da ko'rinadi; exported EMAS. -->
+        <activity
+            android:name=".VideoCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
+        <!-- Debug-only: tizim kamera ilovasi videoni shu papkaga yozadi
+             (MainActivity.startSystemCamera). Authority image_picker'niki
+             (${applicationId}.flutter.image_provider) bilan to'qnashmaydi. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.videocapture.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/video_capture_paths" />
+        </provider>
         <!-- FCM: app fonда kelgan push qaysi kanalga tushishini belgilaydi
              (PushNotifications._channel bilan bir xil id). -->
         <meta-data
@@ -85,6 +108,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Debug-only: qurilmaning kamera ilovasini topish uchun
+             (MainActivity.startSystemCamera → grantUriPermission sikli). -->
+        <intent>
+            <action android:name="android.media.action.VIDEO_CAPTURE"/>
         </intent>
         <!-- Bosh sahifadagi "qo'ng'iroq" tugmasi tel: orqali terish ilovasini
              ochishi uchun (Android 11+ package visibility). -->

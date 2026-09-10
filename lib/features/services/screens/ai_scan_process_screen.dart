@@ -11,7 +11,7 @@ import '../api_ai_upload_service.dart';
 import '../data/room_plan_scanner.dart';
 import '../models/ai_scan_result.dart';
 import '../widgets/service_app_bar.dart';
-import 'ai_cadastre_screen.dart';
+import 'ai_start_screen.dart';
 
 enum _ProcStage { idle, processing, done, error }
 
@@ -153,8 +153,12 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
     scanKey ??= await _uploadUsdz(r.usdzPath);
 
     // Skandan keyin DRAFT ariza (skan kaliti + to'liq to'plam + keyingi qadam).
+    // Qadam — 'video': skan tugagach foydalanuvchi AYNAN video qadamiga
+    // tushadi. Ilgari bu yerda 'cadastre' yozilardi va skan qilib video
+    // olmasdan chiqib ketgan odamning drafti video qadamini butunlay
+    // o'tkazib yuborib, kadastrdan ochilardi.
     final draftId = await createAiDraft(
-      currentStep: 'cadastre',
+      currentStep: 'video',
       scanUsdzKey: scanKey,
       scanFiles: scanFiles,
     );
@@ -165,8 +169,8 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
     // avtomatik olinadi).
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/cadastre'),
-        builder: (_) => AiCadastreScreen(scan: r, draftId: draftId),
+        settings: const RouteSettings(name: 'ai/start'),
+        builder: (_) => AiStartScreen(scan: r, draftId: draftId),
       ),
     );
   }

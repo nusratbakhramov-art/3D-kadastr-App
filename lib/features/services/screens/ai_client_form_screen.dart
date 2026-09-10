@@ -13,11 +13,11 @@ import 'package:flutter/services.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../home/user_profile.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../ai_draft_saver.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import '../widgets/wizard_nav_bar.dart';
 import 'ai_location_screen.dart';
 
 class AiClientFormScreen extends StatefulWidget {
@@ -169,12 +169,15 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                       child: ServiceAppBar(
                         title: _ClientFormStrings.title(l),
                         subtitle: _ClientFormStrings.subtitle(l),
+                        // Bu tugma butun oqimni yopadi — bitta qadam
+                        // orqaga EMAS. Qadamma-qadam qaytish pastda.
+                        onBack: () => closeAiWizard(context),
                       ),
                     ),
                     const SizedBox(height: 8),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: StepProgressBar(count: 7, activeIndex: 1),
+                      child: StepProgressBar(count: 8, activeIndex: 2),
                     ),
                     Expanded(
                       child: ListView(
@@ -254,10 +257,10 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: ListingCtaButton(
-                        label: _ClientFormStrings.continueLabel(l),
-                        enabled: true,
-                        onTap: _continue,
+                      child: WizardNavBar(
+                        onBack: () => Navigator.of(context).maybePop(),
+                        onContinue: _continue,
+                        continueLabel: _ClientFormStrings.continueLabel(l),
                       ),
                     ),
                   ],

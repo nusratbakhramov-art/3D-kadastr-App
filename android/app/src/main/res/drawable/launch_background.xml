@@ -1,9 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Launch screen — faqat bitta tekis qorong'i rang (#040E07).
+
+     Ilova ochilishi bilan DARHOL intro roligi (VideoSplashScreen) ko'rinishi
+     kerak. Rolikning birinchi kadri qorong'i, shuning uchun launch screen ham
+     aynan shu rangda: yashil ekran chaqnab o'tmaydi.
+
+     Eski yashil fon @drawable/background + markazdagi @drawable/splash edi —
+     fayllar o'chirilmagan, qaytarish uchun eski layer-list'ni tiklash kifoya. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
-        <bitmap android:gravity="fill" android:src="@drawable/background"/>
-    </item>
-    <item>
-        <bitmap android:gravity="center" android:src="@drawable/splash"/>
+        <color android:color="#FF040E07"/>
     </item>
 </layer-list>

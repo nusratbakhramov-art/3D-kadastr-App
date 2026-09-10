@@ -20,13 +20,13 @@ import '../../../core/i18n.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../ai_draft_saver.dart';
 import '../data/geocoder_client.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/map_zoom_controls.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import '../widgets/wizard_nav_bar.dart';
 import 'ai_purpose_screen.dart';
 
 class AiLocationScreen extends StatefulWidget {
@@ -378,12 +378,15 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
               child: ServiceAppBar(
                 title: _AiLocationStrings.appBarTitle(l),
                 subtitle: _AiLocationStrings.appBarSubtitle(l),
+                // Bu tugma butun oqimni yopadi — bitta qadam
+                // orqaga EMAS. Qadamma-qadam qaytish pastda.
+                onBack: () => closeAiWizard(context),
               ),
             ),
             const SizedBox(height: 8),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 16),
-              child: StepProgressBar(count: 7, activeIndex: 2),
+              child: StepProgressBar(count: 8, activeIndex: 3),
             ),
             const SizedBox(height: 12),
             Padding(
@@ -459,10 +462,11 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-              child: ListingCtaButton(
-                label: _AiLocationStrings.confirm(l),
-                enabled: !_resolving,
-                onTap: _confirm,
+              child: WizardNavBar(
+                onBack: () => Navigator.of(context).maybePop(),
+                onContinue: _confirm,
+                continueLabel: _AiLocationStrings.confirm(l),
+                continueEnabled: !_resolving,
               ),
             ),
           ],

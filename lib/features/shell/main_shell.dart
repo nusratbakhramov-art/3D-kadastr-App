@@ -24,6 +24,7 @@ import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr/kadastr_area_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
 import '../settings/settings_screen.dart';
+import '../../theme/app_colors.dart';
 import 'app_bottom_nav.dart';
 
 class MainShell extends StatefulWidget {
@@ -224,9 +225,14 @@ class _MainShellState extends State<MainShell> {
       return;
     }
     if (!mounted) return;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AiScanIntroScreen()));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        // Nom SHART: oqimni yopish (`closeAiWizard`) `ai/` bilan
+        // boshlanmaydigan birinchi marshrutgacha poplaydi.
+        settings: const RouteSettings(name: 'ai/scan-intro'),
+        builder: (_) => const AiScanIntroScreen(),
+      ),
+    );
   }
 
   void _openCombinedCalc() {
@@ -303,10 +309,15 @@ class _MainShellState extends State<MainShell> {
 class _ShellStrings {
   const _ShellStrings._();
 
+  // Each tab keeps one fixed colour — nothing here reacts to which tab is
+  // selected. Market and Arizalar are the korzinka.uz and my.gov.uz marks and
+  // ship their brand palettes inside the SVG, so they pass no tint at all.
   static List<AppBottomNavItem> items(Locale locale) => [
     AppBottomNavItem(
       label: _home(locale),
       iconAsset: 'assets/icons/tab-home.svg',
+      tintLight: AppColors.brandGreen,
+      tintDark: AppColors.splashGreen,
     ),
     AppBottomNavItem(
       label: _market(locale),
@@ -319,6 +330,8 @@ class _ShellStrings {
     AppBottomNavItem(
       label: _profile(locale),
       iconAsset: 'assets/icons/tab-profile.svg',
+      tintLight: AppColors.textBlack,
+      tintDark: Colors.white,
     ),
   ];
 

@@ -43,10 +43,31 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
+		<!-- VAQTINCHA: v2m (3DGS) splat viewer'i Vast.ai'da oddiy HTTP orqali
+		     ishlaydi va IP:port har restartda o'zgaradi, shu sababli aniq domen
+		     istisnosi yaramaydi.
+		     Aynan WEB-KONTENT kaliti: ruxsat faqat WKWebView'ga tegadi, butun
+		     ilovaga emas. `NSAllowsArbitraryLoads` bu yerda FOYDASIZ — iOS 10+
+		     da `NSAllowsLocalNetworking` (pastda) mavjud bo'lsa, u e'tiborsiz
+		     qoldiriladi.
+		     v2m barqaror domen + TLS olgach (reja 2.7) OLIB TASHLANG. -->
+		<key>NSAllowsArbitraryLoadsInWebContent</key>
+		<true/>
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
+			<!-- v2m (3DGS) serveri — splat viewer WebView shu manzildan ochiladi.
+			     Vast.ai instance almashsa BU IP NI HAM yangilash kerak (`.env`
+			     dagi `v2m_base_url` bilan birga). Barqaror domen + TLS bo'lgach
+			     ikkalasi ham olib tashlanadi. -->
+			<key>45.81.32.55</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
 			<key>192.168.1.37</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>

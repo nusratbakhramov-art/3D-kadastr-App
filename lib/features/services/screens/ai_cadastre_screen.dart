@@ -7,15 +7,18 @@ import '../../../core/i18n/app_translations.dart';
 import '../../../core/network_error_handler.dart';
 import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../ai_draft_saver.dart';
 import '../api_cadastre_service.dart';
+import '../data/ngis_parcel_client.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../models/ai_scan_result.dart';
+import '../widgets/parcel_map.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import '../widgets/wizard_nav_bar.dart';
 import 'ai_client_form_screen.dart';
 import 'ai_scan_resume_screen.dart';
+import 'parcel_picker_screen.dart';
 
 enum _LoadStatus { idle, loading, loaded, error }
 
@@ -86,6 +89,10 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   String? _inFlightNumber;
   List<String> _recent = const [];
 
+  /// Xaritadan tanlangan uchastka — ichki xaritada ajratib ko'rsatiladi va
+  /// tanlagich qayta ochilganda o'sha joydan boshlanadi.
+  NgisParcel? _parcel;
+
   /// The bundle this screen created, kept so that returning here (Back from a
   /// later step) and pressing Davom etish again REUSES it instead of building a
   /// fresh one — which would wipe every downstream edit (client, joylashuv,
@@ -123,6 +130,44 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     setState(() => _recent = list);
   }
 
+  /// Xaritadan uy tanlash. Qaytgan kadastr raqami maydonga yoziladi va
+  /// oddiy qidiruv oqimi ishga tushadi — manzil va maydon avvalgidek
+  /// davreestr'dan keladi (geoportalning ochiq qatlamida ular yo'q).
+  Future<void> _pickFromMap() async {
+    HapticFeedback.lightImpact();
+    final parcel = await Navigator.of(context).push<NgisParcel>(
+      MaterialPageRoute<NgisParcel>(
+        settings: const RouteSettings(name: 'ai/parcel-map'),
+        builder: (_) => ParcelPickerScreen(
+          initialCenter: _parcel?.center,
+          initialSelection: _parcel,
+        ),
+      ),
+    );
+    if (parcel == null || !mounted) return;
+    setState(() => _parcel = parcel);
+    _applyNumber(parcel.cadastreNumber);
+  }
+
+  /// Raqamni maydonga qo'yadi va qidiruvni MAJBURAN qaytadan boshlaydi.
+  ///
+  /// Holatni oldindan `idle` ga qaytarish shart: [_onCadastreChanged] qidiruvni
+  /// faqat `idle`/`error` da boshlaydi, aks holda avvalgi uyning manzili va
+  /// maydoni yangi raqam ostida turib qolardi.
+  void _applyNumber(String number) {
+    _loadTimer?.cancel();
+    setState(() {
+      _status = _LoadStatus.idle;
+      _info = null;
+      _errorMsg = null;
+    });
+    widget.onResolved?.call(null);
+    _cadastreController.value = TextEditingValue(
+      text: number,
+      selection: TextSelection.collapsed(offset: number.length),
+    );
+  }
+
   void _useRecent(String number) {
     _cadastreController.value = TextEditingValue(
       text: number,
@@ -141,7 +186,14 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   }
 
   void _onCadastreChanged() {
-    final filled = _cadastreRe.hasMatch(_cadastreController.text);
+    final text = _cadastreController.text;
+    // Qo'lda boshqa raqam yozilsa, xaritadagi yashil ajratma endi shu raqamga
+    // tegishli emas — uni olib tashlaymiz, aks holda xarita bir uyni, maydon
+    // esa boshqasini ko'rsatib turardi.
+    if (_parcel != null && _parcel!.cadastreNumber != text) {
+      _parcel = null;
+    }
+    final filled = _cadastreRe.hasMatch(text);
     if (filled) {
       if (_status == _LoadStatus.idle || _status == _LoadStatus.error) {
         _loadTimer?.cancel();
@@ -324,12 +376,15 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                       child: ServiceAppBar(
                         title: _CadastreStrings.title(l),
                         subtitle: _CadastreStrings.subtitle(l),
+                        // Bu tugma butun oqimni yopadi — bitta qadam
+                        // orqaga EMAS. Qadamma-qadam qaytish pastda.
+                        onBack: () => closeAiWizard(context),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 7, activeIndex: 0),
+                      child: const StepProgressBar(count: 8, activeIndex: 1),
                     ),
                     if (widget.scanJobId != null) ...[
                       const SizedBox(height: 12),
@@ -349,6 +404,18 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
+                          _SectionLabel(
+                            _CadastreStrings.mapLabel(l),
+                            color: labelColor,
+                          ),
+                          const SizedBox(height: 10),
+                          _MapCard(
+                            parcel: _parcel,
+                            isDark: isDark,
+                            locale: l,
+                            onTap: _pickFromMap,
+                          ),
+                          const SizedBox(height: 20),
                           _SectionLabel(
                             _CadastreStrings.cadastreNumber(l),
                             color: labelColor,
@@ -451,10 +518,11 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: ListingCtaButton(
-                        label: _CadastreStrings.continueLabel(l),
-                        enabled: _canContinue,
-                        onTap: _continue,
+                      child: WizardNavBar(
+                        onBack: () => Navigator.of(context).maybePop(),
+                        onContinue: _continue,
+                        continueLabel: _CadastreStrings.continueLabel(l),
+                        continueEnabled: _canContinue,
                       ),
                     ),
                   ],
@@ -510,6 +578,134 @@ class _ScanModelBar extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Kadastr raqamini xaritadan olish kartochkasi.
+///
+/// Ichkaridagi xarita ATAYLAB surilmaydi (`interactive: false`): u ro'yxat
+/// ichida turibdi va surish imkoniyati ro'yxatning vertikal siljishini
+/// o'g'irlab, ekranni "yopishqoq" qilib qo'yardi. Bosilganda esa to'liq
+/// ekranli tanlagich ochiladi — u yerda surish ham, masshtablash ham bemalol.
+class _MapCard extends StatelessWidget {
+  const _MapCard({
+    required this.parcel,
+    required this.isDark,
+    required this.locale,
+    required this.onTap,
+  });
+
+  final NgisParcel? parcel;
+  final bool isDark;
+  final Locale locale;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final p = parcel;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 190,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: border),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ParcelMap(
+                  // Kalit tanlov o'zgarganda xaritani o'sha uyga qayta
+                  // markazlaydi — `initialCenter` faqat qurilishda o'qiladi.
+                  key: ValueKey(p?.cadastreNumber ?? 'empty'),
+                  initialCenter: p?.center,
+                  initialZoom: p == null ? 12 : 18,
+                  selected: p,
+                  interactive: false,
+                  onTap: (_, _) {},
+                ),
+              ),
+            ),
+            Positioned(
+              left: 10,
+              right: 10,
+              bottom: 10,
+              child: _MapCardBadge(parcel: p, isDark: isDark, locale: locale),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MapCardBadge extends StatelessWidget {
+  const _MapCardBadge({
+    required this.parcel,
+    required this.isDark,
+    required this.locale,
+  });
+
+  final NgisParcel? parcel;
+  final bool isDark;
+  final Locale locale;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = parcel;
+    final bg = isDark
+        ? Colors.black.withValues(alpha: 0.68)
+        : Colors.white.withValues(alpha: 0.95);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.map_outlined, size: 18,
+              color: AppColors.splashGreen),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              p == null
+                  ? tr(locale, 'services.ai.cadastre.map_cta')
+                  : p.cadastreNumber,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+                color: textColor,
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            tr(
+              locale,
+              p == null
+                  ? 'services.ai.cadastre.map_open'
+                  : 'services.ai.cadastre.map_change',
+            ),
+            style: const TextStyle(
+              fontFamily: 'MTSText',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.splashGreen,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1114,6 +1310,8 @@ class _CadastreStrings {
 
   static String cadastreNumber(Locale l) =>
       tr(l, 'services.ai.cadastre.cadastre_number');
+
+  static String mapLabel(Locale l) => tr(l, 'services.ai.cadastre.map_label');
 
   static String recentSearches(Locale l) =>
       tr(l, 'services.ai.cadastre.recent_searches');

@@ -82,4 +82,24 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // CameraX — debug-only video capture (VideoCaptureActivity). Eng past
+    // zoom (0.5x / 0.6x — qurilmada nima bo'lsa) + HD sifat uchun kerak.
+    val cameraxVersion = "1.4.2"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-video:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation("androidx.activity:activity-ktx:1.9.3")
+
+    // CameraX ning `ListenableFuture` i uchun guava. video_player_android
+    // (media3 1.9.x) guava'ni `implementation` sifatida olib keladi — u :app
+    // ning compile classpath'iga CHIQMAYDI, lekin butun grafda
+    // `com.google.guava:listenablefuture` ni BO'SH artefaktga
+    // (9999.0-empty-to-avoid-conflict-with-guava) ko'taradi. Natijada
+    // VideoCaptureActivity.kt "Cannot access class 'ListenableFuture'" deb
+    // kompilyatsiya bo'lmay qolardi. Guava'ni ochiq qo'shib sinfni qaytaramiz;
+    // versiya media3 talab qilgani bilan bir xil — ikkinchi konflikt bo'lmasin.
+    implementation("com.google.guava:guava:33.3.1-android")
 }

@@ -1,3 +1,4 @@
+import AVFoundation
 import Flutter
 import UIKit
 import ARKit
@@ -13,6 +14,16 @@ import RoomPlan
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+
+    // Splash intro roligining ovozi (VideoSplashScreen) uchun audio sessiya.
+    // `.ambient` — jimlik (Ring/Silent) tugmasini HURMAT qiladi, `.mixWithOthers`
+    // esa foydalanuvchining musiqasini to'xtatmaydi. iOS ning standarti bo'lgan
+    // `.soloAmbient` boshqa ilovalarning ovozini uzib qo'yardi.
+    // Ovoz jimlik rejimida HAM eshitilishi kerak bo'lsa — `.ambient` o'rniga
+    // `.playback` qo'yiladi (lekin bu App Store'da "startda ovoz portlaydi"
+    // shikoyatiga olib keladi).
+    try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+
 
     // Phase 8.1: Auto-process scan from env var (simulator iteration uchun).
     // Misol: xcrun simctl launch booted uz.kadastr.kadastr --setenv KADASTR_AUTO_PROCESS=3 \
@@ -427,6 +438,30 @@ import RoomPlan
           } else {
             result(FlutterError(code: "UNSUPPORTED", message: "Skan iOS 17+ qurilma talab qiladi", details: nil))
           }
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      // Debug-only video capture — 0.5x (ultra-wide) 1080p HD. Flutter'dagi
+      // tugma faqat kDebugMode'da ko'rinadi; kanal esa har doim ro'yxatda
+      // turadi (release build'da hech kim chaqirmaydi).
+      let videoCaptureChannel = FlutterMethodChannel(
+        name: "kadastr/video_capture",
+        binaryMessenger: controller.binaryMessenger
+      )
+      videoCaptureChannel.setMethodCallHandler { [weak controller] call, result in
+        switch call.method {
+        case "isSupported":
+          result(VideoCaptureCoordinator.isSupported)
+
+        case "record":
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
+            return
+          }
+          VideoCaptureCoordinator.shared.start(from: controller, result: result)
 
         default:
           result(FlutterMethodNotImplemented)

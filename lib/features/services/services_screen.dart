@@ -222,6 +222,9 @@ class _ServicesScreenState extends State<ServicesScreen>
         // (Pushing AiCadastreScreen here skipped the scan step.)
         Navigator.of(context).push(
           MaterialPageRoute<void>(
+            // Nom SHART: oqimni yopish (`closeAiWizard`) `ai/` bilan
+            // boshlanmaydigan birinchi marshrutgacha poplaydi.
+            settings: const RouteSettings(name: 'ai/scan-intro'),
             builder: (_) => const AiScanIntroScreen(),
           ),
         );
