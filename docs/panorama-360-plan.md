@@ -394,6 +394,38 @@ KUCHIDA qoladi.
 
 ---
 
+### ⚠️ DOIRA — MAVJUD KODGA TEGILMAYDI (2026-09-11)
+
+360° ish **Bozor e'lon sehrgari** uchun. Undan tashqaridagi mavjud kodga
+tegilmaydi.
+
+Bir marta tegildi va QAYTARILDI (`e720c90`): AI Baholash kamerasi
+(`room_plan_scanner.dart`, `video_capture.dart`) `CameraGuard` ga
+o'ralgan, Android CameraX 1.4.2 → 1.6.0 ko'tarilgan, manifestdan
+`RECORD_AUDIO` olib tashlangan, iOS plist va ilova versiyasi
+o'zgartirilgan edi. Foydalanuvchi buni so'ramagan.
+
+**7.2-bo'limdagi yechim shu sababli QAYTA KO'RIB CHIQILADI.** U «mavjud
+ikkala yo'lni ham `CameraGuard` ga o'rash» deydi — bu mavjud kodga
+tegishni talab qiladi. 19-qadamda avval TEGMAYDIGAN muqobil ko'riladi:
+
+> Panorama capture ekrani **o'zi** ochilishdan oldin bandlikni
+> tekshirsin va band bo'lsa umuman ochilmasin. `CameraGuard`
+> (`lib/features/panorama/data/camera_guard.dart`) shundoq ham sof va
+> hech kimga ulanmagan — uni faqat panorama tomonida ishlatish mumkin.
+>
+> Narxi ochiq: bu FAQAT «panorama boshqasini kutadi» tomonini yopadi.
+> Teskarisi — AI Baholash panorama ochiq turganda kamerani so'rashi —
+> ochiq qoladi. Uni yopish uchun mavjud faylga tegish SHART, va u
+> paytda **so'raladi**.
+
+Xuddi shu qoida `camera` va `dchs_motion_sensors` paketlariga ham
+tegishli: ular Android manifestini va Gradle'ni o'zgartiradi
+(§7.1). Ular 19-qadamda, capture ekrani bilan BIRGA va so'ralgandan
+keyin qo'shiladi — oldin emas.
+
+---
+
 ### Mil nuqtalari — har biridan keyin NIMA ISHLAYDI
 
 | Mil | Qadam | Natija |
