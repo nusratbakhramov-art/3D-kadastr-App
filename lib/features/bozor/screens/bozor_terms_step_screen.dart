@@ -22,15 +22,19 @@ import '../data/bozor_api.dart';
 import '../data/bozor_draft_store.dart';
 import '../data/bozor_submit.dart';
 import '../models/bozor_draft.dart';
+import '../models/bozor_validation.dart';
 import '../widgets/bozor_consent_row.dart';
 import '../widgets/draft_preview_sheet.dart';
 import '../widgets/tier_card.dart';
 import 'bozor_success_screen.dart';
 
 class BozorTermsStepScreen extends StatefulWidget {
-  const BozorTermsStepScreen({super.key, required this.draft});
+  const BozorTermsStepScreen({super.key, required this.draft, this.submitter});
 
   final BozorDraft draft;
+
+  /// Faqat testlar uchun — tarmoqqa chiqmasdan yuborishni almashtirish.
+  final BozorSubmitter? submitter;
 
   @override
   State<BozorTermsStepScreen> createState() => _BozorTermsStepScreenState();
@@ -39,7 +43,7 @@ class BozorTermsStepScreen extends StatefulWidget {
 class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
   TermsDraft get _t => widget.draft.terms;
 
-  final BozorSubmitter _submitter = BozorSubmitter();
+  late final BozorSubmitter _submitter = widget.submitter ?? BozorSubmitter();
   bool _sending = false;
 
   /// Yuklash jarayoni — tugma matnida ko'rinadi («Yuborilmoqda… 3/12»).
@@ -50,7 +54,8 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
 
   @override
   void dispose() {
-    _submitter.dispose();
+    // Testdan berilgan bo'lsa uni yopish testning ishi.
+    if (widget.submitter == null) _submitter.dispose();
     super.dispose();
   }
 
@@ -75,8 +80,40 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
   ///
   /// Xatolikda qoralama JOYIDA qoladi va tugma yana yonadi — foydalanuvchi
   /// hamma narsani qaytadan kiritmasligi kerak.
+  /// Yuborishdan OLDINGI oxirgi darvoza.
+  ///
+  /// Qadamlarning har biri o'z "Далее" sini bloklaydi, lekin qoralamani
+  /// davom ettirish sehrgarni SAQLANGAN qadamdan ochadi: `current_step` ==
+  /// `terms` bo'lsa foydalanuvchi to'g'ridan bu ekranga tushadi va 1–6
+  /// qadamlarning tekshiruvi umuman ishlamaydi. Shunda server tushunarsiz
+  /// 400 berardi (`'bathroom_type' toʻldirilishi shart`) — maydon 3-qadamda,
+  /// u esa ochilmagan ham.
+  ///
+  /// `true` — yuborish mumkin.
+  bool _checkComplete(Locale l) {
+    final blockers = draftBlockers(widget.draft);
+    if (blockers.isEmpty) return true;
+    final first = blockers.first;
+    final step = tr(l, first.stepTitleKey);
+    // Maydon nomlari bo'lsa aytamiz — "Parametrlar qadami to'ldirilmagan"
+    // dan ko'ra "Parametrlar: Sanuzel turi" ancha foydali.
+    final fields = first.fieldLabelKeys.take(3).map((k) => tr(l, k)).join(', ');
+    final more = first.fieldLabelKeys.length > 3
+        ? ' +${first.fieldLabelKeys.length - 3}'
+        : '';
+    final n = widget.draft.stepNumber(first.step);
+    AppToast.error(
+      context,
+      fields.isEmpty
+          ? '$n. $step — ${tr(l, 'bozor.common.fill_required')}'
+          : '$n. $step: $fields$more',
+    );
+    return false;
+  }
+
   Future<void> _submit() async {
     if (_sending) return;
+    if (!_checkComplete(Localizations.localeOf(context))) return;
     setState(() {
       _sending = true;
       _done = 0;
