@@ -1,5 +1,10 @@
 # 360° panorama — capture, tikish va ko'ruvchi (kadastr mobil ilovasi)
 
+> **HOLAT VA DAVOMI → [panorama-360-status.md](panorama-360-status.md)**
+>
+> Bu fayl — REJA va QARORLAR (nega shunday qilingan). Nima bajarilgani,
+> nima qolgani va qayerdan davom ettirish kerakligi alohida hujjatda.
+
 > **Manba:** `~/StudioProjects/panorama` loyihasi (branch `1.0.2` — UX, `1.0.1` — asos).
 > ⚠️ **Unga TEGILMAYDI.** U faqat o'qish uchun manba; hamma kod shu repoda yoziladi.
 >
