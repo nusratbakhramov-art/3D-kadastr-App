@@ -336,3 +336,105 @@ Solishtirish uchun, 2026-09-10, MacBook (darwin arm64), sintetik kadr:
 
 Bu raqamlar Mac protsessorining tezligi — telefonniki EMAS. Ular faqat
 harness ishlayotganini ko'rsatadi.
+
+---
+
+# MIL-1 — 8 kadrni tikish (13-qadam, QURILMA KERAK)
+
+**Butun yondashuvning qaror darvozasi.** MIL-0 «kadrni dekod qila
+olamizmi» degan savolga javob berdi; bu esa «hammasini TIKA olamizmi»
+degan savolga javob beradi.
+
+## Bitta buyruq
+
+```bash
+bash tool/pano/bench_stitch.sh -f ~/Desktop/kadrlar
+```
+
+Android'da skript kadrlarni `adb push` bilan o'zi ko'chiradi. iOS'da adb
+yo'q — kadrlarni qurilmaga o'zingiz joylang va yo'lini bering:
+
+```bash
+bash tool/pano/bench_stitch.sh --device-dir <qurilmadagi papka>
+```
+
+## Kadrlar qanday nomlanadi
+
+Burchaklar FAYL NOMIDAN o'qiladi, chunki capture ekrani (19-qadam) hali
+yozilmagan va sensor yozuvlari yo'q:
+
+```
+y000_p0.jpg   y045_p0.jpg   y090_p0.jpg   y135_p0.jpg
+y180_p0.jpg   y225_p0.jpg   y270_p0.jpg   y315_p0.jpg
+```
+
+`y<yaw>_p<pitch>` — yaw daraja bo'yicha soat yo'nalishida, pitch
+gorizontdan yuqoriga musbat. Kamida 2 ta kerak, MIL-1 uchun **8 ta**
+tavsiya etiladi (bitta gorizont halqasi).
+
+Kadrlarni qo'lda olsangiz: bir joyda turib, telefonni tik ushlab, har
+45° da bitta surat. Aniqlik muhim emas — o'lchov TEZLIKNI ko'radi.
+
+## ⚠️ QAROR `extrapolated76_s` GA QARAB QABUL QILINADI
+
+Bu bosqichda **gains (14), seam (15) va blend (16) hali yozilmagan**,
+ya'ni o'lchov yakuniy quvurning atigi **56 %ini** ko'radi
+(`kMil1Share` = decode 0.10 + project 0.44 + finish 0.02).
+
+Xom `measured_ms` ga qarash «GO» ni **qariyb ikki barobar optimistik**
+qilardi. Skript ekstrapolyatsiyani o'zi hisoblaydi:
+
+```
+extrapolated76 = measured × (76 / kadr_soni) / 0.56
+```
+
+Masalan 8 kadr 10 sekundda tikilsa — bu yaxshi ko'rinadi, lekin
+ekstrapolyatsiya **170 s** beradi, ya'ni 120 s chegarasidan OSHADI.
+
+## QAROR jadvali
+
+| `extrapolated76_s` | Qaror |
+|---|---|
+| **≤ 120 s** | **GO** — sof Dart yetadi, 14–16-qadamlarga o'tiladi |
+| **> 120 s** | **NO** — quvur yengillashtiriladi (pastga qarang) |
+
+120 s qayerdan: foydalanuvchi suratga olishga ~2 daqiqa sarflaydi;
+tikish undan uzoq davom etsa oqim tashlab ketiladi.
+
+**NO bo'lsa variantlar** (arzonidan qimmatiga):
+
+1. **Isolate'larga bo'lish** — `horizontalSlices` va `roiIntersectsRows`
+   allaqachon yozilgan va test bilan qoplangan (tasmalarga bo'lingan
+   natija yaxlit natija bilan baytma-bayt bir xil). 4 yadroda ~4×.
+2. **Tuvalni kichraytirish** — 3072 → 2048 proyeksiya yukini ~2.25×
+   kamaytiradi (piksel soni kvadratga proporsional).
+3. **Kadr sonini kamaytirish** — 76 → 40 (qutblarni tashlash + ±45
+   qatorlarini siyraklashtirish). Qamrov tushadi.
+4. **Native kanal** — eng qimmati, MIL-0 da o'tkazib yuborilgan bo'lsa
+   qaytib kelish.
+
+## Natija — QURILMADA O'LCHANADI (bo'sh)
+
+```
+sana        :
+qurilma     :                     (model, iOS/Android versiyasi)
+rejim       :                     (profile bo'lishi SHART)
+kadr soni   :
+```
+
+| O'lchov | Qiymat |
+|---|---|
+| `measured_ms` | |
+| `decode_ms` | |
+| `project_ms` | |
+| `finish_ms` | |
+| `extrapolated76_s` | |
+| `coverage_deg` | |
+
+**QAROR:** ☐ GO (14-qadamga) ☐ NO (quvur yengillashtiriladi)
+
+**Izoh:**
+
+⚠️ `coverage_deg` ni ham qarang: bitta gorizont halqasi ~46° beradi.
+180° ga yaqin son chiqsa — bu XATO alomati (qamrov piksellardan
+o'lchanadi, nisbatdan emas).
