@@ -15,6 +15,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/api_config.dart';
 import '../../auth/auth_http_client.dart';
+import '../models/bozor_listing.dart';
 
 /// Kod + shu tildagi yorliq.
 class ListingOption {
@@ -132,6 +133,73 @@ class BozorApi {
       throw BozorApiException(_errorOf(res), statusCode: res.statusCode);
     }
     return jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+  }
+
+  /// Ommaviy lenta — faqat `approved` e'lonlar, anonim ham ko'radi.
+  ///
+  /// Sahifalash `page`/`size` (cursor YO'Q). `size` ning yuqori chegarasi
+  /// backendda **50** — kattasini yuborsak 422 qaytadi.
+  /// Narx filtri NORMALLASHTIRILGAN `price_uzs` bo'yicha, ya'ni chegaralar
+  /// har doim SO'MDA yuboriladi (dollarlik e'lon ham shunga tushadi).
+  Future<BozorListingPage> listings({
+    String? dealType,
+    String? propertyType,
+    int? regionId,
+    int? districtId,
+    num? priceMin,
+    num? priceMax,
+    int? rooms,
+    num? areaMin,
+    num? areaMax,
+    String? search,
+    int page = 1,
+    int size = 20,
+  }) async {
+    final body = await _getJson(
+      _uri('/listings/', {
+        'deal_type': ?dealType,
+        'property_type': ?propertyType,
+        if (regionId != null) 'region_id': '$regionId',
+        if (districtId != null) 'district_id': '$districtId',
+        if (priceMin != null) 'price_min': '$priceMin',
+        if (priceMax != null) 'price_max': '$priceMax',
+        if (rooms != null) 'rooms': '$rooms',
+        if (areaMin != null) 'area_min': '$areaMin',
+        if (areaMax != null) 'area_max': '$areaMax',
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        'page': '$page',
+        'size': '$size',
+      }),
+    );
+    return BozorListingPage.fromJson(body);
+  }
+
+  /// "Mening e'lonlarim" — moderatsiyadagi va rad etilganlari BILAN.
+  /// Token SHART (`AuthHttpClient` qo'shadi); mehmon 401 oladi.
+  ///
+  /// [status] — `pending` | `approved` | `rejected` | `archived`; `null` bo'lsa
+  /// hammasi. `size` chegarasi bu yerda **100** (lentadagidan boshqa).
+  Future<BozorListingPage> myListings({
+    String? status,
+    int page = 1,
+    int size = 20,
+  }) async {
+    final body = await _getJson(
+      _uri('/listings/my', {
+        'status': ?status,
+        'page': '$page',
+        'size': '$size',
+      }),
+    );
+    return BozorListingPage.fromJson(body);
+  }
+
+  /// Bitta e'lon. Tasdiqlanmaganini FAQAT egasi ko'radi — begonaga 404
+  /// ("Eʼlon topilmadi") keladi, ya'ni "yo'q" va "hali tasdiqlanmagan"
+  /// klientda ajratilmaydi (ataylab: mavjudligi oshkor bo'lmasin).
+  Future<BozorListing> listing(int id) async {
+    final body = await _getJson(_uri('/listings/$id'));
+    return BozorListing.fromJson(body);
   }
 
   // ── Ichki ─────────────────────────────────────────────────────────────────

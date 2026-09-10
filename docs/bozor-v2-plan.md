@@ -219,6 +219,83 @@ kod bilan ajralib ketadi (`test_generated_option_labels_reach_the_seed` shuni us
 
 ## M1 — Uzilgan halqalarni yopish (mavjud oqim tirik bo'lsin)
 
+### ⚠️ M1 QAMROVI O'ZGARDI (2026-09-10, foydalanuvchi aniqlashtirdi)
+
+**Talab.** Home'dagi «Bozor AI» kartasi **ikki tabli** ekranni ochadi:
+
+| Tab | Nima ko'rinadi |
+|---|---|
+| **«E'lonlar»** | ommaviy lenta — `approved` e'lonlar (`GET /listings/`) |
+| **«Mening e'lonlarim»** | MENING hamma e'lonim: **tugatilmagan qoralamalar**, `pending`, `approved`, `rejected`, `archived` |
+
+«Mening e'lonlarim» tabida **«E'lon qo'shish»** tugmasi turadi — sehrgarni ochadi.
+
+**Rejaga ta'siri:**
+
+1. **8- va 12-qadam BIRLASHADI.** Ular alohida ikki ekran emas, bitta ikki tabli ekranning
+   ikki tabi. `my_listings_screen.dart` (hozir `mockListings`) shu tabga aylanadi.
+2. **34-qadam (sehrgar qoralamasini saqlash) M4 dan M1 ga KO'CHADI.** Sababi oddiy:
+   qoralamalar saqlanmasa «tugatilmagan qoralamalar» ro'yxati BO'SH bo'ladi, ya'ni
+   talabning yarmi ishlamaydi. Qoralamasiz bu tabni yozish ma'nosiz.
+3. **YANGI backend qadami kerak** — qoralama endpointlari (pastda).
+4. Qoralamani bosganda sehrgar **o'sha qadamdan** ochilishi kerak (resume).
+   Loyihada naqsh bor: `lib/features/services/ai_draft_resume.dart`.
+
+### Qoralama dizayni — mavjud naqshga ergashiladi
+
+AI Baholash oqimi allaqachon SERVER tomonda qoralama saqlaydi (lokal emas):
+`POST /ai-valuations/draft` → `PATCH /{id}/draft` (har qadamda, `current_step` bilan) →
+`GET /drafts` → `POST /{id}/submit` (draft → queued). Qismli ma'lumot
+`request_payload: Mapped[dict] = mapped_column(JSON)` da yotadi — sxema DB'da emas,
+so'rov chegarasida majburlanadi (`ai_valuation_job.py:106`). Bozor qoralamasi ham SHUNDAY.
+
+**Lekin bitta farq bilan: ALOHIDA JADVAL** — `bozor_listing_drafts`, `bozor_listings` emas.
+
+| Variant | Nega tanlanmadi / tanlandi |
+|---|---|
+| (a) bir jadval, `status='draft'` + ko'p NULL ustun | ⛔ `bozor_listings` da 46 ustun, ularning ko'pi `NOT NULL`, ustiga 16 indeks. Qoralama uchun ularni nullable qilish CHOP ETILGAN e'lonlarning invariantini ham bo'shashtiradi va mavjud jadvalga migratsiya talab qiladi (alembic 3 head bilan buzuq) |
+| **(b) alohida `bozor_listing_drafts` jadvali** | ✅ Hech qanday ustun bo'shashmaydi; `submit` qoralamani MAVJUD tekshirilgan yo'l (`ListingCreateRequest` → `create()`) orqali haqiqiy e'longa aylantiradi, ya'ni validatsiya bir joyda qoladi |
+
+Narxi: qoralama va e'lonning `id` fazosi boshqa — «Mening e'lonlarim» tabi IKKI manbani
+qo'shib ko'rsatadi. Bu ochiq va ataylab qilingan; UI da qoralama alohida belgi bilan turadi.
+
+**Yangi jadval:** `bozor_listing_drafts(id, user_id FK, payload JSON NOT NULL,
+current_step String(32) NULL, created_at, updated_at)` — `scripts/ensure_bozor_listing_drafts.py`
+idempotent DDL bilan (alembic YO'Q).
+
+**Yangi endpointlar** (`app/api/v1/listings.py`, literal yo'llar `/{listing_id}` dan OLDIN):
+
+| Metod | Yo'l | Nima qiladi |
+|---|---|---|
+| `POST` | `/listings/drafts` | qoralama yaratadi → `{id}` |
+| `PATCH` | `/listings/drafts/{id}` | qadam saqlaydi (`payload` + `current_step`) |
+| `GET` | `/listings/drafts` | mening qoralamalarim |
+| `DELETE` | `/listings/drafts/{id}` | qoralamani o'chiradi |
+| `POST` | `/listings/drafts/{id}/submit` | qoralama → haqiqiy e'lon (`pending`), qoralama o'chadi |
+
+⚠️ `GET /listings/` (ommaviy) qoralamani KO'RSATMASLIGI shart — u alohida jadvalda
+bo'lgani uchun bu o'z-o'zidan ta'minlanadi (qo'shimcha filtr kerak emas).
+
+⚠️ **Maxfiylik:** qoralama `payload` ida telefon raqam va manzil bo'ladi — hamma
+qoralama endpointi `user_id` bo'yicha qat'iy tekshirilishi kerak (boshqa odamning
+qoralamasi 404, 403 emas: mavjudligini ham oshkor qilmaslik uchun).
+
+
+
+> ⚠️ **2026-09-10 da o'lchandi: LOKALDA S3 YO'Q.** `docker-compose.yml` da MinIO xizmati
+> yo'q va konteynerda `settings.AWS_S3_ENDPOINT_URL` **bo'sh**. Demak 4- va 5-qadamning
+> natijasini lokal tekshirib bo'lmaydi.
+>
+> Shuning uchun ikkala qadam **ikkiga bo'linadi**:
+> - **kod qismi** (prefiksni `storage_status_service._PREFIXES` ga qo'shish, yetim fayl GC
+>   vazifasi, thumbnail vazifasi) — yoziladi va soxta (fake) S3 bilan unit-test qilinadi;
+> - **ops qismi** (haqiqiy bucket'ga public-read siyosatini qo'llash) — prod kalitlarini
+>   talab qiladi, ya'ni **buni men bajarmayman**: buyruq/skript hujjatga yoziladi va
+>   egasi qo'llaydi.
+>
+> Natijada M1 ning tekshirib bo'ladigan qadamlari — **6, 7, 8, 9, 10, 12, 13** — ular
+> BIRINCHI bajariladi; 4, 5, 11 keyinroq (kod + fake test + ops yozuvi).
+
 ### 4. MinIO: `listings/media/` public-read + yetim fayl siyosati
 
 | | |
@@ -325,6 +402,11 @@ tekin keladi — shu yo'l tanlansin.
 ---
 
 ### 8. Mobil: «Mening e'lonlarim» — mock'dan haqiqiy `/listings/my` ga
+
+> ⚠️ **BIRLASHTIRILDI 12-qadam bilan** (M1 qamrovi o'zgarishiga qarang): bu alohida ekran
+> emas, ikki tabli «Bozor» ekranining 2-tabi. Qoralamalarni ham ko'rsatadi, ya'ni
+> 34-qadamga (qoralama saqlash) bog'liq.
+
 
 | | |
 |---|---|
@@ -446,6 +528,12 @@ bo'lish limitni chetlab o'tadi, shuning uchun umumiy cheklovni **mobil tarafda o
 ---
 
 ### 12. Mobil: Bozor lentasi — (a) repository, (b) ekran
+
+> ⚠️ **QAYTA TA'RIFLANDI:** ikki tabli ekran («E'lonlar» + «Mening e'lonlarim»),
+> 8-qadamni O'Z ICHIGA OLADI, va «E'lon qo'shish» tugmasi shu ekranda.
+> Kirish nuqtasi — `main_shell.dart:259 _openBozorAi()`. Marshrutga `bozorRoute(...)`
+> BERILMASIN (yuqoridagi tuzoq).
+
 
 > ⚠️ **Bu bitta o'tirishga sig'maydi.** Ikki qism sifatida bajariladi.
 
@@ -1085,6 +1173,11 @@ qisqartirmang. `AiLocationScreen` dagi `_SearchInput`/`_SuggestionList` naqshi k
 
 ### 34. Sehrgar qoralamasini saqlash
 
+> ⚠️ **M4 dan M1 ga KO'CHIRILDI** (2026-09-10): «Mening e'lonlarim» tabi tugatilmagan
+> qoralamalarni ko'rsatishi shart, aks holda ro'yxatning yarmi bo'sh bo'ladi.
+> Dizayni — M1 qamrovi bo'limida (alohida `bozor_listing_drafts` jadvali + 5 endpoint).
+
+
 | | |
 |---|---|
 | **Repo** | mobile |
@@ -1290,9 +1383,17 @@ holatning 8/8 maketi yo'q; `293:12030` — eski 7/7 avlodi, ko'chirish **farazim
 6. **O'qilmagan 7 freym** (`1414-21717`, `1414-21438`, `1414-21488`, `1414-21563`, `1414-21605`,
    `293-12538`, `293-12539`). Ular «Другая нежилая» oqimining qo'shimcha qadamlari bo'lsa —
    M3-18/19 qayta yoziladi. ⛔ **M3 ni bloklaydi.**
-7. **Bozor lentasining kirish nuqtasi.** Hozir 4 tab (Asosiy/Market/Arizalar/Profil).
-   (a) Home'da yangi karta, (b) Market tab ichida segment/ikkinchi bo'lim, (c) 5-tab?
-   ⛔ **M1-12b ni bloklaydi.**
+7. ~~**Bozor lentasining kirish nuqtasi.**~~ ✅ **JAVOB BERILDI (2026-09-10):**
+   mavjud **Home kartasi «Bozor AI»** endi sehrgarni EMAS, **e'lonlar lentasini** ochadi;
+   sehrgarga o'tish lentaning ichidagi tugma orqali. Yangi tab qo'shilmaydi, 4 tab tegilmaydi.
+   Ya'ni `main_shell.dart:259 _openBozorAi()` hozir `BozorTypeStepScreen` ni push qiladi —
+   u lenta ekraniga o'zgaradi.
+
+   ⚠️ **TUZOQ:** lenta marshrutiga `bozorRoute(...)` BERILMASIN. `closeBozorWizard()`
+   `bozor/` prefiksli hamma marshrutni pop qiladi (`bozor_routes.dart`), shuning uchun lenta
+   shu prefiks bilan push qilinsa sehrgar tugagach foydalanuvchi lentaga emas, Home'ga
+   tushib qoladi — va 8/8 dagi `pushAndRemoveUntil` ham lentani olib tashlaydi.
+   Lenta prefikssiz nom bilan (yoki nomsiz) push qilinadi.
 8. **Sevimlilar («Избранные»).** Umuman yo'q — na mobil, na backend, na ikonka.
    Bu rejaga **kiritilmagan**. Kerakmi va qachon?
 9. **«Выделенные цветом» (7🪙) qayerda tanlanadi?** Chekda ko'rinadi, boshqaruvi `293:12030` da
