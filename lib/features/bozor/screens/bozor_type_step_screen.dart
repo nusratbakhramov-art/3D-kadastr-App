@@ -4,6 +4,11 @@
 ///   e'lon turi → mulk toifasi → mulk turi
 /// Oxirgisi butun qolgan oqimni belgilaydi (maydonlar VA qadamlar soni), shu
 /// sababli u toifa tanlanmaguncha o'chiq turadi va toifa o'zgarsa tozalanadi.
+///
+/// Birinchi tanlov — e'lon turi — serverdagi `bozor_sale_enabled` bayrog'iga
+/// bog'liq: sotuv sehrgari hali yarim (narx qadami ijara yorliqlarini beradi,
+/// "Сделка" qadami yo'q), shuning uchun bayroq o'chiq bo'lsa "Продажа" umuman
+/// taklif qilinmaydi.
 library;
 
 import 'package:flutter/material.dart';
@@ -15,16 +20,20 @@ import '../../services/widgets/service_app_bar.dart';
 import '../../services/widgets/step_progress_bar.dart';
 import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
+import '../data/bozor_api.dart';
 import '../models/bozor_draft.dart';
 import 'bozor_address_step_screen.dart';
 import '../widgets/option_picker_sheet.dart';
 import '../widgets/select_field.dart';
 
 class BozorTypeStepScreen extends StatefulWidget {
-  const BozorTypeStepScreen({super.key, this.draft});
+  const BozorTypeStepScreen({super.key, this.draft, this.api});
 
   /// Oqimga qaytib kelinganda oldingi tanlov saqlanib qolsin.
   final BozorDraft? draft;
+
+  /// Faqat testlar uchun — sotuv bayrog'ini o'qiydigan klientni almashtirish.
+  final BozorApi? api;
 
   @override
   State<BozorTypeStepScreen> createState() => _BozorTypeStepScreenState();
@@ -32,13 +41,77 @@ class BozorTypeStepScreen extends StatefulWidget {
 
 class _BozorTypeStepScreenState extends State<BozorTypeStepScreen> {
   late final BozorDraft _draft = widget.draft ?? BozorDraft();
+  late final BozorApi _api = widget.api ?? BozorApi();
+
+  /// Sukut `false`: bayroq javobi kelmaguncha ham, tarmoq yo'q bo'lsa ham
+  /// sotuv ko'rinmaydi. Yarim ishlaydigan oqimni ko'rsatgandan ko'ra
+  /// ko'rsatmaslik arzon.
+  bool _saleEnabled = false;
+  bool _gateRequested = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_gateRequested) return;
+    _gateRequested = true;
+    // Til shu yerda mavjud (initState'da emas), bayroqning o'zi esa tilga
+    // bog'liq emas — shuning uchun bir marta so'raladi.
+    _loadSaleGate(Localizations.localeOf(context).languageCode);
+  }
+
+  @override
+  void dispose() {
+    // Klient testdan berilgan bo'lsa uni yopish testning ishi.
+    if (widget.api == null) _api.dispose();
+    super.dispose();
+  }
+
+  /// Bayroqni fonda o'qiydi. Ataylab `await` qilinmaydi va xato yutiladi:
+  /// bu jimgina cheklov, foydalanuvchiga ko'rsatiladigan xato emas — aks holda
+  /// offline foydalanuvchi sehrgarni umuman ocholmaydi.
+  Future<void> _loadSaleGate(String locale) async {
+    try {
+      final ref = await _api.reference(locale);
+      if (!mounted) return;
+      _applyGate(ref.saleEnabled);
+    } catch (_) {
+      // Sukut `false` bo'lib qoladi — ijara oqimi ishlashda davom etadi.
+      if (mounted) _applyGate(false);
+    }
+  }
+
+  /// Bayroq javobi KELGANDAN keyin qo'llanadi.
+  ///
+  /// Nega bu yerda, `didChangeDependencies` da emas: o'sha payt `_saleEnabled`
+  /// hamisha `false` bo'ladi (so'rov hali ketmagan), ya'ni pastdagi shart
+  /// bayroqdan qat'i nazar ishga tushib, e'lon turini `rent` ga majburlab
+  /// qo'yardi va bayroq `true` bo'lganda ham qaytarmasdi. Natijada sotuv
+  /// yoqilganda 1-qadam «В аренду» bilan to'lgan holda ochilib, sotuvchi
+  /// sezmasdan ijara e'loni yaratishi mumkin edi.
+  void _applyGate(bool saleEnabled) {
+    setState(() {
+      _saleEnabled = saleEnabled;
+      // Bayroq o'chiq — pickerda yakka variant qoladi, shuning uchun uni
+      // oldindan qo'yamiz: maydon bo'sh turib "Далее" ni bloklamasin va
+      // qoralamada yopiq `sale` qolib ketmasin. Bayroq YOQIQ bo'lsa tanlovni
+      // foydalanuvchi qiladi — biz hech narsani to'ldirmaymiz.
+      if (!saleEnabled && _draft.deal != DealType.rent) {
+        _draft.deal = DealType.rent;
+      }
+    });
+  }
+
+  /// Pickerda ko'rinadigan e'lon turlari. Bayroq o'chiq bo'lsa bitta element
+  /// qoladi — varaq shunda ham ochiladi va ishlaydi.
+  List<DealType> get _dealOptions =>
+      _saleEnabled ? DealType.values : const [DealType.rent];
 
   Future<void> _pickDeal() async {
     final l = Localizations.localeOf(context);
     final picked = await showOptionPickerSheet<DealType>(
       context,
       title: _S.dealLabel(l),
-      options: DealType.values,
+      options: _dealOptions,
       labelOf: (v) => v.label(l),
       selected: _draft.deal,
     );

@@ -189,6 +189,7 @@ class ListingReference {
     required this.types,
     required this.kindTypes,
     required this.topTierEnabled,
+    required this.saleEnabled,
   });
 
   final List<ListingOption> dealTypes;
@@ -200,6 +201,11 @@ class ListingReference {
 
   /// "Top" tarifi adminkadan yoqilganmi. O'chiq bo'lsa karta ko'rsatilmaydi.
   final bool topTierEnabled;
+
+  /// Sotuv ("Продажа") oqimi yoqilganmi. Sotuv sehrgari hali yarim — narx
+  /// qadami ijara yorliqlarini ko'rsatadi va "Сделка" qadami yo'q — shu
+  /// sababli bayroq o'chiq bo'lsa 1-qadamda sotuv varianti berilmaydi.
+  final bool saleEnabled;
 
   factory ListingReference.fromJson(Map<String, dynamic> j) {
     List<ListingOption> opts(String key) => [
@@ -216,6 +222,9 @@ class ListingReference {
           e.key: [for (final v in (e.value as List? ?? const [])) v.toString()],
       },
       topTierEnabled: j['top_tier_enabled'] == true,
+      // `== true` ataylab: maydon yo'q bo'lsa (bayroqdan oldingi server)
+      // yoki `null` kelsa `false` chiqadi — xavfsiz taraf.
+      saleEnabled: j['sale_enabled'] == true,
     );
   }
 }

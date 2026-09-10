@@ -175,6 +175,8 @@ tekshiriladi.
 | **Repo** | — (tashqi) |
 | **Fayllar** | `docs/bozor-v2-figma-map.md` (§12 83–89, §10) |
 
+**So'rov matnlari:** [`docs/bozor-v2-blockers.md`](./bozor-v2-blockers.md)
+
 **Nega shu o'rinda.** Uchta narsa **kalendarga bog'liq** va rejaning ichida turib kutib bo'lmaydi:
 (a) 7 ta o'qilmagan freym — agar ular «Другая нежилая» oqimining qo'shimcha qadamlari bo'lsa,
 M3-18/19 qayta yoziladi; (b) `sale_type` / `ownership_years` / `owners_count` /
