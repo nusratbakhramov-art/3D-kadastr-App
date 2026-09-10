@@ -15,21 +15,32 @@ import 'package:flutter/material.dart';
 
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
-import '../../listings/my_listings_screen.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../bozor_routes.dart';
+import '../feed/bozor_listing_detail_screen.dart';
 import '../models/bozor_draft.dart';
 import 'bozor_type_step_screen.dart';
 
 class BozorSuccessScreen extends StatelessWidget {
-  const BozorSuccessScreen({super.key});
+  const BozorSuccessScreen({super.key, this.listingId});
 
-  /// TODO(backend): e'lon yaratish endpoint'i bo'lmagani uchun yangi e'lonning
-  /// id'si yo'q — "nashrga o'tish" hozircha o'z e'lonlarim ro'yxatini ochadi.
-  void _openPublication(BuildContext context) {
+  /// Yaratilgan e'lonning id'si (`POST /listings/` yoki
+  /// `POST /listings/drafts/{id}/submit` javobidan).
+  ///
+  /// `null` bo'lishi mumkin: yuborish muvaffaqiyatli bo'lgan, lekin javobdagi
+  /// `id` kutilmagan shaklda kelgan. Bunday holatda "ko'rish" tugmasi
+  /// ko'rsatilmaydi — mavjud bo'lmagan e'lonni ochib 404 bergandan yaxshi.
+  final int? listingId;
+
+  /// Yaratilgan e'lonning detali. Sehrgar YOPILADI, keyin detal ochiladi —
+  /// shunda orqaga qaytish foydalanuvchini lentaga, sehrgarga EMAS, olib
+  /// boradi.
+  void _openListing(BuildContext context, int id) {
     closeBozorWizard(context);
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const MyListingsScreen()),
+      MaterialPageRoute<void>(
+        builder: (_) => BozorListingDetailScreen(listingId: id),
+      ),
     );
   }
 
@@ -51,6 +62,7 @@ class BozorSuccessScreen extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final id = listingId;
 
     return PopScope(
       // Orqaga qaytish yo'q: sehrgar allaqachon yopilgan.
@@ -83,15 +95,24 @@ class BozorSuccessScreen extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        ListingCtaButton(
-                          label: tr(l, 'bozor.success.go_to_listing'),
-                          onTap: () => _openPublication(context),
-                        ),
-                        const SizedBox(height: 10),
-                        _SecondaryButton(
-                          label: tr(l, 'bozor.success.add_another'),
-                          onTap: () => _addAnother(context),
-                        ),
+                        if (id != null) ...[
+                          ListingCtaButton(
+                            label: tr(l, 'bozor.success.go_to_listing'),
+                            onTap: () => _openListing(context, id),
+                          ),
+                          const SizedBox(height: 10),
+                          _SecondaryButton(
+                            label: tr(l, 'bozor.success.add_another'),
+                            onTap: () => _addAnother(context),
+                          ),
+                        ] else
+                          // Id yo'q — "yana bittasini qo'shish" asosiy tugma
+                          // bo'ladi, aks holda ekranda hech qanday chiqish yo'l
+                          // qolmaydi (orqaga qaytish ham yopilgan).
+                          ListingCtaButton(
+                            label: tr(l, 'bozor.success.add_another'),
+                            onTap: () => _addAnother(context),
+                          ),
                       ],
                     ),
                   ),

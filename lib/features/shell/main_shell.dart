@@ -23,8 +23,7 @@ import '../profile/profile_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr/kadastr_area_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
-import '../bozor/bozor_routes.dart';
-import '../bozor/screens/bozor_type_step_screen.dart';
+import '../bozor/feed/bozor_home_screen.dart';
 import '../services/screens/service_placeholder_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../theme/app_colors.dart';
@@ -254,14 +253,17 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
-  // "Bozor AI" — e'lon joylash sehrgari. Marshrut nomi SHART: `closeBozorWizard`
-  // `bozor/` bilan boshlanmaydigan birinchi marshrutgacha poplaydi.
+  /// Home'dagi «Bozor AI» kartasi — sehrgarni EMAS, e'lonlar ekranini ochadi
+  /// («E'lonlar» + «Mening e'lonlarim» tablari). Sehrgarga o'sha ekranning
+  /// ichidagi «E'lon qo'shish» tugmasi orqali o'tiladi.
+  ///
+  /// ⚠️ Marshrutga `bozorRoute(...)` BERILMAYDI: `closeBozorWizard()` `bozor/`
+  /// prefiksli hamma marshrutni pop qiladi, ya'ni shu prefiks bilan push
+  /// qilsak sehrgar tugagach foydalanuvchi lentaga emas, Home'ga tushib
+  /// qolardi.
   void _openBozorAi() {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        settings: bozorRoute('type'),
-        builder: (_) => const BozorTypeStepScreen(),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const BozorHomeScreen()),
     );
   }
 

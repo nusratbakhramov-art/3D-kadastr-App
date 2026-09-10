@@ -73,12 +73,16 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
     setState(() => _sending = true);
     final l = Localizations.localeOf(context);
     try {
-      await _submitter.submit(widget.draft);
+      final created = await _submitter.submit(widget.draft);
       if (!mounted) return;
+      // `id` kutilmagan shaklda kelsa `null` qoladi — success ekrani bunda
+      // "ko'rish" tugmasini ko'rsatmaydi (mavjud bo'lmagan e'lonni ochmaydi).
+      final rawId = created['id'];
+      final listingId = rawId is int ? rawId : int.tryParse('$rawId');
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute<void>(
           settings: bozorRoute('success'),
-          builder: (_) => const BozorSuccessScreen(),
+          builder: (_) => BozorSuccessScreen(listingId: listingId),
         ),
         // Sehrgarning hamma qadamini olib tashlaymiz: muvaffaqiyat ekranidan
         // formaga qaytib bo'lmaydi.

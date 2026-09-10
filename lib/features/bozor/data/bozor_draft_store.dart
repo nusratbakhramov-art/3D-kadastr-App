@@ -58,15 +58,3 @@ Future<void> saveBozorDraft(BozorDraft draft, WizardStep reached) async {
     api.dispose();
   }
 }
-
-/// Qoralamani o'chiradi (foydalanuvchi ro'yxatdan o'chirsa).
-///
-/// Bu esa JIM EMAS: foydalanuvchi ataylab bosgan, natijani ko'rishi kerak.
-Future<void> deleteBozorDraft(int id) async {
-  final api = BozorApi();
-  try {
-    await api.deleteDraft(id);
-  } finally {
-    api.dispose();
-  }
-}
