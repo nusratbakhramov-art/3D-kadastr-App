@@ -21,6 +21,7 @@ import '../../services/widgets/step_progress_bar.dart';
 import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
 import '../data/bozor_api.dart';
+import '../data/bozor_draft_store.dart';
 import '../models/bozor_draft.dart';
 import 'bozor_address_step_screen.dart';
 import '../widgets/option_picker_sheet.dart';
@@ -155,6 +156,10 @@ class _BozorTypeStepScreenState extends State<BozorTypeStepScreen> {
   }
 
   Future<void> _onContinue() async {
+    // Qoralamani fonda saqlaymiz: foydalanuvchi shu qadamda chiqib
+    // ketsa "Mening e'lonlarim" dan aynan shu joydan davom etadi.
+    // `await` QILINMAYDI — tarmoq navigatsiyani muzlatmasin.
+    saveBozorDraftInBackground(_draft, WizardStep.address);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: bozorRoute('address'),

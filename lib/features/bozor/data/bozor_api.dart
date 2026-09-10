@@ -202,8 +202,118 @@ class BozorApi {
     return BozorListing.fromJson(body);
   }
 
+  // ── Qoralamalar ───────────────────────────────────────────────────────────
+  // Hammasi tizimga kirishni talab qiladi. DIQQAT: `Authorization` sarlavhasi
+  // UMUMAN bo'lmasa backend **403** qaytaradi (`HTTPBearer(auto_error=True)`),
+  // 401 esa token YUBORILGAN, lekin yaroqsiz bo'lganda keladi — xato ishlovi
+  // ikkalasini ham "tizimga kirmagan" deb qarashi kerak.
+
+  /// Bo'sh qoralama yaratadi va id qaytaradi.
+  Future<int> createDraft({
+    Map<String, dynamic>? payload,
+    String? currentStep,
+  }) async {
+    final body = await _sendJson(
+      'POST',
+      _uri('/listings/drafts'),
+      {'payload': payload ?? const {}, 'current_step': currentStep},
+      expect: 201,
+    );
+    final id = body['id'];
+    if (id is! int) throw BozorApiException('qoralama id kelmadi');
+    return id;
+  }
+
+  /// Qoralamani yangilaydi.
+  ///
+  /// ⚠️ `payload` TO'LIQ ALMASHTIRILADI — qismli birlashtirish YO'Q. Shuning
+  /// uchun har qadamda butun qoralama yuboriladi, aks holda oldingi
+  /// qadamlarning ma'lumoti o'chib ketardi.
+  Future<void> updateDraft(
+    int id, {
+    required Map<String, dynamic> payload,
+    String? currentStep,
+  }) async {
+    await _sendJson(
+      'PATCH',
+      _uri('/listings/drafts/$id'),
+      {'payload': payload, 'current_step': currentStep},
+      expect: 200,
+    );
+  }
+
+  /// Mening tugatilmagan qoralamalarim — oxirgi tegilgani birinchi.
+  Future<List<BozorDraftSummary>> drafts() async {
+    final body = await _getJson(_uri('/listings/drafts'));
+    return [
+      for (final e in (body['items'] as List? ?? const []))
+        if (e is Map) BozorDraftSummary.fromJson(e.cast<String, dynamic>()),
+    ];
+  }
+
+  Future<void> deleteDraft(int id) async {
+    try {
+      final res = await _client
+          .delete(_uri('/listings/drafts/$id'), headers: _headers)
+          .timeout(const Duration(seconds: 20));
+      // 204 — tana bo'sh. 404 ni ham muvaffaqiyat deb qaraymiz: qoralama
+      // allaqachon yo'q bo'lsa foydalanuvchi uchun natija bir xil.
+      if (res.statusCode != 204 && res.statusCode != 404) {
+        throw BozorApiException(_errorOf(res), statusCode: res.statusCode);
+      }
+    } on TimeoutException {
+      throw BozorApiException('server vaqtida javob bermadi');
+    }
+  }
+
+  /// Qoralamani e'longa aylantiradi (`pending`).
+  ///
+  /// TANA YUBORILMAYDI — ma'lumot qoralamaning ichida. Javob
+  /// `POST /listings/` bilan bir xil sxema. Muvaffaqiyatdan keyin qoralama
+  /// serverda O'CHADI, ya'ni ro'yxatdan ham yo'qoladi.
+  Future<Map<String, dynamic>> submitDraft(int id) async => _sendJson(
+    'POST',
+    _uri('/listings/drafts/$id/submit'),
+    null,
+    expect: 201,
+    timeout: const Duration(seconds: 40),
+  );
+
   // ── Ichki ─────────────────────────────────────────────────────────────────
   static const Map<String, String> _headers = {'Accept': 'application/json'};
+
+  /// JSON tanali so'rov. `body` `null` bo'lsa tana YUBORILMAYDI —
+  /// `submit` endpointi aynan shuni kutadi.
+  Future<Map<String, dynamic>> _sendJson(
+    String method,
+    Uri uri,
+    Map<String, dynamic>? body, {
+    required int expect,
+    Duration timeout = const Duration(seconds: 20),
+  }) async {
+    try {
+      final req = http.Request(method, uri)
+        ..headers.addAll(_headers);
+      if (body != null) {
+        req.headers['Content-Type'] = 'application/json';
+        req.body = jsonEncode(body);
+      }
+      final streamed = await _client.send(req).timeout(timeout);
+      final res = await http.Response.fromStream(streamed);
+      if (res.statusCode != expect) {
+        throw BozorApiException(_errorOf(res), statusCode: res.statusCode);
+      }
+      final decoded = jsonDecode(utf8.decode(res.bodyBytes));
+      if (decoded is! Map<String, dynamic>) {
+        throw BozorApiException('javob notoʻgʻri formatda');
+      }
+      return decoded;
+    } on TimeoutException {
+      throw BozorApiException('server vaqtida javob bermadi');
+    } on FormatException {
+      throw BozorApiException('javob JSON emas');
+    }
+  }
 
   Future<Map<String, dynamic>> _getJson(Uri uri) async {
     try {

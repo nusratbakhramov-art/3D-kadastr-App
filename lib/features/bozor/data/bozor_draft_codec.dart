@@ -1,0 +1,315 @@
+/// `BozorDraft` ↔ backend payload o'girmasi.
+///
+/// Ikki yo'nalish BITTA faylda turadi va bir xil kalitlarni ishlatadi —
+/// aks holda yozish (`submit`) va o'qish (`resume`) vaqt o'tib bir-biridan
+/// ajralib ketardi va foydalanuvchi qoralamaga qaytganda maydonlarning
+/// yarmi bo'sh chiqardi.
+///
+/// Payload shakli AYNAN backend `ListingCreateRequest` (`app/schemas/
+/// bozor_listing.py`): shu sabab `POST /listings/drafts/{id}/submit` qo'shimcha
+/// o'girish talab qilmaydi — server qoralamaning payload'ini to'g'ridan-to'g'ri
+/// validatsiya qiladi.
+///
+/// TO'LIQ BO'LMAGAN qoralamaga RUXSAT: [draftToPayload] `null` qiymatlarni
+/// ham yozadi (foydalanuvchi 2-qadamda chiqib ketgan bo'lishi mumkin).
+/// Serverda `POST /drafts` validatsiya QILMAYDI, `submit` esa qiladi — ya'ni
+/// yarim qoralama saqlanadi, lekin e'lon bo'lib chiqmaydi.
+library;
+
+import '../models/bozor_draft.dart';
+
+// ── Enum ↔ kod ──────────────────────────────────────────────────────────────
+// Nomlar `app/schemas/listing_options.py` bilan AYNAN bir xil. Ikki yo'nalish
+// yonma-yon turadi: bittasi o'zgarsa ikkinchisi ham ko'zga tashlanadi.
+
+extension DealTypeCode on DealType {
+  String get code => switch (this) {
+    DealType.rent => 'rent',
+    DealType.sale => 'sale',
+  };
+}
+
+extension PropertyKindCode on PropertyKind {
+  String get code => switch (this) {
+    PropertyKind.residential => 'residential',
+    PropertyKind.nonResidential => 'non_residential',
+  };
+}
+
+extension PropertyTypeCode on PropertyType {
+  String get code => switch (this) {
+    PropertyType.apartment => 'apartment',
+    PropertyType.house => 'house',
+    PropertyType.land => 'land',
+    PropertyType.commercial => 'commercial',
+    PropertyType.garage => 'garage',
+    PropertyType.otherNonResidential => 'other_non_residential',
+  };
+}
+
+extension PlacementTierCode on PlacementTier {
+  String get code => switch (this) {
+    PlacementTier.standard => 'standard',
+    PlacementTier.top => 'top',
+  };
+}
+
+/// Noma'lum kod `null` beradi — server yangi qiymat qo'shsa eski ilova
+/// yiqilmaydi, shunchaki o'sha maydonni bo'sh ko'rsatadi.
+DealType? dealTypeFromCode(Object? code) => switch (code) {
+  'rent' => DealType.rent,
+  'sale' => DealType.sale,
+  _ => null,
+};
+
+PropertyKind? propertyKindFromCode(Object? code) => switch (code) {
+  'residential' => PropertyKind.residential,
+  'non_residential' => PropertyKind.nonResidential,
+  _ => null,
+};
+
+PropertyType? propertyTypeFromCode(Object? code) => switch (code) {
+  'apartment' => PropertyType.apartment,
+  'house' => PropertyType.house,
+  'land' => PropertyType.land,
+  'commercial' => PropertyType.commercial,
+  'garage' => PropertyType.garage,
+  'other_non_residential' => PropertyType.otherNonResidential,
+  _ => null,
+};
+
+PlacementTier placementTierFromCode(Object? code) =>
+    code == 'top' ? PlacementTier.top : PlacementTier.standard;
+
+// ── Narx birligi ────────────────────────────────────────────────────────────
+// `PriceDraft.unit` — `bozor_price_step_screen.dart` dagi QAT'IY tokenlar
+// (`UZS/oy`, `USD/oy`, `UZS`, `USD`), tarjima qilinmaydi. Shu sababli
+// valyuta + davr → token o'girmasi bir qiymatli.
+
+/// `UZS/oy` → `UZS`.
+String currencyOfUnit(String unit) => unit.split('/').first.trim();
+
+/// `UZS/oy` → `month`; davrsiz token → `null`.
+String? periodOfUnit(String unit) {
+  if (!unit.contains('/')) return null;
+  final suffix = unit.split('/').last.trim().toLowerCase();
+  return switch (suffix) {
+    'oy' || 'мес' || 'mo' => 'month',
+    'kun' || 'сут' || 'day' => 'day',
+    _ => null,
+  };
+}
+
+/// Teskarisi: `UZS` + `month` → `UZS/oy`.
+String unitFromCurrency(Object? currency, Object? period) {
+  final c = (currency ?? 'UZS').toString();
+  return switch (period) {
+    'month' => '$c/oy',
+    'day' => '$c/kun',
+    _ => c,
+  };
+}
+
+// ── Yozish ──────────────────────────────────────────────────────────────────
+
+/// Qoralamaning MAHALLIY fayl yo'llari uchun kalit.
+///
+/// Rasmlar e'lon yuborilgunicha yuklanmaydi, ya'ni qoralamada faqat qurilma
+/// yo'llari bor. Backend `ListingCreateRequest` da `extra="forbid"` YO'Q
+/// (pydantic sukut bo'yicha notanish kalitni jimgina tashlaydi), shuning
+/// uchun bu kalit `submit` ni buzmaydi — tekshirilgan.
+const String kLocalMediaKey = '_local_media';
+
+/// Qoralama uchun payload: [draftToPayload] ning media'siz varianti +
+/// mahalliy fayl yo'llari.
+Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
+  final d = draft.description;
+  return {
+    ...draftToPayload(draft, const []),
+    // Rasmlar hali S3 da yo'q — qurilma yo'llarini saqlaymiz, aks holda
+    // qoralamaga qaytgan foydalanuvchi tanlagan rasmlarini yo'qotardi.
+    kLocalMediaKey: {
+      'photos': List<String>.from(d.photos),
+      'plan': List<String>.from(d.planFiles),
+      'panorama': List<String>.from(d.panoramas),
+    },
+  };
+}
+
+/// `ListingCreateRequest` shakli.
+///
+/// `deal`/`kind`/`type` `null` bo'lsa `null` yoziladi (qoralama to'liq
+/// bo'lmasligi mumkin). `submit` da server bunga 400 beradi — bu KUTILGAN.
+Map<String, dynamic> draftToPayload(
+  BozorDraft draft,
+  List<Map<String, Object?>> media,
+) {
+  final a = draft.address;
+  final p = draft.price;
+  final d = draft.description;
+  final c = draft.contacts;
+
+  return {
+    'deal_type': draft.deal?.code,
+    'property_kind': draft.kind?.code,
+    'property_type': draft.type?.code,
+    'title': draft.title,
+    'address': {
+      'region_id': a.regionId,
+      'district_id': a.districtId,
+      'address': a.address,
+      if (a.landmark.isNotEmpty) 'landmark': a.landmark,
+      if (a.apartmentNumber.isNotEmpty) 'apartment_number': a.apartmentNumber,
+      if (a.entrance.isNotEmpty) 'entrance': a.entrance,
+      if (a.houseNumber.isNotEmpty) 'house_number': a.houseNumber,
+      if (a.floor.isNotEmpty) 'floor': int.tryParse(a.floor),
+      if (a.totalFloors.isNotEmpty) 'total_floors': int.tryParse(a.totalFloors),
+      if (a.lat != null) 'lat': a.lat,
+      if (a.lng != null) 'lng': a.lng,
+    },
+    'params': Map<String, Object?>.from(draft.params),
+    'price': {
+      'amount': num.tryParse(p.amount) ?? 0,
+      'currency': currencyOfUnit(p.unit),
+      'period': periodOfUnit(p.unit),
+      'negotiable': p.negotiable,
+      if (p.dailyAmount.isNotEmpty) ...{
+        'daily_amount': num.tryParse(p.dailyAmount),
+        'daily_currency': currencyOfUnit(p.dailyUnit),
+      },
+    },
+    'description': {
+      if (d.text.trim().isNotEmpty) 'text': d.text.trim(),
+      if (d.youtubeUrl.isNotEmpty) 'youtube_url': d.youtubeUrl,
+      'media': media,
+    },
+    'contacts': {
+      'name': c.name,
+      'phones': c.phones.where((s) => s.isNotEmpty).toList(),
+      if (c.email.isNotEmpty) 'email': c.email,
+    },
+    'terms': {'tier': draft.terms.tier.code, 'accepted': draft.terms.accepted},
+  };
+}
+
+// ── O'qish ──────────────────────────────────────────────────────────────────
+
+/// Payload'dan qoralamani tiklaydi.
+///
+/// HAR BIR maydon xavfsiz o'qiladi: payload serverda validatsiyasiz
+/// saqlanadi, ya'ni shakli boshqacha bo'lishi mumkin (eski ilova versiyasi
+/// yozgan bo'lishi ham mumkin). Tushunarsiz maydon shunchaki bo'sh qoladi —
+/// hech qanday holatda istisno tashlanmaydi.
+BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
+  final draft = BozorDraft(
+    deal: dealTypeFromCode(json['deal_type']),
+    kind: propertyKindFromCode(json['property_kind']),
+    type: propertyTypeFromCode(json['property_type']),
+  )..draftId = draftId;
+
+  draft.title = _str(json['title']);
+
+  final a = _map(json['address']);
+  draft.address
+    ..regionId = _int(a['region_id'])
+    ..districtId = _int(a['district_id'])
+    ..address = _str(a['address'])
+    ..landmark = _str(a['landmark'])
+    ..apartmentNumber = _str(a['apartment_number'])
+    ..entrance = _str(a['entrance'])
+    ..houseNumber = _str(a['house_number'])
+    ..floor = _numStr(a['floor'])
+    ..totalFloors = _numStr(a['total_floors'])
+    ..lat = _double(a['lat'])
+    ..lng = _double(a['lng']);
+
+  // `setType` params'ni tozalaydi, shuning uchun params'ni turdan KEYIN
+  // to'ldiramiz — aks holda 3-qadam qiymatlari yo'qolardi.
+  final params = _map(json['params']);
+  draft.params
+    ..clear()
+    ..addAll(params);
+
+  final p = _map(json['price']);
+  draft.price
+    ..amount = _numStr(p['amount'])
+    ..unit = unitFromCurrency(p['currency'], p['period'])
+    ..negotiable = p['negotiable'] != false
+    ..dailyAmount = _numStr(p['daily_amount'])
+    ..dailyUnit = _str(p['daily_currency']).isEmpty
+        ? 'UZS'
+        : _str(p['daily_currency']);
+
+  final d = _map(json['description']);
+  draft.description
+    ..text = _str(d['text'])
+    ..youtubeUrl = _str(d['youtube_url']);
+  // Mahalliy yo'llar — [kLocalMediaKey] ga qarang.
+  final local = _map(json[kLocalMediaKey]);
+  draft.description.photos
+    ..clear()
+    ..addAll(_strList(local['photos']));
+  draft.description.planFiles
+    ..clear()
+    ..addAll(_strList(local['plan']));
+  draft.description.panoramas
+    ..clear()
+    ..addAll(_strList(local['panorama']));
+
+  final c = _map(json['contacts']);
+  final phones = _strList(c['phones']);
+  draft.contacts
+    ..name = _str(c['name'])
+    ..email = _str(c['email']);
+  draft.contacts.phones
+    ..clear()
+    // Forma kamida bitta qatorni kutadi (`ContactsDraft.phones = ['']`).
+    ..addAll(phones.isEmpty ? [''] : phones);
+
+  final t = _map(json['terms']);
+  draft.terms
+    ..tier = placementTierFromCode(t['tier'])
+    // Rozilik ATAYLAB tiklanmaydi: u har yuborishda ongli tasdiqlanishi
+    // kerak (huquqiy sabab, reja Z5).
+    ..accepted = false;
+
+  return draft;
+}
+
+/// Saqlangan `current_step` dan qadam. Noma'lum qiymat 1-qadamga tushadi —
+/// bo'sh ekran ko'rsatgandan yaxshi.
+WizardStep wizardStepFromName(Object? name) {
+  for (final s in WizardStep.values) {
+    if (s.name == name) {
+      return s;
+    }
+  }
+  return WizardStep.type;
+}
+
+// ── Xavfsiz o'qish yordamchilari ────────────────────────────────────────────
+
+Map<String, dynamic> _map(Object? v) =>
+    v is Map ? v.map((k, value) => MapEntry(k.toString(), value)) : const {};
+
+String _str(Object? v) => v == null ? '' : v.toString();
+
+/// Son maydonlari formada MATN sifatida turadi (`floor`, `amount`).
+/// `null` → bo'sh satr, `72.5` → `72.5`, `3` → `3` (`3.0` EMAS).
+String _numStr(Object? v) {
+  if (v == null) return '';
+  if (v is int) return v.toString();
+  if (v is num) {
+    // Butun son matn maydonida `3` bo'lib ko'rinishi kerak, `3.0` emas.
+    final whole = v == v.roundToDouble() && v.abs() < 1e15;
+    return whole ? v.toInt().toString() : v.toString();
+  }
+  return v.toString();
+}
+
+int? _int(Object? v) => v is int ? v : int.tryParse(_str(v));
+
+double? _double(Object? v) => v is num ? v.toDouble() : double.tryParse(_str(v));
+
+List<String> _strList(Object? v) =>
+    v is List ? [for (final e in v) e.toString()] : const [];

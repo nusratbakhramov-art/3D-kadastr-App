@@ -20,6 +20,7 @@ import '../../services/widgets/wizard_field.dart';
 import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
 import '../data/regions_repository.dart';
+import '../data/bozor_draft_store.dart';
 import '../models/bozor_draft.dart';
 import '../widgets/address_pin_field.dart';
 import '../widgets/option_picker_sheet.dart';
@@ -241,6 +242,11 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
     // "Boshqa noturar joy" da parametrlar qadami YO'Q — to'g'ri narxga
     // o'tiladi. Aks holda bo'sh parametrlar ekrani ochilardi.
     final next = widget.draft.stepAfter(WizardStep.address);
+    // Qoralama fonda saqlanadi. Saqlanadigan qadam — KEYINGISI (variantga
+    // qarab `params` yoki `price`), ya'ni foydalanuvchi qaytib kelganda
+    // "Boshqa noturar joy" da bo'sh parametrlar ekraniga tushmaydi.
+    // `await` QILINMAYDI — tarmoq navigatsiyani muzlatmasin.
+    saveBozorDraftInBackground(widget.draft, next ?? WizardStep.price);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: bozorRoute(next == WizardStep.params ? 'params' : 'price'),

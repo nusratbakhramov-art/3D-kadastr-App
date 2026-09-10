@@ -282,6 +282,14 @@ class BozorDraft {
   PropertyKind? kind;
   PropertyType? type;
 
+  /// Serverdagi qoralama qatorining id'si (`bozor_listing_drafts.id`).
+  ///
+  /// Birinchi qadam saqlanganda paydo bo'ladi va sehrgar bo'ylab qoralama
+  /// bilan birga yuradi. `null` — hali saqlanmagan (yoki foydalanuvchi
+  /// tizimga kirmagan, yoki tarmoq yo'q): bunday holatda yuborish eski
+  /// yo'l bilan, `POST /listings/` orqali ketadi.
+  int? draftId;
+
   final AddressDraft address = AddressDraft();
 
   /// 3-qadam qiymatlari — sxema bo'yicha kalit→qiymat

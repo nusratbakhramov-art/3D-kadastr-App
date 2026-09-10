@@ -1,0 +1,260 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kadastr/features/bozor/bozor_resume.dart';
+import 'package:kadastr/features/bozor/data/bozor_draft_codec.dart';
+import 'package:kadastr/features/bozor/models/bozor_draft.dart';
+import 'package:kadastr/features/bozor/screens/bozor_address_step_screen.dart';
+import 'package:kadastr/features/bozor/screens/bozor_params_step_screen.dart';
+import 'package:kadastr/features/bozor/screens/bozor_price_step_screen.dart';
+
+/// Qoralama kodeki — yozish (`submit` payload'i) va o'qish (resume) bir xil
+/// kalitlarni ishlatishini qotiradi.
+///
+/// Nega round-trip testi: sehrgar 7 qadamda ~30 maydon to'playdi, ular
+/// payload'ga chiqib qaytib keladi. Bitta kalit nomi noto'g'ri bo'lsa
+/// foydalanuvchi qoralamaga qaytganda o'sha maydon JIMGINA bo'sh chiqadi —
+/// hech qanday xato ko'rinmaydi, shuning uchun faqat test ushlaydi.
+BozorDraft _fullDraft() {
+  final d = BozorDraft(
+    deal: DealType.rent,
+    kind: PropertyKind.residential,
+    type: PropertyType.apartment,
+  );
+  d.title = 'Chilonzorda 3 xonali';
+  d.address
+    ..regionId = 14
+    ..regionName = 'Toshkent'
+    ..districtId = 141
+    ..districtName = 'Chilonzor'
+    ..address = 'Chilonzor 5, 12-uy'
+    ..landmark = 'Metro yonida'
+    ..apartmentNumber = '42'
+    ..entrance = '3'
+    ..houseNumber = '12'
+    ..floor = '5'
+    ..totalFloors = '9'
+    ..lat = 41.2995
+    ..lng = 69.2401;
+  d.params.addAll({
+    'rooms_count': '3',
+    'total_area': 72.5,
+    'repair': 'euro',
+    'security': ['guard', 'cctv'],
+    'gas': true,
+  });
+  d.price
+    ..amount = '4500000'
+    ..unit = 'UZS/oy'
+    ..negotiable = false
+    ..dailyAmount = '300000'
+    ..dailyUnit = 'UZS';
+  d.description
+    ..text = 'Yorug‘ kvartira'
+    ..youtubeUrl = 'https://youtu.be/abc'
+    ..photos.addAll(['/data/a.jpg', '/data/b.jpg'])
+    ..planFiles.add('/data/plan.pdf')
+    ..panoramas.add('/data/360.jpg');
+  d.contacts
+    ..name = 'Ali'
+    ..email = 'ali@example.com';
+  d.contacts.phones
+    ..clear()
+    ..addAll(['901234567', '939998877']);
+  d.terms
+    ..tier = PlacementTier.top
+    ..accepted = true;
+  return d;
+}
+
+void main() {
+  group('draftToDraftPayload → draftFromPayload', () {
+    test('to‘liq qoralama round-trip: hamma maydon qaytadi', () {
+      final before = _fullDraft();
+      final after = draftFromPayload(draftToDraftPayload(before), draftId: 7);
+
+      expect(after.draftId, 7);
+      expect(after.deal, DealType.rent);
+      expect(after.kind, PropertyKind.residential);
+      expect(after.type, PropertyType.apartment);
+      expect(after.title, 'Chilonzorda 3 xonali');
+
+      expect(after.address.regionId, 14);
+      expect(after.address.districtId, 141);
+      expect(after.address.address, 'Chilonzor 5, 12-uy');
+      expect(after.address.landmark, 'Metro yonida');
+      expect(after.address.apartmentNumber, '42');
+      expect(after.address.entrance, '3');
+      expect(after.address.houseNumber, '12');
+      expect(after.address.floor, '5');
+      expect(after.address.totalFloors, '9');
+      expect(after.address.lat, closeTo(41.2995, 1e-9));
+      expect(after.address.lng, closeTo(69.2401, 1e-9));
+
+      expect(after.params['rooms_count'], '3');
+      expect(after.params['total_area'], 72.5);
+      expect(after.params['repair'], 'euro');
+      expect(after.params['security'], ['guard', 'cctv']);
+      expect(after.params['gas'], true);
+
+      expect(after.price.amount, '4500000');
+      expect(after.price.unit, 'UZS/oy');
+      expect(after.price.negotiable, isFalse);
+      expect(after.price.dailyAmount, '300000');
+      expect(after.price.dailyUnit, 'UZS');
+
+      expect(after.description.text, 'Yorug‘ kvartira');
+      expect(after.description.youtubeUrl, 'https://youtu.be/abc');
+      expect(after.description.photos, ['/data/a.jpg', '/data/b.jpg']);
+      expect(after.description.planFiles, ['/data/plan.pdf']);
+      expect(after.description.panoramas, ['/data/360.jpg']);
+
+      expect(after.contacts.name, 'Ali');
+      expect(after.contacts.email, 'ali@example.com');
+      expect(after.contacts.phones, ['901234567', '939998877']);
+
+      expect(after.terms.tier, PlacementTier.top);
+    });
+
+    test('payload IKKI marta o‘girilganda o‘zgarmaydi (barqaror)', () {
+      final once = draftToDraftPayload(_fullDraft());
+      final twice = draftToDraftPayload(draftFromPayload(once));
+      // Rozilik ataylab tiklanmaydi, shuning uchun uni solishtirmaymiz.
+      (once['terms'] as Map)['accepted'] = false;
+      expect(twice, once);
+    });
+
+    test('rozilik TIKLANMAYDI — har yuborishda qaytadan belgilanadi', () {
+      final after = draftFromPayload(draftToDraftPayload(_fullDraft()));
+      expect(after.terms.accepted, isFalse);
+    });
+  });
+
+  group('to‘liq bo‘lmagan qoralama', () {
+    test('bo‘sh qoralama istisno tashlamaydi va null kodlar yozadi', () {
+      final payload = draftToDraftPayload(BozorDraft());
+      expect(payload['deal_type'], isNull);
+      expect(payload['property_kind'], isNull);
+      expect(payload['property_type'], isNull);
+      // Server `submit` da bunga 400 beradi — bu KUTILGAN xatti-harakat.
+      final back = draftFromPayload(payload);
+      expect(back.deal, isNull);
+      expect(back.type, isNull);
+      expect(back.contacts.phones, ['']); // forma kamida bitta qatorni kutadi
+    });
+
+    test('noma‘lum kodlar null bo‘ladi, ilova yiqilmaydi', () {
+      final back = draftFromPayload({
+        'deal_type': 'barter',
+        'property_kind': 'mixed',
+        'property_type': 'dacha',
+        'terms': {'tier': 'platinum'},
+      });
+      expect(back.deal, isNull);
+      expect(back.kind, isNull);
+      expect(back.type, isNull);
+      // Tarif — enum, `null` bo‘lolmaydi: xavfsiz sukut qiymati.
+      expect(back.terms.tier, PlacementTier.standard);
+    });
+
+    test('shakli buzilgan payload istisno tashlamaydi', () {
+      // Har bir ichki obyekt kutilganidan BOSHQA turda.
+      final back = draftFromPayload({
+        'address': 'satr, obyekt emas',
+        'params': [1, 2, 3],
+        'price': 42,
+        'description': null,
+        'contacts': {'phones': 'satr, ro‘yxat emas'},
+        'terms': [],
+        '_local_media': 'satr',
+      });
+      expect(back.address.address, '');
+      expect(back.params, isEmpty);
+      expect(back.price.amount, '');
+      expect(back.description.photos, isEmpty);
+      expect(back.contacts.phones, ['']);
+    });
+  });
+
+  group('maydon shakllari', () {
+    test('butun son matn maydonida 3, «3.0» emas', () {
+      final back = draftFromPayload({
+        'address': {'floor': 3, 'total_floors': 9.0},
+        'price': {'amount': 4500000},
+      });
+      expect(back.address.floor, '3');
+      expect(back.address.totalFloors, '9');
+      expect(back.price.amount, '4500000');
+    });
+
+    test('kasrli maydon kasrligicha qoladi', () {
+      final back = draftFromPayload({
+        'price': {'amount': 72.5},
+      });
+      expect(back.price.amount, '72.5');
+    });
+
+    test('narx birligi: valyuta + davr → token', () {
+      expect(unitFromCurrency('UZS', 'month'), 'UZS/oy');
+      expect(unitFromCurrency('USD', 'month'), 'USD/oy');
+      expect(unitFromCurrency('USD', null), 'USD');
+      // Teskarisi — `bozor_price_step_screen.dart` dagi qat'iy tokenlar.
+      expect(currencyOfUnit('USD/oy'), 'USD');
+      expect(periodOfUnit('USD/oy'), 'month');
+      expect(periodOfUnit('USD'), isNull);
+    });
+
+    test('«savdolashish mumkin» sukut bo‘yicha yoqilgan', () {
+      // `PriceDraft.negotiable` sukuti `true`; payload'da maydon yo'q bo'lsa
+      // uni `false` ga tushirib qo'ymaslik kerak.
+      expect(draftFromPayload(const {}).price.negotiable, isTrue);
+      expect(
+        draftFromPayload(const {'price': {'negotiable': false}})
+            .price
+            .negotiable,
+        isFalse,
+      );
+    });
+  });
+
+  group('wizardStepFromName', () {
+    test('nomlar qadamlarga to‘g‘ri tushadi', () {
+      expect(wizardStepFromName('price'), WizardStep.price);
+      expect(wizardStepFromName('terms'), WizardStep.terms);
+    });
+
+    test('noma‘lum yoki null — 1-qadam', () {
+      expect(wizardStepFromName('payment'), WizardStep.type);
+      expect(wizardStepFromName(null), WizardStep.type);
+    });
+  });
+
+  group('bozorStepScreen — resume', () {
+    test('saqlangan qadam ekranga tushadi', () {
+      final d = BozorDraft(
+        deal: DealType.rent,
+        kind: PropertyKind.residential,
+        type: PropertyType.apartment,
+      );
+      expect(
+        bozorStepScreen(d, WizardStep.params),
+        isA<BozorParamsStepScreen>(),
+      );
+      expect(bozorStepScreen(d, WizardStep.price), isA<BozorPriceStepScreen>());
+    });
+
+    test('turda YO‘Q qadam — eng yaqin oldingi qadamga tushadi', () {
+      // "Boshqa noturar joy" da `params` qadami umuman yo'q. Qoralama o'sha
+      // qadamda saqlangan bo'lsa (tur keyin o'zgargan), foydalanuvchi mavjud
+      // bo'lmagan ekranga tushib qolmasligi kerak.
+      final d = BozorDraft(
+        deal: DealType.rent,
+        kind: PropertyKind.nonResidential,
+        type: PropertyType.otherNonResidential,
+      );
+      expect(d.wizardSteps.contains(WizardStep.params), isFalse);
+      expect(
+        bozorStepScreen(d, WizardStep.params),
+        isA<BozorAddressStepScreen>(),
+      );
+    });
+  });
+}

@@ -18,6 +18,7 @@ import '../../services/widgets/step_progress_bar.dart';
 import '../../services/widgets/wizard_field.dart';
 import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
+import '../data/bozor_draft_store.dart';
 import '../models/bozor_draft.dart';
 import '../widgets/media_upload_row.dart';
 import 'bozor_contacts_step_screen.dart';
@@ -90,6 +91,10 @@ class _BozorDescriptionStepScreenState
   }
 
   Future<void> _openContacts() async {
+    // Qoralamani fonda saqlaymiz: foydalanuvchi shu qadamda chiqib
+    // ketsa "Mening e'lonlarim" dan aynan shu joydan davom etadi.
+    // `await` QILINMAYDI — tarmoq navigatsiyani muzlatmasin.
+    saveBozorDraftInBackground(widget.draft, WizardStep.contacts);
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         settings: bozorRoute('contacts'),

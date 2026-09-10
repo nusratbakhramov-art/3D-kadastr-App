@@ -10,6 +10,7 @@ library;
 
 import '../models/bozor_draft.dart';
 import 'bozor_api.dart';
+import 'bozor_draft_codec.dart';
 
 /// Yuklash jarayonining holati — ekran progress ko'rsatishi uchun.
 typedef SubmitProgress = void Function(int done, int total);
@@ -63,115 +64,50 @@ class BozorSubmitter {
 
     // ── 2. E'lon ──────────────────────────────────────────────────────────
     final payload = buildPayload(draft, media);
-    final created = await _api.createListing(payload);
+    final draftId = draft.draftId;
+    if (draftId == null) {
+      // Qoralama saqlanmagan (tizimga kirilmagan yoki har qadamda tarmoq
+      // yo'q edi) — to'g'ridan-to'g'ri yaratamiz.
+      final created = await _api.createListing(payload);
+      tick();
+      return created;
+    }
+
+    // Qoralama BOR — e'lon ALBATTA shu qoralamadan yaratilishi kerak.
+    // `POST /listings/` bilan yuborsak qoralama serverda yetim qolib,
+    // "Mening e'lonlarim" da bir e'lon IKKI marta (qoralama + e'lon bo'lib)
+    // ko'rinardi.
+    //
+    // `submit` tana yubormaydi va payload'ni qoralamadan oladi — shuning
+    // uchun avval yuklangan fayl kalitlarini qoralamaga yozib qo'yamiz.
+    // Bu `PATCH` ni `await` QILAMIZ (qadam saqlashlaridan farqli): u
+    // muvaffaqiyatsiz bo'lsa e'lon rasmsiz chiqib ketardi.
+    await _api.updateDraft(
+      draftId,
+      payload: payload,
+      currentStep: WizardStep.terms.name,
+    );
+    final created = await _api.submitDraft(draftId);
+    // Server qoralamani o'chirdi — mahalliy nusxada ham id qolmasin, aks
+    // holda "Yana bitta qo'shish" o'chirilgan qoralamani yangilashga
+    // urinardi (404).
+    draft.draftId = null;
     tick();
     return created;
   }
 
   /// So'rov tanasi. Ochiq — testda tekshirish uchun.
+  ///
+  /// Amalda `bozor_draft_codec.dart` bajaradi: qoralama saqlash ham SHU
+  /// funksiyani ishlatadi, ya'ni yuborilgan e'lon va saqlangan qoralama
+  /// hech qachon boshqa shaklda bo'lmaydi.
   static Map<String, dynamic> buildPayload(
     BozorDraft draft,
     List<Map<String, Object?>> media,
-  ) {
-    final a = draft.address;
-    final p = draft.price;
-    final d = draft.description;
-    final c = draft.contacts;
-
-    return {
-      'deal_type': draft.deal!.code,
-      'property_kind': draft.kind!.code,
-      'property_type': draft.type!.code,
-      'title': draft.title,
-      'address': {
-        'region_id': a.regionId,
-        'district_id': a.districtId,
-        'address': a.address,
-        if (a.landmark.isNotEmpty) 'landmark': a.landmark,
-        if (a.apartmentNumber.isNotEmpty)
-          'apartment_number': a.apartmentNumber,
-        if (a.entrance.isNotEmpty) 'entrance': a.entrance,
-        if (a.houseNumber.isNotEmpty) 'house_number': a.houseNumber,
-        if (a.floor.isNotEmpty) 'floor': int.tryParse(a.floor),
-        if (a.totalFloors.isNotEmpty) 'total_floors': int.tryParse(a.totalFloors),
-        if (a.lat != null) 'lat': a.lat,
-        if (a.lng != null) 'lng': a.lng,
-      },
-      'params': draft.params,
-      'price': {
-        'amount': num.tryParse(p.amount) ?? 0,
-        'currency': _currencyOf(p.unit),
-        'period': _periodOf(p.unit),
-        'negotiable': p.negotiable,
-        if (p.dailyAmount.isNotEmpty) ...{
-          'daily_amount': num.tryParse(p.dailyAmount),
-          'daily_currency': _currencyOf(p.dailyUnit),
-        },
-      },
-      'description': {
-        if (d.text.trim().isNotEmpty) 'text': d.text.trim(),
-        if (d.youtubeUrl.isNotEmpty) 'youtube_url': d.youtubeUrl,
-        'media': media,
-      },
-      'contacts': {
-        'name': c.name,
-        'phones': c.phones.where((s) => s.isNotEmpty).toList(),
-        if (c.email.isNotEmpty) 'email': c.email,
-      },
-      'terms': {
-        'tier': draft.terms.tier.code,
-        'accepted': draft.terms.accepted,
-      },
-    };
-  }
-
-  /// `UZS/oy` → `UZS`.
-  static String _currencyOf(String unit) => unit.split('/').first.trim();
-
-  /// `UZS/oy` → `month`; davrsiz token → `null`.
-  static String? _periodOf(String unit) {
-    if (!unit.contains('/')) return null;
-    final suffix = unit.split('/').last.trim().toLowerCase();
-    return switch (suffix) {
-      'oy' || 'мес' || 'mo' => 'month',
-      'kun' || 'сут' || 'day' => 'day',
-      _ => null,
-    };
-  }
+  ) => draftToPayload(draft, media);
 
   void dispose() => _api.dispose();
 }
 
-// Enumlarni backend kodlariga o'giradigan kengaytmalar. Nomlar
-// `app/schemas/listing_options.py` bilan AYNAN bir xil.
-extension DealTypeCode on DealType {
-  String get code => switch (this) {
-    DealType.rent => 'rent',
-    DealType.sale => 'sale',
-  };
-}
-
-extension PropertyKindCode on PropertyKind {
-  String get code => switch (this) {
-    PropertyKind.residential => 'residential',
-    PropertyKind.nonResidential => 'non_residential',
-  };
-}
-
-extension PropertyTypeCode on PropertyType {
-  String get code => switch (this) {
-    PropertyType.apartment => 'apartment',
-    PropertyType.house => 'house',
-    PropertyType.land => 'land',
-    PropertyType.commercial => 'commercial',
-    PropertyType.garage => 'garage',
-    PropertyType.otherNonResidential => 'other_non_residential',
-  };
-}
-
-extension PlacementTierCode on PlacementTier {
-  String get code => switch (this) {
-    PlacementTier.standard => 'standard',
-    PlacementTier.top => 'top',
-  };
-}
+// Enum ↔ kod o'girmasi `bozor_draft_codec.dart` da — u ikki yo'nalishni
+// (yozish va o'qish) yonma-yon saqlaydi, shu sababli bu yerda takrorlanmaydi.

@@ -352,6 +352,65 @@ class BozorListing {
   );
 }
 
+/// Tugatilmagan qoralama — `DraftOut` javobining mobil ko'rinishi.
+///
+/// "Mening e'lonlarim" ro'yxati uchun yetarli maydonlar. Karta chizish uchun
+/// kerakli to'rtta maydon ([title], [dealType], [propertyType], [address])
+/// serverda payload'dan XAVFSIZ olinadi va shakli boshqacha bo'lsa `null`
+/// bo'lib keladi — shu sababli bu yerda ham hammasi nullable.
+///
+/// [payload] — to'liq qoralama. Foydalanuvchi kartani bosganda
+/// `draftFromPayload` shu maydondan sehrgarni tiklaydi, ya'ni ro'yxat uchun
+/// alohida so'rov kerak emas.
+@immutable
+class BozorDraftSummary {
+  const BozorDraftSummary({
+    required this.id,
+    required this.payload,
+    this.currentStep,
+    this.title,
+    this.dealType,
+    this.propertyType,
+    this.address,
+    this.updatedAt,
+  });
+
+  final int id;
+  final Map<String, dynamic> payload;
+
+  /// Foydalanuvchi qaysi qadamda qolgan (`type`, `address`, …). `null` —
+  /// noma'lum, resume 1-qadamdan boshlanadi.
+  final String? currentStep;
+
+  final String? title;
+  final String? dealType;
+  final String? propertyType;
+  final String? address;
+  final DateTime? updatedAt;
+
+  factory BozorDraftSummary.fromJson(Map<String, dynamic> j) {
+    final raw = j['payload'];
+    return BozorDraftSummary(
+      id: j['id'] is int ? j['id'] as int : int.tryParse('${j['id']}') ?? 0,
+      payload: raw is Map
+          ? raw.map((k, v) => MapEntry(k.toString(), v))
+          : const {},
+      currentStep: j['current_step']?.toString(),
+      title: _nonEmpty(j['title']),
+      dealType: _nonEmpty(j['deal_type']),
+      propertyType: _nonEmpty(j['property_type']),
+      address: _nonEmpty(j['address']),
+      updatedAt: DateTime.tryParse('${j['updated_at']}'),
+    );
+  }
+}
+
+/// Bo'sh satr ham `null` bilan bir xil — karta bo'sh qatorni chizmasin.
+String? _nonEmpty(Object? v) {
+  final s = v?.toString().trim() ?? '';
+  return s.isEmpty ? null : s;
+}
+
 /// Sahifalangan javob — `ListingListResponse` (`items` + `total` + `page` +
 /// `size`). Backend cursor ISHLATMAYDI, `page`/`size` bilan sahifalaydi.
 @immutable
