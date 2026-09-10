@@ -373,6 +373,58 @@ qaror ham kuchini yo'qotadi — tuzatiladigan kod ko'chirilmaydi.
 
 ---
 
+### ⚠️ MANBA: port `1.0.2` ni kuzatadi, `1.0.1` ni EMAS (2026-09-11)
+
+`panorama` repozitoriysining HEAD'i `1.0.1` (`f85cacd`) da turibdi, lekin
+port **`1.0.2`** (`9378c62`) ni kuzatadi. `1.0.2` — `1.0.1` ning chiziqli
+davomi, ustidagi olti commit:
+
+```
+9378c62  Blend only the coarsest octaves          ← 16-qadam (qattiq/yumshoq maska)
+f649593  Route seams on brightness                ← 15-qadam (chok yo'naltiruvchisi)
+5469e83  Place frames the way the projector …     ← placementLon + flip (MAJBURIY)
+0dac253  Never lose a capture to a stitch …
+4a4bd44  Fix the heading sign                     ← capture UX
+7377853  Aim the capture with a marker            ← capture UX
+f85cacd  Turn off deformation and seam routing    ← 1.0.1 uchi
+```
+
+**Kodni o'qiyotganda `git show 1.0.2:lib/services/sensor_stitcher.dart`
+ishlatilsin.** Ish daraxtidagi fayl `1.0.1` niki va u ikki joyda ESKI:
+`_multiBand` (qattiq/yumshoq maska yo'q) va `_restoreDetail` (chok bo'ylab
+detal so'ndiriladi).
+
+Tekshirildi: `_place`, `_footprint`, `_columnBlocks`, `_gainsPairwise` va
+raster amallari ikki versiyada AYNAN bir xil — ya'ni 9–14-qadamlarda
+ko'chirilgan kod to'g'ri.
+
+### ⚠️ 15-qadam BEKOR QILINMAYDI — oldingi qaror XATO EDI
+
+Bir muddat 15-qadam «chok yo'naltiruvchisi obyektlarni o'chiradi» degan
+sabab bilan bekor qilingan edi. **Bu xato**, chunki dalil `f85cacd`
+(1.0.1) dan olingan, keyingi commit esa uni TUZATGAN.
+
+`f85cacd` haqiqatan yo'naltiruvchini o'chirgan: u choklarni YUQORI
+CHASTOTA bo'yicha baholardi, oq polda turgan oq guldonda esa yuqori
+chastota yo'q — ya'ni undan kesib o'tish «bepul» ko'rinardi va guldon
+yo'qolardi.
+
+`f649593` uni QAYTA YOQDI va baholashni **yorqinlikka** o'tkazdi:
+
+> Brightness is what tells an object from its background, so brightness is
+> what gets compared. **The pot survives**, and on the seventy frame capture
+> a row of chairs the nearest-centre boundary had been slicing comes back:
+> seams went from 0.93 of the surrounding contrast to **0.78**.
+
+Aynan guldonni yo'qotgan capture'da tekshirilgan. Rejadagi 15-qadam nomi
+(«yorug'lik bo'yicha DP») allaqachon shu tuzatilgan versiyani nazarda
+tutadi.
+
+§4.3 dagi `_routeOne` dagi `index(u, −1)` bug'i haqidagi qaror ham
+KUCHIDA qoladi.
+
+---
+
 ### Mil nuqtalari — har biridan keyin NIMA ISHLAYDI
 
 | Mil | Qadam | Natija |
