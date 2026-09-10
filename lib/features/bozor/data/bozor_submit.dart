@@ -63,6 +63,34 @@ class BozorSubmitter {
     }
 
     // ── 2. E'lon ──────────────────────────────────────────────────────────
+    // Tahrirlash: yangi e'lon YARATILMAYDI, mavjudi yangilanadi.
+    final editingId = draft.editingListingId;
+    if (editingId != null) {
+      // Mavjud fayllar KALIT bilan qaytariladi — `PATCH` media ro'yxatini
+      // to'liq almashtiradi. Ular bilan birga yangi yuklanganlar ham ketadi
+      // (M1-9 da tahrirlash faqat QO'SHADI; o'chirish M4-25).
+      final keep = [
+        for (final m in d.existingMedia)
+          {
+            'key': m.key,
+            'role': m.role,
+            'sort_order': m.sortOrder,
+            'is_cover': m.isCover,
+          },
+      ];
+      // Yangi fayl qo'shilmagan bo'lsa MEDIA UMUMAN yuborilmaydi: server
+      // unga tegmaydi va muqova/tartib o'zgarmasdan qoladi.
+      final all = media.isEmpty
+          ? const <Map<String, Object?>>[]
+          : [...keep, ...media];
+      final updated = await _api.updateListing(
+        editingId,
+        draftToUpdatePayload(draft, all),
+      );
+      tick();
+      return updated;
+    }
+
     final payload = buildPayload(draft, media);
     final draftId = draft.draftId;
     if (draftId == null) {

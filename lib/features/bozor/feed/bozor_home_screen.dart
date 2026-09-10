@@ -156,10 +156,14 @@ class _BozorHomeScreenState extends State<BozorHomeScreen>
     }
   }
 
-  Future<void> _openListing(BozorListing listing) async {
+  /// [owner] — «Mening e'lonlarim» tabidan `true`. Server e'lonning egasini
+  /// aytmaydi (`ListingOut` da user_id yo'q), shuning uchun tahrirlash va
+  /// arxivlash tugmalarini ko'rsatish qarori SHU YERDA qabul qilinadi.
+  Future<void> _openListing(BozorListing listing, {bool owner = false}) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => BozorListingDetailScreen(listingId: listing.id),
+        builder: (_) =>
+            BozorListingDetailScreen(listingId: listing.id, isOwner: owner),
       ),
     );
     // Detalda e'lon arxivlangan/tahrirlangan bo'lishi mumkin.
@@ -339,7 +343,7 @@ class _BozorHomeScreenState extends State<BozorHomeScreen>
           return BozorListingCard(
             listing: item,
             showStatus: true,
-            onTap: () => _openListing(item),
+            onTap: () => _openListing(item, owner: true),
           );
         },
       ),

@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kadastr/features/bozor/bozor_resume.dart';
 import 'package:kadastr/features/bozor/data/bozor_draft_codec.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
+import 'package:kadastr/features/bozor/models/bozor_listing.dart';
 import 'package:kadastr/features/bozor/screens/bozor_address_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_params_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_price_step_screen.dart';
@@ -227,6 +228,8 @@ void main() {
     });
   });
 
+  _editTests();
+
   group('bozorStepScreen — resume', () {
     test('saqlangan qadam ekranga tushadi', () {
       final d = BozorDraft(
@@ -255,6 +258,143 @@ void main() {
         bozorStepScreen(d, WizardStep.params),
         isA<BozorAddressStepScreen>(),
       );
+    });
+  });
+}
+
+/// Tahrirlash (M1-9) — `BozorListing` → `BozorDraft` → `PATCH` tanasi.
+///
+/// Nega test SHART: konvertor QO'LDA yozilgan ~25 maydonli ko'chirma. Bitta
+/// maydon tushib qolsa `PATCH` uni **NULL ga tushirib yuboradi** — ya'ni
+/// foydalanuvchi faqat narxni tahrirlab, mo'ljalini yoki qavatini yo'qotadi.
+/// Hech qanday xato ko'rinmaydi, faqat test ushlaydi.
+BozorListing _listing({
+  String status = 'rejected',
+  List<BozorListingMedia> media = const [],
+}) => BozorListing(
+  id: 42,
+  statusCode: status,
+  title: 'Chilonzorda 3 xonali',
+  dealType: 'rent',
+  propertyKind: 'residential',
+  propertyType: 'apartment',
+  address: 'Chilonzor 5, 12-uy',
+  priceAmount: 4500000,
+  priceCurrency: 'UZS',
+  pricePeriod: 'month',
+  negotiable: false,
+  contactName: 'Ali',
+  contactPhone: '901234567',
+  contactPhones: const ['901234567', '939998877'],
+  contactEmail: 'ali@example.com',
+  createdAt: DateTime.utc(2026, 9, 10),
+  regionId: 7,
+  regionName: 'Toshkent shahri',
+  districtId: 8,
+  districtName: 'Chilonzor',
+  landmark: 'Metro yonida',
+  apartmentNumber: '42',
+  entrance: '3',
+  floor: 5,
+  totalFloors: 9,
+  latitude: 41.2995,
+  longitude: 69.2401,
+  rooms: 3,
+  areaSqm: 72.5,
+  params: const {'rooms_count': '3', 'total_area': 72.5, 'renovation': 'euro'},
+  description: 'Yorugʻ kvartira',
+  youtubeUrl: 'https://youtu.be/abc',
+  media: media,
+);
+
+void _editTests() {
+  group('draftFromListing', () {
+    test('hamma maydon qoralamaga ko‘chadi', () {
+      final d = draftFromListing(_listing());
+      expect(d.editingListingId, 42);
+      expect(d.isEditing, isTrue);
+      expect(d.draftId, isNull); // tahrirlash qoralamadan boshlanmaydi
+      expect(d.deal, DealType.rent);
+      expect(d.type, PropertyType.apartment);
+      expect(d.title, 'Chilonzorda 3 xonali');
+      expect(d.address.regionId, 7);
+      expect(d.address.districtId, 8);
+      expect(d.address.landmark, 'Metro yonida');
+      expect(d.address.apartmentNumber, '42');
+      expect(d.address.entrance, '3');
+      expect(d.address.floor, '5');
+      expect(d.address.totalFloors, '9');
+      expect(d.address.lat, closeTo(41.2995, 1e-9));
+      expect(d.params['renovation'], 'euro');
+      expect(d.price.amount, '4500000');
+      expect(d.price.unit, 'UZS/oy');
+      expect(d.price.negotiable, isFalse);
+      expect(d.description.text, 'Yorugʻ kvartira');
+      expect(d.description.youtubeUrl, 'https://youtu.be/abc');
+      expect(d.contacts.name, 'Ali');
+      expect(d.contacts.email, 'ali@example.com');
+      expect(d.contacts.phones, ['901234567', '939998877']);
+      // Rozilik tahrirlashda ham qaytadan belgilanadi (Z5).
+      expect(d.terms.accepted, isFalse);
+    });
+
+    test('mavjud fayllar KALIT bilan olinadi', () {
+      final d = draftFromListing(
+        _listing(
+          media: const [
+            BozorListingMedia(
+              id: 1,
+              role: 'photo',
+              storageKey: 'listings/media/3/a.jpg',
+              url: 'http://x/a.jpg',
+              isCover: true,
+              sortOrder: 0,
+            ),
+            // Kalitsiz (bayroqdan oldingi server) — ro'yxatga QO'SHILMAYDI:
+            // bo'sh kalit yuborilsa server 400 berardi.
+            BozorListingMedia(
+              id: 2,
+              role: 'photo',
+              storageKey: '',
+              url: 'http://x/b.jpg',
+            ),
+          ],
+        ),
+      );
+      expect(d.description.existingMedia.length, 1);
+      expect(d.description.existingMedia.first.key, 'listings/media/3/a.jpg');
+      expect(d.description.existingMedia.first.isCover, isTrue);
+    });
+  });
+
+  group('draftToUpdatePayload', () {
+    test('mulk turi YUBORILMAYDI — `ListingUpdateRequest` da u yo‘q', () {
+      final p = draftToUpdatePayload(draftFromListing(_listing()), const []);
+      expect(p.containsKey('deal_type'), isFalse);
+      expect(p.containsKey('property_kind'), isFalse);
+      expect(p.containsKey('property_type'), isFalse);
+      expect(p.containsKey('terms'), isFalse);
+      // Qolgan bo'limlar joyida.
+      expect(p.keys, containsAll(<String>[
+        'title', 'address', 'params', 'price', 'description', 'contacts',
+      ]));
+    });
+
+    test('media bo‘sh bo‘lsa `media` kaliti UMUMAN yuborilmaydi', () {
+      // Bu MUHIM: bo'sh ro'yxat server uchun "hamma rasmni o'chir" degani.
+      final p = draftToUpdatePayload(draftFromListing(_listing()), const []);
+      final d = p['description'] as Map;
+      expect(d.containsKey('media'), isFalse);
+      expect(d['text'], 'Yorugʻ kvartira');
+    });
+
+    test('media berilsa `media` yuboriladi', () {
+      final p = draftToUpdatePayload(draftFromListing(_listing()), const [
+        {'key': 'listings/media/3/a.jpg', 'role': 'photo', 'sort_order': 0,
+         'is_cover': true},
+      ]);
+      final d = p['description'] as Map;
+      expect((d['media'] as List).length, 1);
     });
   });
 }

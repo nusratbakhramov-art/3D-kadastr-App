@@ -228,6 +228,21 @@ class PriceDraft {
   String dailyUnit = 'UZS';
 }
 
+/// E'londa allaqachon turgan fayl — tahrirlashda qaytarib yuborish uchun.
+class ExistingMedia {
+  const ExistingMedia({
+    required this.key,
+    required this.role,
+    required this.sortOrder,
+    required this.isCover,
+  });
+
+  final String key;
+  final String role;
+  final int sortOrder;
+  final bool isCover;
+}
+
 /// 5-qadamning ma'lumotlari.
 ///
 /// Fayllar LOKAL yo'llar sifatida saqlanadi — yuklash endpoint'i hali yo'q.
@@ -238,6 +253,16 @@ class DescriptionDraft {
   final List<String> planFiles = [];
   final List<String> photos = [];
   final List<String> panoramas = [];
+
+  /// TAHRIRLASHDA: e'londa ALLAQACHON turgan fayllar (S3 kalitlari bilan).
+  ///
+  /// `PATCH` media ro'yxatini TO'LIQ almashtiradi, ya'ni saqlanadigan
+  /// rasmlarni qaytarib yuborish kerak. Yangi e'londa bu ro'yxat bo'sh.
+  ///
+  /// M1-9 da tahrirlash faqat QO'SHADI: mavjud rasmni o'chirish uchun UI yo'q
+  /// (u M4-25 — muqova tanlash va tartib bilan birga keladi). Shu sababli bu
+  /// ro'yxat o'zgarmaydi, faqat yangi yuklanganlar ustiga qo'shiladi.
+  final List<ExistingMedia> existingMedia = [];
   String youtubeUrl = '';
 }
 
@@ -289,6 +314,16 @@ class BozorDraft {
   /// tizimga kirmagan, yoki tarmoq yo'q): bunday holatda yuborish eski
   /// yo'l bilan, `POST /listings/` orqali ketadi.
   int? draftId;
+
+  /// Tahrirlanayotgan e'lonning id'si.
+  ///
+  /// `null` — YANGI e'lon (qoralama → `submit`, yoki to'g'ridan-to'g'ri
+  /// `POST`). To'lgan bo'lsa yuborish `PATCH /listings/{id}` ga ketadi va
+  /// yangi e'lon YARATILMAYDI. Ikkisi bir vaqtda bo'lmaydi: tahrirlash
+  /// mavjud e'londan boshlanadi, qoralamadan emas.
+  int? editingListingId;
+
+  bool get isEditing => editingListingId != null;
 
   final AddressDraft address = AddressDraft();
 

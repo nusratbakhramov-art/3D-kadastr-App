@@ -49,6 +49,7 @@ class BozorListingMedia {
   const BozorListingMedia({
     required this.id,
     required this.role,
+    required this.storageKey,
     required this.url,
     this.thumbUrl,
     this.isCover = false,
@@ -59,6 +60,11 @@ class BozorListingMedia {
 
   /// `photo` | `plan` | `panorama` — backend `MEDIA_ROLES`.
   final String role;
+
+  /// S3 kaliti. Tahrirlashda kerak: `PATCH` media ro'yxatini TO'LIQ
+  /// almashtiradi, ya'ni SAQLANADIGAN rasmlar kalit bilan qaytariladi.
+  /// Qo'shimcha oshkoralik emas — [url] ning o'zi shu kalitdan quriladi.
+  final String storageKey;
 
   final String url;
   final String? thumbUrl;
@@ -81,6 +87,10 @@ class BozorListingMedia {
       BozorListingMedia(
         id: _toInt(j['id']) ?? 0,
         role: (j['role'] ?? '').toString(),
+        // Eski server bu maydonni qaytarmaydi — bo'sh satr bo'lib qoladi va
+        // tahrirlashda o'sha rasm ro'yxatga qo'shilmaydi (yo'qolmaydi:
+        // media umuman yuborilmasa server unga tegmaydi).
+        storageKey: (j['storage_key'] ?? '').toString(),
         url: (j['url'] ?? '').toString(),
         thumbUrl: _toStringOrNull(j['thumb_url']),
         isCover: j['is_cover'] == true,

@@ -38,21 +38,38 @@ import '../../market/widgets/listing_cta_button.dart';
 import '../../market/widgets/listing_gallery_pager.dart';
 import '../../market/widgets/listing_info_card.dart';
 import '../../market/widgets/listing_meta_pills.dart';
+import '../../../widgets/app_toast.dart';
+import '../bozor_routes.dart';
 import '../data/bozor_api.dart';
+import '../data/bozor_draft_codec.dart';
 import '../data/param_options.dart';
 import '../models/bozor_draft.dart';
 import '../models/bozor_listing.dart';
 import '../models/param_schema.dart';
+import '../screens/bozor_type_step_screen.dart';
 
 class BozorListingDetailScreen extends StatefulWidget {
   const BozorListingDetailScreen({
     super.key,
     required this.listingId,
+    this.isOwner = false,
     this.api,
   });
 
   /// `GET /listings/{id}` uchun e'lon id'si.
   final int listingId;
+
+  /// Ko'rayotgan odam e'lonning EGASIMI.
+  ///
+  /// Server buni aytmaydi: `ListingOut` da egasining id'si YO'Q (ataylab —
+  /// ommaviy lentada begona odamning id'si oshkor bo'lmasin). Shu sababli
+  /// javobgarlik chaqiruvchida: "Mening e'lonlarim" tabi `true` beradi,
+  /// ommaviy lenta `false`.
+  ///
+  /// Sukut `false` — xavfsiz taraf: begonaga tahrirlash tugmasi
+  /// ko'rsatilgandan ko'ra egasiga ko'rsatilmasligi arzon (server baribir
+  /// 404 berardi, lekin foydalanuvchi chalg'iydi).
+  final bool isOwner;
 
   /// Faqat testlar uchun — tarmoq klientini almashtirish.
   final BozorApi? api;
@@ -156,6 +173,93 @@ class _BozorListingDetailScreenState extends State<BozorListingDetailScreen> {
         _errorKey = 'bozor.detail.load_failed';
         _loading = false;
       });
+    }
+  }
+
+  // ── Egasining harakatlari ─────────────────────────────────────────────────
+  /// Tahrirlash/arxivlash tugmalari.
+  ///
+  /// Ro'yxat HOLATGA bog'liq va serverdagi o'tishlar jadvaliga mos
+  /// (`bozor_listing.LISTING_TRANSITIONS`): tahrirlash faqat
+  /// `pending`/`rejected` da (server boshqasini 400 bilan rad etadi),
+  /// arxivlash esa `archived` dan tashqari hamma holatda — u OXIRGI holat,
+  /// undan qaytish yo'q.
+  List<Widget> _ownerActions(BozorListing listing) {
+    final l = Localizations.localeOf(context);
+    final canEdit =
+        listing.status == ListingStatus.pending ||
+        listing.status == ListingStatus.rejected;
+    final canArchive = listing.status != ListingStatus.archived;
+    return [
+      if (canEdit)
+        Expanded(
+          child: _OutlinedAction(
+            label: tr(l, 'bozor.detail.edit'),
+            icon: Icons.edit_outlined,
+            onTap: () => _edit(listing),
+          ),
+        ),
+      if (canEdit && canArchive) const SizedBox(width: 10),
+      if (canArchive)
+        Expanded(
+          child: _OutlinedAction(
+            label: tr(l, 'bozor.detail.archive'),
+            icon: Icons.inventory_2_outlined,
+            onTap: () => _archive(listing),
+          ),
+        ),
+    ];
+  }
+
+  /// Sehrgarni TO'LDIRILGAN qoralama bilan ochadi. Oxirida yuborish
+  /// `POST` emas `PATCH` ga ketadi (`BozorDraft.editingListingId`).
+  Future<void> _edit(BozorListing listing) async {
+    final draft = draftFromListing(listing);
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: bozorRoute('type'),
+        builder: (_) => BozorTypeStepScreen(draft: draft),
+      ),
+    );
+    // Tahrirlangan bo'lsa holat o'zgargan (`rejected` → `pending`).
+    if (mounted) _load();
+  }
+
+  /// Arxivlash — QAYTARIB BO'LMAYDI (`archived` oxirgi holat), shuning uchun
+  /// tasdiq so'raladi.
+  Future<void> _archive(BozorListing listing) async {
+    final l = Localizations.localeOf(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ColorTokens.sheetBg(ctx),
+        title: Text(tr(l, 'bozor.detail.archive_title')),
+        content: Text(tr(l, 'bozor.detail.archive_body')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(tr(l, 'common.cancel')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              tr(l, 'bozor.detail.archive'),
+              style: const TextStyle(color: Color(0xFFE0492A)),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    try {
+      await _api.archiveListing(listing.id);
+      if (mounted) _load();
+    } on BozorApiException catch (e) {
+      if (mounted) AppToast.error(context, e.message);
+    } catch (_) {
+      if (mounted) {
+        AppToast.error(context, tr(l, 'bozor.detail.archive_failed'));
+      }
     }
   }
 
@@ -431,6 +535,15 @@ class _BozorListingDetailScreenState extends State<BozorListingDetailScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: _StatusBanner(listing: listing),
+          ),
+        ],
+        // Egasining harakatlari. `isOwner` chaqiruvchidan keladi — server
+        // e'lonning egasini aytmaydi.
+        if (widget.isOwner && _ownerActions(listing).isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(children: _ownerActions(listing)),
           ),
         ],
         const SizedBox(height: 16),
@@ -850,3 +963,63 @@ PropertyType? _propertyTypeOf(String code) => switch (code) {
 // Son formatlash bu yerda TAKRORLANMAYDI: `bozor_listing.dart` dagi
 // [formatBozorAmount] ishlatiladi (ilgari shu faylda aynan nusxasi turardi
 // va ikkisi vaqt o'tib ajralib ketishi mumkin edi).
+
+/// Egasining ikkilamchi tugmasi — `ListingCtaButton` bilan bir o'lchamda,
+/// lekin konturli: "Qo'ng'iroq" asosiy harakat bo'lib qolishi kerak.
+class _OutlinedAction extends StatelessWidget {
+  const _OutlinedAction({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(999),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          height: 48,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: fg),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: fg,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

@@ -1917,7 +1917,12 @@
       "bozor.draft.delete": "Delete",
       "bozor.draft.delete_title": "Delete draft?",
       "bozor.draft.delete_body": "The entered data will be lost.",
-      "bozor.draft.delete_failed": "Could not delete the draft"
+      "bozor.draft.delete_failed": "Could not delete the draft",
+      "bozor.detail.edit": "Edit",
+      "bozor.detail.archive": "Archive",
+      "bozor.detail.archive_title": "Archive this listing?",
+      "bozor.detail.archive_body": "An archived listing disappears from the feed and cannot be restored.",
+      "bozor.detail.archive_failed": "Could not archive the listing"
     },
     "ru": {
       "about.app_name": "3D kadastr",
@@ -3836,7 +3841,12 @@
       "bozor.draft.delete": "Удалить",
       "bozor.draft.delete_title": "Удалить черновик?",
       "bozor.draft.delete_body": "Введённые данные будут потеряны.",
-      "bozor.draft.delete_failed": "Не удалось удалить черновик"
+      "bozor.draft.delete_failed": "Не удалось удалить черновик",
+      "bozor.detail.edit": "Редактировать",
+      "bozor.detail.archive": "В архив",
+      "bozor.detail.archive_title": "Отправить объявление в архив?",
+      "bozor.detail.archive_body": "Архивное объявление исчезнет из ленты, и вернуть его нельзя.",
+      "bozor.detail.archive_failed": "Не удалось архивировать объявление"
     },
     "uz": {
       "about.app_name": "3D kadastr",
@@ -5755,7 +5765,12 @@
       "bozor.draft.delete": "Oʻchirish",
       "bozor.draft.delete_title": "Qoralama oʻchirilsinmi?",
       "bozor.draft.delete_body": "Kiritilgan maʼlumotlar yoʻqoladi.",
-      "bozor.draft.delete_failed": "Qoralamani oʻchirib boʻlmadi"
+      "bozor.draft.delete_failed": "Qoralamani oʻchirib boʻlmadi",
+      "bozor.detail.edit": "Tahrirlash",
+      "bozor.detail.archive": "Arxivlash",
+      "bozor.detail.archive_title": "Eʼlon arxivlansinmi?",
+      "bozor.detail.archive_body": "Arxivlangan eʼlon lentadan yoʻqoladi va uni qaytarib boʻlmaydi.",
+      "bozor.detail.archive_failed": "Eʼlonni arxivlab boʻlmadi"
     }
   },
   "version": 0

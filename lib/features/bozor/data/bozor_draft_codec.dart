@@ -17,6 +17,7 @@
 library;
 
 import '../models/bozor_draft.dart';
+import '../models/bozor_listing.dart';
 
 // ── Enum ↔ kod ──────────────────────────────────────────────────────────────
 // Nomlar `app/schemas/listing_options.py` bilan AYNAN bir xil. Ikki yo'nalish
@@ -313,3 +314,118 @@ double? _double(Object? v) => v is num ? v.toDouble() : double.tryParse(_str(v))
 
 List<String> _strList(Object? v) =>
     v is List ? [for (final e in v) e.toString()] : const [];
+
+// ── Tahrirlash: e'lon → qoralama ────────────────────────────────────────────
+
+/// Mavjud e'londan tahrirlash uchun qoralama quradi.
+///
+/// [draftFromPayload] dan farqi: manba serverdagi TO'LIQ e'lon
+/// (`ListingOut`), ya'ni maydonlar tipli va ishonchli. Natijada
+/// `editingListingId` to'ladi va yuborish `PATCH /listings/{id}` ga ketadi —
+/// yangi e'lon YARATILMAYDI.
+///
+/// ⚠️ Bu konvertor hozir FAQAT ijara maydonlarini biladi. Sotuv bo'limlari
+/// qo'shilganda (reja M2-16, M3-19, M3-20, M4-26) HAR BIRI shu funksiyani
+/// yangilashi SHART — aks holda sotuv e'loni tahrirlanganda o'sha bo'limlar
+/// qoralamaga tiklanmaydi va `PATCH` ularni NULL ga tushiradi (jimgina
+/// ma'lumot yo'qolishi).
+BozorDraft draftFromListing(BozorListing l) {
+  final draft = BozorDraft(
+    deal: dealTypeFromCode(l.dealType),
+    kind: propertyKindFromCode(l.propertyKind),
+    type: propertyTypeFromCode(l.propertyType),
+  )..editingListingId = l.id;
+
+  draft.title = l.title;
+
+  draft.address
+    ..regionId = l.regionId
+    ..regionName = l.regionName
+    ..districtId = l.districtId
+    ..districtName = l.districtName
+    ..address = l.address
+    ..landmark = l.landmark ?? ''
+    ..apartmentNumber = l.apartmentNumber ?? ''
+    ..entrance = l.entrance ?? ''
+    ..houseNumber = l.houseNumber ?? ''
+    ..floor = l.floor?.toString() ?? ''
+    ..totalFloors = l.totalFloors?.toString() ?? ''
+    ..lat = l.latitude
+    ..lng = l.longitude;
+
+  // Tur `BozorDraft` konstruktorida berilgani uchun `setType` chaqirilmaydi,
+  // ya'ni `params` tozalanmaydi — to'g'ridan-to'g'ri to'ldirsak bo'ladi.
+  draft.params
+    ..clear()
+    ..addAll(l.params);
+
+  draft.price
+    ..amount = _numStr(l.priceAmount)
+    ..unit = unitFromCurrency(l.priceCurrency, l.pricePeriod)
+    ..negotiable = l.negotiable
+    ..dailyAmount = l.dailyAmount == null ? '' : _numStr(l.dailyAmount)
+    ..dailyUnit = (l.dailyCurrency ?? '').isEmpty ? 'UZS' : l.dailyCurrency!;
+
+  draft.description
+    ..text = l.description ?? ''
+    ..youtubeUrl = l.youtubeUrl ?? '';
+  // Mavjud fayllar KALIT bilan olinadi: `PATCH` media ro'yxatini to'liq
+  // almashtiradi, ya'ni ularni qaytarib yubormasak e'lon rasmsiz qolardi.
+  // Kalit bo'sh bo'lsa (bayroqdan oldingi server) o'sha faylni ro'yxatga
+  // qo'shmaymiz — noto'g'ri kalit yuborish 400 berardi.
+  draft.description.existingMedia
+    ..clear()
+    ..addAll([
+      for (final m in l.media)
+        if (m.storageKey.isNotEmpty)
+          ExistingMedia(
+            key: m.storageKey,
+            role: m.role,
+            sortOrder: m.sortOrder,
+            isCover: m.isCover,
+          ),
+    ]);
+
+  draft.contacts
+    ..name = l.contactName
+    ..email = l.contactEmail ?? '';
+  draft.contacts.phones
+    ..clear()
+    ..addAll(l.contactPhones.isEmpty ? [l.contactPhone] : l.contactPhones);
+
+  // Rozilik qaytadan belgilanadi — tahrirlash ham yuborish (reja Z5).
+  draft.terms.accepted = false;
+
+  return draft;
+}
+
+/// Tahrirlash uchun `PATCH` tanasi.
+///
+/// [draftToPayload] dan farqi ikkita:
+///   * `deal_type`/`property_kind`/`property_type` YUBORILMAYDI —
+///     `ListingUpdateRequest` da bu maydonlar YO'Q (mulk turini o'zgartirish
+///     butun `params` sxemasini buzardi);
+///   * [media] bo'sh bo'lsa `description.media` UMUMAN yuborilmaydi, ya'ni
+///     server rasmlarga TEGMAYDI (`DescriptionUpdateIn.media = None`).
+///     Bo'sh ro'yxat yuborish server uchun "hammasini o'chir" degani bo'lardi.
+Map<String, dynamic> draftToUpdatePayload(
+  BozorDraft draft,
+  List<Map<String, Object?>> media,
+) {
+  final full = draftToPayload(draft, media);
+  final description = <String, Object?>{
+    if (draft.description.text.trim().isNotEmpty)
+      'text': draft.description.text.trim(),
+    if (draft.description.youtubeUrl.isNotEmpty)
+      'youtube_url': draft.description.youtubeUrl,
+    if (media.isNotEmpty) 'media': media,
+  };
+  return {
+    'title': full['title'],
+    'address': full['address'],
+    'params': full['params'],
+    'price': full['price'],
+    'description': description,
+    'contacts': full['contacts'],
+  };
+}

@@ -202,6 +202,33 @@ class BozorApi {
     return BozorListing.fromJson(body);
   }
 
+  /// Mavjud e'lonni tahrirlaydi. Faqat `pending`/`rejected` holatida
+  /// mumkin; `rejected` e'lon tahrirlangach server uni QAYTA `pending` ga
+  /// o'tkazadi va rad etish sababini tozalaydi.
+  ///
+  /// ⚠️ Berilgan bo'limlar ALMASHTIRILADI, berilmagani tegilmaydi. Ayniqsa
+  /// `description.media`: uni umuman yubormaslik = "rasmlarga tegmang",
+  /// bo'sh ro'yxat yuborish = "hammasini olib tashla".
+  Future<Map<String, dynamic>> updateListing(
+    int id,
+    Map<String, dynamic> payload,
+  ) async => _sendJson(
+    'PATCH',
+    _uri('/listings/$id'),
+    payload,
+    expect: 200,
+    timeout: const Duration(seconds: 40),
+  );
+
+  /// E'lonni arxivlaydi — lentadan yo'qoladi. `archived` OXIRGI holat:
+  /// serverda undan qaytish o'tishi yo'q, ya'ni bu qaytarib bo'lmaydigan.
+  Future<Map<String, dynamic>> archiveListing(int id) async => _sendJson(
+    'POST',
+    _uri('/listings/$id/archive'),
+    null,
+    expect: 200,
+  );
+
   // ── Qoralamalar ───────────────────────────────────────────────────────────
   // Hammasi tizimga kirishni talab qiladi. DIQQAT: `Authorization` sarlavhasi
   // UMUMAN bo'lmasa backend **403** qaytaradi (`HTTPBearer(auto_error=True)`),

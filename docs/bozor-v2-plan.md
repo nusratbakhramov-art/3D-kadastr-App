@@ -1353,6 +1353,33 @@ holatning 8/8 maketi yo'q; `293:12030` — eski 7/7 avlodi, ko'chirish **farazim
 
 ---
 
+## 5.9 ⚠️ TUZATISH — «alembic 3 head» DA'VOSI NOTO'G'RI EDI
+
+Bu hujjat bir necha joyda «alembic 3 head bilan buzuq» deb yozgan va shu bilan
+`ensure_*.py` naqshini asoslagan. 2026-09-10 da o'lchandi:
+
+    docker compose exec -T app alembic heads
+    → davreestr_logs_01 (head)
+
+Ya'ni **bitta head**, uchta emas. Xato qayerdan chiqqan: lokal bazada
+`alembic_version` qatori UMUMAN yo'q (`alembic current` bo'sh) — baza
+`ensure_*` skriptlari bilan qurilgan, migratsiyalar bilan emas. Shu sababli
+lokal `alembic upgrade head` `type "marketmodelstatus" already exists` bilan
+yiqiladi — bu **lokal bazaning artefakti**, migratsiya grafining nuqsoni emas.
+Prod esa head'ga stamp qilingan va `.gitlab-ci.yml` 1c izohi buni tasdiqlaydi.
+
+**Qaror o'zgarmaydi** — `ensure_*` naqshi baribir to'g'ri tanlov:
+`.gitlab-ci.yml` 1b izohi ~39 obyekt (`app_settings`, `poi_cache`,
+`chat_suggestions`, …) HECH QANDAY migratsiya bilan yaratilmaganini yozadi,
+ya'ni bu repoda sxema manbai ikkiga bo'lingan va yangi jadval uchun ham shu
+yo'l izchil. **Lekin sabab boshqa:** «3 head buzuq» emas, «bu repoda
+sxemaning bir qismi tarixan `ensure_*` da yashaydi».
+
+M6 va texnik qarz bo'limlarida «3 head» deb yozilgan joylarni shu izoh
+bilan o'qish kerak.
+
+---
+
 ## 6. Alohida qayd etilgan texnik qarz (bu rejaga kirmaydi)
 
 | Qarz | Ta'siri | Nega hozir emas |
