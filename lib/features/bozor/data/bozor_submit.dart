@@ -31,27 +31,55 @@ class BozorSubmitter {
     final d = draft.description;
 
     // ── 1. Fayllar ────────────────────────────────────────────────────────
-    // Rollar bo'yicha alohida so'rov: backend `role` ni forma maydonida
-    // kutadi va har rolning o'z chegarasi bor.
+    // BITTALAB yuboriladi, rol bo'yicha to'plab EMAS. Sabab xotira:
+    // `AuthHttpClient._toReplayable` multipart'ni to'liq baytga o'qiydi
+    // (`finalize().toBytes()`) va `_cloneRequest` yana nusxa oladi — ya'ni
+    // 20 ta 20 MB'lik foto bitta so'rovda ≈ 800 MB, telefonda OOM.
+    // Bittalab yuborilganda cho'qqi ≈ 2 × bitta fayl.
+    //
+    // Ikkinchi foyda — QISMAN MUVAFFAQIYAT: har bir muvaffaqiyatli kalit
+    // darhol qoralamaga yoziladi, shuning uchun uzilishdan keyingi qayta
+    // urinish faqat QOLGANINI yuklaydi.
     final groups = <String, List<String>>{
       'photo': d.photos,
       'plan': d.planFiles,
       'panorama': d.panoramas,
     }..removeWhere((_, v) => v.isEmpty);
 
-    final total = groups.length + 1; // + e'lonning o'zi
-    var done = 0;
-    void tick() => onProgress?.call(++done, total);
+    final allPaths = [
+      for (final e in groups.entries)
+        for (final path in e.value) (role: e.key, path: path),
+    ];
 
+    // Umumiy: hamma fayl + e'lonning o'zi. Allaqachon yuklangani DARHOL
+    // bajarilgan deb hisoblanadi — qayta urinishda "3/12" mantiqiy ko'rinadi.
+    final total = allPaths.length + 1;
+    var done = allPaths.where((f) => d.uploadedMedia.containsKey(f.path)).length;
+    onProgress?.call(done, total);
+
+    for (final f in allPaths) {
+      if (d.uploadedMedia.containsKey(f.path)) continue;
+      // Xato YUTILMAYDI: chaqiruvchi (7-qadam ekrani) uni ko'rsatadi va
+      // qoralama joyida qoladi. Shu paytgacha yuklangan kalitlar
+      // `uploadedMedia` da saqlanib turadi.
+      final uploaded = await _api.uploadMedia(role: f.role, paths: [f.path]);
+      if (uploaded.isEmpty) {
+        throw BozorApiException('fayl yuklanmadi: ${f.path}');
+      }
+      d.uploadedMedia[f.path] = uploaded.first.key;
+      onProgress?.call(++done, total);
+    }
+
+    // Kalitlar ro'yxati — tartib va muqova qoralamadagi TARTIB bo'yicha,
+    // yuklash ketma-ketligi bo'yicha EMAS (qayta urinishda tartib
+    // o'zgarmasligi kerak).
     final media = <Map<String, Object?>>[];
     for (final entry in groups.entries) {
-      final uploaded = await _api.uploadMedia(
-        role: entry.key,
-        paths: entry.value,
-      );
-      for (var i = 0; i < uploaded.length; i++) {
+      for (var i = 0; i < entry.value.length; i++) {
+        final key = d.uploadedMedia[entry.value[i]];
+        if (key == null) continue;
         media.add({
-          'key': uploaded[i].key,
+          'key': key,
           'role': entry.key,
           'sort_order': i,
           // Muqova — birinchi foto. Backend ham shu qoidaga tushadi, lekin
@@ -59,8 +87,9 @@ class BozorSubmitter {
           'is_cover': entry.key == 'photo' && i == 0,
         });
       }
-      tick();
     }
+
+    void tick() => onProgress?.call(++done, total);
 
     // ── 2. E'lon ──────────────────────────────────────────────────────────
     // Tahrirlash: yangi e'lon YARATILMAYDI, mavjudi yangilanadi.

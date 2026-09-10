@@ -133,6 +133,8 @@ Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
       'photos': List<String>.from(d.photos),
       'plan': List<String>.from(d.planFiles),
       'panorama': List<String>.from(d.panoramas),
+      // Allaqachon yuklangan fayllar — qayta urinish ularni takrorlamasin.
+      'uploaded': Map<String, String>.from(d.uploadedMedia),
     },
   };
 }
@@ -256,6 +258,12 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
   draft.description.panoramas
     ..clear()
     ..addAll(_strList(local['panorama']));
+  draft.description.uploadedMedia
+    ..clear()
+    ..addAll({
+      for (final e in _map(local['uploaded']).entries)
+        if (e.value != null) e.key: e.value.toString(),
+    });
 
   final c = _map(json['contacts']);
   final phones = _strList(c['phones']);

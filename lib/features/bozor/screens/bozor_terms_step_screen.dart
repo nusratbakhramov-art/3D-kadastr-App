@@ -19,6 +19,7 @@ import '../../services/widgets/service_app_bar.dart';
 import '../../services/widgets/step_progress_bar.dart';
 import '../bozor_routes.dart';
 import '../data/bozor_api.dart';
+import '../data/bozor_draft_store.dart';
 import '../data/bozor_submit.dart';
 import '../models/bozor_draft.dart';
 import '../widgets/bozor_consent_row.dart';
@@ -40,6 +41,12 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
 
   final BozorSubmitter _submitter = BozorSubmitter();
   bool _sending = false;
+
+  /// Yuklash jarayoni — tugma matnida ko'rinadi («Yuborilmoqda… 3/12»).
+  /// 12 ta fotoni yuborish daqiqalar oladi; progressiz foydalanuvchi ilova
+  /// qotib qoldi deb o'ylab, tugmani qayta bosadi.
+  int _done = 0;
+  int _total = 0;
 
   @override
   void dispose() {
@@ -70,10 +77,23 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
   /// hamma narsani qaytadan kiritmasligi kerak.
   Future<void> _submit() async {
     if (_sending) return;
-    setState(() => _sending = true);
+    setState(() {
+      _sending = true;
+      _done = 0;
+      _total = 0;
+    });
     final l = Localizations.localeOf(context);
     try {
-      final created = await _submitter.submit(widget.draft);
+      final created = await _submitter.submit(
+        widget.draft,
+        onProgress: (done, total) {
+          if (!mounted) return;
+          setState(() {
+            _done = done;
+            _total = total;
+          });
+        },
+      );
       if (!mounted) return;
       // `id` kutilmagan shaklda kelsa `null` qoladi — success ekrani bunda
       // "ko'rish" tugmasini ko'rsatmaydi (mavjud bo'lmagan e'lonni ochmaydi).
@@ -92,12 +112,26 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
         },
       );
     } on BozorApiException catch (e) {
+      // Uzilishdan oldin yuklangan fayl kalitlari qoralamaga yozilgan —
+      // ularni SERVERGA ham saqlaymiz, aks holda ilova qayta ishga
+      // tushirilsa qayta urinish hamma faylni boshidan yuklardi.
+      saveBozorDraftInBackground(widget.draft, WizardStep.terms);
       if (mounted) AppToast.error(context, e.message);
     } catch (e) {
+      saveBozorDraftInBackground(widget.draft, WizardStep.terms);
       if (mounted) AppToast.error(context, tr(l, 'bozor.terms.submit_failed'));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  /// «Yuborilmoqda…» yoki fayl bo'lsa «Yuborilmoqda… 3/12».
+  ///
+  /// Umumiy son 1 dan katta bo'lgandagina raqam ko'rsatiladi: rasmsiz e'londa
+  /// «1/1» faqat shovqin bo'lardi.
+  String _sendingLabel(Locale l) {
+    final base = tr(l, 'bozor.terms.submitting');
+    return _total > 1 ? '$base $_done/$_total' : base;
   }
 
   @override
@@ -192,7 +226,7 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
                                     ),
                               child: ListingCtaButton(
                                 label: _sending
-                                    ? tr(l, 'bozor.terms.submitting')
+                                    ? _sendingLabel(l)
                                     : tr(l, 'bozor.terms.submit'),
                                 enabled: _t.accepted && !_sending,
                                 onTap: _submit,

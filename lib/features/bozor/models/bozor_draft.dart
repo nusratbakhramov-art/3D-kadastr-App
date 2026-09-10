@@ -263,6 +263,17 @@ class DescriptionDraft {
   /// (u M4-25 — muqova tanlash va tartib bilan birga keladi). Shu sababli bu
   /// ro'yxat o'zgarmaydi, faqat yangi yuklanganlar ustiga qo'shiladi.
   final List<ExistingMedia> existingMedia = [];
+
+  /// MUVAFFAQIYATLI yuklangan fayllar: qurilma yo'li → S3 kaliti.
+  ///
+  /// Yuborish yarim yo'lda uzilsa (Wi-Fi o'chdi, server 500) qoralama JOYIDA
+  /// qoladi va foydalanuvchi qayta uriniradi. Shu xarita busiz har urinishda
+  /// HAMMA fayl qaytadan ketardi: 12 fotoli e'lon uchun bu o'n daqiqa va
+  /// storage'da bir necha to'plam yetim fayl. Endi faqat qolgani yuklanadi.
+  ///
+  /// Qoralama payload'ida saqlanadi, ya'ni ilova qayta ishga tushsa ham
+  /// yo'qolmaydi.
+  final Map<String, String> uploadedMedia = {};
   String youtubeUrl = '';
 }
 
