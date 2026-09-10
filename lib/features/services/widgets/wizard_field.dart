@@ -15,6 +15,7 @@ class WizardField extends StatelessWidget {
     this.placeholder,
     this.keyboardType,
     this.suffix,
+    this.alwaysShowSuffix = false,
     this.maxLines = 1,
     this.numericOnly = false,
     this.allowDecimal = false,
@@ -29,6 +30,13 @@ class WizardField extends StatelessWidget {
   final TextEditingController controller;
   final TextInputType? keyboardType;
   final String? suffix;
+
+  /// Flutter'ning `suffixText` i maydon bo'sh va fokussiz bo'lsa KO'RINMAYDI.
+  /// O'lchov birligi (m², sot.) esa maydon bo'sh turganda ham ko'rinishi
+  /// kerak — nimani kiritish kerakligini o'sha aytadi. Shu bayroq birlikni
+  /// doimiy ko'rinadigan qilib chizadi. Mavjud chaqiruvlar tegilmasin uchun
+  /// sukut bo'yicha `false`.
+  final bool alwaysShowSuffix;
   final int maxLines;
   final bool numericOnly;
   final bool allowDecimal;
@@ -127,12 +135,26 @@ class WizardField extends StatelessWidget {
               fontSize: 14.5,
               color: hintColor,
             ),
-            suffixText: suffix,
+            suffixText: alwaysShowSuffix ? null : suffix,
             suffixStyle: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 13,
               color: suffixColor,
             ),
+            suffixIcon: alwaysShowSuffix && suffix != null
+                ? Padding(
+                    padding: const EdgeInsets.only(right: 14, left: 8),
+                    child: Text(
+                      suffix!,
+                      style: TextStyle(
+                        fontFamily: 'MTSText',
+                        fontSize: 13,
+                        color: suffixColor,
+                      ),
+                    ),
+                  )
+                : null,
+            suffixIconConstraints: const BoxConstraints(minWidth: 0),
             filled: true,
             fillColor: fill,
             enabledBorder: OutlineInputBorder(

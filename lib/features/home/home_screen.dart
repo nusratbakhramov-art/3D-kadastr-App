@@ -28,6 +28,8 @@ class HomeScreen extends StatefulWidget {
     this.onLoginTap,
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
+    this.onOpenBozorAi,
+    this.onOpenTaqiqCheck,
     this.onOpenMarket,
     this.onOpenKalkulyator,
     this.onOpenOrder,
@@ -40,6 +42,8 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onLoginTap;
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
+  final VoidCallback? onOpenBozorAi;
+  final VoidCallback? onOpenTaqiqCheck;
   final VoidCallback? onOpenMarket;
   final VoidCallback? onOpenKalkulyator;
   final VoidCallback? onOpenOrder;
@@ -237,6 +241,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       locale: widget.locale,
                       onOpenKadastr3d: widget.onOpenKadastr3d,
                       onOpenAiValuation: widget.onOpenAiValuation,
+                      onOpenBozorAi: widget.onOpenBozorAi,
+                      onOpenTaqiqCheck: widget.onOpenTaqiqCheck,
                       onOpenKalkulyator: widget.onOpenKalkulyator,
                     ),
                   ),
@@ -513,20 +519,25 @@ class _HomePatternBackground extends StatelessWidget {
 }
 
 /// The Home service grid — the rich dark cards brought over from the (removed)
-/// Services page: two square cards (AI Baholash, 3D kadastr) + one wide card
-/// (Kalkulyator), each with an accent glow and a 3D image. Market lives in the
-/// bottom tab + "Top modellar", so it's not a card here.
+/// Services page: two rows of square cards (AI Baholash + 3D kadastr, then
+/// Bozor AI + Taqiqni tekshirish) and one wide card (Kalkulyator), each with an
+/// accent glow and a 3D image. Market lives in the bottom tab + "Top modellar",
+/// so it's not a card here.
 class _CardsGrid extends StatelessWidget {
   const _CardsGrid({
     required this.locale,
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
+    this.onOpenBozorAi,
+    this.onOpenTaqiqCheck,
     this.onOpenKalkulyator,
   });
 
   final Locale locale;
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
+  final VoidCallback? onOpenBozorAi;
+  final VoidCallback? onOpenTaqiqCheck;
   final VoidCallback? onOpenKalkulyator;
 
   @override
@@ -546,6 +557,25 @@ class _CardsGrid extends StatelessWidget {
       subtitle: _CardStrings.aiValuationSub(l),
       asset: 'assets/images/services/ai.png',
       accent: const Color(0xFF7C3AED),
+      layout: ServiceLayout.square,
+    );
+    // Row 2. Accents stay off the row-1 hues (purple / brand green) so the four
+    // glows read as four services, not two pairs; the artwork is the same 3D
+    // icon family as ai.png, re-cropped to the ~88% fill the card expects.
+    final bozorAi = ServiceItem(
+      id: ServiceId.bozorAi,
+      title: _CardStrings.bozorAi(l),
+      subtitle: _CardStrings.bozorAiSub(l),
+      asset: 'assets/images/services/bozor-ai.png',
+      accent: const Color(0xFFF59E0B),
+      layout: ServiceLayout.square,
+    );
+    final taqiq = ServiceItem(
+      id: ServiceId.taqiqCheck,
+      title: _CardStrings.taqiqCheck(l),
+      subtitle: _CardStrings.taqiqCheckSub(l),
+      asset: 'assets/images/services/taqiq.png',
+      accent: const Color(0xFFF43F5E),
       layout: ServiceLayout.square,
     );
     final calculator = ServiceItem(
@@ -601,6 +631,27 @@ class _CardsGrid extends StatelessWidget {
             ),
             const SizedBox(height: gap),
             SizedBox(
+              height: squareHeight,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ServiceCard(
+                      item: bozorAi,
+                      onTap: onOpenBozorAi ?? () {},
+                    ),
+                  ),
+                  const SizedBox(width: gap),
+                  Expanded(
+                    child: ServiceCard(
+                      item: taqiq,
+                      onTap: onOpenTaqiqCheck ?? () {},
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: gap),
+            SizedBox(
               height: wideHeight,
               width: double.infinity,
               child: ServiceCard(
@@ -629,6 +680,14 @@ class _CardStrings {
   static String calculator(Locale l) => tr(l, 'home.card.calculator');
 
   static String calculatorSub(Locale l) => tr(l, 'home.card.calculator_sub');
+
+  static String bozorAi(Locale l) => tr(l, 'home.card.bozor_ai');
+
+  static String bozorAiSub(Locale l) => tr(l, 'home.card.bozor_ai_sub');
+
+  static String taqiqCheck(Locale l) => tr(l, 'home.card.taqiq_check');
+
+  static String taqiqCheckSub(Locale l) => tr(l, 'home.card.taqiq_check_sub');
 }
 
 class _HomeScreenStrings {

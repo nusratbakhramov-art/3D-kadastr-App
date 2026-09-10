@@ -6,6 +6,7 @@ import 'models/service_item.dart';
 import 'screens/ai_scan_intro_screen.dart';
 import 'screens/kadastr/kadastr_area_screen.dart';
 import 'screens/online_calculator_screen.dart';
+import 'screens/service_placeholder_screen.dart';
 import 'screens/smeta/smeta_editor_screen.dart';
 import 'widgets/service_card.dart';
 
@@ -238,6 +239,14 @@ class _ServicesScreenState extends State<ServicesScreen>
       case ServiceId.smetaPro:
         Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const SmetaEditorScreen()),
+        );
+      case ServiceId.bozorAi:
+      case ServiceId.taqiqCheck:
+        // Home'dagi yangi kartalar bilan bir xil: ekran hali yo'q.
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ServicePlaceholderScreen(title: item.title),
+          ),
         );
     }
   }

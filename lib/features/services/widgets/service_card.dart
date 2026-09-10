@@ -156,7 +156,10 @@ class _ServiceCardState extends State<ServiceCard>
                   children: [
                     Text(
                       item.title,
-                      maxLines: 1,
+                      // Kvadrat kartada ikki qator: "Taqiqni tekshirish" kabi
+                      // uzun nom 19pt da bitta qatorga sig'maydi va kesilardi.
+                      // Keng kartada bitta qator — u yerda joy yetarli.
+                      maxLines: isWide ? 1 : 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontFamily: 'MTSCompact',

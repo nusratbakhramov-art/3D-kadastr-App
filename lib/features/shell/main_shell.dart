@@ -23,6 +23,9 @@ import '../profile/profile_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr/kadastr_area_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
+import '../bozor/bozor_routes.dart';
+import '../bozor/screens/bozor_type_step_screen.dart';
+import '../services/screens/service_placeholder_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../theme/app_colors.dart';
 import 'app_bottom_nav.dart';
@@ -251,6 +254,27 @@ class _MainShellState extends State<MainShell> {
     );
   }
 
+  // "Bozor AI" — e'lon joylash sehrgari. Marshrut nomi SHART: `closeBozorWizard`
+  // `bozor/` bilan boshlanmaydigan birinchi marshrutgacha poplaydi.
+  void _openBozorAi() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        settings: bozorRoute('type'),
+        builder: (_) => const BozorTypeStepScreen(),
+      ),
+    );
+  }
+
+  void _openTaqiqCheck() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ServicePlaceholderScreen(
+          title: tr(widget.locale, 'home.card.taqiq_check'),
+        ),
+      ),
+    );
+  }
+
   void _openMarketTab() => _onTabChanged(1);
 
   @override
@@ -272,6 +296,8 @@ class _MainShellState extends State<MainShell> {
             // "3D kadastr" karta → xizmatlar ro'yxati kalkulyatori.
             onOpenKadastr3d: _openServiceList,
             onOpenAiValuation: _openAiValuation,
+            onOpenBozorAi: _openBozorAi,
+            onOpenTaqiqCheck: _openTaqiqCheck,
             onOpenMarket: _openMarketTab,
             // "Kalkulyator" karta → birlashgan (maydon → xizmatlar) kalkulyator.
             onOpenKalkulyator: _openCombinedCalc,
