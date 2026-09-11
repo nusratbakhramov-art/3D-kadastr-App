@@ -15,7 +15,7 @@ Oxirgi yangilanish: **2026-09-12**, branch `feat/bozor-ai-v2`.
 
 ```
 Bozor → e'lon qo'shish → 5-qadam (Tavsif) → «360 foto qo'shish»
-   → NATIV capture (iOS: ARKit) — 30 nishon, avtomatik zatvor
+   → NATIV capture (iOS: ARKit / Android: ARCore) — 30 nishon, avto-zatvor
    → har kadr + KAMERA POZASI serverga yuklanadi
    → foydalanuvchi SHU EKRANDA kutadi (~30 s tikish)
    → tayyor panorama S3 KALITI bilan qoralamaga tushadi
@@ -24,7 +24,7 @@ Bozor → e'lon qo'shish → 5-qadam (Tavsif) → «360 foto qo'shish»
 
 | | |
 |---|---|
-| Mobil taraf | iOS **tayyor**, Android (ARCore) **QOLGAN** |
+| Mobil taraf | iOS (ARKit) **tayyor**, Android (ARCore) **tayyor** — ikkalasi ham QURILMADA SINALMAGAN |
 | Server taraf | tayyor — `kadastr-backend` `4ae28b0` |
 | Regressiya bazasi | `analyze 27 (0 error, 4 warning)`, `tests 379 / fail 16` |
 | Push | branch hali **pushlanmagan** (upstream yo'q) |
@@ -77,6 +77,12 @@ git diff 966fe3d..HEAD --stat -- lib/features/services/   # BO'SH bo'lishi kerak
 bash tool/pano/baseline.sh
 ```
 
+Android tomoni uchun alohida (sof JVM, emulyator kerak emas):
+
+```bash
+cd android && ./gradlew :app:testDebugUnitTest   # 14 test
+```
+
 `0 error`, `4 warning`, `fail 16` — yomonlashmasin. 16 yiqilgan test
 **bizdan oldin** ham yiqilardi, ro'yxati
 [tool/pano/README.md](../tool/pano/README.md) da.
@@ -107,40 +113,37 @@ qo'riqlamayapti.
 
 ## 3. Qolgan ish
 
-### 3.1 Android capture (ARCore) — ASOSIY QOLGAN ISH
+### 3.1 Qurilmada sinash — ASOSIY QOLGAN ISH
 
-Protokol **platformadan mustaqil**: server ARKit haqida hech narsa
-bilmaydi, faqat `transform` (camera→world 4×4, ustun-bo'yicha) va
-`intrinsics` (fx, fy, cx, cy) kutadi. ARCore aynan shu konvensiyani
-beradi (OpenGL, −Z oldinga):
+Ikkala platforma ham **yozilgan va kompilyatsiya bo'ladi**, lekin HAQIQIY
+qurilmada hali sinalmagan. Simulyator/emulatorda ARKit ham, ARCore ham yo'q —
+`isSupported()` `false` qaytaradi va 360 qatori umuman ko'rinmaydi.
 
-| iOS (ARKit) | Android (ARCore) |
-|---|---|
-| `frame.camera.transform` | `frame.camera.pose.toMatrix()` |
-| `frame.camera.intrinsics` | `camera.getImageIntrinsics()` |
-| `captureHighResolutionFrame` (iOS 16+) | `frame.acquireCameraImage()` |
-| `.gravity` worldAlignment | ARCore'da poza allaqachon tortishishga tekis |
-
-Yozilishi kerak: `android/app/src/main/kotlin/.../PanoCapture.kt` +
-`MainActivity` da `kadastr/pano_capture` kanali. Dart tarafida **hech narsa
-o'zgarmaydi** — [pano_capture_channel.dart](../lib/features/panorama/data/pano_capture_channel.dart)
-o'sha kanalni chaqiradi va o'sha natijani kutadi (`dir`, `frames`).
-
-⚠️ ARCore **hamma Android qurilmada yo'q**. `isSupported()` `false`
-qaytarsa 360 bo'limi **umuman chizilmaydi** — muqobil taklif qilinmaydi,
-chunki eski sensorli oqim ham, galereyadan yuklash ham olib tashlangan.
-
-### 3.2 Qurilmada sinash (iOS)
-
-Simulyatorda ARKit **yo'q** — `isSupported()` `false` qaytaradi va 360
-qatori ko'rinmaydi. Haqiqiy telefon kerak (A9+).
-
-Tekshiriladigan uchta narsa:
+Tekshiriladigan uchta narsa (har ikki platformada):
 
 1. 30 nishon aylanib chiqiladi, avtomatik zatvor ishlaydi;
 2. yuklash progressi kadrma-kadr o'sadi, keyin «tikilmoqda» ga o'tadi;
 3. tayyor panorama eskizi qatorida ko'rinadi (**tarmoqdan** yuklanadi) va
    bosilganda sferada ochiladi.
+
+⚠️ **Android'da birinchi qaraladigan narsa — CHOK.** iOS birinchi kadrdan
+keyin ekspozitsiya va oq balansni QULFLAYDI; ARCore'da bunga to'g'ridan
+yo'l yo'q (Shared Camera / Camera2 qatlami kerak bo'lardi) va qulf
+QO'YILMAGAN. Server gain kompensatsiyasi + ko'p bandli aralashtirish buni
+tekislashi kerak. Tekislamasa —
+`android/.../pano/PanoCaptureActivity.kt` dagi izohga qarang.
+
+### 3.2 Platformalar orasidagi UCH farq (ataylab)
+
+| | iOS (ARKit) | Android (ARCore) |
+|---|---|---|
+| Kamera oqimini chizish | `ARSCNView` o'zi chizadi | qo'lda, `PanoBackgroundRenderer` (GL) |
+| Yuqori aniqlikdagi kadr | `captureHighResolutionFrame` | yo'q — eng katta CPU kadri (≤1920) tanlanadi |
+| Ekspozitsiya qulfi | bor (`AVCaptureDevice`) | **yo'q** (yuqoriga qarang) |
+
+Protokol esa AYNAN bir xil: `camera.transform`/`camera.pose.toMatrix()` —
+ikkalasi ham OpenGL konvensiyasi (−Z oldinga), column-major; kadr SENSOR
+orientatsiyasida, aylantirilmasdan yuboriladi.
 
 ### 3.3 Kichik qarzlar
 
@@ -149,6 +152,10 @@ Tekshiriladigan uchta narsa:
   yo'q, lekin tozalash backend seed'i bilan birga qilinishi kerak —
   bundle backenddan keladi, faqat mobil tarafdan o'chirish drift beradi.
 * `pano_source_sheet.dart` izohda turibdi (yuqoriga qarang).
+* `camera`, `dchs_motion_sensors` va `vector_math` paketlari `lib/` da
+  ENDI ISHLATILMAYDI (eski sensorli capture ular uchun edi). Ular bilan
+  birga `AndroidManifest.xml` dagi `RECORD_AUDIO`/`camera.any`/giroskop
+  bloklari ham keraksiz. Alohida tozalash.
 
 ---
 
@@ -160,6 +167,12 @@ Tekshiriladigan uchta narsa:
 |---|---|
 | `ios/Runner/PanoCapture.swift` | ARKit sessiyasi, 30 nishon, avtomatik zatvor, JPEG 1280px + `meta.json` |
 | `ios/Runner/AppDelegate.swift` | `kadastr/pano_capture` kanali |
+| `android/.../pano/PanoCaptureActivity.kt` | ARCore sessiyasi, o'sha 30 nishon, o'sha zatvor, `meta.json` |
+| `android/.../pano/PanoBackgroundRenderer.kt` | kamera oqimini GL bilan chizish (ARCore'da tayyor ko'rinish yo'q) |
+| `android/.../pano/PanoOverlayView.kt` | nishon nuqtalari + reticle |
+| `android/.../pano/PanoYuv.kt` | YUV_420_888 → NV21 (sof JVM, testlangan) |
+| `android/.../pano/PanoTargets.kt` | nishon panjarasi + `meta` modeli (sof JVM, testlangan) |
+| `android/.../MainActivity.kt` | `kadastr/pano_capture` kanali |
 | `lib/features/panorama/data/pano_capture_channel.dart` | kanal klienti; matnlar SHU YERDA tarjima qilinadi va nativ tarafga uzatiladi |
 | `lib/features/panorama/data/pano_api.dart` | `createJob → uploadFrame × N → finish → status` |
 | `lib/features/panorama/screens/pano_capture_flow.dart` | kutish ekrani: capture → yuklash → tikish → natija; xatoda qayta urinish KADRLARNI QAYTA ISHLATADI |
@@ -197,8 +210,9 @@ keyin** o'chiriladi.
 ## 5. Yangi sessiyada birinchi navbatda
 
 ```bash
-bash tool/pano/baseline.sh          # 0 error / 4 warning / fail 16
-git -C ~/StudioProjects/kadastr-backend log --oneline -1   # 4ae28b0 bo'lsin
+bash tool/pano/baseline.sh                               # 0 error / 4 warning / fail 16
+cd android && ./gradlew :app:testDebugUnitTest           # 14 test (pano)
+git -C ~/StudioProjects/kadastr-backend log --oneline -1 # 4ae28b0 bo'lsin
 ```
 
-Keyin — **3.1 (Android capture)**.
+Keyin — **3.1 (qurilmada sinash)**.

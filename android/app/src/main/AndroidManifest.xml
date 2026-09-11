@@ -38,6 +38,12 @@
         android:required="false"
         tools:replace="android:required" />
 
+    <!-- 360° panorama capture ARCore'ga tayanadi. `required="false"` —
+         ARCore'siz qurilmada ilovaning qolgani to'liq ishlaydi va 360
+         bo'limi Dart tarafda umuman ko'rsatilmaydi. Majburiy qilsak Play
+         ilovani ARCore'siz telefonlarga umuman ko'rsatmasdi. -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
+
     <!-- Panorama capture kadr burchagini giroskop/akselerometrdan oladi
          (dchs_motion_sensors). Sensor yo'q qurilmada faqat SHU ekran
          ishlamaydi — ilovaning qolgani ishlaydi, demak majburiy emas.
@@ -103,6 +109,22 @@
                 <data android:scheme="kadastr3d" android:host="market"/>
             </intent-filter>
         </activity>
+        <!-- ARCore IXTIYORIY (`optional`): ilova ARCore'siz ham to'liq
+             ishlaydi, faqat 360° bo'limi ko'rinmaydi. `required` qilinsa Play
+             Store ARCore'ni majburan o'rnatardi va qo'llamaydigan
+             qurilmalarga ilova umuman tushmasdi. -->
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
+
+        <!-- 360° panorama capture (ARCore). Portretga qulflangan: nishonlar
+             va reticle shu yo'nalishga qarab joylashtirilgan, aylanishda
+             GL sirt va sessiya qayta qurilardi. exported EMAS. -->
+        <activity
+            android:name=".pano.PanoCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="keyboardHidden|keyboard|locale|layoutDirection|fontScale|uiMode" />
+
         <!-- Debug-only video recorder (0.5x/0.6x + HD). Flutter'dagi tugma
              faqat kDebugMode'da ko'rinadi; exported EMAS. -->
         <activity

@@ -15,6 +15,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show PlatformException;
 
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
@@ -180,7 +181,15 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
     if (!mounted) return;
     setState(() {
       _stage = _Stage.failed;
-      _error = e is PanoApiException ? e.message : e.toString();
+      // Nativ taraf xatoni `PlatformException` qilib qaytaradi (masalan
+      // ARCore o'rnatilmagan). Uning `toString()` i «PlatformException(
+      // CAPTURE_FAILED, …, null, null)» bo'ladi — foydalanuvchiga shu
+      // ko'rinishda chiqarish mumkin emas.
+      _error = switch (e) {
+        PanoApiException(:final message) => message,
+        PlatformException(:final message?) => message,
+        _ => e.toString(),
+      };
     });
   }
 

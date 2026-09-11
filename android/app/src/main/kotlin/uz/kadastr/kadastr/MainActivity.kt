@@ -8,15 +8,19 @@ import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.google.ar.core.ArCoreApk
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
+import uz.kadastr.kadastr.pano.PanoCaptureActivity
 
 class MainActivity : FlutterActivity() {
 
@@ -25,10 +29,19 @@ class MainActivity : FlutterActivity() {
         private const val VIDEO_CAPTURE_REQUEST = 9301
         private const val SYSTEM_VIDEO_REQUEST = 9302
         private const val CAMERA_PERMISSION_REQUEST = 9303
+        private const val PANO_CAPTURE_REQUEST = 9304
     }
 
     /** `record` / `recordSystem` chaqirig'i — natija kelguncha saqlanadi. */
     private var pendingVideoResult: MethodChannel.Result? = null
+
+    /** `kadastr/pano_capture` → `start` — nativ ekran yopilguncha saqlanadi. */
+    private var pendingPanoResult: MethodChannel.Result? = null
+
+    /** Oxirgi ANIQ javob; `null` — hali hisoblanmagan. */
+    private var arCoreSupported: Boolean? = null
+
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var systemVideoFile: File? = null
 
     /// Ruxsat berilgach bajariladigan ish (kamera ochish).
@@ -36,6 +49,16 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        // ARCore tekshiruvi ASINXRON: shu yerda bir marta turtib qo'yamiz,
+        // toki Dart «Tavsif» qadamiga yetganda javob allaqachon tayyor bo'lsin.
+        try {
+            arCoreSupported = ArCoreApk.getInstance().checkAvailability(this)
+                .takeIf { it != ArCoreApk.Availability.UNKNOWN_CHECKING }
+                ?.isSupported
+        } catch (e: Exception) {
+            Log.w(TAG, "ARCore tekshiruvi boshlanmadi", e)
+        }
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "kadastr/scan_capability"
@@ -71,6 +94,113 @@ class MainActivity : FlutterActivity() {
 
                 else -> result.notImplemented()
             }
+        }
+
+        // 360° panorama capture — iOS'dagi `kadastr/pano_capture` kanalining
+        // egizagi (`ios/Runner/AppDelegate.swift`). Nativ taraf faqat KADR
+        // YIG'ADI; tikish serverda.
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "kadastr/pano_capture"
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isSupported" -> resolveArCore(result)
+                "start" -> startPanoCapture(call.argument("strings"), result)
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    /**
+     * Qurilma ARCore'ni qo'llaydimi — javob Dart'ga ASINXRON qaytadi.
+     *
+     * `SUPPORTED_NOT_INSTALLED` va `SUPPORTED_APK_TOO_OLD` ham `true`:
+     * qurilma qobiliyatli, faqat «Google Play Services for AR» yangilanishi
+     * kerak — buni `PanoCaptureActivity` ochilganda ARCore'ning O'ZI so'raydi.
+     *
+     * ⚠️ `checkAvailability` birinchi chaqiruvda `UNKNOWN_CHECKING` qaytarib,
+     * javobni FONDA hisoblaydi. Shu holatda `false` qaytarish 360 qatorini
+     * qo'llaydigan qurilmada ham yashirib qo'yardi (va u faqat keyingi
+     * kirishda paydo bo'lardi). Shuning uchun javob tayyor bo'lguncha
+     * ~1 sekundgacha qayta so'raladi — UI oqimini BLOKLAMASDAN,
+     * `Handler.postDelayed` bilan.
+     */
+    private fun resolveArCore(result: MethodChannel.Result, tries: Int = 0) {
+        val availability = try {
+            ArCoreApk.getInstance().checkAvailability(this)
+        } catch (e: Exception) {
+            Log.w(TAG, "ARCore holati aniqlanmadi", e)
+            null
+        }
+        when {
+            availability == null -> result.success(false)
+
+            availability == ArCoreApk.Availability.UNKNOWN_CHECKING && tries < 10 ->
+                mainHandler.postDelayed({ resolveArCore(result, tries + 1) }, 100)
+
+            else -> {
+                arCoreSupported = availability.isSupported
+                result.success(availability.isSupported)
+            }
+        }
+    }
+
+    private fun startPanoCapture(
+        strings: Map<String, String>?,
+        result: MethodChannel.Result,
+    ) {
+        if (pendingPanoResult != null) {
+            result.error("BUSY", "Suratga olish allaqachon ochiq", null)
+            return
+        }
+        // ⚠️ FAQAT qurilma aniq qo'llamasa rad etamiz. `UNKNOWN_*` holatlarida
+        // ekran ochiladi: ARCore o'rnatish/yangilashni O'ZI so'raydi va
+        // muvaffaqiyatsiz bo'lsa tushunarli xato qaytaradi. Bu yerda
+        // ehtiyotkorlik qilib rad etsak, ARCore'ni endi o'rnatgan
+        // foydalanuvchi 360 ga umuman kira olmasdi.
+        val availability = try {
+            ArCoreApk.getInstance().checkAvailability(this)
+        } catch (e: Exception) {
+            null
+        }
+        if (availability == ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE) {
+            result.error("UNSUPPORTED", "Qurilma ARCore'ni qoʻllamaydi", null)
+            return
+        }
+        pendingPanoResult = result
+        try {
+            startActivityForResult(
+                Intent(this, PanoCaptureActivity::class.java).putExtra(
+                    PanoCaptureActivity.EXTRA_STRINGS,
+                    HashMap(strings ?: emptyMap()),
+                ),
+                PANO_CAPTURE_REQUEST,
+            )
+        } catch (e: Exception) {
+            pendingPanoResult = null
+            result.error("LAUNCH_FAILED", e.message ?: "Ekran ochilmadi", null)
+        }
+    }
+
+    private fun handlePanoResult(resultCode: Int, data: Intent?) {
+        val pending = pendingPanoResult ?: return
+        pendingPanoResult = null
+        when (resultCode) {
+            RESULT_OK -> pending.success(
+                mapOf(
+                    "dir" to data?.getStringExtra(PanoCaptureActivity.EXTRA_DIR),
+                    "frames" to (data?.getIntExtra(PanoCaptureActivity.EXTRA_FRAMES, 0) ?: 0),
+                )
+            )
+
+            PanoCaptureActivity.RESULT_FAILED -> pending.error(
+                "CAPTURE_FAILED",
+                data?.getStringExtra(PanoCaptureActivity.EXTRA_ERROR) ?: "Suratga olinmadi",
+                null,
+            )
+
+            // RESULT_CANCELED — foydalanuvchi bekor qildi.
+            else -> pending.success(null)
         }
     }
 
@@ -183,6 +313,7 @@ class MainActivity : FlutterActivity() {
         when (requestCode) {
             VIDEO_CAPTURE_REQUEST -> handleRecorderResult(resultCode, data)
             SYSTEM_VIDEO_REQUEST -> handleSystemResult(resultCode, data)
+            PANO_CAPTURE_REQUEST -> handlePanoResult(resultCode, data)
         }
         super.onActivityResult(requestCode, resultCode, data)
     }
@@ -308,6 +439,8 @@ class MainActivity : FlutterActivity() {
         // Process o'lsa Dart Future'i abadiy osilib qolmasin.
         pendingVideoResult?.error("CANCELLED", "Ekran yopildi", null)
         pendingVideoResult = null
+        pendingPanoResult?.error("CANCELLED", "Ekran yopildi", null)
+        pendingPanoResult = null
         super.onDestroy()
     }
 
@@ -324,7 +457,7 @@ class MainActivity : FlutterActivity() {
         "platform" to "android",
         "hasLidar" to false,
         "hasRoomPlan" to false,
-        "hasArCore" to false,
+        "hasArCore" to (arCoreSupported ?: false),
         "hasDepthApi" to false,
         "arWorldTrackingSupported" to false,
         "deviceModel" to "${Build.MANUFACTURER} ${Build.MODEL}",
