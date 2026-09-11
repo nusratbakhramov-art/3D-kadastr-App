@@ -36,6 +36,8 @@ import '../../../theme/app_colors.dart';
 import '../../../theme/color_tokens.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../market/widgets/listing_gallery_pager.dart';
+import '../../../core/haptics.dart';
+import '../../panorama/screens/pano_tour_screen.dart';
 import '../../market/widgets/listing_info_card.dart';
 import '../../market/widgets/listing_meta_pills.dart';
 import '../../../widgets/app_toast.dart';
@@ -481,6 +483,39 @@ class _BozorListingDetailScreenState extends State<BozorListingDetailScreen> {
     return _content(listing);
   }
 
+  /// E'londagi 360° fayllar, e'londagi TARTIBDA.
+  ///
+  /// Tartib muhim: tur birinchisidan boshlanadi va havolalar shu
+  /// ro'yxatdagi kalitlar bo'yicha topiladi.
+  List<BozorListingMedia> _panoramas(BozorListing listing) => <BozorListingMedia>[
+    for (final BozorListingMedia m in listing.media)
+      if (m.role == 'panorama' && m.storageKey.isNotEmpty) m,
+  ];
+
+  void _openTour(BozorListing listing) {
+    final List<BozorListingMedia> panos = _panoramas(listing);
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PanoTourScreen(
+          panoramas: <TourPano>[
+            for (final BozorListingMedia m in panos)
+              TourPano(
+                // ⚠️ `ref` — `storage_key`. Havolalar serverda aynan shu
+                // bilan saqlanadi; `url` ishlatilsa hech bir havola
+                // topilmasdi va tur bo'sh ko'rinardi.
+                ref: m.storageKey,
+                url: ApiConfig.resolveUrl(m.url),
+                thumbUrl: m.thumbUrl == null
+                    ? null
+                    : ApiConfig.resolveUrl(m.thumbUrl!),
+              ),
+          ],
+          links: listing.tour,
+        ),
+      ),
+    );
+  }
+
   Widget _content(BozorListing listing) {
     final locale = Localizations.localeOf(context);
     final type = _propertyTypeOf(listing.propertyType);
@@ -524,6 +559,21 @@ class _BozorListingDetailScreenState extends State<BozorListingDetailScreen> {
             onShare: _share,
           ),
         ),
+        // 360° tur — galereyadan KEYIN va alohida tugma bilan.
+        //
+        // Galereyaga qo'shib yuborilmadi: panorama tekis ko'rsatilganda
+        // cho'zilgan lenta bo'lib chiqadi va xaridor uni sifatsiz rasm
+        // deb o'ylaydi. Tugma esa u SFERADA ochilishini oldindan aytadi.
+        if (_panoramas(listing).isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _TourButton(
+              count: _panoramas(listing).length,
+              onTap: () => _openTour(listing),
+            ),
+          ),
+        ],
         // Egasiga ko'rinadigan holat — begona bu ekranga umuman kirmaydi
         // (`approved` bo'lmagan e'longa 404, `get_for_viewer`). `archived`
         // ham shu ro'yxatda: arxivlangan e'lon tirik e'londan ajralib
@@ -1016,6 +1066,73 @@ class _OutlinedAction extends StatelessWidget {
                   ),
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// «360° tur» tugmasi — galereya ostida.
+class _TourButton extends StatelessWidget {
+  const _TourButton({required this.count, required this.onTap});
+
+  final int count;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color fill = isDark ? const Color(0xFF20262A) : const Color(0xFFFCFDFF);
+    final Color border = isDark
+        ? const Color(0xFF2C3133)
+        : const Color(0xFFE3E5E8);
+    final BorderRadius radius = BorderRadius.circular(14);
+
+    return Material(
+      color: fill,
+      borderRadius: radius,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: hapticTap(onTap),
+        child: Container(
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            children: <Widget>[
+              const Icon(
+                Icons.threesixty_rounded,
+                size: 24,
+                color: AppColors.splashGreen,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  tr(Localizations.localeOf(context), 'bozor.pano.tour.open'),
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                    color: isDark ? Colors.white : const Color(0xFF1B2124),
+                  ),
+                ),
+              ),
+              Text(
+                '$count',
+                style: const TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: AppColors.splashGreen,
+                ),
+              ),
+              const SizedBox(width: 6),
+              const Icon(Icons.chevron_right_rounded, color: Colors.grey),
             ],
           ),
         ),

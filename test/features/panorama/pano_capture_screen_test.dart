@@ -153,7 +153,11 @@ void main() {
       // 25 → 30: `bozor.pano.resume.*` (5 ta) — tashlab ketilgan
       // suratga olishni yig'ishni taklif qilish (`0dac253` porti).
       // 30 → 32: `bozor.pano.view.*` (2 ta) — sferadagi ko'ruvchi.
-      expect(pano['uz'], hasLength(32));
+      // 32 → 46: `bozor.pano.tour.*` (14 ta) — 360° house tour.
+      // 46 → 49: `bozor.pano.view.err_{missing,network,decode}` —
+      // nosozlik SABABI. Ilgari uch xil xato bitta matn berardi va
+      // qurilmadagi xabardan nima bo'lganini aniqlab bo'lmasdi.
+      expect(pano['uz'], hasLength(49));
     });
 
     test('tarjimalar BO‘SH emas va kalitning o‘zi emas', () {

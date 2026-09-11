@@ -116,6 +116,27 @@ class BozorSubmitter {
         editingId,
         draftToUpdatePayload(draft, all),
       );
+
+      // ⚠️ TAHRIRLASH QORALAMASI SHU YERDA O'CHADI. Sehrgar har qadamda
+      // qoralama saqlaydi — tahrirlashda ham, chunki yarim qolgan tahrir
+      // ham yo'qolmasligi kerak. Lekin tahrir YAKUNLANGANDAN keyin u
+      // qoralama ortiqcha: «Mening e'lonlarim» da e'lonning o'zi ham,
+      // uning tahriri ham ko'rinib, ikkinchisidan davom ettirish ASL
+      // e'lonni yana bir marta tahrirlashga olib borardi.
+      //
+      // `submit` yo'lidan farqli (u qoralamani SERVER o'chiradi), bu
+      // yerda o'chirish bizning zimmamizda — `PATCH /listings/{id}`
+      // qoralama haqida hech narsa bilmaydi.
+      final int? id = draft.draftId;
+      if (id != null) {
+        try {
+          await _api.deleteDraft(id);
+        } on Object {
+          // Qoralama qolib ketsa ham tahrir SAQLANGAN — buning uchun
+          // foydalanuvchiga xato ko'rsatish noto'g'ri bo'lardi.
+        }
+        draft.draftId = null;
+      }
       tick();
       return updated;
     }

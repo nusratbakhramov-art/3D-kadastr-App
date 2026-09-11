@@ -502,15 +502,59 @@ class _PanoCaptureScreenState extends State<PanoCaptureScreen>
       if (!mounted) return;
       switch (outcome) {
         case StitchSuccess(:final path):
-          // Ish papkasi natija bilan birga chaqiruvchiga o'tadi —
-          // uni SHU YERDA o'chirmaymiz.
+          // ⚠️ NATIJA ISH PAPKASIDAN CHIQARILADI.
+          //
+          // Ilgari qoralamaga `<ish papkasi>/panorama.jpg` yo'li
+          // berilardi — ya'ni ilovaning O'ZI o'chiradigan papka ichidagi
+          // fayl. `purgeStale` capture ekrani har ochilganda 6 soatdan
+          // eski `pano_stitch_*` papkalarni o'chiradi, shuning uchun
+          // saqlangan qoralamadagi panorama bir kundan keyin jimgina
+          // yo'qolardi va faqat «ochib bo'lmadi» bo'lib ko'rinardi.
+          final String kept = await _keepOutput(path);
+          // Endi papkada kerakli narsa qolmadi: 76 kadr va xom kesh
+          // DARHOL bo'shatiladi. Ilgari ular keyingi tozalashgacha
+          // yotardi — har panorama uchun yuzlab megabayt.
+          final StitchWorkDir? done = _workDir;
           _workDir = null;
-          Navigator.of(context).pop(path);
+          unawaited(done?.dispose());
+          if (!mounted) return;
+          Navigator.of(context).pop(kept);
         case StitchFailure(:final message):
           _fail(message);
       }
     } on Object catch (e) {
       _fail('${_t('bozor.pano.err.stitch')}: $e');
+    }
+  }
+
+  /// Tikilgan panoramani BARQAROR joyga ko'chiradi va yangi yo'lni
+  /// qaytaradi.
+  ///
+  /// Qoralama bu yo'lni haftalab saqlashi mumkin — foydalanuvchi e'lonni
+  /// bir kunda tugatmaydi. Shuning uchun natija [StitchWorkDir] ning
+  /// tozalanadigan hududidan chiqariladi.
+  ///
+  /// Ko'chirish YIQILSA asl yo'l qaytadi: panorama tayyor va uni
+  /// foydalanuvchiga bermaslik — ko'chira olmaslikdan ko'ra battar.
+  /// U holda fayl eski joyida qoladi, ya'ni eski xatti-harakat.
+  Future<String> _keepOutput(String path) async {
+    try {
+      final Directory docs = await getApplicationDocumentsDirectory();
+      final Directory dest = await Directory(
+        '${docs.path}/$kPanoramaDirName',
+      ).create(recursive: true);
+      final String name =
+          'pano_${DateTime.now().millisecondsSinceEpoch}_'
+          '${path.hashCode.toUnsigned(16).toRadixString(36)}.jpg';
+      final File moved = await File(path).copy('${dest.path}/$name');
+      try {
+        await File(path).delete();
+      } on FileSystemException {
+        // Asl nusxa qolib ketsa ish papkasi bilan birga o'chadi.
+      }
+      return moved.path;
+    } on Object {
+      return path;
     }
   }
 

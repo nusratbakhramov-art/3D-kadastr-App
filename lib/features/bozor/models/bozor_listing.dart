@@ -15,6 +15,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/i18n/app_translations.dart';
 import 'bozor_draft.dart';
+import 'tour_link.dart';
 
 /// Moderatsiya holati.
 ///
@@ -144,6 +145,7 @@ class BozorListing {
     this.moderatedAt,
     this.publishedAt,
     this.media = const [],
+    this.tour = const [],
   });
 
   final int id;
@@ -220,6 +222,10 @@ class BozorListing {
   final DateTime? moderatedAt;
   final DateTime? publishedAt;
   final List<BozorListingMedia> media;
+
+  /// 360° tur havolalari — uchlari `media` dagi `panorama` rolli
+  /// fayllarning `storage_key` lari.
+  final List<TourLink> tour;
   final DateTime createdAt;
 
   // ── Hosila qiymatlar ──────────────────────────────────────────────────────
@@ -352,6 +358,10 @@ class BozorListing {
     rejectionReason: _toStringOrNull(j['rejection_reason']),
     moderatedAt: _toDate(j['moderated_at']),
     publishedAt: _toDate(j['published_at']),
+    tour: [
+      for (final t in (j['tour'] as List? ?? const []))
+        if (t is Map) TourLink.fromJson(Map<String, Object?>.from(t)),
+    ],
     media: [
       for (final m in (j['media'] as List? ?? const []))
         if (m is Map) BozorListingMedia.fromJson(m.cast<String, dynamic>()),

@@ -22,6 +22,14 @@ import 'raw_plane.dart';
 /// topadi. Boshqa hech narsani o'chirmasligi uchun ATAYLAB o'ziga xos.
 const String kWorkDirPrefix = 'pano_stitch_';
 
+/// Tayyor panoramalar saqlanadigan papka (ilova hujjatlari ichida).
+///
+/// ⚠️ ATAYLAB [kWorkDirPrefix] dan TASHQARIDA: [purgeStale] faqat ish
+/// papkalarini yig'adi, natijalarga esa tegmasligi shart. Qoralama
+/// panorama yo'lini haftalab saqlashi mumkin, ish papkasi esa olti
+/// soatdan keyin o'chiriladi.
+const String kPanoramaDirName = 'panoramas';
+
 /// Kadr uchun namuna olish eni — manbadagi `_sampleWidthFor` qoidasi.
 ///
 /// Kadr tuval ushlab turadigan detaldan ANCHA ko'p ma'lumot olib keladi:

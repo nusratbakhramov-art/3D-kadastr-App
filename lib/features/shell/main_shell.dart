@@ -261,13 +261,23 @@ class _MainShellState extends State<MainShell> {
   /// prefiksli hamma marshrutni pop qiladi, ya'ni shu prefiks bilan push
   /// qilsak sehrgar tugagach foydalanuvchi lentaga emas, Home'ga tushib
   /// qolardi.
-  void _openBozorAi() {
+  ///
+  /// AI Baholash kabi mehmonga YOPIQ: lenta, «Mening e'lonlarim» va e'lon
+  /// qo'shish — hammasi token talab qiladi, shuning uchun xom 401 o'rniga
+  /// kirishdan oldin login drawer chiqadi.
+  Future<void> _openBozorAi() async {
+    if (!await ensureLoggedIn(context, storage: widget.authStorage)) return;
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const BozorHomeScreen()),
     );
   }
 
-  void _openTaqiqCheck() {
+  /// «Taqiqni tekshirish» — shaxsiy kadastr ma'lumoti bo'yicha so'rov, shuning
+  /// uchun Bozor AI / AI Baholash bilan bir xil login drawer bilan qulflanadi.
+  Future<void> _openTaqiqCheck() async {
+    if (!await ensureLoggedIn(context, storage: widget.authStorage)) return;
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ServicePlaceholderScreen(

@@ -242,7 +242,12 @@ class _ServicesScreenState extends State<ServicesScreen>
         );
       case ServiceId.bozorAi:
       case ServiceId.taqiqCheck:
-        // Home'dagi yangi kartalar bilan bir xil: ekran hali yo'q.
+        // Home'dagi yangi kartalar bilan bir xil: ekran hali yo'q va ikkalasi
+        // ham mehmonga yopiq — AI Baholash bilan bir xil login drawer.
+        if (!await ensureLoggedIn(context)) {
+          return;
+        }
+        if (!context.mounted) return;
         Navigator.of(context).push(
           MaterialPageRoute<void>(
             builder: (_) => ServicePlaceholderScreen(title: item.title),

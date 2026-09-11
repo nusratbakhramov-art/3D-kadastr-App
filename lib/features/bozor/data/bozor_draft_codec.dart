@@ -17,6 +17,7 @@
 library;
 
 import '../models/bozor_draft.dart';
+import '../models/tour_link.dart';
 import '../models/bozor_listing.dart';
 
 // ── Enum ↔ kod ──────────────────────────────────────────────────────────────
@@ -121,6 +122,26 @@ String unitFromCurrency(Object? currency, Object? period) {
 /// uchun bu kalit `submit` ni buzmaydi — tekshirilgan.
 const String kLocalMediaKey = '_local_media';
 
+/// Qoralama MAVJUD e'londan ochilganini bildiruvchi kalit.
+///
+/// ⚠️ BUSIZ TAHRIRLASH JIMGINA YANGI E'LON YASARDI. Sehrgar har qadamda
+/// qoralamani saqlaydi — tahrirlashda ham. Foydalanuvchi sehrgardan
+/// chiqib, keyin «Mening e'lonlarim» dagi qoralamadan davom ettirsa,
+/// `draftFromPayload` faqat `draftId` ni tiklardi va `editingListingId`
+/// NULL bo'lib qolardi. Yuborishda esa shu maydon `PATCH /listings/{id}`
+/// bilan `POST /drafts/{id}/submit` orasidagi yagona ayirg'ich — ya'ni
+/// tahrir NUSXA bo'lib ketardi, asl e'lon esa o'zgarmasdan qolardi.
+const String kEditingListingKey = '_editing_listing_id';
+
+/// Serverda ALLAQACHON turgan fayllar (tahrirlash uchun).
+///
+/// ⚠️ BUSIZ TAHRIRLASHNI DAVOM ETTIRISH RASMLARNI O'CHIRARDI. `PATCH`
+/// media ro'yxatini TO'LIQ almashtiradi, ya'ni yuborishda eski fayllar
+/// kalitlari bilan QAYTA yuborilishi shart. Qoralamadan tiklanganda bu
+/// ro'yxat bo'sh bo'lsa, e'lonning bor rasmlari o'rniga faqat shu
+/// sessiyada qo'shilganlari qolardi.
+const String kExistingMediaKey = '_existing_media';
+
 /// Qoralama uchun payload: [draftToPayload] ning media'siz varianti +
 /// mahalliy fayl yo'llari.
 Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
@@ -135,7 +156,23 @@ Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
       'panorama': List<String>.from(d.panoramas),
       // Allaqachon yuklangan fayllar — qayta urinish ularni takrorlamasin.
       'uploaded': Map<String, String>.from(d.uploadedMedia),
+      // 360° tur havolalari. Qoralamada LOKAL YO'L bilan yotadi, ya'ni
+      // `description.tour` ga (u kalit kutadi) yozib bo'lmaydi.
+      'tour': [for (final l in d.tourLinks) l.toJson()],
     },
+    // Tahrirlash rejimi qoralamada SAQLANADI — sababi kalit izohida.
+    if (draft.editingListingId != null)
+      kEditingListingKey: draft.editingListingId,
+    if (d.existingMedia.isNotEmpty)
+      kExistingMediaKey: [
+        for (final m in d.existingMedia)
+          {
+            'key': m.key,
+            'role': m.role,
+            'sort_order': m.sortOrder,
+            'is_cover': m.isCover,
+          },
+      ],
   };
 }
 
@@ -185,6 +222,19 @@ Map<String, dynamic> draftToPayload(
       if (d.text.trim().isNotEmpty) 'text': d.text.trim(),
       if (d.youtubeUrl.isNotEmpty) 'youtube_url': d.youtubeUrl,
       'media': media,
+      // ⚠️ Havolalar AYNI SHU `media` ro'yxatidan hisoblanadi. Server
+      // ularni o'sha ro'yxat bilan solishtiradi, ya'ni ro'yxatga
+      // tushmagan panoramaga ishora qilgan havola butun e'lonni 400 ga
+      // olib borardi.
+      'tour': resolveTourLinks(
+        d.tourLinks,
+        uploaded: d.uploadedMedia,
+        allowedKeys: {
+          for (final m in media)
+            if (m['role'] == 'panorama' && m['key'] is String)
+              m['key']! as String,
+        },
+      ),
     },
     'contacts': {
       'name': c.name,
@@ -209,6 +259,22 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
     kind: propertyKindFromCode(json['property_kind']),
     type: propertyTypeFromCode(json['property_type']),
   )..draftId = draftId;
+
+  // Tahrirlash rejimi — `draftToDraftPayload` yozib qo'ygan bo'lsa.
+  draft.editingListingId = _int(json[kEditingListingKey]);
+  for (final e in (json[kExistingMediaKey] as List? ?? const [])) {
+    if (e is! Map) continue;
+    final key = (e['key'] ?? '').toString();
+    if (key.isEmpty) continue;
+    draft.description.existingMedia.add(
+      ExistingMedia(
+        key: key,
+        role: (e['role'] ?? 'photo').toString(),
+        sortOrder: _int(e['sort_order']) ?? 0,
+        isCover: e['is_cover'] == true,
+      ),
+    );
+  }
 
   draft.title = _str(json['title']);
 
@@ -264,6 +330,12 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
       for (final e in _map(local['uploaded']).entries)
         if (e.value != null) e.key: e.value.toString(),
     });
+  draft.description.tourLinks
+    ..clear()
+    ..addAll([
+      for (final t in (local['tour'] as List? ?? const []))
+        if (t is Map) TourLink.fromJson(Map<String, Object?>.from(t)),
+    ]);
 
   final c = _map(json['contacts']);
   final phones = _strList(c['phones']);
@@ -381,6 +453,13 @@ BozorDraft draftFromListing(BozorListing l) {
   // almashtiradi, ya'ni ularni qaytarib yubormasak e'lon rasmsiz qolardi.
   // Kalit bo'sh bo'lsa (bayroqdan oldingi server) o'sha faylni ro'yxatga
   // qo'shmaymiz — noto'g'ri kalit yuborish 400 berardi.
+  // Mavjud tur — KALITLAR bilan keladi va shundayligicha qaytariladi.
+  // Busiz e'lonni tahrirlash (masalan matnni tuzatish) turni JIMGINA
+  // o'chirib tashlardi: `PATCH` media'ni almashtiradi, server esa
+  // almashtirilgan media bilan birga kelmagan havolalarni tozalaydi.
+  draft.description.tourLinks
+    ..clear()
+    ..addAll(l.tour);
   draft.description.existingMedia
     ..clear()
     ..addAll([
@@ -427,6 +506,12 @@ Map<String, dynamic> draftToUpdatePayload(
     if (draft.description.youtubeUrl.isNotEmpty)
       'youtube_url': draft.description.youtubeUrl,
     if (media.isNotEmpty) 'media': media,
+    // ⚠️ `media` bilan BIRGA yuriladi. Server turni faqat media
+    // almashtirilganda qayta bog'laydi (`media is not None`), ya'ni
+    // media'siz yuborilgan tur JIMGINA e'tiborsiz qolardi — va
+    // foydalanuvchi qo'ygan tugma saqlanmadi deb o'ylardi.
+    if (media.isNotEmpty)
+      'tour': (full['description']! as Map<String, Object?>)['tour'],
   };
   return {
     'title': full['title'],

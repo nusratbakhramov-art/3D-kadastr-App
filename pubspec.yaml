@@ -1,7 +1,7 @@
 name: kadastr
 description: "Kadastr — Flutter starter."
 publish_to: 'none'
-version: 1.0.5+39
+version: 1.0.5+42
 
 environment:
   # ^3.11.0 (^3.10.1 EMAS): `dchs_motion_sensors 2.0.2` shuni talab qiladi.

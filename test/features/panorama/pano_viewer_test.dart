@@ -245,6 +245,85 @@ void main() {
     });
   });
 
+  group('ViewBasis — TUGMALAR shu bilan joylashadi', () {
+    // Tugmalar sfera ustiga Flutter widget'i bo'lib qo'yiladi, ya'ni
+    // ularning o'rni ALOHIDA hisoblanadi. Bu yerdagi da'volar sfera
+    // bilan tugmalarni bir joyda ushlab turadi — ular ajralsa tugma
+    // eshik ustidan devorga siljib ketardi va hech narsa yiqilmasdi.
+
+    ViewBasis basis({double yaw = 0, double pitch = 0, double fov = kInitialFovDeg}) =>
+        ViewBasis.of(size: size, yawDeg: yaw, pitchDeg: pitch, fovDeg: fov)!;
+
+    test('QARALAYOTGAN yo‘nalish aynan markazda', () {
+      for (final (double yaw, double pitch) in <(double, double)>[
+        (0, 0),
+        (90, 0),
+        (237, 0),
+        (45, 30),
+        (300, -60),
+      ]) {
+        final Offset? at = basis(yaw: yaw, pitch: pitch).projectDeg(yaw, pitch);
+        expect(at, isNotNull, reason: 'yaw=$yaw pitch=$pitch');
+        expect(at!.dx, closeTo(size.width / 2, 1e-6), reason: 'yaw=$yaw');
+        expect(at.dy, closeTo(size.height / 2, 1e-6), reason: 'pitch=$pitch');
+      }
+    });
+
+    test('SFERA bilan AYNI natija beradi', () {
+      // Eng muhim bog'lanish: to'r tuguni va tugma bir xil yo'nalish
+      // uchun bir xil ekran nuqtasiga tushishi SHART.
+      final SphereMesh m = mesh(yaw: 40, pitch: 15);
+      final ViewBasis b = basis(yaw: 40, pitch: 15);
+      const int cols = _cols + 1;
+
+      int checked = 0;
+      for (int j = 0; j < _rows + 1; j += 2) {
+        for (int i = 0; i < _cols; i += 2) {
+          final int k = j * cols + i;
+          final Offset? at = b.projectDeg(i / _cols * 360, 90 - j / _rows * 180);
+          if (at == null) continue;
+          if (m.positions[k * 2] == 0 && m.positions[k * 2 + 1] == 0) continue;
+          // ⚠️ FAQAT EKRANDAGI nuqtalar. To'r ko'rish o'qidan 89° gacha
+          // cho'ziladi va u yerdagi koordinatalar o'n minglab pikselga
+          // chiqadi; `positions` esa `Float32List`, ya'ni 14 000 px da
+          // uning qadami ~0.008 bo'ladi. Bu tugmalarga aloqasiz —
+          // ular faqat ekranda chiziladi.
+          if (at.dx < 0 || at.dy < 0 || at.dx > size.width || at.dy > size.height) {
+            continue;
+          }
+          expect(m.positions[k * 2], closeTo(at.dx, 1e-3));
+          expect(m.positions[k * 2 + 1], closeTo(at.dy, 1e-3));
+          checked++;
+        }
+      }
+      expect(checked, greaterThan(10), reason: 'hech narsa solishtirilmadi');
+    });
+
+    test('ORQADAGI yo‘nalish uchun null', () {
+      // Qisib qo‘yilsa orqangizdagi xonaning tugmasi ro‘parangizda
+      // turardi.
+      expect(basis().projectDeg(180, 0), isNull);
+      expect(basis().projectDeg(91, 0), isNull);
+    });
+
+    test('o‘ngdagi yo‘nalish ekranning O‘NGIDA', () {
+      final Offset at = basis().projectDeg(20, 0)!;
+      expect(at.dx, greaterThan(size.width / 2));
+    });
+
+    test('tepadagi yo‘nalish ekranning TEPASIDA', () {
+      final Offset at = basis().projectDeg(0, 20)!;
+      expect(at.dy, lessThan(size.height / 2));
+    });
+
+    test('bo‘sh o‘lcham va qutb — null', () {
+      expect(
+        ViewBasis.of(size: Size.zero, yawDeg: 0, pitchDeg: 0, fovDeg: 75),
+        isNull,
+      );
+    });
+  });
+
   test('to‘r ZICH — affin interpolyatsiya xatosi KO‘RINMAYDI', () {
     // `drawVertices` teksturani AFFIN interpolyatsiya qiladi: uchburchak
     // ichida ekran nuqtasi bilan tekstura nuqtasi chiziqli bog'lanadi,

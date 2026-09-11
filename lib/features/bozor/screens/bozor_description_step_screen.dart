@@ -10,7 +10,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-import '../../panorama/screens/pano_viewer_screen.dart';
+import '../../panorama/screens/pano_tour_screen.dart';
+import '../models/tour_link.dart';
 import '../widgets/pano_source_sheet.dart';
 
 import '../../../core/i18n/app_translations.dart';
@@ -97,6 +98,31 @@ class _BozorDescriptionStepScreenState
   ///
   /// Ikkala yo'l ham haqiqiy — foydalanuvchi joyida bo'lsa panoramani
   /// shu yerda oladi, boshqa ilovada yasagan bo'lsa yuklaydi.
+  /// 360° ni SFERADA ochadi va turni tahrirlash imkonini beradi.
+  ///
+  /// Havolalar qoralamada LOKAL YO'L bilan yotadi — panoramalar hali
+  /// yuklanmagan. Yuborishda `resolveTourLinks` ularni S3 kalitiga
+  /// o'giradi.
+  void _open360(int index) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PanoTourScreen(
+          panoramas: <TourPano>[
+            for (final String p in _d.panoramas) TourPano(ref: p, file: p),
+          ],
+          links: _d.tourLinks,
+          initialIndex: index,
+          editable: true,
+          onChanged: (List<TourLink> links) => setState(() {
+            _d.tourLinks
+              ..clear()
+              ..addAll(links);
+          }),
+        ),
+      ),
+    );
+  }
+
   Future<void> _add360() async {
     final l = Localizations.localeOf(context);
     if (_d.panoramas.length >= _maxPhotos) {
@@ -226,14 +252,10 @@ class _BozorDescriptionStepScreenState
                                 setState(() => _d.panoramas.removeAt(i)),
                             // 360° SFERADA ochiladi. Oddiy galereya uni
                             // cho'zilgan lenta qilib ko'rsatadi va
-                            // panorama ekani bilinmaydi.
-                            onOpen: (i) => Navigator.of(context).push(
-                              MaterialPageRoute<void>(
-                                builder: (_) => PanoViewerScreen(
-                                  path: _d.panoramas[i],
-                                ),
-                              ),
-                            ),
+                            // panorama ekani bilinmaydi. Bir nechta
+                            // bo'lsa — yurib bo'ladigan TUR, va egasi
+                            // shu yerda o'tish tugmalarini qo'yadi.
+                            onOpen: _open360,
                           ),
                           const SizedBox(height: 16),
                           WizardField(

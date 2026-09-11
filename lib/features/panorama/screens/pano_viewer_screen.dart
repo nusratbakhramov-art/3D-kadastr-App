@@ -297,6 +297,119 @@ class SpherePainter extends CustomPainter {
       !identical(old.image, image);
 }
 
+/// Ko'rish bazisi — sfera ham, TUGMALAR ham aynan shundan proyeksiya
+/// qilinadi.
+///
+/// ⚠️ AJRATILGANINING SABABI SHU. Tugmalar (360° tur o'tish nuqtalari)
+/// sfera ustiga Flutter widget'i bo'lib qo'yiladi, ya'ni ularning
+/// ekrandagi o'rni ALOHIDA hisoblanadi. Ikki hisob bir-biridan ozgina
+/// farq qilsa tugma foydalanuvchi qo'ygan joydan suriladi — va bu jim
+/// bo'ladi: hech narsa yiqilmaydi, shunchaki eshik ustidagi tugma
+/// devorda turadi.
+@immutable
+class ViewBasis {
+  const ViewBasis({
+    required this.fx,
+    required this.fy,
+    required this.fz,
+    required this.rx,
+    required this.rz,
+    required this.ux,
+    required this.uy,
+    required this.uz,
+    required this.focal,
+    required this.cx,
+    required this.cy,
+  });
+
+  /// Qarayotgan yo'nalish.
+  final double fx, fy, fz;
+
+  /// Ekranning o'ngi. `ry` har doim NOL — `worldUp × f` ning y'i
+  /// soddalashib yo'qoladi, shuning uchun saqlanmaydi.
+  final double rx, rz;
+
+  /// Ekranning yuqorisi.
+  final double ux, uy, uz;
+
+  final double focal;
+  final double cx, cy;
+
+  /// `null` — tuval o'lchanmagan yoki qutbda (o'ng tomon vektori nol).
+  static ViewBasis? of({
+    required Size size,
+    required double yawDeg,
+    required double pitchDeg,
+    required double fovDeg,
+  }) {
+    // Tuval hali o'lchanmagan bo'lishi mumkin (birinchi kadr). Fokus
+    // masofasi o'shanda nolga aylanadi va HAMMA tugun (0, 0) ga
+    // tushardi — chizilgan narsa bitta nuqta bo'lardi.
+    if (size.isEmpty) return null;
+
+    const double deg = math.pi / 180;
+    final double yaw = yawDeg * deg;
+    final double pitch = pitchDeg.clamp(-kMaxPitchDeg, kMaxPitchDeg) * deg;
+
+    final double cp = math.cos(pitch);
+    final double fx = cp * math.sin(yaw);
+    final double fy = math.sin(pitch);
+    final double fz = cp * math.cos(yaw);
+
+    // r = normalize(worldUp × f). `worldUp = (0, 1, 0)` bo'lgani uchun
+    // ko'paytma soddalashadi va uzunligi `cos(pitch)` ga teng — shuning
+    // uchun qutbda nolga aylanadi va balandlik chegaralangan.
+    final double rl = math.sqrt(fz * fz + fx * fx);
+    if (rl < 1e-9) return null;
+    final double rx = fz / rl;
+    final double rz = -fx / rl;
+
+    // u = f × r. `r` ning y'i nol, shuning uchun ko'paytma qisqaradi:
+    //   f × r = (fy·rz,  fz·rx − fx·rz,  −fy·rx)
+    //
+    // ⚠️ `rx` bilan `rz` ni almashtirib yuborish OSON va natijasi jim:
+    // `u` endi `f` ga perpendikulyar bo'lmaydi (tekshirildi: pitch 45°
+    // da `f·u = 0.5`), ya'ni yuqoriga yoki pastga qaraganda manzara
+    // qiyshayib ketadi. Gorizontda esa hammasi to'g'ri ko'rinadi —
+    // shuning uchun buni faqat balandlikka qarab sinash tutadi.
+    return ViewBasis(
+      fx: fx,
+      fy: fy,
+      fz: fz,
+      rx: rx,
+      rz: rz,
+      ux: fy * rz,
+      uy: fz * rx - fx * rz,
+      uz: -fy * rx,
+      focal: size.height / 2 / math.tan(fovDeg * deg / 2),
+      cx: size.width / 2,
+      cy: size.height / 2,
+    );
+  }
+
+  /// Sferadagi yo'nalishni ekran nuqtasiga. `null` — KAMERA ORQASIDA.
+  ///
+  /// Orqadagi nuqtani chizish mumkin emas: uning proyeksiyasi ekranning
+  /// qarama-qarshi tomonida paydo bo'ladi, ya'ni orqangizdagi xonaning
+  /// tugmasi oldingizda turardi.
+  Offset? projectDeg(double lonDeg, double latDeg) {
+    const double deg = math.pi / 180;
+    final double lat = latDeg * deg;
+    final double lon = lonDeg * deg;
+    final double cl = math.cos(lat);
+    final double dx = cl * math.sin(lon);
+    final double dy = math.sin(lat);
+    final double dz = cl * math.cos(lon);
+
+    final double zc = dx * fx + dy * fy + dz * fz;
+    if (zc <= 1e-3) return null;
+
+    final double xc = dx * rx + dz * rz;
+    final double yc = dx * ux + dy * uy + dz * uz;
+    return Offset(cx + focal * (xc / zc), cy - focal * (yc / zc));
+  }
+}
+
 /// Chizishga tayyor to'r.
 class SphereMesh {
   const SphereMesh({
@@ -336,45 +449,20 @@ SphereMesh? projectSphere({
   int lonSteps = _lonSteps,
   int latSteps = _latSteps,
 }) {
-  // Tuval hali o'lchanmagan bo'lishi mumkin (birinchi kadr). Fokus
-  // masofasi o'shanda nolga aylanadi va HAMMA tugun (0, 0) ga tushardi —
-  // chizilgan narsa bitta nuqta bo'lardi.
-  if (size.isEmpty) return null;
+  final ViewBasis? basis = ViewBasis.of(
+    size: size,
+    yawDeg: yawDeg,
+    pitchDeg: pitchDeg,
+    fovDeg: fovDeg,
+  );
+  if (basis == null) return null;
 
-  const double deg = math.pi / 180;
-  final double yaw = yawDeg * deg;
-  final double pitch = pitchDeg.clamp(-kMaxPitchDeg, kMaxPitchDeg) * deg;
-
-  // Ko'rish bazisi. `f` — qarayotgan yo'nalish, `r` — ekranning o'ngi,
-  // `u` — yuqorisi.
-  final double cp = math.cos(pitch);
-  final double fx = cp * math.sin(yaw);
-  final double fy = math.sin(pitch);
-  final double fz = cp * math.cos(yaw);
-
-  // r = normalize(worldUp × f). `worldUp = (0, 1, 0)` bo'lgani uchun
-  // ko'paytma soddalashadi va uzunligi `cos(pitch)` ga teng — shuning
-  // uchun qutbda nolga aylanadi va balandlik chegaralangan.
-  final double rl = math.sqrt(fz * fz + fx * fx);
-  if (rl < 1e-9) return null;
-  final double rx = fz / rl;
-  final double rz = -fx / rl;
-  // u = f × r. `r` ning y'i nol, shuning uchun ko'paytma qisqaradi:
-  //   f × r = (fy·rz,  fz·rx − fx·rz,  −fy·rx)
-  //
-  // ⚠️ `rx` bilan `rz` ni almashtirib yuborish OSON va natijasi jim:
-  // `u` endi `f` ga perpendikulyar bo'lmaydi (tekshirildi: pitch 45° da
-  // `f·u = 0.5`), ya'ni yuqoriga yoki pastga qaraganda manzara
-  // qiyshayib ketadi. Gorizontda esa hammasi to'g'ri ko'rinadi —
-  // shuning uchun buni faqat balandlikka qarab sinash tutadi.
-  final double ux = fy * rz;
-  final double uy = fz * rx - fx * rz;
-  final double uz = -fy * rx;
-
-  // Vertikal FOV'dan fokus masofasi.
-  final double focal = size.height / 2 / math.tan(fovDeg * deg / 2);
-  final double cx = size.width / 2;
-  final double cy = size.height / 2;
+  final double fx = basis.fx, fy = basis.fy, fz = basis.fz;
+  final double rx = basis.rx, rz = basis.rz;
+  final double ux = basis.ux, uy = basis.uy, uz = basis.uz;
+  final double focal = basis.focal;
+  final double cx = basis.cx;
+  final double cy = basis.cy;
 
   final int cols = lonSteps + 1;
   final int rows = latSteps + 1;

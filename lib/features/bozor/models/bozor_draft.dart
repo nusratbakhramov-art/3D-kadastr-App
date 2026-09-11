@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/i18n/app_translations.dart';
+import 'tour_link.dart';
 
 /// E'lon turi. Dizaynda faqat [rent] oqimi chizilgan; [sale] model uchun bor,
 /// uning 4-qadami (narx) hali dizaynda yo'q.
@@ -274,6 +275,14 @@ class DescriptionDraft {
   /// Qoralama payload'ida saqlanadi, ya'ni ilova qayta ishga tushsa ham
   /// yo'qolmaydi.
   final Map<String, String> uploadedMedia = {};
+
+  /// 360° tur havolalari — panoramalarni bir-biriga bog'laydi.
+  ///
+  /// Uchlari LOKAL YO'L (hali yuklanmagan panorama) yoki S3 KALITI
+  /// (tahrirlashda e'londa allaqachon turgani) bo'lishi mumkin;
+  /// `resolveTourLinks` yuborishdan oldin ikkalasini kalitga keltiradi.
+  final List<TourLink> tourLinks = [];
+
   String youtubeUrl = '';
 }
 
