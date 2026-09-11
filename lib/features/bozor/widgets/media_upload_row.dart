@@ -27,6 +27,7 @@ class MediaUploadRow extends StatelessWidget {
     required this.paths,
     required this.onAdd,
     required this.onRemove,
+    this.onOpen,
   });
 
   final String label;
@@ -36,6 +37,14 @@ class MediaUploadRow extends StatelessWidget {
   final List<String> paths;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
+
+  /// Eskiz bosilganda nima ochilishi.
+  ///
+  /// Berilmasa — oddiy rasm galereyasi. 360° qatori buni ALMASHTIRADI:
+  /// tikilgan panorama tekis JPEG bo'lib ko'rinadi, lekin uni tekis
+  /// ko'rsatish tasvirni cho'zilgan lentaga aylantiradi va 360° ekanini
+  /// umuman bildirmaydi — u sferada ochilishi kerak.
+  final ValueChanged<int>? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -111,12 +120,19 @@ class MediaUploadRow extends StatelessWidget {
               itemBuilder: (context, i) => _Thumb(
                 path: paths[i],
                 onRemove: () => onRemove(i),
-                onOpen: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) =>
-                        FilePreviewGallery(paths: paths, initialIndex: i),
-                  ),
-                ),
+                onOpen: () {
+                  final ValueChanged<int>? open = onOpen;
+                  if (open != null) {
+                    open(i);
+                    return;
+                  }
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          FilePreviewGallery(paths: paths, initialIndex: i),
+                    ),
+                  );
+                },
               ),
             ),
           ),

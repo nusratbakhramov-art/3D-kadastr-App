@@ -152,7 +152,8 @@ void main() {
       // yangi kalit qo'shilsa uchala tilga ham qo'shilgani tekshirilsin.
       // 25 → 30: `bozor.pano.resume.*` (5 ta) — tashlab ketilgan
       // suratga olishni yig'ishni taklif qilish (`0dac253` porti).
-      expect(pano['uz'], hasLength(30));
+      // 30 → 32: `bozor.pano.view.*` (2 ta) — sferadagi ko'ruvchi.
+      expect(pano['uz'], hasLength(32));
     });
 
     test('tarjimalar BO‘SH emas va kalitning o‘zi emas', () {

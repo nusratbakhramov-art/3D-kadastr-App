@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../panorama/screens/pano_viewer_screen.dart';
 import '../widgets/pano_source_sheet.dart';
 
 import '../../../core/i18n/app_translations.dart';
@@ -223,6 +224,16 @@ class _BozorDescriptionStepScreenState
                             onAdd: _add360,
                             onRemove: (i) =>
                                 setState(() => _d.panoramas.removeAt(i)),
+                            // 360° SFERADA ochiladi. Oddiy galereya uni
+                            // cho'zilgan lenta qilib ko'rsatadi va
+                            // panorama ekani bilinmaydi.
+                            onOpen: (i) => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => PanoViewerScreen(
+                                  path: _d.panoramas[i],
+                                ),
+                              ),
+                            ),
                           ),
                           const SizedBox(height: 16),
                           WizardField(
