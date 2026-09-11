@@ -78,6 +78,27 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
   @override
   void initState() {
     super.initState();
+    // Qoralamadagi (yoki tahrirlanayotgan e'londagi) qiymatlarni maydonlarga
+    // TIKLAYMIZ.
+    //
+    // ⚠️ BUSIZ IKKI XATO BIRDAN BO'LARDI. Ekran qoralamani davom ettirganda
+    // yoki e'lonni tahrirlaganda ochilsa, viloyat/tuman va xarita nuqtasi
+    // ko'rinardi (ular `_a` dan to'g'ridan o'qiladi), MATN maydonlari esa
+    // bo'sh chiqardi — foydalanuvchi "ma'lumotlarim yo'qolibdi" deb o'ylaydi.
+    // Yomoni ikkinchisi: `_onContinue` shu bo'sh kontrollerlarni `_a` ga
+    // ustidan yozardi, ya'ni "Keyingisi" bosilishi bilan manzil, uy raqami va
+    // qavatlar `PATCH` da JIMGINA yo'qolardi.
+    //
+    // Tinglovchilardan OLDIN to'ldiriladi — aks holda har bir tayinlash
+    // keraksiz `setState` chaqirardi.
+    _address.text = _a.address;
+    _landmark.text = _a.landmark;
+    _apartmentNumber.text = _a.apartmentNumber;
+    _entrance.text = _a.entrance;
+    _houseNumber.text = _a.houseNumber;
+    _totalFloors.text = _a.totalFloors;
+    _floor.text = _a.floor;
+
     // "Далее" har bosishda qayta hisoblanadi.
     for (final c in _all) {
       c.addListener(_rebuild);
