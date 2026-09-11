@@ -44,6 +44,7 @@ const Map<WizardStep, String> kStepTitleKeys = {
   WizardStep.type: 'bozor.step.type.title',
   WizardStep.address: 'bozor.address.title',
   WizardStep.params: 'bozor.params.title',
+  WizardStep.deal: 'bozor.transaction.title',
   WizardStep.price: 'bozor.price.title',
   WizardStep.description: 'bozor.desc.title',
   WizardStep.contacts: 'bozor.contacts.title',
@@ -80,7 +81,7 @@ List<DraftBlocker> draftBlockers(BozorDraft draft) {
         fieldLabelKeys: fields,
       ));
 
-  // 1-qadam.
+  // E'lon turi (1-qadam).
   final type = draft.type;
   if (draft.deal == null || draft.kind == null || type == null) {
     add(WizardStep.type);
@@ -90,7 +91,7 @@ List<DraftBlocker> draftBlockers(BozorDraft draft) {
     return out;
   }
 
-  // 2-qadam. `AddressDraft` dagi majburiy qatorlar — ekran bilan bir xil.
+  // Manzil (2-qadam). Majburiy qatorlar — ekran bilan bir xil.
   final a = draft.address;
   final addressFields = <String>[
     if (a.regionId == null) 'bozor.address.field.region',
@@ -101,7 +102,7 @@ List<DraftBlocker> draftBlockers(BozorDraft draft) {
   ];
   if (addressFields.isNotEmpty) add(WizardStep.address, addressFields);
 
-  // 3-qadam (variantda bo'lmasa o'tkazib yuboriladi).
+  // Parametrlar (3-qadam; variantda bo'lmasa o'tkazib yuboriladi).
   if (draft.wizardSteps.contains(WizardStep.params)) {
     final missing = missingRequiredParams(draft);
     if (missing.isNotEmpty) {
@@ -109,15 +110,22 @@ List<DraftBlocker> draftBlockers(BozorDraft draft) {
     }
   }
 
-  // 4-qadam.
+  // «Сделка» — faqat sotuvda. Dizaynda yagona majburiy maydon
+  // «Собственники»; qolgan uchtasi «(по желанию)».
+  if (draft.wizardSteps.contains(WizardStep.deal) &&
+      (draft.transaction.ownersCount ?? '').isEmpty) {
+    add(WizardStep.deal, ['bozor.transaction.owners_count']);
+  }
+
+  // Narx.
   if (draft.price.amount.trim().isEmpty) add(WizardStep.price);
 
-  // 5-qadam.
+  // Tavsif.
   if (draft.title.trim().length < 3 || draft.description.text.trim().isEmpty) {
     add(WizardStep.description);
   }
 
-  // 6-qadam. Telefon — 9 raqam (`+998` siz), ekrandagi qoida bilan bir xil.
+  // Kontaktlar. Telefon — 9 raqam (`+998` siz), ekrandagi qoida bilan bir xil.
   final c = draft.contacts;
   final firstPhone = c.phones.isEmpty ? '' : c.phones.first;
   if (c.name.trim().isEmpty || _digits(firstPhone).length != 9) {

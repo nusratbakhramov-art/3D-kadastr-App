@@ -23,12 +23,17 @@ import '../widgets/option_picker_sheet.dart';
 import '../widgets/price_field.dart';
 import 'bozor_description_step_screen.dart';
 
-/// Birlik tokenlari — HOZIRCHA STUB.
+/// Birlik tokenlari.
 ///
-/// Dizaynda faqat `UZS/мес` va `UZS` ko'rinadi, ro'yxat ochiq holda hech
-/// qayerda chizilmagan. Valyutani almashtirish mumkin deb qabul qildik,
-/// davr esa qatorga biriktirilgan (oylik qatorda `/oy`, sutkalikda yo'q).
+/// Dizaynda ro'yxat ochiq holda chizilmagan; valyutani almashtirish mumkin
+/// deb qabul qildik, davr esa qatorga biriktirilgan.
+///
+/// ⚠️ SOTUVDA DAVR YO'Q. Ijara narxi oylik (`UZS/oy`), sotuv narxi esa bir
+/// martalik summa (`UZS`) — dizaynda hech bir sotuv freymida «/мес» yo'q.
+/// Sotuvga davrli token yuborilsa e'lon lentada «450 000 000 soʻm/oy» bo'lib
+/// chiqardi.
 const List<String> _monthlyUnits = ['UZS/oy', 'USD/oy'];
+const List<String> _saleUnits = ['UZS', 'USD'];
 const List<String> _dailyUnits = ['UZS', 'USD'];
 
 class BozorPriceStepScreen extends StatefulWidget {
@@ -48,12 +53,16 @@ class _BozorPriceStepScreenState extends State<BozorPriceStepScreen> {
 
   PriceDraft get _p => widget.draft.price;
 
-  /// Sutkalik narx faqat turar joyda — dizaynda uchastka, tijorat, garaj va
-  /// boshqa noturar joyda bu qator umuman yo'q (kartaning balandligi ham
-  /// 283 emas, 197).
+  /// Sutkalik narx faqat turar joyda VA faqat ijarada — dizaynda uchastka,
+  /// tijorat, garaj va boshqa noturar joyda bu qator umuman yo'q (kartaning
+  /// balandligi ham 283 emas, 197), sotuv freymlarida esa hech qayerda yo'q.
   bool get _hasDailyPrice =>
-      widget.draft.type == PropertyType.apartment ||
-      widget.draft.type == PropertyType.house;
+      widget.draft.deal != DealType.sale &&
+      (widget.draft.type == PropertyType.apartment ||
+          widget.draft.type == PropertyType.newBuildingApartment ||
+          widget.draft.type == PropertyType.house);
+
+  bool get _isSale => widget.draft.deal == DealType.sale;
 
   @override
   void initState() {
@@ -79,7 +88,9 @@ class _BozorPriceStepScreenState extends State<BozorPriceStepScreen> {
     final picked = await showOptionPickerSheet<String>(
       context,
       title: tr(l, 'bozor.price.unit_title'),
-      options: daily ? _dailyUnits : _monthlyUnits,
+      options: daily
+          ? _dailyUnits
+          : (_isSale ? _saleUnits : _monthlyUnits),
       labelOf: (o) => o,
       selected: daily ? _p.dailyUnit : _p.unit,
     );
@@ -150,7 +161,10 @@ class _BozorPriceStepScreenState extends State<BozorPriceStepScreen> {
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
                           PriceField(
-                            label: tr(l, 'bozor.price.rent'),
+                            // Ijarada «Ijara haqi», sotuvda mulk turiga mos
+                            // sarlavha («Kvartira narxi», «Uy narxi»…).
+                            label: (draft.type ?? PropertyType.apartment)
+                                .priceLabel(l, draft.deal),
                             controller: _amount,
                             unit: _p.unit,
                             required: true,
@@ -163,6 +177,15 @@ class _BozorPriceStepScreenState extends State<BozorPriceStepScreen> {
                             onChanged: (v) =>
                                 setState(() => _p.negotiable = v),
                           ),
+                          if (_isSale) ...[
+                            const SizedBox(height: 12),
+                            WizardSwitchTile(
+                              label: tr(l, 'bozor.price.mortgage'),
+                              value: _p.mortgage,
+                              onChanged: (v) =>
+                                  setState(() => _p.mortgage = v),
+                            ),
+                          ],
                           if (_hasDailyPrice) ...[
                             const SizedBox(height: 12),
                             PriceField(

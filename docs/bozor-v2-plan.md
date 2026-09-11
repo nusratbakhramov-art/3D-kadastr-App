@@ -18,7 +18,8 @@
 2. **7-chi mulk turi** — `Квартира в новостройке` (`new_building_apartment`).
 3. **Narx qadami sotuv rejimi** — davr yo'q (`UZS`/`USD`), yorliq mulk turiga qarab,
    sutkalik narx yo'q, yangi **«Ипотека»** toggle.
-4. **Kontakt SMS tasdiqlash** haqiqiy bo'ladi (hozir UI stub) — 2 ta yangi backend endpoint.
+4. ~~**Kontakt SMS tasdiqlash** haqiqiy bo'ladi (hozir UI stub) — 2 ta yangi backend endpoint.~~ **BEKOR (2026-09-11):** tasdiqlash UMUMAN yo'q — «Yuborish» tugmasi, kod
+   kataklari va taymer 6-qadamdan olib tashlandi. Qadamlar **30, 31, 32** bekor qilindi.
 5. **Dizayn deltalari**: foto boshqaruv ekrani, maydon birligi dropdowni (`соток`/`м²`),
    xonalar `10+`, `Площадь балкона`, segmented picker'lar, picker qidiruvi, xarita qidiruvi.
 6. **Uzilgan halqalar yopiladi** (bu dizayndan mustaqil, lekin busiz hech narsa ko'rinmaydi):
@@ -28,6 +29,32 @@
    Bayroqning **ikkala yarmi** ham yoziladi: backend (M2-14) va **mobil gate (M2-17b)**;
    yoqilishi — M3-22. Rollback'da bayroq serverdan `false` bo'ladi va yangi ilova versiyasi ham
    sotuvni ko'rsatmaydi.
+
+### HOLAT — 2026-09-11
+
+**M2 (backend) va M3 (mobil) KOD JIHATDAN BAJARILDI.** Sotuv oqimi uchidan-uchiga
+yozilgan, lekin **`bozor_sale_enabled` hamon `false`** — foydalanuvchi hali ko'rmaydi.
+
+| Qadam | Holat |
+|---|---|
+| M2-14…16 (option'lar, ustunlar, `DealIn`) | ✅ backend `feat/bozor-sale-flow` |
+| M3-18 (`wizardSteps` → DealType × PropertyType) | ✅ `wizardStepsFor()` |
+| M3-19 (4/8 «Сделка» ekrani) | ✅ `bozor_deal_step_screen.dart` |
+| M3-20 (sotuv narx rejimi) | ✅ davrsiz birlik, turga mos yorliq, «Ипотека» |
+| M3-21 (`newBuildingApartment`) | ✅ 7-chi mulk turi |
+| M3-22 (parity) | ✅ fixture qayta generatsiya qilindi (86 → **111** maydon) |
+| M3-22 (bayroqni YOQISH) | ⛔ **QILINMADI** — pastdagi shartga qarang |
+
+⚠️ **Option KODLARI hamon TASDIQLANMAGAN** (`sale_type`, `ownership_years`,
+`owners_count`, `registered_count` — so'rov B, `docs/bozor-v2-blockers.md`). Ular
+dizayndan chiqarilgan taxminiy to'plam. **Hozir o'zgartirish ARZON**: prod'da e'lon
+umuman yo'q (`GET /listings/` → `total: 0`) va sotuv yopiq, ya'ni migratsiya ham,
+ma'lumot ko'chirish ham kerak emas — ikki faylda bir necha qator.
+
+**Bayroqni yoqish sharti:** (a) mijoz kodlarni tasdiqlasin, (b) backend prod'ga
+chiqsin va `ensure_bozor_listings` ustunlarni qo'shsin, (c) haqiqiy qurilmada
+sotuv oqimi uchidan-uchiga sinalsin. Uchalasidan keyin:
+`UPDATE app_settings SET bozor_sale_enabled = true;` (adminkada bu bayroq YO'Q).
 
 ### Nega shu tartibda
 
@@ -1084,70 +1111,31 @@ tartibni buzmang. **Z6:** «Все параметры» yulduzchalari **ixtiyori
 
 ---
 
-### 30. Backend: e'lon kontaktini tasdiqlash uchun OTP endpointlari
+### 30–32. ~~E'lon kontaktini SMS bilan tasdiqlash~~ — **BEKOR QILINDI (2026-09-11)**
 
 | | |
 |---|---|
-| **Repo** | backend |
-| **Fayllar** | `app/api/v1/listings.py`, `app/services/otp_service.py`, `app/integrations/sms_provider.py`, `app/schemas/bozor_listing.py`, `app/services/bozor_listing_service.py` |
+| **Repo** | — |
+| **Fayllar** | — |
 
-**Nega shu o'rinda.** `/auth/verify-otp` **token qaytaradi va foydalanuvchini o'sha raqam bilan
-tizimga kiritadi** — e'lon kontaktini u bilan tekshirib bo'lmaydi. Namuna: `profile.py:123
-change_phone` (`otp_service.verify_otp` + token yo'q). SMS shabloni M0-2 da tasdiqlashga yuborilgan.
+**Mahsulot qarori.** E'lon kontakt raqami **tasdiqlanmaydi**: foydalanuvchi raqamini
+kiritadi va o'tib ketadi. Shu sababli uchta qadam ham bekor:
 
-**Tugadi mezoni.**
-`POST /api/v1/listings/contact/send-otp {phone}` → **200** `{expires_in}`;
-`POST /api/v1/listings/contact/verify-otp {phone, code}` → **200** `{verified: true}` va javobda
-`access_token` **YO'Q**, joriy sessiya o'zgarmaydi (`GET /profile/` o'sha foydalanuvchi);
-Redis kaliti `contact_otp:{phone}` (login `otp:{phone}` ga **tegmaydi**);
-60s ichida ikkinchi send → **429**; 3 urinishdan keyin **400**;
-demo raqam (`+998990000011`, kod `00000`) ishlaydi.
-**Z1:** kod uzunligi **5**.
+* **30.** `POST /listings/contact/send-otp` va `/verify-otp` — **yozilmaydi**.
+* **31.** Mobil OTP modali — **yozilmaydi**. Aksincha, mavjud UI stub'i (dizayndagi
+  «Отправить» tugmasi, 5 katak, «Qayta yuborish» taymeri) `bozor_contacts_step_screen.dart`
+  dan **olib tashlandi**; `ContactsDraft.phoneVerified` va
+  `bozor.contacts.{send,verified,phone_invalid,code_stub}` kalitlari ham o'chirildi.
+  Qo'riqchi test: `test/features/bozor/contacts_no_otp_test.dart`.
+* **32.** `contact_phone_verified` ni serverda qayta tekshirish — **kerak emas**. Ustun
+  joyida qoladi (migratsiya qilinmaydi, alembic 3 head bilan buzuq) va **abadiy `false`**:
+  uni `true` qiladigan oqim endi rejada ham yo'q. Adminkadagi «Telefon tasdiqlangan»
+  ustuni (`app/admin.py:2268`) shu sababli hamisha «yo'q» ko'rsatadi.
 
-**Xavf.** Yuqori. Prod'ga chiqish PlayMobile shabloni tasdig'iga bog'liq (M0-2, §3).
-
----
-
-### 31. Mobil: kontakt OTP modali + tasdiqlangan holat + «Моё имя / Мой номер»
-
-| | |
-|---|---|
-| **Repo** | mobile |
-| **Fayllar** | `lib/features/bozor/screens/bozor_contact_otp_screen.dart`, `screens/bozor_contacts_step_screen.dart`, `data/bozor_api.dart`, `assets/i18n/bundle.json` |
-
-**Nega shu o'rinda.** 30-qadam endpointlarni berdi. `OtpBoxes` + `ResendTimer` + `BozorPhoneField`
-tayyor.
-
-**Tugadi mezoni.** «Отправить» → modal (`bozorRoute('contacts/otp')`): telefon chipi + qalam,
-**5 katak**, **60s** taymer + qayta yuborish; noto'g'ri kodda `OtpBoxState.error` (qizil ramkalar) +
-«Qolgan urinishlar: N»; to'g'ri kodda modal yopiladi, maydonda yashil ✓ + **trash** tugmasi
-(`293-12207`).
-**Avtorizatsiya qilingan foydalanuvchi** (`293:12520`): ism va telefon maydonlari ostida
-«Моё имя» / «Мой номер» toggle'lari — yoqilganda profildagi qiymat ishlatiladi va maydon o'chadi.
-**Z2:** `_isComplete` **o'zgarmaydi** — tasdiqlash ixtiyoriy.
-
-**Xavf.** O'rta. `_codeLength` konstantasi bir joyda bo'lsin (`otp_step.dart:39` dagi literal `5`
-naqshini takrorlamang).
-
----
-
-### 32. `contact_phone_verified` ni serverda qayta tekshirish
-
-| | |
-|---|---|
-| **Repo** | ikkalasi |
-| **Fayllar** | `kadastr-backend/app/services/bozor_listing_service.py`, `app/schemas/bozor_listing.py`, `mobile/lib/features/bozor/data/bozor_submit.dart`, `models/bozor_draft.dart` |
-
-**Nega shu o'rinda.** `contact_phone_verified` ustuni **bor**, uni `true` qiladigan oqim yo'q;
-`ContactsDraft.phoneVerified` payload'ga **umuman ketmaydi**. 31-qadamdagi tasdiqlash natijasiz
-qolmasligi kerak. **Klientga ishonmaymiz.**
-
-**Tugadi mezoni.** Tasdiqlangan raqam bilan e'lon yaratilgach `GET /listings/{id}` da
-`contact_phone_verified: true`; tasdiqlamasdan yuborilganda `false` — **klient `true` yuborsa ham**
-backend Redis'dagi `contact_otp_verified:{phone}` bayrog'iga qarab `false` qo'yadi.
-Moderatsiya UI'da (M1-6) tasdiqlangan/tasdiqlanmagan farqlanadi.
-
-**Xavf.** Past.
+**Oqibatlari.** Z1 (OTP uzunligi) va Z2 (tasdiqlash majburiymi) **ahamiyatsiz** bo'ldi;
+PlayMobile SMS shabloni bloklovchisi (§3, M0-2) **olib tashlanadi** — e'lon oqimi uchun
+yangi shablon kerak emas (login OTP'si o'z shabloni bilan ishlashda davom etadi).
+Dizayndan ongli chekinish: 6/7 (va sotuvda 7/8) ekranida kod bloki chizilgan edi.
 
 ---
 

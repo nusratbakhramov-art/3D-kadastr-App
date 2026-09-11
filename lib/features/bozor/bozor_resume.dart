@@ -9,16 +9,10 @@ library;
 import 'package:flutter/material.dart';
 
 import 'bozor_routes.dart';
+import 'bozor_step_route.dart';
 import 'data/bozor_draft_codec.dart';
 import 'models/bozor_draft.dart';
 import 'models/bozor_listing.dart';
-import 'screens/bozor_address_step_screen.dart';
-import 'screens/bozor_contacts_step_screen.dart';
-import 'screens/bozor_description_step_screen.dart';
-import 'screens/bozor_params_step_screen.dart';
-import 'screens/bozor_price_step_screen.dart';
-import 'screens/bozor_terms_step_screen.dart';
-import 'screens/bozor_type_step_screen.dart';
 
 /// Saqlangan qadamdan mos ekranni quradi.
 ///
@@ -31,19 +25,10 @@ import 'screens/bozor_type_step_screen.dart';
 /// "Boshqa noturar joy" ga o'zgargan) foydalanuvchi mavjud bo'lmagan
 /// ekranga tushib qolardi — shuning uchun bunday holatda ro'yxatdagi eng
 /// yaqin oldingi qadamga tushiriladi.
-Widget bozorStepScreen(BozorDraft draft, WizardStep step) {
+Widget bozorStepScreenSafe(BozorDraft draft, WizardStep step) {
   final steps = draft.wizardSteps;
   final safe = steps.contains(step) ? step : _fallbackStep(steps, step);
-
-  return switch (safe) {
-    WizardStep.type => BozorTypeStepScreen(draft: draft),
-    WizardStep.address => BozorAddressStepScreen(draft: draft),
-    WizardStep.params => BozorParamsStepScreen(draft: draft),
-    WizardStep.price => BozorPriceStepScreen(draft: draft),
-    WizardStep.description => BozorDescriptionStepScreen(draft: draft),
-    WizardStep.contacts => BozorContactsStepScreen(draft: draft),
-    WizardStep.terms => BozorTermsStepScreen(draft: draft),
-  };
+  return bozorStepScreen(draft, safe);
 }
 
 /// `WizardStep.values` tartibida [step] dan oldinda turgan va [steps] ichida
@@ -61,7 +46,7 @@ WizardStep _fallbackStep(List<WizardStep> steps, WizardStep step) {
 Route<void> bozorResumeRoute(BozorDraft draft, WizardStep step) =>
     MaterialPageRoute<void>(
       settings: bozorRoute(step.name),
-      builder: (_) => bozorStepScreen(draft, step),
+      builder: (_) => bozorStepScreenSafe(draft, step),
     );
 
 /// Qoralama kartasi bosilganda: payload'dan qoralamani tiklab, saqlangan

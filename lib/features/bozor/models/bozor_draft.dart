@@ -22,6 +22,11 @@ enum PropertyKind { residential, nonResidential }
 /// Mulk turi — sehrgarning butun shakli shunga bog'liq.
 enum PropertyType {
   apartment,
+  /// «Квартира в новостройке» — dizaynda `Квартира` dan keyin turadi.
+  /// Parametrlari hozircha oddiy kvartiraniki (maxsus maydonlar dizaynda
+  /// ochilmagan), lekin AYRIM tur: sotuvda «Прописано» qatori faqat shu
+  /// ikkisida so'raladi.
+  newBuildingApartment,
   house,
   land,
   commercial,
@@ -47,6 +52,7 @@ extension PropertyKindX on PropertyKind {
   List<PropertyType> get types => switch (this) {
     PropertyKind.residential => const [
       PropertyType.apartment,
+      PropertyType.newBuildingApartment,
       PropertyType.house,
       PropertyType.land,
     ],
@@ -61,6 +67,7 @@ extension PropertyKindX on PropertyKind {
 extension PropertyTypeX on PropertyType {
   String label(Locale l) => switch (this) {
     PropertyType.apartment => tr(l, 'bozor.type.apartment'),
+    PropertyType.newBuildingApartment => tr(l, 'bozor.type.new_building'),
     PropertyType.house => tr(l, 'bozor.type.house'),
     PropertyType.land => tr(l, 'bozor.type.land'),
     PropertyType.commercial => tr(l, 'bozor.type.commercial'),
@@ -71,6 +78,7 @@ extension PropertyTypeX on PropertyType {
   /// Qaysi toifaga tegishli — toifa o'zgarganda turni tozalash uchun.
   PropertyKind get kind => switch (this) {
     PropertyType.apartment ||
+    PropertyType.newBuildingApartment ||
     PropertyType.house ||
     PropertyType.land => PropertyKind.residential,
     PropertyType.commercial ||
@@ -78,38 +86,70 @@ extension PropertyTypeX on PropertyType {
     PropertyType.otherNonResidential => PropertyKind.nonResidential,
   };
 
-  /// Shu turdagi qadamlar ketma-ketligi.
+  /// "Параметры" qadami shu turda bormi.
   ///
-  /// "Boshqa noturar joy" da "Параметры" qadami YO'Q — shu sababli unda 6 ta
-  /// qadam va narx UCHINCHI o'rinda turadi (dizaynda `3/6`), qolganlarida esa
-  /// to'rtinchi (`4/7`). Raqamlar hech qayerda qo'lda yozilmasin: ekranlar
-  /// [BozorDraft.stepNumber] dan so'raydi.
-  List<WizardStep> get wizardSteps =>
-      this == PropertyType.otherNonResidential
-      ? const [
-          WizardStep.type,
-          WizardStep.address,
-          WizardStep.price,
-          WizardStep.description,
-          WizardStep.contacts,
-          WizardStep.terms,
-        ]
-      : const [
-          WizardStep.type,
-          WizardStep.address,
-          WizardStep.params,
-          WizardStep.price,
-          WizardStep.description,
-          WizardStep.contacts,
-          WizardStep.terms,
-        ];
+  /// "Boshqa noturar joy" da YO'Q — dizaynda o'sha variantda bu ekran
+  /// umuman chizilmagan.
+  bool get hasParamsStep => this != PropertyType.otherNonResidential;
 
-  int get stepCount => wizardSteps.length;
+  /// Sotuvda «Прописано» (4/8) qatori so'raladimi.
+  ///
+  /// Faqat kvartira turlarida: dizaynda Дом va Гараж freymlarida bu qator
+  /// umuman yo'q. Backend ham shunday tekshiradi
+  /// (`listing_options.TYPES_WITH_REGISTERED_COUNT`) — ikkisi ajralib
+  /// ketmasin.
+  bool get asksRegisteredCount =>
+      this == PropertyType.apartment ||
+      this == PropertyType.newBuildingApartment;
 }
 
-/// Sehrgar qadamlari. Ro'yxati mulk turiga bog'liq —
-/// [PropertyTypeX.wizardSteps] ga qarang.
-enum WizardStep { type, address, params, price, description, contacts, terms }
+/// Sehrgar qadamlari.
+///
+/// ⚠️ TARTIB MUHIM: [wizardStepsFor] ro'yxatni shu tartibda quradi va
+/// `bozor_resume.dart` dagi `_fallbackStep` "oldingi qadam" ni AYNAN shu
+/// enum tartibi bo'yicha izlaydi.
+enum WizardStep {
+  type,
+  address,
+  params,
+  /// «Сделка» — FAQAT sotuv oqimida (4/8).
+  deal,
+  price,
+  description,
+  contacts,
+  terms,
+}
+
+/// Qadamlar ketma-ketligi — (e'lon turi × mulk turi) juftligiga bog'liq.
+///
+/// Ilgari u faqat [PropertyType] ga bog'liq edi, chunki dizaynda faqat ijara
+/// oqimi bor edi. Sotuv freymlari kelgach ikkinchi o'lchov paydo bo'ldi:
+/// «Сделка» qadami FAQAT sotuvda chiziladi. To'rt kombinatsiya:
+///
+/// | E'lon turi | Mulk turi | Qadamlar |
+/// |---|---|---|
+/// | sotuv | params bor 6 tur | **8** |
+/// | sotuv | Boshqa noturar joy | **7** |
+/// | ijara | params bor 6 tur | 7 (o'zgarmagan) |
+/// | ijara | Boshqa noturar joy | 6 (o'zgarmagan) |
+///
+/// [deal] `null` bo'lsa (1-qadam hali to'ldirilmagan) «Сделка» qo'shilmaydi —
+/// ijara eng keng tarqalgan holat va progress chizig'i sakramaydi.
+/// Raqamlar hech qayerda qo'lda yozilmasin: ekranlar
+/// [BozorDraft.stepNumber] dan so'raydi.
+List<WizardStep> wizardStepsFor(DealType? deal, PropertyType? type) {
+  final t = type ?? PropertyType.apartment;
+  return [
+    WizardStep.type,
+    WizardStep.address,
+    if (t.hasParamsStep) WizardStep.params,
+    if (deal == DealType.sale) WizardStep.deal,
+    WizardStep.price,
+    WizardStep.description,
+    WizardStep.contacts,
+    WizardStep.terms,
+  ];
+}
 
 /// 2-qadamdagi qatorlar — kanonik (yuqoridan pastga) tartibda.
 ///
@@ -140,7 +180,7 @@ extension PropertyTypeAddressX on PropertyType {
       AddressRow.landmark,
     ];
     return switch (this) {
-      PropertyType.apartment => const [
+      PropertyType.apartment || PropertyType.newBuildingApartment => const [
         ...common,
         AddressRow.apartmentNumber,
         AddressRow.entrance,
@@ -167,7 +207,8 @@ extension PropertyTypeAddressX on PropertyType {
   /// bu yerda turga mos sarlavha qo'yildi. Dizaynga so'zma-so'z qaytarish
   /// kerak bo'lsa — faqat shu switch o'zgartiriladi.
   String descriptionLabel(Locale l) => switch (this) {
-    PropertyType.apartment => tr(l, 'bozor.desc.about.apartment'),
+    PropertyType.apartment ||
+    PropertyType.newBuildingApartment => tr(l, 'bozor.desc.about.apartment'),
     PropertyType.house => tr(l, 'bozor.desc.about.house'),
     PropertyType.land => tr(l, 'bozor.desc.about.land'),
     PropertyType.commercial => tr(l, 'bozor.desc.about.commercial'),
@@ -175,8 +216,31 @@ extension PropertyTypeAddressX on PropertyType {
     PropertyType.otherNonResidential => tr(l, 'bozor.desc.about.other'),
   };
 
+  /// Narx maydonining sarlavhasi.
+  ///
+  /// Ijarada u har doim «Ijara haqi», sotuvda esa MULK TURIGA bog'liq
+  /// («Стоимость квартиры / дома / участка / гаража / помещения»). Shu sabab
+  /// yorliq qat'iy yozilmaydi — ekran shu funksiyadan so'raydi.
+  ///
+  /// [deal] `null` (1-qadam to'ldirilmagan) bo'lsa ijara yorlig'i: sotuv
+  /// bayroq ostida va kamroq uchraydi.
+  String priceLabel(Locale l, DealType? deal) {
+    if (deal != DealType.sale) return tr(l, 'bozor.price.rent');
+    return switch (this) {
+      PropertyType.apartment ||
+      PropertyType.newBuildingApartment => tr(l, 'bozor.price.sale.apartment'),
+      PropertyType.house => tr(l, 'bozor.price.sale.house'),
+      PropertyType.land => tr(l, 'bozor.price.sale.land'),
+      PropertyType.commercial => tr(l, 'bozor.price.sale.commercial'),
+      PropertyType.garage => tr(l, 'bozor.price.sale.garage'),
+      PropertyType.otherNonResidential => tr(l, 'bozor.price.sale.other'),
+    };
+  }
+
   /// Manzil qatorining sarlavhasi — faqat kvartirada boshqacha.
-  String addressRowLabel(Locale l) => this == PropertyType.apartment
+  String addressRowLabel(Locale l) =>
+      this == PropertyType.apartment ||
+          this == PropertyType.newBuildingApartment
       ? tr(l, 'bozor.address.field.address_apartment')
       : tr(l, 'bozor.address.field.address');
 }
@@ -224,11 +288,45 @@ class PriceDraft {
   /// "Торг уместен". Dizaynda oltita frame'da ham YOQILGAN holda chizilgan.
   bool negotiable = true;
 
-  /// Sutkalik narx — faqat kvartira va uyda.
+  /// Sutkalik narx — faqat kvartira va uyda, va faqat IJARADA.
   String dailyAmount = '';
   String dailyUnit = 'UZS';
+
+  /// «Ипотека» (5/8) — faqat sotuvda. Dizaynda toggle YOQILGAN holda
+  /// chizilgan, lekin sukut `false`: ipoteka bor-yo'qligi e'lonning moddiy
+  /// da'vosi, uni foydalanuvchi ongli yoqishi kerak ("Торг уместен" boshqa
+  /// masala — u sozlama, da'vo emas).
+  bool mortgage = false;
 }
 
+/// 4/8 «Сделка» — FAQAT sotuv oqimida to'ldiriladi.
+///
+/// ⚠️ Nomi ATAYLAB `TransactionDraft`, `DealDraft` emas: [BozorDraft.deal]
+/// allaqachon [DealType] uchun band va `deal` ni ikki ma'noda ishlatish
+/// kodni o'qib bo'lmaydigan qilardi.
+///
+/// Qiymatlar — `listing.option.*` KODLARI (`free_sale`, `under_3`, `6_plus`),
+/// yorliq emas: til almashganda tanlov o'zgarib ketmasin.
+class TransactionDraft {
+  /// «Тип продажи» — ixtiyoriy.
+  String? saleType;
+
+  /// «Лет в собственности» — ixtiyoriy.
+  String? ownershipYears;
+
+  /// «Собственники» — dizaynda 4/8 dagi YAGONA majburiy maydon.
+  String? ownersCount;
+
+  /// «Прописано» — ixtiyoriy va faqat kvartira turlarida
+  /// ([PropertyTypeX.asksRegisteredCount]).
+  String? registeredCount;
+
+  /// Mulk turi o'zgarganda «Прописано» so'ralmaydigan turga o'tilsa qiymat
+  /// osilib qolmasin — backend uni 400 bilan rad etadi.
+  void clearRegisteredIfUnsupported(PropertyType? type) {
+    if (type == null || !type.asksRegisteredCount) registeredCount = null;
+  }
+}
 /// E'londa allaqachon turgan fayl — tahrirlashda qaytarib yuborish uchun.
 class ExistingMedia {
   const ExistingMedia({
@@ -295,10 +393,6 @@ class ContactsDraft {
   final List<String> phones = [''];
 
   String email = '';
-
-  /// SMS kod tasdiqlanganmi. Hozircha faqat UI holati — tekshiruvning
-  /// backend tarafi yo'q (`bozor_contacts_step_screen.dart` izohiga qarang).
-  bool phoneVerified = false;
 }
 
 /// E'lonni joylashtirish tarifi.
@@ -354,10 +448,9 @@ class BozorDraft {
   /// 1-qadam to'liq to'ldirilganmi — "Далее" shunga qarab yonadi.
   bool get isTypeStepComplete => deal != null && kind != null && type != null;
 
-  /// Tanlangan turdagi qadamlar ro'yxati. Tur hali tanlanmagan bo'lsa eng
-  /// keng tarqalgan holat (7 qadam) — progress chizig'i sakramasligi uchun.
-  List<WizardStep> get wizardSteps =>
-      (type ?? PropertyType.apartment).wizardSteps;
+  /// Tanlangan (e'lon turi × mulk turi) juftligidagi qadamlar ro'yxati —
+  /// [wizardStepsFor] ga qarang.
+  List<WizardStep> get wizardSteps => wizardStepsFor(deal, type);
 
   int get stepCount => wizardSteps.length;
 
@@ -373,7 +466,11 @@ class BozorDraft {
     return i < 0 || i + 1 >= wizardSteps.length ? null : wizardSteps[i + 1];
   }
 
-  /// 4-qadam qiymatlari.
+  /// 4/8 «Сделка» qiymatlari — FAQAT sotuvda to'ldiriladi. Ijara e'lonida
+  /// bo'sh qoladi va payload'ga umuman ketmaydi.
+  final TransactionDraft transaction = TransactionDraft();
+
+  /// Narx qadamining qiymatlari (ijara 4/7, sotuv 5/8).
   final PriceDraft price = PriceDraft();
 
   /// E'lon sarlavhasi. Dizaynda sehrgar uni SO'RAMAYDI, lekin lenta kartasi
@@ -389,6 +486,40 @@ class BozorDraft {
   /// 7-qadam qiymatlari.
   final TermsDraft terms = TermsDraft();
 
+  /// E'lon turi o'zgarganda narx BIRLIGINI shu oqimga moslaydi.
+  ///
+  /// NEGA KERAK. Ijarada birlik davr bilan keladi (`UZS/oy`), sotuvda esa
+  /// davr umuman yo'q (`UZS`). Foydalanuvchi ijarani tanlab narxgacha borib,
+  /// keyin 1-qadamga qaytib sotuvni tanlasa, `unit` da `'UZS/oy'` qolib
+  /// ketardi va e'lon "sotiladi, oyiga …" bo'lib chiqardi.
+  ///
+  /// Valyuta SAQLANADI — foydalanuvchi uni ataylab tanlagan bo'lishi mumkin;
+  /// faqat davr qismi olib tashlanadi yoki qo'shiladi.
+  ///
+  /// Sotuvdan ijaraga qaytilganda «Сделка» va «Ипотека» ham tozalanadi: ular
+  /// ijara e'lonida yuborilsa backend 400 beradi.
+  void setDeal(DealType? next) {
+    if (deal == next) return;
+    deal = next;
+    final currency = price.unit.split('/').first.trim();
+    switch (next) {
+      case DealType.sale:
+        price.unit = currency;
+        // Sutkalik narx sotuvda yo'q.
+        price.dailyAmount = '';
+      case DealType.rent:
+        price.unit = '$currency/oy';
+        price.mortgage = false;
+        transaction
+          ..saleType = null
+          ..ownershipYears = null
+          ..ownersCount = null
+          ..registeredCount = null;
+      case null:
+        break;
+    }
+  }
+
   /// Toifa o'zgarganda unga tegishli bo'lmay qolgan turni tozalaydi.
   void setKind(PropertyKind? next) {
     kind = next;
@@ -402,5 +533,8 @@ class BozorDraft {
     if (type == next) return;
     type = next;
     params.clear();
+    // «Прописано» faqat kvartira turlarida so'raladi — uyga o'tilsa qiymat
+    // osilib qolmasin, aks holda backend uni 400 bilan rad etadi.
+    transaction.clearRegisteredIfUnsupported(next);
   }
 }

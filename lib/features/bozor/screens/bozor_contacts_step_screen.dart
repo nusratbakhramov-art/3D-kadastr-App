@@ -2,16 +2,14 @@
 ///
 /// Dizaynda oltita variantda ham AYNAN bir xil — tarmoqlanish yo'q.
 ///
-/// ⚠️ SMS TASDIQLASH — BACKEND YO'Q.
-/// Dizaynda karta ichida "Отправить" tugmasi bor, lekin KOD KIRITISH EKRANI
-/// butun to'plamda yo'q. Ilovada esa faqat `/auth/send-otp` va
-/// `/auth/verify-otp` bor — ular LOGIN endpointlari: e'lon kontakt raqamini
-/// ular bilan tekshirish foydalanuvchini o'sha raqam bilan tizimga kiritib
-/// yuborardi. Shu sababli bu yerda kod bloki UI sifatida (mavjud [OtpBoxes]
-/// va [ResendTimer] bilan) chizilgan, lekin HECH QANDAY so'rov yubormaydi.
-/// "Далее" ham tasdiqlashni TALAB QILMAYDI — aks holda oqim boshi berk
-/// ko'chaga kirardi. Endpoint paydo bo'lganda faqat [_sendCode] va
-/// [_verifyCode] to'ldiriladi.
+/// SMS TASDIQLASH YO'Q — ATAYLAB.
+/// Dizaynda "Отправить" tugmasi, kod kataklari va qayta yuborish taymeri
+/// chizilgan edi va ular UI sifatida yasalgan ham edi (hech qanday so'rov
+/// yubormasdan — e'lon kontaktini tekshiradigan endpoint yo'q, `/auth/*`
+/// esa LOGIN oqimi va u foydalanuvchini o'sha raqam bilan tizimga kiritib
+/// yuborardi). Mahsulot qarori (2026-09-11): raqam TASDIQSIZ qabul qilinadi,
+/// shuning uchun butun blok OLIB TASHLANDI — ishlamaydigan tugma
+/// ko'rsatgandan ko'ra ko'rsatmaslik tushunarli.
 library;
 
 import 'package:flutter/material.dart';
@@ -19,9 +17,6 @@ import 'package:flutter/material.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
-import '../../auth/widgets/otp_boxes.dart';
-import '../../auth/widgets/resend_timer.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../../services/widgets/service_app_bar.dart';
 import '../../services/widgets/step_progress_bar.dart';
 import '../../services/widgets/wizard_field.dart';
@@ -34,9 +29,6 @@ import 'bozor_terms_step_screen.dart';
 
 /// Nechta telefon qo'shish mumkin. Dizaynda chegara ko'rsatilmagan.
 const int _maxPhones = 3;
-
-/// SMS kodning uzunligi — ilovadagi login kodi bilan bir xil.
-const int _codeLength = 5;
 
 class BozorContactsStepScreen extends StatefulWidget {
   const BozorContactsStepScreen({super.key, required this.draft});
@@ -56,9 +48,6 @@ class _BozorContactsStepScreenState extends State<BozorContactsStepScreen> {
   late final List<TextEditingController> _phones = [
     for (final p in _c.phones) TextEditingController(text: p),
   ];
-
-  /// Kod bloki ochilganmi ("Yuborish" bosilgandan keyin).
-  bool _codeSent = false;
 
   ContactsDraft get _c => widget.draft.contacts;
 
@@ -112,25 +101,6 @@ class _BozorContactsStepScreenState extends State<BozorContactsStepScreen> {
     _sync();
   }
 
-  /// TODO(backend): e'lon kontaktini tasdiqlash uchun endpoint kerak.
-  /// `/auth/send-otp` MAQBUL EMAS — u login oqimi.
-  void _sendCode() {
-    final l = Localizations.localeOf(context);
-    if (!_firstPhoneValid) {
-      AppToast.error(context, _S.phoneInvalid(l));
-      return;
-    }
-    setState(() => _codeSent = true);
-    AppToast.success(context, _S.codeStub(l));
-  }
-
-  /// TODO(backend): kodni tekshirish. Hozircha faqat UI holati.
-  void _verifyCode(String code) {
-    if (code.length < _codeLength) return;
-    setState(() => _c.phoneVerified = true);
-    AppToast.success(context, _S.codeStub(Localizations.localeOf(context)));
-  }
-
   Future<void> _openTerms() async {
     // Qoralamani fonda saqlaymiz: foydalanuvchi shu qadamda chiqib
     // ketsa "Mening e'lonlarim" dan aynan shu joydan davom etadi.
@@ -145,7 +115,7 @@ class _BozorContactsStepScreenState extends State<BozorContactsStepScreen> {
     if (mounted) setState(() {});
   }
 
-  /// Tasdiqlash TALAB QILINMAYDI — yuqoridagi izohga qarang.
+  /// Ism + to'liq telefon raqami yetadi.
   bool get _isComplete => _c.name.isNotEmpty && _firstPhoneValid;
 
   @override
@@ -231,46 +201,6 @@ class _BozorContactsStepScreenState extends State<BozorContactsStepScreen> {
                               onTap: _addPhone,
                             ),
                           ],
-                          const SizedBox(height: 16),
-                          ListingCtaButton(
-                            label: _S.send(l),
-                            enabled: _firstPhoneValid && !_c.phoneVerified,
-                            onTap: _sendCode,
-                          ),
-                          if (_codeSent && !_c.phoneVerified) ...[
-                            const SizedBox(height: 18),
-                            OtpBoxes(
-                              length: _codeLength,
-                              onChanged: (_) {},
-                              onCompleted: _verifyCode,
-                              autofocus: false,
-                            ),
-                            const SizedBox(height: 12),
-                            Center(child: ResendTimer(onResend: _sendCode)),
-                          ],
-                          if (_c.phoneVerified) ...[
-                            const SizedBox(height: 14),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.check_circle_rounded,
-                                  size: 18,
-                                  color: AppColors.splashGreen,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  _S.verified(l),
-                                  style: const TextStyle(
-                                    fontFamily: 'MTSCompact',
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                    color: AppColors.splashGreen,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -344,10 +274,5 @@ class _S {
   static String email(Locale l) => tr(l, 'bozor.contacts.email');
   static String emailHint(Locale l) => tr(l, 'bozor.contacts.email_hint');
   static String addPhone(Locale l) => tr(l, 'bozor.contacts.add_phone');
-  static String send(Locale l) => tr(l, 'bozor.contacts.send');
   static String remove(Locale l) => tr(l, 'bozor.common.clear');
-  static String verified(Locale l) => tr(l, 'bozor.contacts.verified');
-  static String phoneInvalid(Locale l) =>
-      tr(l, 'bozor.contacts.phone_invalid');
-  static String codeStub(Locale l) => tr(l, 'bozor.contacts.code_stub');
 }

@@ -19,14 +19,12 @@ import '../../services/widgets/step_progress_bar.dart';
 import '../../services/widgets/wizard_field.dart';
 import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
+import '../bozor_step_route.dart';
 import '../data/regions_repository.dart';
-import '../data/bozor_draft_store.dart';
 import '../models/bozor_draft.dart';
 import '../widgets/address_pin_field.dart';
 import '../widgets/option_picker_sheet.dart';
 import '../widgets/select_field.dart';
-import 'bozor_params_step_screen.dart';
-import 'bozor_price_step_screen.dart';
 
 /// Bitta nusxa — daraxt bir marta olinadi va sehrgar bo'ylab keshda qoladi.
 final RegionsRepository _defaultRegions = ApiRegionsRepository();
@@ -239,22 +237,11 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
     _a.houseNumber = _houseNumber.text.trim();
     _a.totalFloors = _totalFloors.text.trim();
     _a.floor = _floor.text.trim();
-    // "Boshqa noturar joy" da parametrlar qadami YO'Q — to'g'ri narxga
-    // o'tiladi. Aks holda bo'sh parametrlar ekrani ochilardi.
-    final next = widget.draft.stepAfter(WizardStep.address);
-    // Qoralama fonda saqlanadi. Saqlanadigan qadam — KEYINGISI (variantga
-    // qarab `params` yoki `price`), ya'ni foydalanuvchi qaytib kelganda
-    // "Boshqa noturar joy" da bo'sh parametrlar ekraniga tushmaydi.
-    // `await` QILINMAYDI — tarmoq navigatsiyani muzlatmasin.
-    saveBozorDraftInBackground(widget.draft, next ?? WizardStep.price);
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        settings: bozorRoute(next == WizardStep.params ? 'params' : 'price'),
-        builder: (_) => next == WizardStep.params
-            ? BozorParamsStepScreen(draft: widget.draft)
-            : BozorPriceStepScreen(draft: widget.draft),
-      ),
-    );
+    // Keyingisi qaysi ekran ekani (e'lon turi × mulk turi) juftligiga
+    // bog'liq: ijarada odatda «Параметры», "Boshqa noturar joy" da esa u
+    // yo'q, sotuvda esa o'sha holatda to'g'ridan «Сделка» keladi. Tanlov
+    // BITTA joyda — `openNextBozorStep`.
+    await openNextBozorStep(context, widget.draft, WizardStep.address);
     if (mounted) setState(() {});
   }
 

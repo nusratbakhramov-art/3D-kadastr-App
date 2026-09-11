@@ -498,7 +498,13 @@ const _garage = <ParamField>[
 extension PropertyTypeParamsX on PropertyType {
   /// Shu turdagi BARCHA parametrlar, chizish tartibida.
   List<ParamField> get paramFields => switch (this) {
-    PropertyType.apartment => _apartment,
+    // Yangi bino kvartirasi — hozircha AYNAN oddiy kvartira maydonlari.
+    // Dizaynda bu turning «Все параметры» jadvali ochilmagan (`1297-23722`
+    // freymida oddiy kvartira maydonlari turibdi), ya'ni maxsus maydonlar
+    // (застройщик, срок сдачи, очередь, тип отделки) TASDIQLANMAGAN.
+    // Backend ham shu nusxani ishlatadi (`listing_param_schema.py`) — farq
+    // kelganda ikkala tarafda ham faqat shu qator o'zgaradi.
+    PropertyType.apartment || PropertyType.newBuildingApartment => _apartment,
     PropertyType.house => _house,
     PropertyType.land => _land,
     PropertyType.commercial => _commercial,

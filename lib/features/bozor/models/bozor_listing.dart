@@ -130,6 +130,11 @@ class BozorListing {
     this.rooms,
     this.areaSqm,
     this.params = const {},
+    this.saleType,
+    this.ownershipYears,
+    this.ownersCount,
+    this.registeredCount,
+    this.mortgage = false,
     this.pricePeriod,
     this.priceUzs,
     this.dailyAmount,
@@ -190,6 +195,16 @@ class BozorListing {
   /// qiymatlari KOD (`renovation: "euro"`), yorlig'i `/listings/options` dan.
   final Map<String, dynamic> params;
 
+  // ── «Сделка» — ijara e'lonlarida to'rttasi ham `null` ───────────────────
+  // Qiymatlar KOD (`free_sale`, `under_3`, `6_plus`); yorliqlari
+  // `/listings/options` dan, `params` bilan bir xil qoida.
+  final String? saleType;
+  final String? ownershipYears;
+  final String? ownersCount;
+
+  /// «Прописано» — faqat kvartira turlarida so'raladi.
+  final String? registeredCount;
+
   final double priceAmount;
   final String priceCurrency;
 
@@ -202,6 +217,9 @@ class BozorListing {
   final bool negotiable;
   final double? dailyAmount;
   final String? dailyCurrency;
+
+  /// «Ипотека» — faqat sotuvda ma'noli, ijarada har doim `false`.
+  final bool mortgage;
 
   final String? description;
   final String? youtubeUrl;
@@ -337,6 +355,10 @@ class BozorListing {
     rooms: _toInt(j['rooms']),
     areaSqm: _toDouble(j['area_sqm']),
     params: (j['params'] as Map?)?.cast<String, dynamic>() ?? const {},
+    saleType: _toStringOrNull(j['sale_type']),
+    ownershipYears: _toStringOrNull(j['ownership_years']),
+    ownersCount: _toStringOrNull(j['owners_count']),
+    registeredCount: _toStringOrNull(j['registered_count']),
     priceAmount: _toDouble(j['price_amount']) ?? 0,
     priceCurrency: (j['price_currency'] ?? 'UZS').toString(),
     pricePeriod: _toStringOrNull(j['price_period']),
@@ -344,6 +366,8 @@ class BozorListing {
     negotiable: j['negotiable'] == true,
     dailyAmount: _toDouble(j['daily_amount']),
     dailyCurrency: _toStringOrNull(j['daily_currency']),
+    // Bayroqdan oldingi server bu maydonni yubormaydi — `false` qoladi.
+    mortgage: j['mortgage'] == true,
     description: _toStringOrNull(j['description']),
     youtubeUrl: _toStringOrNull(j['youtube_url']),
     contactName: (j['contact_name'] ?? '').toString(),

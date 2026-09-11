@@ -41,6 +41,7 @@ extension PropertyKindCode on PropertyKind {
 extension PropertyTypeCode on PropertyType {
   String get code => switch (this) {
     PropertyType.apartment => 'apartment',
+    PropertyType.newBuildingApartment => 'new_building_apartment',
     PropertyType.house => 'house',
     PropertyType.land => 'land',
     PropertyType.commercial => 'commercial',
@@ -72,6 +73,7 @@ PropertyKind? propertyKindFromCode(Object? code) => switch (code) {
 
 PropertyType? propertyTypeFromCode(Object? code) => switch (code) {
   'apartment' => PropertyType.apartment,
+  'new_building_apartment' => PropertyType.newBuildingApartment,
   'house' => PropertyType.house,
   'land' => PropertyType.land,
   'commercial' => PropertyType.commercial,
@@ -208,11 +210,27 @@ Map<String, dynamic> draftToPayload(
       if (a.lng != null) 'lng': a.lng,
     },
     'params': Map<String, Object?>.from(draft.params),
+    // «Сделка» — FAQAT sotuvda. Ijarada bo'lim umuman YUBORILMAYDI: backend
+    // uni ijara e'lonida 400 bilan rad etadi
+    // (`ListingCreateRequest.check_deal()`).
+    if (draft.deal == DealType.sale)
+      'deal': {
+        'sale_type': draft.transaction.saleType,
+        'ownership_years': draft.transaction.ownershipYears,
+        'owners_count': draft.transaction.ownersCount,
+        // «Прописано» so'ralmaydigan turda `null` — backend notanish turda
+        // qiymat kelsa 400 beradi.
+        'registered_count': (draft.type?.asksRegisteredCount ?? false)
+            ? draft.transaction.registeredCount
+            : null,
+      },
     'price': {
       'amount': num.tryParse(p.amount) ?? 0,
       'currency': currencyOfUnit(p.unit),
       'period': periodOfUnit(p.unit),
       'negotiable': p.negotiable,
+      // «Ипотека» ham faqat sotuvda — ijarada `true` yuborilsa 400.
+      'mortgage': draft.deal == DealType.sale && p.mortgage,
       if (p.dailyAmount.isNotEmpty) ...{
         'daily_amount': num.tryParse(p.dailyAmount),
         'daily_currency': currencyOfUnit(p.dailyUnit),
@@ -299,8 +317,16 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
     ..clear()
     ..addAll(params);
 
+  final deal = _map(json['deal']);
+  draft.transaction
+    ..saleType = _strOrNull(deal['sale_type'])
+    ..ownershipYears = _strOrNull(deal['ownership_years'])
+    ..ownersCount = _strOrNull(deal['owners_count'])
+    ..registeredCount = _strOrNull(deal['registered_count']);
+
   final p = _map(json['price']);
   draft.price
+    ..mortgage = p['mortgage'] == true
     ..amount = _numStr(p['amount'])
     ..unit = unitFromCurrency(p['currency'], p['period'])
     ..negotiable = p['negotiable'] != false
@@ -375,6 +401,14 @@ Map<String, dynamic> _map(Object? v) =>
 
 String _str(Object? v) => v == null ? '' : v.toString();
 
+/// Bo'sh satr ham `null` — «Сделка» maydonlari tanlanmagan holatni `null`
+/// bilan ifodalaydi, bo'sh satr bilan emas.
+String? _strOrNull(Object? v) {
+  if (v == null) return null;
+  final s = v.toString().trim();
+  return s.isEmpty ? null : s;
+}
+
 /// Son maydonlari formada MATN sifatida turadi (`floor`, `amount`).
 /// `null` → bo'sh satr, `72.5` → `72.5`, `3` → `3` (`3.0` EMAS).
 String _numStr(Object? v) {
@@ -404,11 +438,10 @@ List<String> _strList(Object? v) =>
 /// `editingListingId` to'ladi va yuborish `PATCH /listings/{id}` ga ketadi —
 /// yangi e'lon YARATILMAYDI.
 ///
-/// ⚠️ Bu konvertor hozir FAQAT ijara maydonlarini biladi. Sotuv bo'limlari
-/// qo'shilganda (reja M2-16, M3-19, M3-20, M4-26) HAR BIRI shu funksiyani
-/// yangilashi SHART — aks holda sotuv e'loni tahrirlanganda o'sha bo'limlar
-/// qoralamaga tiklanmaydi va `PATCH` ularni NULL ga tushiradi (jimgina
-/// ma'lumot yo'qolishi).
+/// ⚠️ HAR BIR yangi bo'lim shu funksiyaga ham qo'shilishi SHART — aks holda
+/// e'lon tahrirlanganda o'sha bo'lim qoralamaga tiklanmaydi va `PATCH` uni
+/// NULL ga tushiradi (jimgina ma'lumot yo'qolishi). «Сделка» va «Ипотека»
+/// qo'shilgan; keyingisi — maydon birligi (reja M4-26).
 BozorDraft draftFromListing(BozorListing l) {
   final draft = BozorDraft(
     deal: dealTypeFromCode(l.dealType),
@@ -439,7 +472,14 @@ BozorDraft draftFromListing(BozorListing l) {
     ..clear()
     ..addAll(l.params);
 
+  draft.transaction
+    ..saleType = l.saleType
+    ..ownershipYears = l.ownershipYears
+    ..ownersCount = l.ownersCount
+    ..registeredCount = l.registeredCount;
+
   draft.price
+    ..mortgage = l.mortgage
     ..amount = _numStr(l.priceAmount)
     ..unit = unitFromCurrency(l.priceCurrency, l.pricePeriod)
     ..negotiable = l.negotiable
@@ -517,6 +557,9 @@ Map<String, dynamic> draftToUpdatePayload(
     'title': full['title'],
     'address': full['address'],
     'params': full['params'],
+    // Ijara e'lonida `draftToPayload` bu kalitni umuman yozmaydi, ya'ni
+    // `PATCH` ham uni yubormaydi va server «Сделка» ga tegmaydi.
+    if (full.containsKey('deal')) 'deal': full['deal'],
     'price': full['price'],
     'description': description,
     'contacts': full['contacts'],

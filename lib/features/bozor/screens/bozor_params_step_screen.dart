@@ -18,13 +18,12 @@ import '../../services/widgets/step_progress_bar.dart';
 import '../../services/widgets/wizard_nav_bar.dart';
 import '../../../widgets/app_toast.dart';
 import '../bozor_routes.dart';
-import '../data/bozor_draft_store.dart';
+import '../bozor_step_route.dart';
 import '../data/param_options.dart';
 import '../models/bozor_draft.dart';
 import '../models/param_schema.dart';
 import '../widgets/param_form.dart';
 import 'bozor_all_params_screen.dart';
-import 'bozor_price_step_screen.dart';
 
 class BozorParamsStepScreen extends StatefulWidget {
   const BozorParamsStepScreen({super.key, required this.draft});
@@ -66,17 +65,9 @@ class _BozorParamsStepScreenState extends State<BozorParamsStepScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _openPrice() async {
-    // Qoralamani fonda saqlaymiz: foydalanuvchi shu qadamda chiqib
-    // ketsa "Mening e'lonlarim" dan aynan shu joydan davom etadi.
-    // `await` QILINMAYDI — tarmoq navigatsiyani muzlatmasin.
-    saveBozorDraftInBackground(widget.draft, WizardStep.price);
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        settings: bozorRoute('price'),
-        builder: (_) => BozorPriceStepScreen(draft: widget.draft),
-      ),
-    );
+  /// Keyingi qadam — sotuvda «Сделка», ijarada narx.
+  Future<void> _openNext() async {
+    await openNextBozorStep(context, widget.draft, WizardStep.params);
     if (mounted) setState(() {});
   }
 
@@ -200,7 +191,7 @@ class _BozorParamsStepScreenState extends State<BozorParamsStepScreen> {
                         onBack: () => Navigator.of(context).maybePop(),
                         continueLabel: tr(l, 'bozor.common.next'),
                         continueEnabled: complete,
-                        onContinue: _openPrice,
+                        onContinue: _openNext,
                         onBlockedTap: () => _explainMissing(type, l),
                       ),
                     ),

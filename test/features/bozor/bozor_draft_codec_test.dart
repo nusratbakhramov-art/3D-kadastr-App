@@ -230,7 +230,7 @@ void main() {
 
   _editTests();
 
-  group('bozorStepScreen — resume', () {
+  group('bozorStepScreenSafe — resume', () {
     test('saqlangan qadam ekranga tushadi', () {
       final d = BozorDraft(
         deal: DealType.rent,
@@ -238,10 +238,10 @@ void main() {
         type: PropertyType.apartment,
       );
       expect(
-        bozorStepScreen(d, WizardStep.params),
+        bozorStepScreenSafe(d, WizardStep.params),
         isA<BozorParamsStepScreen>(),
       );
-      expect(bozorStepScreen(d, WizardStep.price), isA<BozorPriceStepScreen>());
+      expect(bozorStepScreenSafe(d, WizardStep.price), isA<BozorPriceStepScreen>());
     });
 
     test('turda YO‘Q qadam — eng yaqin oldingi qadamga tushadi', () {
@@ -255,7 +255,7 @@ void main() {
       );
       expect(d.wizardSteps.contains(WizardStep.params), isFalse);
       expect(
-        bozorStepScreen(d, WizardStep.params),
+        bozorStepScreenSafe(d, WizardStep.params),
         isA<BozorAddressStepScreen>(),
       );
     });

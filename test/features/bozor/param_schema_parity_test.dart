@@ -35,6 +35,7 @@ const _fixturePath =
 
 String _code(PropertyType t) => switch (t) {
   PropertyType.apartment => 'apartment',
+  PropertyType.newBuildingApartment => 'new_building_apartment',
   PropertyType.house => 'house',
   PropertyType.land => 'land',
   PropertyType.commercial => 'commercial',
@@ -130,7 +131,13 @@ void main() {
         .map((v) => (v as List).length)
         .fold<int>(0, (a, b) => a + b);
     // Bu son o'zgarishi normal — lekin O'YLAMASDAN o'zgarmasligi kerak.
-    expect(total, 86, reason: 'sxemaga maydon qo‘shildi/olindi — fixture va '
+    //
+    // 86 → 111 (2026-09-11): `new_building_apartment` turi qo'shildi va uning
+    // maydonlari hozircha AYNAN kvartiraniki (25 ta) — dizaynda bu turning
+    // «Все параметры» jadvali ochilmagan. Ya'ni yangi maydon YO'Q, yangi TUR
+    // bor. Backend ham shu nusxani ishlatadi (`listing_param_schema.py` dagi
+    // `_APARTMENT`).
+    expect(total, 111, reason: 'sxemaga maydon qo‘shildi/olindi — fixture va '
         'backend sxemasi ikkalasi ham yangilanganini tekshir');
   });
 }

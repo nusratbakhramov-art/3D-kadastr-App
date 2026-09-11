@@ -97,7 +97,7 @@ class _BozorTypeStepScreenState extends State<BozorTypeStepScreen> {
       // qoralamada yopiq `sale` qolib ketmasin. Bayroq YOQIQ bo'lsa tanlovni
       // foydalanuvchi qiladi — biz hech narsani to'ldirmaymiz.
       if (!saleEnabled && _draft.deal != DealType.rent) {
-        _draft.deal = DealType.rent;
+        _draft.setDeal(DealType.rent);
       }
     });
   }
@@ -117,7 +117,10 @@ class _BozorTypeStepScreenState extends State<BozorTypeStepScreen> {
       selected: _draft.deal,
     );
     if (picked == null || !mounted) return;
-    setState(() => _draft.deal = picked);
+    // `_draft.deal = picked` EMAS: `setDeal` narx birligini oqimga moslaydi
+    // (`UZS/oy` ↔ `UZS`) va ijaraga qaytilganda «Сделка» bilan «Ипотека» ni
+    // tozalaydi — ular ijara e'lonida backend tomonidan rad etiladi.
+    setState(() => _draft.setDeal(picked));
   }
 
   Future<void> _pickKind() async {
