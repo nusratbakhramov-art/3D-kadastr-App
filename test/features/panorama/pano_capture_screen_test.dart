@@ -150,7 +150,9 @@ void main() {
       expect(pano['uz'], pano['en']);
       // Son o'zgarishi NORMAL, lekin O'YLAMASDAN o'zgarmasligi kerak —
       // yangi kalit qo'shilsa uchala tilga ham qo'shilgani tekshirilsin.
-      expect(pano['uz'], hasLength(25));
+      // 25 → 30: `bozor.pano.resume.*` (5 ta) — tashlab ketilgan
+      // suratga olishni yig'ishni taklif qilish (`0dac253` porti).
+      expect(pano['uz'], hasLength(30));
     });
 
     test('tarjimalar BO‘SH emas va kalitning o‘zi emas', () {

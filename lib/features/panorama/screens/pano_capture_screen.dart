@@ -31,6 +31,7 @@ import '../../../core/i18n/app_translations.dart';
 import '../../settings/settings_state.dart' show localeNotifier;
 import '../../../theme/app_colors.dart';
 import '../data/camera_guard.dart';
+import '../data/capture_log.dart';
 import '../data/heading_source.dart';
 import '../models/capture_guidance.dart';
 import '../models/capture_ring.dart';
@@ -119,6 +120,9 @@ class _PanoCaptureScreenState extends State<PanoCaptureScreen>
   StitchWorkDir? _workDir;
   Directory? _shotsDir;
 
+  /// Burchaklar yozuvi — har kadrdan keyin diskka.
+  CaptureLog? _log;
+
   _Stage _stage = _Stage.starting;
   String? _error;
   PanoProgress? _progress;
@@ -197,9 +201,29 @@ class _PanoCaptureScreenState extends State<PanoCaptureScreen>
     try {
       final Directory parent = await getApplicationDocumentsDirectory();
       await StitchWorkDir.purgeStale(parent);
+
+      // ⚠️ `purgeStale` dan KEYIN: eskirgani allaqachon o'chirilgan
+      // bo'lishi kerak, aks holda ekran o'chirilishi lozim bo'lgan
+      // sessiyani taklif qilardi.
+      //
+      // ⚠️ HOZIRGI papka CHETLATILADI. `_retry` shu yerga qaytadi, va
+      // usiz ekran aynan hozir yiqilgan sessiyani «yig'aylikmi?» deb
+      // taklif qilardi — u esa xuddi shu tarzda yana yiqilardi.
+      final StrandedCapture? stranded = await findStranded(
+        parent,
+        exclude: _workDir?.dir,
+      );
+      if (stranded != null && mounted && await _offerResume(stranded)) {
+        await _resume(stranded);
+        return;
+      }
+
       final wd = await StitchWorkDir.create(parent);
       _workDir = wd;
-      _shotsDir = await Directory('${wd.path}/shots').create(recursive: true);
+      _shotsDir = await Directory(
+        '${wd.path}/$kShotsDirName',
+      ).create(recursive: true);
+      _log = CaptureLog(wd.dir);
 
       await _openCamera();
       _heading.start();
@@ -208,6 +232,56 @@ class _PanoCaptureScreenState extends State<PanoCaptureScreen>
     } on Object catch (e) {
       _fail('${_t('bozor.pano.err.camera_open')}: $e');
     }
+  }
+
+  /// Tashlab ketilgan suratga olishni yig'ishni TAKLIF qiladi.
+  ///
+  /// So'raladi, o'z-o'zidan qilinmaydi: foydalanuvchi bu ekranga yangi
+  /// panorama olish uchun kelgan bo'lishi mumkin, va uning o'rniga
+  /// eskisini yig'ib berish — u so'ramagan ish.
+  Future<bool> _offerResume(StrandedCapture stranded) async {
+    final int n = stranded.shots.length;
+    // Burchaklar fayl nomlaridan tiklangan bo'lsa buni AYTAMIZ: natija
+    // bir-ikki gradus xato bo'ladi va foydalanuvchi buni tikishdan oldin
+    // bilishi kerak, keyin emas.
+    final String body =
+        _t(
+          stranded.source == AimSource.recorded
+              ? 'bozor.pano.resume.body'
+              : 'bozor.pano.resume.body_approx',
+        ).replaceAll('{n}', '$n');
+
+    final bool? yes = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: Text(_t('bozor.pano.resume.title')),
+        content: Text(body),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(_t('bozor.pano.resume.no')),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(_t('bozor.pano.resume.yes')),
+          ),
+        ],
+      ),
+    );
+    return yes ?? false;
+  }
+
+  /// Tashlab ketilgan kadrlarni yig'adi — kamerasiz.
+  Future<void> _resume(StrandedCapture stranded) async {
+    // Kamera umuman ochilmaydi, ya'ni guard'ni ushlab turishning ma'nosi
+    // yo'q: tikish daqiqalab ketadi va shu vaqt ichida AI Baholash
+    // skanini bloklab turardi.
+    if (_holdsGuard) {
+      CameraGuard.release(CameraGuard.panorama);
+      _holdsGuard = false;
+    }
+    _workDir = StitchWorkDir.adopt(stranded.dir);
+    await _stitch(shots: stranded.shots);
   }
 
   Future<void> _openCamera() async {
@@ -319,11 +393,9 @@ class _PanoCaptureScreenState extends State<PanoCaptureScreen>
       // Suratlar plagin hech qachon tozalamaydigan vaqtinchalik keshga
       // tushadi — o'z papkamizga ko'chirib, aslini o'chiramiz.
       //
-      // Nol bilan to'ldirilgan nom: fayl tartibi olish tartibiga mos
-      // kelsin va `r0c2` `r0c10` dan keyin turmasin.
-      final String name =
-          'shot_r${shot.row}c${shot.column.toString().padLeft(2, '0')}.jpg';
-      final String dest = '${dir.path}/$name';
+      // Nom `shotFileName` dan: aynan shu qoidani burchaklarni fayl
+      // nomlaridan tiklovchi ham o'qiydi.
+      final String dest = '${dir.path}/${shotFileName(shot)}';
       await File(raw.path).copy(dest);
       try {
         await File(raw.path).delete();
@@ -335,6 +407,15 @@ class _PanoCaptureScreenState extends State<PanoCaptureScreen>
       _shots[shot] = dest;
       _aims[shot] = shotAim;
       _ring.record(shot, shotAim.yawDeg);
+
+      // ⚠️ HOZIR yoziladi, suratga olish oxirida EMAS. Bu burchaklar —
+      // telefon qayerga qaraganining yagona yozuvi, tikish esa
+      // capture'ning eng uzun va eng noaniq qismi: 76 kadr telefonni
+      // daqiqalab band qilishi mumkin. «Qotib qoldi» deb ilovani
+      // yopgan foydalanuvchi ilgari butun sessiyaning burchaklarini
+      // yo'qotardi — suratlar diskda qolardi va befoyda bo'lardi.
+      _log?.write(_sensorShots());
+
       if (_ring.isPoleRow(shot.row)) _lastPoleShot = DateTime.now();
       if (!mounted) return;
       setState(() {});
@@ -350,7 +431,27 @@ class _PanoCaptureScreenState extends State<PanoCaptureScreen>
     }
   }
 
-  Future<void> _stitch() async {
+  /// Olingan kadrlar — tikuvchi kutadigan shaklda.
+  ///
+  /// Bir joyda yig'ilgani sababi: uni IKKI chaqiruvchi ishlatadi —
+  /// tikish va har kadrdan keyingi yozuv. Ikki joyda takrorlansa ular
+  /// jimgina bir-biridan uzoqlashardi va diskdagi yozuv tikilgan
+  /// narsadan boshqa bo'lib qolardi.
+  List<SensorShot> _sensorShots() => <SensorShot>[
+    for (final MapEntry<ShotId, String> e in _shots.entries)
+      SensorShot(
+        path: e.value,
+        yawDeg: _aims[e.key]!.yawDeg,
+        pitchDeg: _aims[e.key]!.pitchDeg,
+        // ⚠️ `rollDeg` — LINZA roll'i, xom qurilma roll'i EMAS.
+        rollDeg: _aims[e.key]!.rollDeg,
+        row: e.key.row,
+      ),
+  ];
+
+  /// [shots] berilsa AYNAN ular tikiladi (tashlab ketilgan sessiyani
+  /// tiklash), aks holda hozirgi sessiyaning kadrlari.
+  Future<void> _stitch({List<SensorShot>? shots}) async {
     if (_stage == _Stage.stitching) return;
     final StitchWorkDir? wd = _workDir;
     if (wd == null) return;
@@ -372,20 +473,8 @@ class _PanoCaptureScreenState extends State<PanoCaptureScreen>
     });
 
     try {
-      final shots = <SensorShot>[
-        for (final entry in _shots.entries)
-          SensorShot(
-            path: entry.value,
-            yawDeg: _aims[entry.key]!.yawDeg,
-            pitchDeg: _aims[entry.key]!.pitchDeg,
-            // ⚠️ `rollDeg` — LINZA roll'i, xom qurilma roll'i EMAS.
-            rollDeg: _aims[entry.key]!.rollDeg,
-            row: entry.key.row,
-          ),
-      ];
-
       final req = StitchRequest(
-        shots: shots,
+        shots: shots ?? _sensorShots(),
         workDir: wd,
         longSideFovDeg: kPreviewFovDeg,
       );

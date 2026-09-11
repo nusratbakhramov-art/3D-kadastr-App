@@ -92,6 +92,14 @@ class StitchWorkDir {
     throw StateError('ish papkasi uchun bo\'sh nom topilmadi: ${parent.path}');
   }
 
+  /// MAVJUD papkani ish papkasi sifatida oladi.
+  ///
+  /// Tashlab ketilgan suratga olishni tiklash uchun: kadrlar allaqachon
+  /// o'sha papkada va ularni ko'chirish bekor ish bo'lardi. [create] dan
+  /// farqi shundaki, bu hech narsa yaratmaydi va nomni ham tekshirmaydi
+  /// — chaqiruvchi papkani qayerdan olganini biladi.
+  static StitchWorkDir adopt(Directory dir) => StitchWorkDir._(dir);
+
   /// Kadr keshining yo'li.
   ///
   /// [frameId] fayl nomiga tushadi, shuning uchun u TEKSHIRILADI: kadr
