@@ -6,7 +6,7 @@ import 'package:video_player/video_player.dart';
 
 /// Splash — oldindan render qilingan intro roligi (ovoz bilan).
 ///
-/// `assets/branding/splash/intro.mp4` — 720×1680 (9:21), 5.5s, h264 + AAC.
+/// `assets/branding/splash/intro.mp4` — 720×1680 (9:21), 5.1s, h264 + AAC.
 /// Sahna [BlueprintSplashScreen] dagi bilan bir xil g'oya (lockup paydo
 /// bo'ladi → neon uy o'zini chizadi), faqat bu safar tayyor video sifatida.
 ///
@@ -31,9 +31,26 @@ import 'package:video_player/video_player.dart';
 ///     baribir ko'rinib turardi.
 ///
 /// Yechim asset darajasida: rolikning O'ZI 9:21 gacha kengaytirilgan —
-/// tepa va past chetlari 200px dan "smear" (chekka qatorni davom ettirish)
-/// bilan cho'zilgan (`ffmpeg -vf "pad=720:1680:0:200,fillborders=...
-/// mode=smear"`). Endi bo'sh joy ham VIDEO ning o'zi, ya'ni bitta rang
+/// tepa va pastga 200px dan qo'shilgan va u joy kadrning O'Z piksellari
+/// bilan to'ldirilgan: chekka qatorlar AKS ETTIRILADI (`mirror`), so'ng
+/// chetga borgan sari qoraytiriladi (vinyetka). Retsept:
+///
+/// ```
+/// G="if(lt(Y,200),0.1+0.9*Y/200,\
+///     if(gt(Y,1479),0.1+0.9*(1680-Y)/200,1))"
+/// ffmpeg -i src.mp4 -vf "pad=720:1680:0:200,\
+///   fillborders=top=200:bottom=200:mode=mirror,format=rgb24,\
+///   geq=r='r(X,Y)*($G)':g='g(X,Y)*($G)':b='b(X,Y)*($G)',format=yuv420p" \
+///   -c:v libx264 -profile:v high -level 4.0 -crf 21 -preset slow \
+///   -movflags +faststart -c:a aac -b:a 128k intro.mp4
+/// ```
+///
+/// `mirror` (ilgari `smear` edi) shu rolik uchun SHART: pastki chekka —
+/// qoyatoshlar, va bitta qatorni cho'zish vertikal chiziqlar qoldirardi.
+/// Aks ettirish chokda piksel-bapiksel mos tushadi, qoraytirish esa
+/// chetdagi takrorlangan naqshni ko'rinmas qiladi.
+///
+/// Muhimi o'zgarmadi: bo'sh joy ham VIDEO ning o'zi, ya'ni bitta rang
 /// quvuridan o'tadi va chok fizik jihatdan mumkin emas. Shuning uchun bu
 /// yerda [BoxFit.cover] ishlatiladi:
 ///   * 16:9 ekranda — aynan kengaytirilgan qismi qirqiladi, kompozitsiya butun;
@@ -197,7 +214,7 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: GestureDetector(
-        // Introni o'tkazib yuborish — 5.5 soniya har startda uzun tuyulishi
+        // Introni o'tkazib yuborish — 5 soniya har startda uzun tuyulishi
         // mumkin, ekranning istalgan joyiga bosish yetarli.
         behavior: HitTestBehavior.opaque,
         onTap: _finish,
