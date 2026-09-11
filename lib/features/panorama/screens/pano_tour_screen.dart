@@ -32,7 +32,7 @@ import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../bozor/models/tour_link.dart';
 import '../../settings/settings_state.dart' show localeNotifier;
-import 'pano_viewer_screen.dart';
+import '../render/pano_sphere.dart';
 
 /// Turdagi bitta panorama — tasvir QAYERDAN olinishi.
 ///

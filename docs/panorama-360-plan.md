@@ -1,9 +1,17 @@
 # 360° panorama — capture, tikish va ko'ruvchi (kadastr mobil ilovasi)
 
-> **HOLAT VA DAVOMI → [panorama-360-status.md](panorama-360-status.md)**
+> ⚠️ **BU HUJJAT TARIX — 2026-09-12 dan boshlab AMALDA EMAS.**
 >
-> Bu fayl — REJA va QARORLAR (nega shunday qilingan). Nima bajarilgani,
-> nima qolgani va qayerdan davom ettirish kerakligi alohida hujjatda.
+> Undagi asosiy qaror — panoramani **telefonda, sof Dart bilan** tikish —
+> bekor qilindi. Endi telefon faqat kadr yig'adi (nativ AR sessiyasi), tikish
+> esa **serverda** bajariladi. Quyidagi 23 qadamning 1–18 va 21-qadamlari
+> shu bilan birga o'chirildi.
+>
+> **AMALDAGI HOLAT → [panorama-360-status.md](panorama-360-status.md)**
+>
+> Bu fayl nima uchun saqlanadi: unda o'lchovlar, manbadagi topilgan xatolar
+> va «nega bunday emas» degan qarorlar yozilgan — o'sha yo'lga qaytish
+> taklifi chiqsa, javob shu yerda.
 
 > **Manba:** `~/StudioProjects/panorama` loyihasi (branch `1.0.2` — UX, `1.0.1` — asos).
 > ⚠️ **Unga TEGILMAYDI.** U faqat o'qish uchun manba; hamma kod shu repoda yoziladi.

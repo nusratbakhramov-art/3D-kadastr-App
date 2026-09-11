@@ -351,7 +351,20 @@ class DescriptionDraft {
   String text = '';
   final List<String> planFiles = [];
   final List<String> photos = [];
+  /// 360° panoramalar — **S3 KALITLARI** (lokal yo'llar EMAS).
+  ///
+  /// ⚠️ Foto va planirovkadan FARQLI. Panorama serverda tikiladi
+  /// (`panorama` Celery navbati) va tikish tugaganda u ALLAQACHON
+  /// `listings/media/{user_id}/` da yotadi — ya'ni yuborishda qayta
+  /// yuklanmaydi. Shuning uchun bu yerda kalit turadi va u bilan birga
+  /// [uploadedMedia] ga `kalit → kalit` yozuvi qo'yiladi: `bozor_submit`
+  /// shunda faylni yuklashga urinmaydi va to'g'ridan media ro'yxatiga
+  /// qo'shadi.
   final List<String> panoramas = [];
+
+  /// Kalit → ko'rsatish uchun URL. Viewer va tur ekrani shundan o'qiydi
+  /// (e'lon hali yaratilmagani uchun serverdan `ListingOut` kelmaydi).
+  final Map<String, String> panoramaUrls = {};
 
   /// TAHRIRLASHDA: e'londa ALLAQACHON turgan fayllar (S3 kalitlari bilan).
   ///

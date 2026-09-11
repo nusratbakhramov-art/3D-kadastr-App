@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:ui' show Offset, Size;
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:kadastr/features/panorama/screens/pano_viewer_screen.dart';
+import 'package:kadastr/features/panorama/render/pano_sphere.dart';
 
 /// Sfera proyeksiyasi — 360° ko'ruvchining butun geometriyasi.
 ///

@@ -1,3 +1,22 @@
+// 360° MANBA VARAG'I — IZOHGA OLINDI (2026-09-12).
+//
+// NEGA. Panorama endi SERVERDA tikiladi va buning uchun har kadrning
+// KAMERA POZASI kerak (`transform` + `intrinsics`, ARKit/ARCore beradi).
+// Galereyadagi tayyor equirect faylda bunday ma'lumot YO'Q — uni serverga
+// yuborib bo'lmaydi. Shu sababli tanlov qolmadi: «360° qo'shish» to'g'ridan
+// nativ suratga olishni ochadi (`pano_capture_flow.dart`).
+//
+// QAYTARISH. Agar tayyor equirect'ni ham qabul qilmoqchi bo'lsangiz:
+//   1. pastdagi kodni izohdan chiqaring;
+//   2. `bozor_description_step_screen.dart` dagi `_add360()` ga tanlov
+//      varag'ini qaytaring (o'sha faylda ham izoh bor);
+//   3. serverga "tayyor panoramani shundayligicha qabul qilish" yo'lini
+//      qo'shing — hozir `POST /listings/pano` faqat kadrlarni biladi.
+//
+// ⚠️ Fayl ATAYLAB o'chirilmadi — yuqoridagi qadamlar uchun andoza bo'lib
+// turadi.
+
+/*
 /// 360° foto manbasini tanlash — suratga olish yoki galereyadan.
 ///
 /// NEGA TANLOV. Ikkala yo'l ham haqiqiy: foydalanuvchi joyida bo'lsa
@@ -157,3 +176,5 @@ class _Row extends StatelessWidget {
     );
   }
 }
+
+*/

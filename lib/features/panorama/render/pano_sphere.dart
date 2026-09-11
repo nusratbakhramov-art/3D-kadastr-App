@@ -1,4 +1,10 @@
-/// 360° ko'ruvchi — ekvirektangulyar tasvirni SFERADA ko'rsatadi.
+/// 360° SFERA RENDERI — ekvirektangulyar tasvirni ichkaridan ko'rsatadi.
+///
+/// Bu yerda EKRAN yo'q, faqat geometriya va bo'yoqchi: [projectSphere],
+/// [SphereMesh], [ViewBasis], [SpherePainter]. Ekran — `pano_tour_screen.dart`
+/// (u bitta panorama uchun ham ishlaydi va tasvirni fayldan ham, tarmoqdan
+/// ham oladi). Alohida bir panoramalik ekran BOR EDI va o'chirildi: u faqat
+/// LOKAL fayl o'qirdi, panoramalar esa endi serverda tikiladi.
 ///
 /// NEGA PAKET EMAS. Rejada `panorama_viewer` ko'rsatilgan edi, lekin uning
 /// renderer'i `flutter_cube 0.1.1` — Dart 2 davri paketi, ta'mirlanmaydi
@@ -23,16 +29,11 @@
 /// egallaydi va egrilik ko'rinmaydi.
 library;
 
-import 'dart:async';
-import 'dart:io';
 import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-
-import '../../../core/i18n/app_translations.dart';
-import '../../settings/settings_state.dart' show localeNotifier;
 
 /// To'r zichligi. Ko'paytirish aniqlikni oshiradi va narxi chiziqli —
 /// 96×48 da 4 657 tugun, bu kadr uchun hech narsa.
@@ -54,182 +55,6 @@ const double kInitialFovDeg = 75;
 /// bilan ustma-ust tushadi va o'ng tomon vektori nolga aylanadi —
 /// tasvir bir kadrga aylanib ketardi.
 const double kMaxPitchDeg = 89;
-
-class PanoViewerScreen extends StatefulWidget {
-  const PanoViewerScreen({super.key, required this.path});
-
-  /// Tikilgan ekvirektangulyar JPEG yo'li.
-  final String path;
-
-  @override
-  State<PanoViewerScreen> createState() => _PanoViewerScreenState();
-}
-
-class _PanoViewerScreenState extends State<PanoViewerScreen> {
-  ui.Image? _image;
-  String? _error;
-
-  double _yawDeg = 0;
-  double _pitchDeg = 0;
-  double _fovDeg = kInitialFovDeg;
-
-  // Ishorat boshlangandagi holat — `onScaleUpdate` ular ustiga qo'yadi.
-  double _yawAtStart = 0;
-  double _pitchAtStart = 0;
-  double _fovAtStart = kInitialFovDeg;
-  Offset _focalAtStart = Offset.zero;
-
-  Locale get _l => localeNotifier.value;
-  String _t(String key) => tr(_l, key);
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_load());
-  }
-
-  @override
-  void dispose() {
-    _image?.dispose();
-    super.dispose();
-  }
-
-  Future<void> _load() async {
-    try {
-      final File f = File(widget.path);
-      if (!f.existsSync()) {
-        if (mounted) setState(() => _error = _t('bozor.pano.view.err'));
-        return;
-      }
-      final Uint8List bytes = await f.readAsBytes();
-      final ui.Codec codec = await ui.instantiateImageCodec(bytes);
-      final ui.FrameInfo frame = await codec.getNextFrame();
-      codec.dispose();
-      if (!mounted) {
-        frame.image.dispose();
-        return;
-      }
-      setState(() => _image = frame.image);
-    } on Object {
-      if (mounted) setState(() => _error = _t('bozor.pano.view.err'));
-    }
-  }
-
-  void _onScaleStart(ScaleStartDetails d) {
-    _yawAtStart = _yawDeg;
-    _pitchAtStart = _pitchDeg;
-    _fovAtStart = _fovDeg;
-    _focalAtStart = d.localFocalPoint;
-  }
-
-  void _onScaleUpdate(ScaleUpdateDetails d, Size size) {
-    final Offset delta = d.localFocalPoint - _focalAtStart;
-
-    // ⚠️ Burilish FOV'ga PROPORSIONAL. Piksel boshiga qat'iy gradus
-    // berilsa, yaqinlashtirilgan holatda barmoq ostidagi manzara
-    // otilib ketardi: bir xil surish tor ko'rishda ancha katta
-    // burchakka teng bo'ladi.
-    final double fov = _fovAtStart;
-    final double hFov = fov * (size.width / size.height);
-
-    setState(() {
-      _fovDeg = (_fovAtStart / d.scale).clamp(kMinFovDeg, kMaxFovDeg);
-      // Manzara barmoq bilan BIRGA yuradi: o'ngga surish ko'rish
-      // o'qini chapga buradi.
-      _yawDeg = _yawAtStart - delta.dx / size.width * hFov;
-      _pitchDeg = (_pitchAtStart + delta.dy / size.height * fov).clamp(
-        -kMaxPitchDeg,
-        kMaxPitchDeg,
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ui.Image? image = _image;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          if (_error != null)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white70, fontSize: 15),
-                ),
-              ),
-            )
-          else if (image == null)
-            const Center(
-              child: CircularProgressIndicator(color: Colors.white70),
-            )
-          else
-            LayoutBuilder(
-              builder: (BuildContext _, BoxConstraints c) {
-                final Size size = Size(c.maxWidth, c.maxHeight);
-                return GestureDetector(
-                  onScaleStart: _onScaleStart,
-                  onScaleUpdate: (ScaleUpdateDetails d) =>
-                      _onScaleUpdate(d, size),
-                  child: CustomPaint(
-                    size: size,
-                    painter: SpherePainter(
-                      image: image,
-                      yawDeg: _yawDeg,
-                      pitchDeg: _pitchDeg,
-                      fovDeg: _fovDeg,
-                    ),
-                  ),
-                );
-              },
-            ),
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 8,
-            child: _RoundButton(
-              icon: Icons.close_rounded,
-              onTap: () => Navigator.of(context).maybePop(),
-            ),
-          ),
-          if (image != null && _error == null)
-            Positioned(
-              left: 0,
-              right: 0,
-              bottom: MediaQuery.of(context).padding.bottom + 20,
-              child: IgnorePointer(
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      _t('bozor.pano.view.hint'),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontFamily: 'MTSCompact',
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
 
 /// Sferani ichkaridan chizadi.
 ///
@@ -537,27 +362,5 @@ SphereMesh? projectSphere({
     positions: positions,
     texCoords: texCoords,
     indices: Uint16List.fromList(indices),
-  );
-}
-
-class _RoundButton extends StatelessWidget {
-  const _RoundButton({required this.icon, required this.onTap});
-
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    color: Colors.black.withValues(alpha: 0.45),
-    shape: const CircleBorder(),
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onTap,
-      child: SizedBox(
-        width: 40,
-        height: 40,
-        child: Icon(icon, color: Colors.white, size: 22),
-      ),
-    ),
   );
 }

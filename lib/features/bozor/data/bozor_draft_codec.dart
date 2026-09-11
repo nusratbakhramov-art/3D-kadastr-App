@@ -156,6 +156,8 @@ Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
       'photos': List<String>.from(d.photos),
       'plan': List<String>.from(d.planFiles),
       'panorama': List<String>.from(d.panoramas),
+      // Panorama kalitlarining ko'rsatish URL'lari — viewer/tur uchun.
+      'panorama_urls': Map<String, String>.from(d.panoramaUrls),
       // Allaqachon yuklangan fayllar — qayta urinish ularni takrorlamasin.
       'uploaded': Map<String, String>.from(d.uploadedMedia),
       // 360° tur havolalari. Qoralamada LOKAL YO'L bilan yotadi, ya'ni
@@ -350,6 +352,12 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
   draft.description.panoramas
     ..clear()
     ..addAll(_strList(local['panorama']));
+  draft.description.panoramaUrls
+    ..clear()
+    ..addAll({
+      for (final e in _map(local['panorama_urls']).entries)
+        if (e.value != null) e.key: e.value.toString(),
+    });
   draft.description.uploadedMedia
     ..clear()
     ..addAll({

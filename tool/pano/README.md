@@ -110,121 +110,22 @@ Warning va info faqat sanaladi — ular yuqoridagi baza bilan solishtiriladi.
 
 ---
 
-## Kamera ziddiyati proboni — OLIB TASHLANDI (2026-09-11)
+## Nima bo'ldi: tikish SERVERGA ko'chdi (2026-09-12)
 
-Bu yerda `CameraGuard` ziddiyatini qurilmada tekshiradigan DEV-only ekran
-turardi. U OLIB TASHLANDI, chunki tekshiradigan ziddiyatning O'ZI yo'q:
+Bu papkada qurilmada tikishni o'lchaydigan ikkita benchmark
+(`bench_decode.sh`, `bench_stitch.sh`) va ularning MIL-0/MIL-1 qaror
+darvozalari turardi. Ular **o'chirildi**, chunki javob berilgan savolni
+o'lchardi: sof Dart bilan telefonda tikish tashlab yuborildi.
 
-360° ish Bozor e'lon sehrgari uchun so'ralgan. AI Baholash kamerasini
-(`video_capture.dart`, `room_plan_scanner.dart`) qayta qurish so'ralmagan
-edi va u fayllar ASL HOLIGA qaytarildi. `CameraGuard` ning o'zi
-`lib/features/panorama/data/camera_guard.dart` da qoladi — u sof, test
-bilan qoplangan va hech kimga bog'lanmagan.
+Endi telefon faqat KADR YIG'ADI (iOS: ARKit, `ios/Runner/PanoCapture.swift`)
+va ularni serverga yuboradi; tikish `kadastr-backend` da, alohida `panorama`
+Celery navbatida bajariladi. Shu sababli:
 
-⚠️ **19-qadamda ziddiyat HAQIQIY bo'ladi** — panorama capture ekrani
-kamerani ochadi, AI Baholash ham ochadi, iOS'da ikkalasi bir vaqtda
-ochilsa sessiya qotadi. O'shanda MAVJUD kodga tegishdan oldin so'raladi.
-Birinchi ko'riladigan muqobil — panorama ekrani o'zi ochilishdan oldin
-bandlikni tekshirsin, ya'ni AI Baholash fayllariga umuman tegilmasin.
+* `lib/features/panorama/stitch/**`, `math/rotation.dart`, sensorga tayangan
+  capture ekrani va ularning testlari o'chirildi;
+* `integration_test/**` butunlay o'chdi (unda faqat shu ikki benchmark bor
+  edi), `integration_test` dev-bog'liqligi ham `pubspec.yaml` dan olindi;
+* `CameraGuard` ham o'chdi — nativ capture kamerani o'zi boshqaradi.
 
----
-
-# MIL-1 — 8 kadrni tikish (13-qadam, QURILMA KERAK)
-
-**Butun yondashuvning qaror darvozasi.** MIL-0 «kadrni dekod qila
-olamizmi» degan savolga javob berdi; bu esa «hammasini TIKA olamizmi»
-degan savolga javob beradi.
-
-## Bitta buyruq
-
-```bash
-bash tool/pano/bench_stitch.sh -f ~/Desktop/kadrlar
-```
-
-Android'da skript kadrlarni `adb push` bilan o'zi ko'chiradi. iOS'da adb
-yo'q — kadrlarni qurilmaga o'zingiz joylang va yo'lini bering:
-
-```bash
-bash tool/pano/bench_stitch.sh --device-dir <qurilmadagi papka>
-```
-
-## Kadrlar qanday nomlanadi
-
-Burchaklar FAYL NOMIDAN o'qiladi, chunki capture ekrani (19-qadam) hali
-yozilmagan va sensor yozuvlari yo'q:
-
-```
-y000_p0.jpg   y045_p0.jpg   y090_p0.jpg   y135_p0.jpg
-y180_p0.jpg   y225_p0.jpg   y270_p0.jpg   y315_p0.jpg
-```
-
-`y<yaw>_p<pitch>` — yaw daraja bo'yicha soat yo'nalishida, pitch
-gorizontdan yuqoriga musbat. Kamida 2 ta kerak, MIL-1 uchun **8 ta**
-tavsiya etiladi (bitta gorizont halqasi).
-
-Kadrlarni qo'lda olsangiz: bir joyda turib, telefonni tik ushlab, har
-45° da bitta surat. Aniqlik muhim emas — o'lchov TEZLIKNI ko'radi.
-
-## ⚠️ QAROR `extrapolated76_s` GA QARAB QABUL QILINADI
-
-Bu bosqichda **gains (14), seam (15) va blend (16) hali yozilmagan**,
-ya'ni o'lchov yakuniy quvurning atigi **56 %ini** ko'radi
-(`kMil1Share` = decode 0.10 + project 0.44 + finish 0.02).
-
-Xom `measured_ms` ga qarash «GO» ni **qariyb ikki barobar optimistik**
-qilardi. Skript ekstrapolyatsiyani o'zi hisoblaydi:
-
-```
-extrapolated76 = measured × (76 / kadr_soni) / 0.56
-```
-
-Masalan 8 kadr 10 sekundda tikilsa — bu yaxshi ko'rinadi, lekin
-ekstrapolyatsiya **170 s** beradi, ya'ni 120 s chegarasidan OSHADI.
-
-## QAROR jadvali
-
-| `extrapolated76_s` | Qaror |
-|---|---|
-| **≤ 120 s** | **GO** — sof Dart yetadi, 14–16-qadamlarga o'tiladi |
-| **> 120 s** | **NO** — quvur yengillashtiriladi (pastga qarang) |
-
-120 s qayerdan: foydalanuvchi suratga olishga ~2 daqiqa sarflaydi;
-tikish undan uzoq davom etsa oqim tashlab ketiladi.
-
-**NO bo'lsa variantlar** (arzonidan qimmatiga):
-
-1. **Isolate'larga bo'lish** — `horizontalSlices` va `roiIntersectsRows`
-   allaqachon yozilgan va test bilan qoplangan (tasmalarga bo'lingan
-   natija yaxlit natija bilan baytma-bayt bir xil). 4 yadroda ~4×.
-2. **Tuvalni kichraytirish** — 3072 → 2048 proyeksiya yukini ~2.25×
-   kamaytiradi (piksel soni kvadratga proporsional).
-3. **Kadr sonini kamaytirish** — 76 → 40 (qutblarni tashlash + ±45
-   qatorlarini siyraklashtirish). Qamrov tushadi.
-4. **Native kanal** — eng qimmati, MIL-0 da o'tkazib yuborilgan bo'lsa
-   qaytib kelish.
-
-## Natija — QURILMADA O'LCHANADI (bo'sh)
-
-```
-sana        :
-qurilma     :                     (model, iOS/Android versiyasi)
-rejim       :                     (profile bo'lishi SHART)
-kadr soni   :
-```
-
-| O'lchov | Qiymat |
-|---|---|
-| `measured_ms` | |
-| `decode_ms` | |
-| `project_ms` | |
-| `finish_ms` | |
-| `extrapolated76_s` | |
-| `coverage_deg` | |
-
-**QAROR:** ☐ GO (14-qadamga) ☐ NO (quvur yengillashtiriladi)
-
-**Izoh:**
-
-⚠️ `coverage_deg` ni ham qarang: bitta gorizont halqasi ~46° beradi.
-180° ga yaqin son chiqsa — bu XATO alomati (qamrov piksellardan
-o'lchanadi, nisbatdan emas).
+`baseline.sh` QOLADI: u panorama ishiga bog'liq emas, oddiy
+«analyze + test, `otp_step_test.dart` siz» yugurtirgichi.

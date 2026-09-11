@@ -12,7 +12,8 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../panorama/screens/pano_tour_screen.dart';
 import '../models/tour_link.dart';
-import '../widgets/pano_source_sheet.dart';
+import '../../panorama/data/pano_capture_channel.dart';
+import '../../panorama/screens/pano_capture_flow.dart';
 
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
@@ -54,9 +55,19 @@ class _BozorDescriptionStepScreenState
 
   DescriptionDraft get _d => widget.draft.description;
 
+  /// Qurilma 360° suratga olishni qo'llaydimi.
+  ///
+  /// Sukut `false` — javob kelmaguncha qator KO'RSATILMAYDI. Eski sensorli
+  /// oqim o'chirilgan va galereyadan yuklash ham olib tashlangan, ya'ni
+  /// qo'llab-quvvatlanmagan qurilmada taklif qiladigan muqobil yo'q:
+  /// bosilib xato beradigan tugma ko'rsatgandan ko'ra umuman
+  /// ko'rsatmaslik tushunarli.
+  bool _pano360 = false;
+
   @override
   void initState() {
     super.initState();
+    _probe360();
     _title.addListener(_onTitle);
     _text.addListener(_onText);
     _youtube.addListener(_onYoutube);
@@ -71,6 +82,11 @@ class _BozorDescriptionStepScreenState
     _text.dispose();
     _youtube.dispose();
     super.dispose();
+  }
+
+  Future<void> _probe360() async {
+    final ok = await PanoCaptureChannel.isSupported();
+    if (mounted && ok != _pano360) setState(() => _pano360 = ok);
   }
 
   void _onTitle() =>
@@ -94,21 +110,20 @@ class _BozorDescriptionStepScreenState
     setState(() => into.addAll(picked.map((x) => x.path)));
   }
 
-  /// 360° foto: SURATGA OLISH yoki galereyadan.
-  ///
-  /// Ikkala yo'l ham haqiqiy — foydalanuvchi joyida bo'lsa panoramani
-  /// shu yerda oladi, boshqa ilovada yasagan bo'lsa yuklaydi.
   /// 360° ni SFERADA ochadi va turni tahrirlash imkonini beradi.
   ///
-  /// Havolalar qoralamada LOKAL YO'L bilan yotadi — panoramalar hali
-  /// yuklanmagan. Yuborishda `resolveTourLinks` ularni S3 kalitiga
-  /// o'giradi.
+  /// Havolalar S3 KALITI bilan yotadi — panorama serverda tikilgan va
+  /// sehrgarga tayyor kaliti bilan qaytgan. `resolveTourLinks` shu sababli
+  /// ayniyat bo'ladi (`uploaded[ref] ?? ref`), lekin u baribir chaqiriladi:
+  /// o'chirilgan panoramaga qolib ketgan havolani filtrlaydi.
   void _open360(int index) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PanoTourScreen(
           panoramas: <TourPano>[
-            for (final String p in _d.panoramas) TourPano(ref: p, file: p),
+            // Panoramalar serverda — lokal fayl emas, URL bilan ochiladi.
+            for (final String p in _d.panoramas)
+              TourPano(ref: p, url: _d.panoramaUrls[p] ?? p),
           ],
           links: _d.tourLinks,
           initialIndex: index,
@@ -123,23 +138,28 @@ class _BozorDescriptionStepScreenState
     );
   }
 
+  /// 360° qo'shish: nativ suratga olish → serverda tikish → tayyor kalit.
+  ///
+  /// ⚠️ GALEREYADAN YUKLASH OLIB TASHLANDI (izohga olingan —
+  /// `pano_source_sheet.dart` ga qarang). Sabab: server tikish uchun har
+  /// kadrning KAMERA POZASINI talab qiladi, galereyadagi tayyor equirect'da
+  /// esa u yo'q. Qaytarish kerak bo'lsa o'sha fayldagi izohni oching va
+  /// bu yerga tanlov varag'ini qaytaring.
   Future<void> _add360() async {
     final l = Localizations.localeOf(context);
     if (_d.panoramas.length >= _maxPhotos) {
       AppToast.error(context, _S.tooMany(l, _maxPhotos));
       return;
     }
-    final source = await showPanoSourceSheet(context);
-    if (!mounted || source == null) return;
-
-    switch (source) {
-      case PanoSource.gallery:
-        await _pick(_d.panoramas, multiple: false);
-      case PanoSource.capture:
-        final path = await openPanoCapture(context);
-        if (!mounted || path == null) return;
-        setState(() => _d.panoramas.add(path));
-    }
+    final outcome = await openPanoCapture(context);
+    if (!mounted || outcome == null) return;
+    setState(() {
+      _d.panoramas.add(outcome.storageKey);
+      _d.panoramaUrls[outcome.storageKey] = outcome.url;
+      // Panorama ALLAQACHON serverda — `bozor_submit` uni qayta
+      // yuklamasin (`uploadedMedia` da bo'lgan yo'l o'tkazib yuboriladi).
+      _d.uploadedMedia[outcome.storageKey] = outcome.storageKey;
+    });
   }
 
   Future<void> _openContacts() async {
@@ -242,14 +262,30 @@ class _BozorDescriptionStepScreenState
                             onRemove: (i) =>
                                 setState(() => _d.photos.removeAt(i)),
                           ),
+                          // Qurilma ARKit/ARCore ni qo'llamasa qator UMUMAN
+                          // chizilmaydi — `_pano360` izohiga qarang.
+                          if (_pano360) ...[
                           const SizedBox(height: 12),
                           MediaUploadRow(
                             label: _S.add360(l),
                             iconAsset: 'assets/icons/upload-360.svg',
                             paths: _d.panoramas,
+                            // Eskiz serverdan keladi — kadrlar o'chirilgan,
+                            // lokal nusxa yo'q.
+                            urlOf: (k) => _d.panoramaUrls[k],
                             onAdd: _add360,
-                            onRemove: (i) =>
-                                setState(() => _d.panoramas.removeAt(i)),
+                            onRemove: (i) => setState(() {
+                              final key = _d.panoramas.removeAt(i);
+                              // Qoralamada osilib qolmasin: yuborishda
+                              // `uploadedMedia` bo'yicha media ro'yxati
+                              // quriladi va o'chirilgan panorama qaytib
+                              // kelardi.
+                              _d.panoramaUrls.remove(key);
+                              _d.uploadedMedia.remove(key);
+                              _d.tourLinks.removeWhere(
+                                (t) => t.from == key || t.to == key,
+                              );
+                            }),
                             // 360° SFERADA ochiladi. Oddiy galereya uni
                             // cho'zilgan lenta qilib ko'rsatadi va
                             // panorama ekani bilinmaydi. Bir nechta
@@ -257,6 +293,7 @@ class _BozorDescriptionStepScreenState
                             // shu yerda o'tish tugmalarini qo'yadi.
                             onOpen: _open360,
                           ),
+                          ],
                           const SizedBox(height: 16),
                           WizardField(
                             label: _S.youtube(l),

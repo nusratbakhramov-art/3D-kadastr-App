@@ -87,11 +87,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  # Qurilmada yuriladigan o'lchov/testlar (integration_test/**). 3-qadam
-  # (MIL-0) JPEG dekod benchmarki AOT talab qiladi — `flutter drive --profile`,
-  # u esa shu paketni va uning drayverini talab qiladi.
-  integration_test:
-    sdk: flutter
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.1
 

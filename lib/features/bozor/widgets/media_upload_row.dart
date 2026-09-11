@@ -28,15 +28,25 @@ class MediaUploadRow extends StatelessWidget {
     required this.onAdd,
     required this.onRemove,
     this.onOpen,
+    this.urlOf,
   });
 
   final String label;
   final String iconAsset;
 
-  /// Tanlangan fayllarning LOKAL yo'llari.
+  /// Tanlangan yozuvlar. Odatda LOKAL YO'L, 360° qatorida esa S3 KALITI
+  /// ([urlOf] ga qarang).
   final List<String> paths;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
+
+  /// Yozuv uchun TARMOQ manzili; `null` bo'lsa yozuv lokal fayl deb o'qiladi.
+  ///
+  /// 360° panorama endi SERVERDA tikiladi va sehrgarga tayyor holda kaliti
+  /// bilan qaytadi — lokal nusxasi YO'Q (kadrlar darhol o'chiriladi).
+  /// Busiz eskiz `Image.file` ga tushib «hujjat» ikonkasiga aylanardi va
+  /// foydalanuvchi panoramasi yuklanmagan deb o'ylardi.
+  final String? Function(String path)? urlOf;
 
   /// Eskiz bosilganda nima ochilishi.
   ///
@@ -119,6 +129,7 @@ class MediaUploadRow extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, i) => _Thumb(
                 path: paths[i],
+                url: urlOf?.call(paths[i]),
                 onRemove: () => onRemove(i),
                 onOpen: () {
                   final ValueChanged<int>? open = onOpen;
@@ -147,9 +158,14 @@ class _Thumb extends StatelessWidget {
     required this.path,
     required this.onRemove,
     required this.onOpen,
+    this.url,
   });
 
   final String path;
+
+  /// Bo'sh bo'lmasa — eskiz shu manzildan yuklanadi, [path] esa faqat
+  /// kalit sifatida qoladi.
+  final String? url;
   final VoidCallback onRemove;
   final VoidCallback onOpen;
 
@@ -174,16 +190,31 @@ class _Thumb extends StatelessWidget {
                     borderRadius: radius,
                     border: Border.all(color: border),
                   ),
-                  child: Image.file(
-                    File(path),
-                    fit: BoxFit.cover,
-                    // PDF/hujjat tanlansa rasm ochilmaydi — qulflanib
-                    // qolmasin, o'rniga fayl ikonkasi chiqadi.
-                    errorBuilder: (_, _, _) => Icon(
-                      Icons.insert_drive_file_rounded,
-                      color: isDark ? Colors.white38 : Colors.black26,
-                    ),
-                  ),
+                  child: (url != null && url!.isNotEmpty)
+                      ? Image.network(
+                          url!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) => _fallbackIcon(isDark),
+                          loadingBuilder: (_, child, progress) =>
+                              progress == null
+                              ? child
+                              : const Center(
+                                  child: SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
+                        )
+                      : Image.file(
+                          File(path),
+                          fit: BoxFit.cover,
+                          // PDF/hujjat tanlansa rasm ochilmaydi — qulflanib
+                          // qolmasin, o'rniga fayl ikonkasi chiqadi.
+                          errorBuilder: (_, _, _) => _fallbackIcon(isDark),
+                        ),
                 ),
               ),
             ),
@@ -213,3 +244,8 @@ class _Thumb extends StatelessWidget {
     );
   }
 }
+
+Widget _fallbackIcon(bool isDark) => Icon(
+  Icons.insert_drive_file_rounded,
+  color: isDark ? Colors.white38 : Colors.black26,
+);

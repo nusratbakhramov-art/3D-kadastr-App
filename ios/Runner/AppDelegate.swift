@@ -444,6 +444,45 @@ import RoomPlan
         }
       }
 
+      // 360° panorama — ARKit bilan yo'naltirilgan suratga olish.
+      //
+      // Natija: `{dir, frames}` — Dart shu katalogdagi kadrlarni serverga
+      // yuklaydi (tikish SERVERDA, `panorama` Celery navbatida) va yuklagach
+      // katalogni o'zi o'chiradi. Bekor qilinsa `nil`.
+      let panoChannel = FlutterMethodChannel(
+        name: "kadastr/pano_capture",
+        binaryMessenger: controller.binaryMessenger
+      )
+      panoChannel.setMethodCallHandler { [weak controller] call, result in
+        switch call.method {
+        case "isSupported":
+          // ARKit dunyo-kuzatuvi A9+ talab qiladi; simulyatorda false.
+          if #available(iOS 15, *) {
+            result(PanoCaptureCoordinator.shared.isSupported)
+          } else {
+            result(false)
+          }
+
+        case "start":
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
+            return
+          }
+          guard #available(iOS 15, *) else {
+            result(FlutterError(code: "UNSUPPORTED", message: "iOS 15+ kerak", details: nil))
+            return
+          }
+          // Matnlar Dart'dan keladi — ilova uch tilli, Swift'da i18n
+          // takrorlanmasin.
+          let args = call.arguments as? [String: Any]
+          let strings = (args?["strings"] as? [String: String]) ?? [:]
+          PanoCaptureCoordinator.shared.start(from: controller, strings: strings, result: result)
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
       // Debug-only video capture — 0.5x (ultra-wide) 1080p HD. Flutter'dagi
       // tugma faqat kDebugMode'da ko'rinadi; kanal esa har doim ro'yxatda
       // turadi (release build'da hech kim chaqirmaydi).
