@@ -38,6 +38,11 @@ Future<PanoOutcome?> openPanoCapture(BuildContext context) =>
       MaterialPageRoute<PanoOutcome>(builder: (_) => const PanoCaptureFlow()),
     );
 
+/// Server berilgan vaqt ichida javob bermadi.
+class PanoTimeoutException implements Exception {
+  const PanoTimeoutException();
+}
+
 /// Oqimning qaysi bosqichida turibmiz.
 enum _Stage { capturing, uploading, stitching, failed }
 
@@ -48,10 +53,14 @@ class PanoCaptureFlow extends StatefulWidget {
   final PanoApi? api;
 
   @override
-  State<PanoCaptureFlow> createState() => _PanoCaptureFlowState();
+  State<PanoCaptureFlow> createState() => PanoCaptureFlowState();
 }
 
-class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
+/// ⚠️ OCHIQ (xususiy emas) FAQAT test uchun: kutish muddati va unga
+/// kirish nuqtasi tashqaridan tekshiriladi. Nativ capture testda yo'q,
+/// shuning uchun «tikilmoqda» bosqichiga [debugEnterStitching] bilan
+/// to'g'ridan o'tiladi.
+class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   late final PanoApi _api = widget.api ?? PanoApi();
 
   _Stage _stage = _Stage.capturing;
@@ -62,6 +71,26 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
   PanoCaptureResult? _capture;
   Timer? _poll;
   bool _started = false;
+
+  /// Tikish shu vaqtdan oshsa — kutishni to'xtatamiz.
+  ///
+  /// ⚠️ NEGA KERAK. Bu ekranda chiqish yo'li ATAYLAB yopiq (`canPop`) va
+  /// polling o'zi hech qachon tugamaydi: server `queued` da qotib qolsa
+  /// (masalan `celery-panorama` worker'i ko'tarilmagan bo'lsa) foydalanuvchi
+  /// aylanayotgan doirani CHEKSIZ kuzatardi — ilovani majburan yopishdan
+  /// boshqa chorasi qolmasdi. 2026-09-12 da prodda aynan shunday holat
+  /// bo'lishi mumkin edi.
+  ///
+  /// Chegara o'lchangan vaqtdan ancha yuqori: tikish ~32 s
+  /// (4096×2048, 28 kadr), navbatda kutish esa concurrency 1 da yana bir
+  /// necha marta shuncha bo'lishi mumkin.
+  static const Duration kStitchTimeout = Duration(minutes: 6);
+
+  /// ⚠️ TAYMER, `DateTime.now()` bilan solishtirish EMAS. Ikki sabab:
+  /// qurilma soati o'zgarsa (avtomatik sinxronlash, qo'lda tuzatish)
+  /// solishtirish yolg'on natija berardi; va soxta vaqtli testda
+  /// `DateTime.now()` umuman surilmaydi, ya'ni chegara sinalmay qolardi.
+  Timer? _timeout;
 
   @override
   void didChangeDependencies() {
@@ -76,6 +105,7 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
   @override
   void dispose() {
     _poll?.cancel();
+    _timeout?.cancel();
     if (widget.api == null) _api.dispose();
     super.dispose();
   }
@@ -130,6 +160,7 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
 
     await _api.finish(job.id);
     if (!mounted) return;
+    _armTimeout();
     setState(() {
       _stage = _Stage.stitching;
       _progress = 0;
@@ -147,6 +178,7 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
         if (!mounted) return;
         if (job.isDone) {
           t.cancel();
+          _timeout?.cancel();
           await _capture?.cleanUp();   // kadrlar endi kerak emas
           if (!mounted) return;
           final key = job.storageKey;
@@ -176,8 +208,21 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
     });
   }
 
+  /// Tikish bosqichi uchun muddatni qo'yadi.
+  ///
+  /// ⚠️ Kadrlar muddatdan keyin ham SAQLANADI: `_retry` ularni qayta
+  /// ishlatadi, ya'ni foydalanuvchi 30 nishonni qaytadan aylanmaydi.
+  void _armTimeout() {
+    _timeout?.cancel();
+    _timeout = Timer(kStitchTimeout, () {
+      _poll?.cancel();
+      _fail(const PanoTimeoutException());
+    });
+  }
+
   void _fail(Object e) {
     _poll?.cancel();
+    _timeout?.cancel();
     if (!mounted) return;
     setState(() {
       _stage = _Stage.failed;
@@ -186,6 +231,10 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
       // CAPTURE_FAILED, …, null, null)» bo'ladi — foydalanuvchiga shu
       // ko'rinishda chiqarish mumkin emas.
       _error = switch (e) {
+        PanoTimeoutException() => tr(
+          Localizations.localeOf(context),
+          'bozor.pano.flow.timeout',
+        ),
         PanoApiException(:final message) => message,
         PlatformException(:final message?) => message,
         _ => e.toString(),
@@ -196,6 +245,7 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
   Future<void> _retry() async {
     final shot = _capture;
     _poll?.cancel();
+    _timeout?.cancel();
     setState(() => _error = null);
     // Kadrlar hali diskda bo'lsa qaytadan suratga olmaymiz — faqat yuklashni
     // takrorlaymiz. Bu eng qimmat qismni (foydalanuvchining 30 nishonni
@@ -210,6 +260,19 @@ class _PanoCaptureFlowState extends State<PanoCaptureFlow> {
       setState(() => _stage = _Stage.capturing);
       await _run();
     }
+  }
+
+  /// Faqat testlar uchun: nativ suratga olishni o'tkazib, to'g'ridan
+  /// «tikilmoqda» bosqichiga o'tadi va pollingni boshlaydi.
+  @visibleForTesting
+  void debugEnterStitching(int jobId) {
+    _armTimeout();
+    setState(() {
+      _stage = _Stage.stitching;
+      _progress = 0;
+      _note = '';
+    });
+    _startPolling(jobId);
   }
 
   @override
