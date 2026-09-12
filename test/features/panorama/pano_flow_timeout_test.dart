@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -28,18 +29,22 @@ void main() {
 
   tearDown(() => appTranslationsNotifier.value = AppTranslations.empty);
 
-  test('kStitchTimeout o\'lchangan vaqtdan ANCHA katta', () {
-    // Tikish ~32 s (4096×2048, 28 kadr). Chegara undan kamida 5 barobar
-    // katta bo'lsin — navbatda kutish ham qo'shiladi (concurrency 1).
+  test('kStitchTimeout PRODDA o\'lchangan vaqtdan katta', () {
+    // ⚠️ 2026-09-12, prod `celery-panorama` logi (28 kadr → 4096×2048):
+    //     420.5 s · 451.2 s · 459.4 s · 474.1 s
+    // Ilgari bu yerda 6 daqiqa turardi — ishlab chiqish mashinasidagi
+    // 32 s o'lchoviga tayanib. Prodda muddat ish TUGASHIDAN OLDIN otildi
+    // va TAYYOR panorama tashlab yuborildi.
+    const worstMeasured = 475;
     expect(
       PanoCaptureFlowState.kStitchTimeout.inSeconds,
-      greaterThanOrEqualTo(32 * 5),
-      reason: 'juda qisqa chegara ISHLAYOTGAN tikishni uzib qo\'yadi',
+      greaterThanOrEqualTo(worstMeasured * 2),
+      reason: 'ishlayotgan tikishni uzib qo\'yadi — prodda shunday bo\'lgan',
     );
     // Lekin cheksiz ham emas — foydalanuvchi shu ekranda kutib turibdi.
     expect(
       PanoCaptureFlowState.kStitchTimeout.inMinutes,
-      lessThanOrEqualTo(10),
+      lessThanOrEqualTo(30),
     );
   });
 
@@ -112,5 +117,89 @@ void main() {
         findsOneWidget);
     expect(find.text(tr(const Locale('uz'), 'bozor.pano.flow.retry')),
         findsOneWidget);
+  });
+
+  testWidgets('muddatdan keyin «Qayta urinish» TAYYOR ishni oladi — '
+      'kadrlarni QAYTA YUBORMAYDI', (tester) async {
+    // ⚠️ 2026-09-12 da prodda aynan shu yo'qotildi: ilova 6-daqiqada voz
+    // kechdi, server esa 7.9-daqiqada panoramani tayyorlab S3 ga yukladi.
+    // Eski `_retry` YANGI ish yaratardi — tayyor panorama tashlanib,
+    // foydalanuvchi yana sakkiz daqiqa kutardi.
+    var done = false;
+    var uploads = 0;
+    final client = MockClient((req) async {
+      final p = req.url.path;
+      if (p.endsWith('/listings/pano')) {
+        uploads++;
+        return http.Response('{"id":7,"status":"capturing"}', 201);
+      }
+      final body = done
+          ? '{"id":7,"status":"done","progress":1,'
+              '"storage_key":"listings/media/1/pano_7.jpg",'
+              '"url":"https://cdn.test/pano_7.jpg"}'
+          : '{"id":7,"status":"stitching","progress":0.4}';
+      return http.Response(body, 200,
+          headers: {'content-type': 'application/json; charset=utf-8'});
+    });
+
+    // ⚠️ Oqim OSTIDA sahifa bo'lishi shart: `Navigator.pop` yagona
+    // marshrutni yopmaydi, ya'ni oqim o'zi root bo'lsa natija hech qachon
+    // qaytmaydi va test yolg'on yiqiladi (bir marta shunday bo'ldi).
+    PanoOutcome? popped;
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('uz'),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: const [Locale('uz'), Locale('ru'), Locale('en')],
+        home: const Scaffold(body: Text('ortda')),
+      ),
+    );
+    final ctx = tester.element(find.text('ortda'));
+    unawaited(
+      Navigator.of(ctx)
+          .push<PanoOutcome>(
+            MaterialPageRoute<PanoOutcome>(
+              builder: (_) => PanoCaptureFlow(api: PanoApi(client: client)),
+            ),
+          )
+          .then((v) => popped = v),
+    );
+    // ⚠️ `pumpAndSettle` ISHLATILMAYDI: ekranda cheksiz aylanadigan
+    // `CircularProgressIndicator` bor, ya'ni kadr rejasi hech qachon
+    // bo'shamaydi va `pumpAndSettle` timeout bilan yiqiladi.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    final state = tester.state<PanoCaptureFlowState>(
+      find.byType(PanoCaptureFlow),
+    );
+    state.debugEnterStitching(7);
+    await tester.pump();
+
+    // Muddat otiladi — ekran xato ko'rsatadi.
+    await tester.pump(PanoCaptureFlowState.kStitchTimeout);
+    await tester.pump();
+    expect(find.text(tr(const Locale('uz'), 'bozor.pano.flow.failed')),
+        findsOneWidget);
+
+    // Shu orada server ishni YAKUNLADI.
+    done = true;
+
+    await tester.tap(find.text(tr(const Locale('uz'), 'bozor.pano.flow.retry')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(uploads, 0,
+        reason: 'yangi ish yaratilmasin — tayyorini olish kerak edi');
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(PanoCaptureFlow), findsNothing,
+        reason: 'natija bilan yopilishi kerak edi');
+    expect(popped, isNotNull, reason: 'natija qaytmadi');
+    expect(popped!.storageKey, 'listings/media/1/pano_7.jpg');
+    expect(popped!.url, 'https://cdn.test/pano_7.jpg');
   });
 }

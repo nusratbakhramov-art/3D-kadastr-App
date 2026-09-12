@@ -69,6 +69,15 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   String? _error;
 
   PanoCaptureResult? _capture;
+
+  /// Serverdagi oxirgi tikish ishi.
+  ///
+  /// ⚠️ MUDDAT OTILSA HAM SAQLANADI. Server ishni to'xtatmaydi va odatda
+  /// uni YAKUNLAYDI — 2026-09-12 da aynan shunday bo'ldi: ilova 6-daqiqada
+  /// voz kechdi, server esa 7.9-daqiqada panoramani tayyorlab S3 ga
+  /// yukladi. «Qayta urinish» shu sababli avval SHU ishni so'raydi,
+  /// kadrlarni qaytadan yubormaydi.
+  int? _jobId;
   Timer? _poll;
   bool _started = false;
 
@@ -81,10 +90,21 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   /// boshqa chorasi qolmasdi. 2026-09-12 da prodda aynan shunday holat
   /// bo'lishi mumkin edi.
   ///
-  /// Chegara o'lchangan vaqtdan ancha yuqori: tikish ~32 s
-  /// (4096×2048, 28 kadr), navbatda kutish esa concurrency 1 da yana bir
-  /// necha marta shuncha bo'lishi mumkin.
-  static const Duration kStitchTimeout = Duration(minutes: 6);
+  /// ⚠️ RAQAM PRODDA O'LCHANGAN, ishlab chiqish mashinasida EMAS.
+  /// `celery-panorama` logidan (2026-09-12, 28 kadr → 4096×2048):
+  ///
+  ///     ish 7 → 420.5 s    ish 9  → 459.4 s
+  ///     ish 8 → 451.2 s    ish 10 → 474.1 s
+  ///
+  /// Ilgari bu yerda 6 daqiqa turardi — 4 yadroli konteynerdagi 32 s
+  /// o'lchoviga tayanib. Prod VM'i 8 vCPU e'lon qiladi, lekin amalda ~1
+  /// yadro beradi, ya'ni ~10 barobar sekin. Natijada muddat ish
+  /// TUGASHIDAN OLDIN otilardi va TAYYOR panorama tashlab yuborilardi.
+  ///
+  /// 20 daqiqa = eng yomon o'lchovdan ~2.5 barobar. Zapas kerak: navbat
+  /// concurrency 1 da, ya'ni oldinda bitta ish tursa yana shuncha
+  /// kutiladi.
+  static const Duration kStitchTimeout = Duration(minutes: 20);
 
   /// ⚠️ TAYMER, `DateTime.now()` bilan solishtirish EMAS. Ikki sabab:
   /// qurilma soati o'zgarsa (avtomatik sinxronlash, qo'lda tuzatish)
@@ -144,6 +164,7 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
     }
 
     final job = await _api.createJob();
+    _jobId = job.id;
 
     for (var i = 0; i < metas.length; i++) {
       if (!mounted) return;
@@ -247,9 +268,42 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
     _poll?.cancel();
     _timeout?.cancel();
     setState(() => _error = null);
-    // Kadrlar hali diskda bo'lsa qaytadan suratga olmaymiz — faqat yuklashni
-    // takrorlaymiz. Bu eng qimmat qismni (foydalanuvchining 30 nishonni
-    // aylanib chiqishini) tejaydi.
+
+    // 1) Serverda ish bor bo'lsa — AVVAL O'SHANI so'raymiz. U allaqachon
+    //    tayyor bo'lishi mumkin (muddat otilgan, lekin server davom etgan),
+    //    va bu holda foydalanuvchi hech narsa kutmaydi.
+    final id = _jobId;
+    if (id != null) {
+      try {
+        final job = await _api.status(id);
+        if (!mounted) return;
+        if (job.isDone && (job.storageKey ?? '').isNotEmpty) {
+          await _capture?.cleanUp();
+          if (!mounted) return;
+          Navigator.of(context).pop(
+            PanoOutcome(storageKey: job.storageKey!, url: job.url ?? ''),
+          );
+          return;
+        }
+        if (!job.isError) {
+          // Hali ishlayapti — shunchaki kutishda davom etamiz.
+          _armTimeout();
+          setState(() {
+            _stage = _Stage.stitching;
+            _progress = job.progress;
+            _note = job.message ?? '';
+          });
+          _startPolling(id);
+          return;
+        }
+      } on Object catch (_) {
+        // So'rov yiqilsa pastdagi odatiy yo'lga tushamiz.
+      }
+    }
+
+    // 2) Kadrlar hali diskda bo'lsa qaytadan suratga olmaymiz — faqat
+    //    yuklashni takrorlaymiz. Bu eng qimmat qismni (foydalanuvchining
+    //    30 nishonni aylanib chiqishini) tejaydi.
     if (shot != null && shot.directory.existsSync()) {
       try {
         await _upload(shot);
@@ -266,6 +320,7 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   /// «tikilmoqda» bosqichiga o'tadi va pollingni boshlaydi.
   @visibleForTesting
   void debugEnterStitching(int jobId) {
+    _jobId = jobId;
     _armTimeout();
     setState(() {
       _stage = _Stage.stitching;
