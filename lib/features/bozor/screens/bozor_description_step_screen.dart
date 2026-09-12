@@ -7,11 +7,14 @@
 /// qoralamada saqlanadi, yuborish keyingi ishda.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../panorama/screens/pano_tour_screen.dart';
 import '../models/tour_link.dart';
+import '../../panorama/data/pano_api.dart';
 import '../../panorama/data/pano_capture_channel.dart';
 import '../../panorama/screens/pano_capture_flow.dart';
 
@@ -24,6 +27,7 @@ import '../../services/widgets/wizard_field.dart';
 import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
 import '../data/bozor_draft_store.dart';
+import '../data/pano_job_watcher.dart';
 import '../models/bozor_draft.dart';
 import '../widgets/media_upload_row.dart';
 import 'bozor_contacts_step_screen.dart';
@@ -64,10 +68,21 @@ class _BozorDescriptionStepScreenState
   /// ko'rsatmaslik tushunarli.
   bool _pano360 = false;
 
+  final PanoJobWatcher _watcher = PanoJobWatcher.instance;
+
+  void _onPanoChanged() {
+    if (mounted) setState(() {});
+  }
+
   @override
   void initState() {
     super.initState();
     _probe360();
+    // Fonda tikilayotgan panoramalar — tayyor bo'lganda qator o'zi
+    // yangilanishi uchun kuzatuvchiga ulanamiz.
+    _watcher
+      ..addListener(_onPanoChanged)
+      ..watch(widget.draft);
     _title.addListener(_onTitle);
     _text.addListener(_onText);
     _youtube.addListener(_onYoutube);
@@ -75,6 +90,9 @@ class _BozorDescriptionStepScreenState
 
   @override
   void dispose() {
+    // ⚠️ Kuzatuvchi TO'XTATILMAYDI: u ilova bo'yicha yagona va sehrgarning
+    // boshqa qadamlari ham unga tayanadi. Faqat tinglashni bekor qilamiz.
+    _watcher.removeListener(_onPanoChanged);
     _title.removeListener(_onTitle);
     _text.removeListener(_onText);
     _youtube.removeListener(_onYoutube);
@@ -116,17 +134,67 @@ class _BozorDescriptionStepScreenState
   /// sehrgarga tayyor kaliti bilan qaytgan. `resolveTourLinks` shu sababli
   /// ayniyat bo'ladi (`uploaded[ref] ?? ref`), lekin u baribir chaqiriladi:
   /// o'chirilgan panoramaga qolib ketgan havolani filtrlaydi.
+  /// Eskiz bosilganda: tayyorni sferada ochadi, kutilayotgani haqida
+  /// aytadi, yiqilganini qayta urinishga taklif qiladi.
+  void _openPano(int index) {
+    final l = Localizations.localeOf(context);
+    final ref = _d.panoramas[index];
+    final p = _d.pendingPanoramas[ref];
+    if (p == null) {
+      _open360(index);
+      return;
+    }
+    if (!p.failed) {
+      AppToast.success(context, tr(l, 'bozor.pano.flow.stitching'));
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(tr(l, 'bozor.pano.flow.failed')),
+        content: Text(p.error ?? ''),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(tr(l, 'common.cancel')),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              unawaited(_retryPano(ref));
+            },
+            child: Text(tr(l, 'bozor.pano.flow.retry')),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _open360(int index) {
+    final l = Localizations.localeOf(context);
+    // ⚠️ FAQAT TAYYORLARI. Kutilayotgan panoramaning tasviri hali yo'q —
+    // uni turga qo'shsak ekran bo'sh sferada ochilardi. Tur baribir
+    // hammasi tayyor bo'lgach quriladi (mahsulot qarori), shuning uchun
+    // bu yerda faqat ogohlantiramiz.
+    final ready = <String>[
+      for (final String p in _d.panoramas)
+        if (!_d.isPending(p)) p,
+    ];
+    if (ready.isEmpty) return;
+    if (_d.pendingPanoramas.isNotEmpty) {
+      AppToast.success(context, tr(l, 'bozor.pano.tour.wait'));
+    }
+    final start = ready.indexOf(_d.panoramas[index]);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PanoTourScreen(
           panoramas: <TourPano>[
             // Panoramalar serverda — lokal fayl emas, URL bilan ochiladi.
-            for (final String p in _d.panoramas)
+            for (final String p in ready)
               TourPano(ref: p, url: _d.panoramaUrls[p] ?? p),
           ],
           links: _d.tourLinks,
-          initialIndex: index,
+          initialIndex: start < 0 ? 0 : start,
           editable: true,
           onChanged: (List<TourLink> links) => setState(() {
             _d.tourLinks
@@ -153,13 +221,52 @@ class _BozorDescriptionStepScreenState
     }
     final outcome = await openPanoCapture(context);
     if (!mounted || outcome == null) return;
+
+    // ⚠️ VAQTINCHALIK HAVOLA. Panorama hali tikilmagan (~7–9 daqiqa), lekin
+    // tartibdagi o'z o'rnini EGALLASHI kerak: foydalanuvchi qatorni ko'rib
+    // turibdi va keyin tur havolalari ham shu tartibga tayanadi.
+    // `PanoJobWatcher` tayyor bo'lgach AYNAN SHU O'RINDA haqiqiy kalitga
+    // almashtiradi.
+    final ref = PendingPano.refOf(outcome.jobId);
     setState(() {
-      _d.panoramas.add(outcome.storageKey);
-      _d.panoramaUrls[outcome.storageKey] = outcome.url;
-      // Panorama ALLAQACHON serverda — `bozor_submit` uni qayta
-      // yuklamasin (`uploadedMedia` da bo'lgan yo'l o'tkazib yuboriladi).
-      _d.uploadedMedia[outcome.storageKey] = outcome.storageKey;
+      _d.panoramas.add(ref);
+      _d.pendingPanoramas[ref] = PendingPano(
+        jobId: outcome.jobId,
+        startedAt: DateTime.now(),
+      );
     });
+    _watcher.watch(widget.draft);
+    if (mounted) AppToast.success(context, tr(l, 'bozor.pano.flow.queued'));
+  }
+
+  /// Yiqilgan tikishni qaytadan navbatga qo'yadi.
+  ///
+  /// ⚠️ KADRLAR QAYTA YUBORILMAYDI. Server ularni 24 soat saqlaydi va
+  /// `POST /pano/{id}/finish` XATO holatidagi ishni qaytadan yig'ib navbatga
+  /// qo'yadi — ya'ni foydalanuvchi 30 nishonni qaytadan aylanmaydi.
+  Future<void> _retryPano(String ref) async {
+    final p = _d.pendingPanoramas[ref];
+    if (p == null) return;
+    setState(() {
+      _d.pendingPanoramas[ref] = PendingPano(
+        jobId: p.jobId,
+        startedAt: DateTime.now(),
+      );
+    });
+    final api = PanoApi();
+    try {
+      await api.finish(p.jobId);
+      _watcher.watch(widget.draft);
+    } on Object catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _d.pendingPanoramas[ref] = p.withError(
+          e is PanoApiException ? e.message : e.toString(),
+        );
+      });
+    } finally {
+      api.dispose();
+    }
   }
 
   Future<void> _openContacts() async {
@@ -273,6 +380,13 @@ class _BozorDescriptionStepScreenState
                             // Eskiz serverdan keladi — kadrlar o'chirilgan,
                             // lokal nusxa yo'q.
                             urlOf: (k) => _d.panoramaUrls[k],
+                            statusOf: (k) {
+                              final p = _d.pendingPanoramas[k];
+                              if (p == null) return MediaItemStatus.ready;
+                              return p.failed
+                                  ? MediaItemStatus.failed
+                                  : MediaItemStatus.pending;
+                            },
                             onAdd: _add360,
                             onRemove: (i) => setState(() {
                               final key = _d.panoramas.removeAt(i);
@@ -282,6 +396,11 @@ class _BozorDescriptionStepScreenState
                               // kelardi.
                               _d.panoramaUrls.remove(key);
                               _d.uploadedMedia.remove(key);
+                              // Kutilayotganini ham olib tashlaymiz — aks
+                              // holda e'lon YUBORILMAS bo'lib qolardi:
+                              // qatorda ko'rinmaydigan ish uni to'sib
+                              // turardi.
+                              _d.pendingPanoramas.remove(key);
                               _d.tourLinks.removeWhere(
                                 (t) => t.from == key || t.to == key,
                               );
@@ -291,7 +410,7 @@ class _BozorDescriptionStepScreenState
                             // panorama ekani bilinmaydi. Bir nechta
                             // bo'lsa — yurib bo'ladigan TUR, va egasi
                             // shu yerda o'tish tugmalarini qo'yadi.
-                            onOpen: _open360,
+                            onOpen: _openPano,
                           ),
                           ],
                           const SizedBox(height: 16),

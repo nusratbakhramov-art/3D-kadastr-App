@@ -25,10 +25,14 @@ import 'screens/bozor_params_step_screen.dart';
 import 'screens/bozor_price_step_screen.dart';
 import 'screens/bozor_terms_step_screen.dart';
 import 'screens/bozor_type_step_screen.dart';
+import 'widgets/pano_ready_banner.dart';
 
 /// Qadamning ekrani. Ro'yxatda bo'lmagan qadam ham chiziladi — tekshiruv
 /// chaqiruvchida ([bozorStepScreenSafe] ga qarang).
-Widget bozorStepScreen(BozorDraft draft, WizardStep step) => switch (step) {
+Widget bozorStepScreen(BozorDraft draft, WizardStep step) =>
+    PanoReadyBanner(draft: draft, child: _stepScreen(draft, step));
+
+Widget _stepScreen(BozorDraft draft, WizardStep step) => switch (step) {
   WizardStep.type => BozorTypeStepScreen(draft: draft),
   WizardStep.address => BozorAddressStepScreen(draft: draft),
   WizardStep.params => BozorParamsStepScreen(draft: draft),

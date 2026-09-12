@@ -1,16 +1,21 @@
-/// 360° panorama: suratga olish → yuklash → serverda tikish → natija.
+/// 360° panorama: suratga olish → kadrlarni yuborish → EKRAN YOPILADI.
 ///
-/// Foydalanuvchi shu ekranda KUTADI (mahsulot qarori): tikish ~30 s, unga
-/// yuklash qo'shiladi. Kutgani uchun tayyor bo'lgach panoramani darhol
-/// ko'radi va keyingi xonaga o'tadi; barcha xonalar yig'ilgach turni
-/// hozirgidek qo'yadi.
+/// ⚠️ TIKISH BU YERDA KUTILMAYDI. Ilgari foydalanuvchi natijani shu ekranda
+/// kutardi. O'lchov (prod `celery-panorama` logi, 2026-09-12) tikish
+/// **7–9 daqiqa** olishini ko'rsatdi:
 ///
-/// Nega bu ekran bor. Uchta bosqichni (nativ capture, yuklash, polling)
-/// tavsif qadamiga solsak, u ekran tarmoq holati bilan to'lib ketardi.
-/// Bu yerda ular bitta joyda va bitta progress chizig'iga aylanadi.
+///     ish 7 → 420.5 s   ish 9  → 459.4 s   ish 15 → 567.1 s
+///     ish 8 → 451.2 s   ish 10 → 474.1 s
+///
+/// Uchta xonaga bu yarim soatlik qotib turish demakdi. Endi ekran kadrlar
+/// yuborilishi bilan yopiladi va ISHNING RAQAMINI qaytaradi; tikilishini
+/// `PanoJobWatcher` fonda kuzatadi.
+///
+/// Nega bu ekran baribir kerak: nativ capture va kadrlarni yuklash — ikki
+/// bosqich va ikkalasining ham progressi bor. Ularni tavsif qadamiga solsak
+/// u ekran tarmoq holati bilan to'lib ketardi.
 library;
 
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -22,29 +27,28 @@ import '../../../theme/app_colors.dart';
 import '../data/pano_api.dart';
 import '../data/pano_capture_channel.dart';
 
-/// Tayyor panorama — e'longa shu qo'shiladi.
+/// Serverga topshirilgan tikish ishi.
+///
+/// ⚠️ Bu TAYYOR PANORAMA EMAS — kadrlar yuborildi va navbatga qo'yildi,
+/// xolos. Natija `PanoJobWatcher` orqali keladi.
 @immutable
 class PanoOutcome {
-  const PanoOutcome({required this.storageKey, required this.url});
+  const PanoOutcome({required this.jobId});
 
-  /// `listings/media/{user_id}/pano_*.jpg` — e'lonning media kaliti.
-  final String storageKey;
-  final String url;
+  /// `bozor_pano_jobs.id` — kuzatuv shu bo'yicha boradi.
+  final int jobId;
 }
 
-/// Ekranni ochadi. Bekor qilinsa yoki xato bo'lsa `null`.
+/// Ekranni ochadi. Bekor qilinsa yoki yuklash yiqilsa `null`.
 Future<PanoOutcome?> openPanoCapture(BuildContext context) =>
     Navigator.of(context).push<PanoOutcome>(
       MaterialPageRoute<PanoOutcome>(builder: (_) => const PanoCaptureFlow()),
     );
 
-/// Server berilgan vaqt ichida javob bermadi.
-class PanoTimeoutException implements Exception {
-  const PanoTimeoutException();
-}
-
 /// Oqimning qaysi bosqichida turibmiz.
-enum _Stage { capturing, uploading, stitching, failed }
+///
+/// «Tikilmoqda» bosqichi YO'Q — u fonga ko'chdi.
+enum _Stage { capturing, uploading, failed }
 
 class PanoCaptureFlow extends StatefulWidget {
   const PanoCaptureFlow({super.key, this.api});
@@ -56,10 +60,7 @@ class PanoCaptureFlow extends StatefulWidget {
   State<PanoCaptureFlow> createState() => PanoCaptureFlowState();
 }
 
-/// ⚠️ OCHIQ (xususiy emas) FAQAT test uchun: kutish muddati va unga
-/// kirish nuqtasi tashqaridan tekshiriladi. Nativ capture testda yo'q,
-/// shuning uchun «tikilmoqda» bosqichiga [debugEnterStitching] bilan
-/// to'g'ridan o'tiladi.
+/// ⚠️ OCHIQ (xususiy emas) FAQAT test uchun.
 class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   late final PanoApi _api = widget.api ?? PanoApi();
 
@@ -69,48 +70,7 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   String? _error;
 
   PanoCaptureResult? _capture;
-
-  /// Serverdagi oxirgi tikish ishi.
-  ///
-  /// ⚠️ MUDDAT OTILSA HAM SAQLANADI. Server ishni to'xtatmaydi va odatda
-  /// uni YAKUNLAYDI — 2026-09-12 da aynan shunday bo'ldi: ilova 6-daqiqada
-  /// voz kechdi, server esa 7.9-daqiqada panoramani tayyorlab S3 ga
-  /// yukladi. «Qayta urinish» shu sababli avval SHU ishni so'raydi,
-  /// kadrlarni qaytadan yubormaydi.
-  int? _jobId;
-  Timer? _poll;
   bool _started = false;
-
-  /// Tikish shu vaqtdan oshsa — kutishni to'xtatamiz.
-  ///
-  /// ⚠️ NEGA KERAK. Bu ekranda chiqish yo'li ATAYLAB yopiq (`canPop`) va
-  /// polling o'zi hech qachon tugamaydi: server `queued` da qotib qolsa
-  /// (masalan `celery-panorama` worker'i ko'tarilmagan bo'lsa) foydalanuvchi
-  /// aylanayotgan doirani CHEKSIZ kuzatardi — ilovani majburan yopishdan
-  /// boshqa chorasi qolmasdi. 2026-09-12 da prodda aynan shunday holat
-  /// bo'lishi mumkin edi.
-  ///
-  /// ⚠️ RAQAM PRODDA O'LCHANGAN, ishlab chiqish mashinasida EMAS.
-  /// `celery-panorama` logidan (2026-09-12, 28 kadr → 4096×2048):
-  ///
-  ///     ish 7 → 420.5 s    ish 9  → 459.4 s
-  ///     ish 8 → 451.2 s    ish 10 → 474.1 s
-  ///
-  /// Ilgari bu yerda 6 daqiqa turardi — 4 yadroli konteynerdagi 32 s
-  /// o'lchoviga tayanib. Prod VM'i 8 vCPU e'lon qiladi, lekin amalda ~1
-  /// yadro beradi, ya'ni ~10 barobar sekin. Natijada muddat ish
-  /// TUGASHIDAN OLDIN otilardi va TAYYOR panorama tashlab yuborilardi.
-  ///
-  /// 20 daqiqa = eng yomon o'lchovdan ~2.5 barobar. Zapas kerak: navbat
-  /// concurrency 1 da, ya'ni oldinda bitta ish tursa yana shuncha
-  /// kutiladi.
-  static const Duration kStitchTimeout = Duration(minutes: 20);
-
-  /// ⚠️ TAYMER, `DateTime.now()` bilan solishtirish EMAS. Ikki sabab:
-  /// qurilma soati o'zgarsa (avtomatik sinxronlash, qo'lda tuzatish)
-  /// solishtirish yolg'on natija berardi; va soxta vaqtli testda
-  /// `DateTime.now()` umuman surilmaydi, ya'ni chegara sinalmay qolardi.
-  Timer? _timeout;
 
   @override
   void didChangeDependencies() {
@@ -124,8 +84,6 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
 
   @override
   void dispose() {
-    _poll?.cancel();
-    _timeout?.cancel();
     if (widget.api == null) _api.dispose();
     super.dispose();
   }
@@ -135,7 +93,7 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
       final shot = await PanoCaptureChannel.start(context);
       if (!mounted) return;
       if (shot == null) {
-        Navigator.of(context).pop();   // bekor qilindi
+        Navigator.of(context).pop(); // bekor qilindi
         return;
       }
       _capture = shot;
@@ -159,12 +117,11 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
     final metas = (jsonDecode(await metaFile.readAsString()) as List)
         .cast<Map<String, dynamic>>();
     if (metas.isEmpty) {
-      _fail(StateError('kadrlar yo\'q'));
+      _fail(StateError('kadrlar yoʻq'));
       return;
     }
 
     final job = await _api.createJob();
-    _jobId = job.id;
 
     for (var i = 0; i < metas.length; i++) {
       if (!mounted) return;
@@ -181,69 +138,21 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
 
     await _api.finish(job.id);
     if (!mounted) return;
-    _armTimeout();
-    setState(() {
-      _stage = _Stage.stitching;
-      _progress = 0;
-      _note = '';
-    });
-    _startPolling(job.id);
-  }
 
-  void _startPolling(int jobId) {
-    // 1.5 s — serverdagi progress ham shu tezlikda yangilanadi
-    // (`_PROGRESS_MIN_INTERVAL_S`), tez-tez so'rashning ma'nosi yo'q.
-    _poll = Timer.periodic(const Duration(milliseconds: 1500), (t) async {
-      try {
-        final job = await _api.status(jobId);
-        if (!mounted) return;
-        if (job.isDone) {
-          t.cancel();
-          _timeout?.cancel();
-          await _capture?.cleanUp();   // kadrlar endi kerak emas
-          if (!mounted) return;
-          final key = job.storageKey;
-          if (key == null || key.isEmpty) {
-            _fail(StateError('server kalit qaytarmadi'));
-            return;
-          }
-          Navigator.of(context).pop(
-            PanoOutcome(storageKey: key, url: job.url ?? ''),
-          );
-          return;
-        }
-        if (job.isError) {
-          t.cancel();
-          _fail(PanoApiException(job.error ?? 'tikib boʻlmadi'));
-          return;
-        }
-        setState(() {
-          _progress = job.progress;
-          _note = job.message ?? '';
-        });
-      } on Object catch (e) {
-        // Bitta so'rov yiqilsa to'xtamaymiz — tarmoq bir lahzaga uzilgan
-        // bo'lishi mumkin va tikish serverda davom etyapti.
-        debugPrint('pano polling: $e');
-      }
-    });
-  }
-
-  /// Tikish bosqichi uchun muddatni qo'yadi.
-  ///
-  /// ⚠️ Kadrlar muddatdan keyin ham SAQLANADI: `_retry` ularni qayta
-  /// ishlatadi, ya'ni foydalanuvchi 30 nishonni qaytadan aylanmaydi.
-  void _armTimeout() {
-    _timeout?.cancel();
-    _timeout = Timer(kStitchTimeout, () {
-      _poll?.cancel();
-      _fail(const PanoTimeoutException());
-    });
+    // Kadrlar SERVERDA — telefondagi nusxa endi kerak emas (bitta tushirish
+    // ~6 MB, foydalanuvchi esa ketma-ket bir necha xona oladi).
+    //
+    // ⚠️ AYNAN SHU YERDA — `finish` MUVAFFAQIYATLI bo'lgandan keyin.
+    // Ilgariroq o'chirsak, `finish` tarmoq sababli yiqilganda qayta urinish
+    // uchun hech narsa qolmasdi. Serverdagi TIKISH yiqilsa esa lokal kadrlar
+    // baribir kerak emas: server ularni 24 soat saqlaydi va qayta urinish
+    // o'sha yerdan ketadi.
+    await _capture?.cleanUp();
+    if (!mounted) return;
+    Navigator.of(context).pop(PanoOutcome(jobId: job.id));
   }
 
   void _fail(Object e) {
-    _poll?.cancel();
-    _timeout?.cancel();
     if (!mounted) return;
     setState(() {
       _stage = _Stage.failed;
@@ -252,10 +161,6 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
       // CAPTURE_FAILED, …, null, null)» bo'ladi — foydalanuvchiga shu
       // ko'rinishda chiqarish mumkin emas.
       _error = switch (e) {
-        PanoTimeoutException() => tr(
-          Localizations.localeOf(context),
-          'bozor.pano.flow.timeout',
-        ),
         PanoApiException(:final message) => message,
         PlatformException(:final message?) => message,
         _ => e.toString(),
@@ -265,45 +170,10 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
 
   Future<void> _retry() async {
     final shot = _capture;
-    _poll?.cancel();
-    _timeout?.cancel();
     setState(() => _error = null);
-
-    // 1) Serverda ish bor bo'lsa — AVVAL O'SHANI so'raymiz. U allaqachon
-    //    tayyor bo'lishi mumkin (muddat otilgan, lekin server davom etgan),
-    //    va bu holda foydalanuvchi hech narsa kutmaydi.
-    final id = _jobId;
-    if (id != null) {
-      try {
-        final job = await _api.status(id);
-        if (!mounted) return;
-        if (job.isDone && (job.storageKey ?? '').isNotEmpty) {
-          await _capture?.cleanUp();
-          if (!mounted) return;
-          Navigator.of(context).pop(
-            PanoOutcome(storageKey: job.storageKey!, url: job.url ?? ''),
-          );
-          return;
-        }
-        if (!job.isError) {
-          // Hali ishlayapti — shunchaki kutishda davom etamiz.
-          _armTimeout();
-          setState(() {
-            _stage = _Stage.stitching;
-            _progress = job.progress;
-            _note = job.message ?? '';
-          });
-          _startPolling(id);
-          return;
-        }
-      } on Object catch (_) {
-        // So'rov yiqilsa pastdagi odatiy yo'lga tushamiz.
-      }
-    }
-
-    // 2) Kadrlar hali diskda bo'lsa qaytadan suratga olmaymiz — faqat
-    //    yuklashni takrorlaymiz. Bu eng qimmat qismni (foydalanuvchining
-    //    30 nishonni aylanib chiqishini) tejaydi.
+    // Kadrlar hali diskda bo'lsa qaytadan suratga olmaymiz — faqat yuklashni
+    // takrorlaymiz. Bu eng qimmat qismni (foydalanuvchining 30 nishonni
+    // aylanib chiqishini) tejaydi.
     if (shot != null && shot.directory.existsSync()) {
       try {
         await _upload(shot);
@@ -316,20 +186,6 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
     }
   }
 
-  /// Faqat testlar uchun: nativ suratga olishni o'tkazib, to'g'ridan
-  /// «tikilmoqda» bosqichiga o'tadi va pollingni boshlaydi.
-  @visibleForTesting
-  void debugEnterStitching(int jobId) {
-    _jobId = jobId;
-    _armTimeout();
-    setState(() {
-      _stage = _Stage.stitching;
-      _progress = 0;
-      _note = '';
-    });
-    _startPolling(jobId);
-  }
-
   @override
   Widget build(BuildContext context) {
     final l = Localizations.localeOf(context);
@@ -338,8 +194,8 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
     final fg = isDark ? Colors.white : AppColors.textBlack;
 
     return PopScope(
-      // Tikish serverda davom etyapti — orqaga qaytish uni to'xtatmaydi,
-      // lekin foydalanuvchi natijasiz qoladi. Ataylab bloklaymiz; chiqish
+      // Kadrlar yuborilyapti — orqaga qaytish ularni yarim yo'lda qoldiradi
+      // va server hech qachon `finish` olmaydi. Ataylab bloklaymiz; chiqish
       // yo'li xato holatida beriladi.
       canPop: _stage == _Stage.failed,
       child: Scaffold(
@@ -359,11 +215,9 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   }
 
   Widget _busyView(Locale l, Color fg) {
-    final title = switch (_stage) {
-      _Stage.capturing => tr(l, 'bozor.pano.flow.opening'),
-      _Stage.uploading => tr(l, 'bozor.pano.flow.uploading'),
-      _ => tr(l, 'bozor.pano.flow.stitching'),
-    };
+    final title = _stage == _Stage.capturing
+        ? tr(l, 'bozor.pano.flow.opening')
+        : tr(l, 'bozor.pano.flow.uploading');
     // Nativ ekran ochilayotganda progress noma'lum — aylanuvchi ko'rsatkich.
     final value = _stage == _Stage.capturing ? null : _progress.clamp(0.0, 1.0);
 
@@ -401,19 +255,6 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
             ),
           ),
         ],
-        if (_stage == _Stage.stitching) ...[
-          const SizedBox(height: 16),
-          Text(
-            tr(l, 'bozor.pano.flow.wait_hint'),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'MTSText',
-              fontSize: 12,
-              height: 1.4,
-              color: fg.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
       ],
     );
   }
@@ -421,7 +262,11 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   Widget _errorView(Locale l, Color fg) => Column(
     mainAxisSize: MainAxisSize.min,
     children: [
-      const Icon(Icons.error_outline_rounded, size: 44, color: Color(0xFFE0492A)),
+      const Icon(
+        Icons.error_outline_rounded,
+        size: 44,
+        color: Color(0xFFE0492A),
+      ),
       const SizedBox(height: 16),
       Text(
         tr(l, 'bozor.pano.flow.failed'),

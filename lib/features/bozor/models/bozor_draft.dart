@@ -10,6 +10,7 @@ library;
 import 'package:flutter/material.dart';
 
 import '../../../core/i18n/app_translations.dart';
+import 'parcel_boundary.dart';
 import 'tour_link.dart';
 
 /// E'lon turi. Dizaynda faqat [rent] oqimi chizilgan; [sale] model uchun bor,
@@ -266,6 +267,26 @@ class AddressDraft {
   double? lat;
   double? lng;
 
+  /// Geoportaldan tanlangan uchastkaning kadastr raqami.
+  ///
+  /// Bo'sh bo'lishi MUMKIN va bu normal: NGIS hamma obyektni qamramaydi
+  /// (yangi qurilish, xatlovdan o'tmagan joy), shuning uchun manzilni
+  /// xaritada qo'lda belgilash yo'li saqlanib qolgan.
+  String cadastreNumber = '';
+
+  /// O'sha uchastkaning chegarasi — e'lon sahifasidagi xaritada chiziladi.
+  ParcelBoundary? boundary;
+
+  /// Uchastka bilan bog'liq hammasini birdan tozalaydi.
+  ///
+  /// Bittasini qoldirib ketish OSON xato bo'lardi: masalan foydalanuvchi
+  /// metkani qo'lda ko'chirsa, eski uchastkaning chegarasi yangi nuqta
+  /// ustida turib qolardi.
+  void clearParcel() {
+    cadastreNumber = '';
+    boundary = null;
+  }
+
   /// Viloyat o'zgarsa tuman mos kelmay qoladi — tozalanadi.
   void setRegion(int id, String name) {
     if (regionId == id) return;
@@ -347,6 +368,61 @@ class ExistingMedia {
 /// Fayllar LOKAL yo'llar sifatida saqlanadi — yuklash endpoint'i hali yo'q.
 /// Planirovka va 360 ham ro'yxat: dizaynda nechta fayl ruxsat etilgani
 /// ko'rsatilmagan, ro'yxat bo'lsa chegarani keyin validatsiya hal qiladi.
+/// Serverda tikilayotgan (yoki yiqilgan) panorama.
+///
+/// `bozor_pano_jobs` jadvalidagi ishning mobil tarafdagi soyasi. Qoralamaga
+/// yoziladi, ya'ni ilova yopilib ochilsa ham kuzatuv davom etadi.
+@immutable
+class PendingPano {
+  const PendingPano({
+    required this.jobId,
+    required this.startedAt,
+    this.error,
+  });
+
+  final int jobId;
+
+  /// Kadrlar yuborilgan payt.
+  ///
+  /// ⚠️ KUZATUV MUDDATI shundan hisoblanadi. Busiz `queued` da qotib qolgan
+  /// ish (masalan worker ko'tarilmagan bo'lsa) abadiy «tayyorlanmoqda»
+  /// bo'lib turaverardi va e'lon hech qachon yuborilmasdi.
+  final DateTime startedAt;
+
+  /// `null` — hali ishlayapti. Bo'sh bo'lmasa — server qaytargan xato.
+  final String? error;
+
+  bool get failed => error != null && error!.isNotEmpty;
+
+  /// [panoramas] ro'yxatidagi vaqtinchalik havola.
+  ///
+  /// ⚠️ S3 kaliti bilan ADASHMASLIGI shart: kalitlar `listings/media/...`
+  /// bilan boshlanadi, bu esa `job:` bilan.
+  static String refOf(int jobId) => 'job:$jobId';
+
+  static int? jobIdOf(String ref) =>
+      ref.startsWith('job:') ? int.tryParse(ref.substring(4)) : null;
+
+  PendingPano withError(String? e) =>
+      PendingPano(jobId: jobId, startedAt: startedAt, error: e);
+
+  Map<String, Object?> toJson() => {
+    'job_id': jobId,
+    'started_at': startedAt.toUtc().toIso8601String(),
+    if (error != null) 'error': error,
+  };
+
+  factory PendingPano.fromJson(Map<String, Object?> j) => PendingPano(
+    jobId: (j['job_id'] as num?)?.toInt() ?? 0,
+    // Eski qoralamada maydon yo'q — o'shanda "hozir" deb olamiz, ya'ni
+    // muddat qaytadan boshlanadi. Abadiy kutishdan ko'ra shu yaxshi.
+    startedAt:
+        DateTime.tryParse('${j['started_at'] ?? ''}')?.toLocal() ??
+        DateTime.now(),
+    error: j['error']?.toString(),
+  );
+}
+
 class DescriptionDraft {
   String text = '';
   final List<String> planFiles = [];
@@ -365,6 +441,35 @@ class DescriptionDraft {
   /// Kalit → ko'rsatish uchun URL. Viewer va tur ekrani shundan o'qiydi
   /// (e'lon hali yaratilmagani uchun serverdan `ListingOut` kelmaydi).
   final Map<String, String> panoramaUrls = {};
+
+  /// HALI TIKILAYOTGAN panoramalar: [panoramas] dagi VAQTINCHALIK havola →
+  /// serverdagi ish holati.
+  ///
+  /// ⚠️ NEGA VAQTINCHALIK HAVOLA. Tikish serverda ~7–9 daqiqa oladi va
+  /// foydalanuvchi uni kutib o'tirmaydi — capture ekrani kadrlar
+  /// yuborilishi bilan yopiladi. Panorama esa TARTIBDAGI o'z o'rnini
+  /// egallashi kerak (foydalanuvchi uni ko'rib turibdi), shuning uchun
+  /// [panoramas] ga darhol `job:<id>` ko'rinishidagi havola qo'yiladi va
+  /// tayyor bo'lganda AYNAN O'SHA O'RINDA haqiqiy S3 kalitiga
+  /// almashtiriladi.
+  ///
+  /// ⚠️ Bo'sh bo'lmasa e'lonni YUBORIB BO'LMAYDI — aks holda tayyor
+  /// bo'lmagan panorama `bozor_submit` da jimgina tashlanib ketardi
+  /// (`uploadedMedia` da kaliti yo'q).
+  final Map<String, PendingPano> pendingPanoramas = {};
+
+  /// [panoramas] dagi havola hali tikilayotganmi.
+  bool isPending(String ref) => pendingPanoramas.containsKey(ref);
+
+  /// Tikish yiqilgan panoramalar — qatorda QIZIL ko'rinadi.
+  Iterable<String> get failedPanoramas => pendingPanoramas.entries
+      .where((e) => e.value.failed)
+      .map((e) => e.key);
+
+  /// Hali ishlayotganlar (xato bermaganlar).
+  Iterable<String> get workingPanoramas => pendingPanoramas.entries
+      .where((e) => !e.value.failed)
+      .map((e) => e.key);
 
   /// TAHRIRLASHDA: e'londa ALLAQACHON turgan fayllar (S3 kalitlari bilan).
   ///

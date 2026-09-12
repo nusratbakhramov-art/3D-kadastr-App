@@ -29,6 +29,7 @@ class MediaUploadRow extends StatelessWidget {
     required this.onRemove,
     this.onOpen,
     this.urlOf,
+    this.statusOf,
   });
 
   final String label;
@@ -39,6 +40,13 @@ class MediaUploadRow extends StatelessWidget {
   final List<String> paths;
   final VoidCallback onAdd;
   final ValueChanged<int> onRemove;
+
+  /// Yozuvning holati — 360° panorama uchun.
+  ///
+  /// Panorama serverda ~7–9 daqiqa tikiladi va foydalanuvchi buni kutmaydi:
+  /// qatorda o'sha vaqt davomida KUTILAYOTGAN yozuv turadi. Berilmasa
+  /// hamma yozuv tayyor deb qaraladi (foto va planirovka shunday).
+  final MediaItemStatus Function(String path)? statusOf;
 
   /// Yozuv uchun TARMOQ manzili; `null` bo'lsa yozuv lokal fayl deb o'qiladi.
   ///
@@ -130,6 +138,7 @@ class MediaUploadRow extends StatelessWidget {
               itemBuilder: (context, i) => _Thumb(
                 path: paths[i],
                 url: urlOf?.call(paths[i]),
+                status: statusOf?.call(paths[i]) ?? MediaItemStatus.ready,
                 onRemove: () => onRemove(i),
                 onOpen: () {
                   final ValueChanged<int>? open = onOpen;
@@ -153,13 +162,28 @@ class MediaUploadRow extends StatelessWidget {
   }
 }
 
+/// Tasmadagi bitta yozuvning holati.
+enum MediaItemStatus {
+  /// Ko'rsatishga tayyor.
+  ready,
+
+  /// Serverda tayyorlanmoqda (360° tikish).
+  pending,
+
+  /// Tayyorlash yiqildi — bosilsa qayta urinish taklif qilinadi.
+  failed,
+}
+
 class _Thumb extends StatelessWidget {
   const _Thumb({
     required this.path,
     required this.onRemove,
     required this.onOpen,
+    required this.status,
     this.url,
   });
+
+  final MediaItemStatus status;
 
   final String path;
 
@@ -190,31 +214,55 @@ class _Thumb extends StatelessWidget {
                     borderRadius: radius,
                     border: Border.all(color: border),
                   ),
-                  child: (url != null && url!.isNotEmpty)
-                      ? Image.network(
-                          url!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) => _fallbackIcon(isDark),
-                          loadingBuilder: (_, child, progress) =>
-                              progress == null
-                              ? child
-                              : const Center(
-                                  child: SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                ),
-                        )
-                      : Image.file(
-                          File(path),
-                          fit: BoxFit.cover,
-                          // PDF/hujjat tanlansa rasm ochilmaydi — qulflanib
-                          // qolmasin, o'rniga fayl ikonkasi chiqadi.
-                          errorBuilder: (_, _, _) => _fallbackIcon(isDark),
+                  child: switch (status) {
+                    MediaItemStatus.pending => _Placeholder(
+                      isDark: isDark,
+                      color: AppColors.splashGreen,
+                      child: const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.splashGreen,
                         ),
+                      ),
+                    ),
+                    MediaItemStatus.failed => _Placeholder(
+                      isDark: isDark,
+                      color: const Color(0xFFE0492A),
+                      child: const Icon(
+                        Icons.refresh_rounded,
+                        color: Color(0xFFE0492A),
+                        size: 24,
+                      ),
+                    ),
+                    MediaItemStatus.ready =>
+                      (url != null && url!.isNotEmpty)
+                          ? Image.network(
+                              url!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => _fallbackIcon(isDark),
+                              loadingBuilder: (_, child, progress) =>
+                                  progress == null
+                                  ? child
+                                  : const Center(
+                                      child: SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      ),
+                                    ),
+                            )
+                          : Image.file(
+                              File(path),
+                              fit: BoxFit.cover,
+                              // PDF/hujjat tanlansa rasm ochilmaydi — qulflanib
+                              // qolmasin, o'rniga fayl ikonkasi chiqadi.
+                              errorBuilder: (_, _, _) => _fallbackIcon(isDark),
+                            ),
+                  },
                 ),
               ),
             ),
@@ -249,3 +297,24 @@ Widget _fallbackIcon(bool isDark) => Icon(
   Icons.insert_drive_file_rounded,
   color: isDark ? Colors.white38 : Colors.black26,
 );
+
+/// Eskiz o'rnidagi belgi — hali rasm yo'q (tayyorlanmoqda yoki yiqilgan).
+class _Placeholder extends StatelessWidget {
+  const _Placeholder({
+    required this.isDark,
+    required this.color,
+    required this.child,
+  });
+
+  final bool isDark;
+  final Color color;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: color.withValues(alpha: isDark ? 0.16 : 0.10),
+    ),
+    child: Center(child: child),
+  );
+}

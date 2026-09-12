@@ -17,6 +17,7 @@
 library;
 
 import '../models/bozor_draft.dart';
+import '../models/parcel_boundary.dart';
 import '../models/tour_link.dart';
 import '../models/bozor_listing.dart';
 
@@ -135,6 +136,14 @@ const String kLocalMediaKey = '_local_media';
 /// tahrir NUSXA bo'lib ketardi, asl e'lon esa o'zgarmasdan qolardi.
 const String kEditingListingKey = '_editing_listing_id';
 
+/// Ro'yxatdagi qoralama MAVJUD e'lonning tahriri bo'lsa — o'sha e'lon id'si.
+///
+/// Qoralamani to'liq tiklamasdan (`draftFromPayload`) javob beradi: chaqiruvi
+/// ikkita — saqlashda TAKRORNI oldini olish va kartada «Tahrirlanmoqda»
+/// nishonini ko'rsatish. Ikkalasiga ham faqat shu bitta son kerak.
+int? editingListingIdOf(BozorDraftSummary draft) =>
+    _int(draft.payload[kEditingListingKey]);
+
 /// Serverda ALLAQACHON turgan fayllar (tahrirlash uchun).
 ///
 /// ⚠️ BUSIZ TAHRIRLASHNI DAVOM ETTIRISH RASMLARNI O'CHIRARDI. `PATCH`
@@ -158,6 +167,12 @@ Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
       'panorama': List<String>.from(d.panoramas),
       // Panorama kalitlarining ko'rsatish URL'lari — viewer/tur uchun.
       'panorama_urls': Map<String, String>.from(d.panoramaUrls),
+      // HALI TIKILAYOTGANLAR. Busiz ilova yopilib ochilganda kuzatuv
+      // uzilardi: `panoramas` da `job:<id>` havolasi qolib, uni hech kim
+      // haqiqiy kalitga almashtirmasdi va e'lon abadiy yuborilmas bo'lardi.
+      'pending_panorama': {
+        for (final e in d.pendingPanoramas.entries) e.key: e.value.toJson(),
+      },
       // Allaqachon yuklangan fayllar — qayta urinish ularni takrorlamasin.
       'uploaded': Map<String, String>.from(d.uploadedMedia),
       // 360° tur havolalari. Qoralamada LOKAL YO'L bilan yotadi, ya'ni
@@ -210,6 +225,8 @@ Map<String, dynamic> draftToPayload(
       if (a.totalFloors.isNotEmpty) 'total_floors': int.tryParse(a.totalFloors),
       if (a.lat != null) 'lat': a.lat,
       if (a.lng != null) 'lng': a.lng,
+      if (a.cadastreNumber.isNotEmpty) 'cadastre_number': a.cadastreNumber,
+      if (a.boundary != null) 'boundary': a.boundary!.toGeoJson(),
     },
     'params': Map<String, Object?>.from(draft.params),
     // «Сделка» — FAQAT sotuvda. Ijarada bo'lim umuman YUBORILMAYDI: backend
@@ -310,7 +327,9 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
     ..floor = _numStr(a['floor'])
     ..totalFloors = _numStr(a['total_floors'])
     ..lat = _double(a['lat'])
-    ..lng = _double(a['lng']);
+    ..lng = _double(a['lng'])
+    ..cadastreNumber = _str(a['cadastre_number'])
+    ..boundary = ParcelBoundary.fromGeoJson(a['boundary']);
 
   // `setType` params'ni tozalaydi, shuning uchun params'ni turdan KEYIN
   // to'ldiramiz — aks holda 3-qadam qiymatlari yo'qolardi.
@@ -357,6 +376,15 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
     ..addAll({
       for (final e in _map(local['panorama_urls']).entries)
         if (e.value != null) e.key: e.value.toString(),
+    });
+  draft.description.pendingPanoramas
+    ..clear()
+    ..addAll({
+      for (final e in _map(local['pending_panorama']).entries)
+        if (e.value is Map)
+          e.key: PendingPano.fromJson(
+            (e.value as Map).cast<String, Object?>(),
+          ),
     });
   draft.description.uploadedMedia
     ..clear()
@@ -472,7 +500,9 @@ BozorDraft draftFromListing(BozorListing l) {
     ..floor = l.floor?.toString() ?? ''
     ..totalFloors = l.totalFloors?.toString() ?? ''
     ..lat = l.latitude
-    ..lng = l.longitude;
+    ..lng = l.longitude
+    ..cadastreNumber = l.cadastreNumber ?? ''
+    ..boundary = l.boundary;
 
   // Tur `BozorDraft` konstruktorida berilgani uchun `setType` chaqirilmaydi,
   // ya'ni `params` tozalanmaydi — to'g'ridan-to'g'ri to'ldirsak bo'ladi.

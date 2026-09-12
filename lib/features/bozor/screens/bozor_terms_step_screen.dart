@@ -21,6 +21,7 @@ import '../bozor_routes.dart';
 import '../data/bozor_api.dart';
 import '../data/bozor_draft_store.dart';
 import '../data/bozor_submit.dart';
+import '../data/pano_submit_gate.dart';
 import '../models/bozor_draft.dart';
 import '../models/bozor_validation.dart';
 import '../widgets/bozor_consent_row.dart';
@@ -113,7 +114,16 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
 
   Future<void> _submit() async {
     if (_sending) return;
-    if (!_checkComplete(Localizations.localeOf(context))) return;
+    final locale = Localizations.localeOf(context);
+    if (!_checkComplete(locale)) return;
+    // ⚠️ Panorama to'sig'i ALOHIDA: `_checkComplete` majburiy MAYDONLARNI
+    // tekshiradi, bu esa fonda tikilayotgan ishni. Ikkalasini birlashtirsak
+    // xabar aniqligini yo'qotardi.
+    final blocker = panoSubmitBlocker(widget.draft.description);
+    if (blocker != null) {
+      AppToast.error(context, tr(locale, blocker));
+      return;
+    }
     setState(() {
       _sending = true;
       _done = 0;

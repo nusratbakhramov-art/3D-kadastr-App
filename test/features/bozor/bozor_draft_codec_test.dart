@@ -1,7 +1,9 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kadastr/features/bozor/bozor_resume.dart';
 import 'package:kadastr/features/bozor/data/bozor_draft_codec.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
+import 'package:kadastr/features/bozor/widgets/pano_ready_banner.dart';
 import 'package:kadastr/features/bozor/models/bozor_listing.dart';
 import 'package:kadastr/features/bozor/screens/bozor_address_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_params_step_screen.dart';
@@ -231,17 +233,23 @@ void main() {
   _editTests();
 
   group('bozorStepScreenSafe — resume', () {
+    /// ⚠️ Ekran `PanoReadyBanner` ga O'RALGAN: fonda tikilayotgan panorama
+    /// tayyor bo'lganda lenta sehrgarning ISTALGAN qadamida chiqishi kerak,
+    /// va har qadam o'z `Scaffold` iga ega bo'lgani uchun o'ram shu yerda.
+    /// Test o'ram ICHIGA qaraydi — kafolat o'sha-o'sha: to'g'ri ekran.
+    Widget screen(BozorDraft d, WizardStep step) {
+      final w = bozorStepScreenSafe(d, step);
+      return w is PanoReadyBanner ? w.child : w;
+    }
+
     test('saqlangan qadam ekranga tushadi', () {
       final d = BozorDraft(
         deal: DealType.rent,
         kind: PropertyKind.residential,
         type: PropertyType.apartment,
       );
-      expect(
-        bozorStepScreenSafe(d, WizardStep.params),
-        isA<BozorParamsStepScreen>(),
-      );
-      expect(bozorStepScreenSafe(d, WizardStep.price), isA<BozorPriceStepScreen>());
+      expect(screen(d, WizardStep.params), isA<BozorParamsStepScreen>());
+      expect(screen(d, WizardStep.price), isA<BozorPriceStepScreen>());
     });
 
     test('turda YO‘Q qadam — eng yaqin oldingi qadamga tushadi', () {
@@ -254,10 +262,7 @@ void main() {
         type: PropertyType.otherNonResidential,
       );
       expect(d.wizardSteps.contains(WizardStep.params), isFalse);
-      expect(
-        bozorStepScreenSafe(d, WizardStep.params),
-        isA<BozorAddressStepScreen>(),
-      );
+      expect(screen(d, WizardStep.params), isA<BozorAddressStepScreen>());
     });
   });
 }
