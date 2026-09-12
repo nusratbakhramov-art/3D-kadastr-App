@@ -24,7 +24,7 @@ import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr/kadastr_area_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
 import '../bozor/feed/bozor_home_screen.dart';
-import '../services/screens/service_placeholder_screen.dart';
+import '../services/screens/taqiq_check_screen.dart';
 import '../settings/settings_screen.dart';
 import '../../theme/app_colors.dart';
 import 'app_bottom_nav.dart';
@@ -275,15 +275,13 @@ class _MainShellState extends State<MainShell> {
 
   /// «Taqiqni tekshirish» — shaxsiy kadastr ma'lumoti bo'yicha so'rov, shuning
   /// uchun Bozor AI / AI Baholash bilan bir xil login drawer bilan qulflanadi.
+  /// (Tekshiruvning o'zi ham token talab qiladi: davreestr captchasi backend
+  /// orqali yechiladi.)
   Future<void> _openTaqiqCheck() async {
     if (!await ensureLoggedIn(context, storage: widget.authStorage)) return;
     if (!mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ServicePlaceholderScreen(
-          title: tr(widget.locale, 'home.card.taqiq_check'),
-        ),
-      ),
+      MaterialPageRoute<void>(builder: (_) => const TaqiqCheckScreen()),
     );
   }
 
@@ -344,12 +342,32 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
+/// Pastki panel tablari — TEST uchun ochiq.
+///
+/// Ro'yxatning o'zi `_ShellStrings` ichida xususiy; bu yerda faqat unga
+/// kirish nuqtasi. Sabab: tablarning RANGI jimgina qaytadigan narsa —
+/// tint berilmasa Market va Arizalar o'z brend ranglarini (qizil, ko'k)
+/// chiqaradi va buni `analyze` ham, boshqa testlar ham ko'rmaydi.
+@visibleForTesting
+List<AppBottomNavItem> shellNavItems(Locale locale) =>
+    _ShellStrings.items(locale);
+
 class _ShellStrings {
   const _ShellStrings._();
 
   // Each tab keeps one fixed colour — nothing here reacts to which tab is
-  // selected. Market and Arizalar are the korzinka.uz and my.gov.uz marks and
-  // ship their brand palettes inside the SVG, so they pass no tint at all.
+  // selected.
+  //
+  // Market va Arizalar ilgari TINTSIZ edi: ular korzinka.uz va my.gov.uz
+  // belgilari va o'z brend ranglarini SVG ichida olib yuradi (qizil va
+  // ko'k). Panel esa shu sababli uch xil rangli bo'lib ko'rinardi. Endi
+  // ikkalasi ham Asosiy bilan bir xil yashilga bo'yaladi.
+  //
+  // ⚠️ `BlendMode.srcIn` ikonkani BITTA rangga tekislaydi. Bu ikkalasida
+  // ham tekshirilgan: Market bir rangli edi, Arizalar esa uch rangli, lekin
+  // uning plitkalari oq ORALIQ bilan ajralgan va "bajarildi" belgisi
+  // KESIK (teshik) — shuning uchun tekislangach ham tuzilishi o'qiladi.
+  // Yangi ko'p rangli ikonka qo'shilsa — avval shunday tekshirib ko'ring.
   static List<AppBottomNavItem> items(Locale locale) => [
     AppBottomNavItem(
       label: _home(locale),
@@ -360,10 +378,14 @@ class _ShellStrings {
     AppBottomNavItem(
       label: _market(locale),
       iconAsset: 'assets/icons/tab-market.svg',
+      tintLight: AppColors.brandGreen,
+      tintDark: AppColors.splashGreen,
     ),
     AppBottomNavItem(
       label: _applications(locale),
       iconAsset: 'assets/icons/tab-applications.svg',
+      tintLight: AppColors.brandGreen,
+      tintDark: AppColors.splashGreen,
     ),
     AppBottomNavItem(
       label: _profile(locale),
