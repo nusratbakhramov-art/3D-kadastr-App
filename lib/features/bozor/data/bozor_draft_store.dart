@@ -42,19 +42,63 @@ Future<void> saveBozorDraft(BozorDraft draft, WizardStep reached) async {
 
   final api = BozorApi();
   try {
-    final payload = draftToDraftPayload(draft);
-    final id = draft.draftId;
-    if (id == null) {
-      draft.draftId = await api.createDraft(
-        payload: payload,
-        currentStep: reached.name,
-      );
-    } else {
-      await api.updateDraft(id, payload: payload, currentStep: reached.name);
-    }
+    await persistBozorDraft(api, draft, reached);
   } catch (_) {
     // Jim — keyingi qadamda yana urinib ko'riladi.
   } finally {
     api.dispose();
   }
+}
+
+/// Qoralama qatorini serverda ta'minlaydi: bori yangilanadi, yo'g'i yaratiladi.
+///
+/// [saveBozorDraft] dan ayri turishining sababi — SINALISHI: bu yerda na
+/// `AuthStorage`, na `BozorApi()` qurilishi bor, ya'ni testda `MockClient`
+/// bilan haydash mumkin. Xatolar bu yerda YUTILMAYDI — ularni chaqiruvchi
+/// yutadi.
+Future<void> persistBozorDraft(
+  BozorApi api,
+  BozorDraft draft,
+  WizardStep reached,
+) async {
+  final payload = draftToDraftPayload(draft);
+  // ⚠️ Tahrirlashda YANGI qator yaratish TAQIQLANADI. «Tahrirlash» har
+  // bosilganda `draftFromListing` `draftId` siz qoralama beradi, ya'ni bu yer
+  // `createDraft` ga tushardi va «Mening e'lonlarim» ga yana bitta karta
+  // qo'shilardi — foydalanuvchi buni e'lon tahrirlanmay, NUSXA ochilgani deb
+  // ko'radi. Tahrir oxiriga yetkazilmasa (odatiy hol) karta abadiy qolardi,
+  // 20 talik chegaraga yetganda esa backend eng eski HAQIQIY qoralamani
+  // jimgina o'chirardi.
+  //
+  // Shuning uchun bitta e'longa BITTA tahrir-qoralamasi.
+  final id = draft.draftId ?? await _existingEditDraftId(api, draft);
+  if (id == null) {
+    draft.draftId = await api.createDraft(
+      payload: payload,
+      currentStep: reached.name,
+    );
+    return;
+  }
+  draft.draftId = id;
+  await api.updateDraft(id, payload: payload, currentStep: reached.name);
+}
+
+/// Shu e'lon uchun ALLAQACHON ochilgan tahrir-qoralamasi (bo'lsa).
+///
+/// Tahrirlash EMAS (oddiy, yangi e'lon oqimi) bo'lsa so'rov UMUMAN
+/// yuborilmaydi — sehrgarni ortiqcha kutdirmaslik uchun.
+///
+/// Xato yutiladi va `null` qaytadi: ro'yxatni ololmaslik sababli qoralama
+/// saqlanmay qolgandan ko'ra, yangi qator yaratilgani yaxshiroq.
+Future<int?> _existingEditDraftId(BozorApi api, BozorDraft draft) async {
+  final listingId = draft.editingListingId;
+  if (listingId == null) return null;
+  try {
+    for (final d in await api.drafts()) {
+      if (editingListingIdOf(d) == listingId) return d.id;
+    }
+  } catch (_) {
+    // Jim — chaqiruvchi `createDraft` ga tushadi.
+  }
+  return null;
 }

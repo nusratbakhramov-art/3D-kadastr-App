@@ -4,6 +4,22 @@
 /// to'rttasi hammada bir xil (viloyat, tuman, manzil, mo'ljal), qolgani faqat
 /// kvartira va uyda. Ro'yxat qat'iy yozilmagan — bitta `for` aylanma enum
 /// bo'yicha yuradi, shunda yangi tur qo'shilsa faqat model o'zgaradi.
+///
+/// ## Manzilni xaritadan olish
+///
+/// Asosiy yo'l — GEOPORTAL uchastkalari xaritasi (AI Baholash va «Taqiqni
+/// tekshirish» dagi bilan bir xil ekran). U uchta narsani birdan beradi:
+/// kadastr raqami, uchastka chegarasi va markaz nuqtasi. Keyin raqam bo'yicha
+/// davreestr so'raladi va bo'sh maydonlar to'ldiriladi.
+///
+/// Ikkinchi yo'l — eski erkin metka. U ATAYLAB qoldirilgan: geoportal hamma
+/// obyektni qamramaydi, va uchastka topilmagani uchun e'lon berish yo'li
+/// berkilib qolmasligi kerak.
+///
+/// ⚠️ AVTOTO'LDIRISH HECH QACHON USTIDAN YOZMAYDI. Faqat BO'SH maydon
+/// to'ldiriladi — foydalanuvchi qo'lda yozganini reyestr ma'lumoti bilan
+/// almashtirish jimgina ma'lumot yo'qotish bo'lardi (u o'zgarganini
+/// sezmasligi ham mumkin).
 library;
 
 import 'package:flutter/material.dart';
@@ -12,16 +28,23 @@ import 'package:latlong2/latlong.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
+import '../../auth/auth_storage.dart';
+import '../../services/api_cadastre_service.dart';
 import '../../services/data/geocoder_client.dart';
+import '../../services/data/ngis_parcel_client.dart';
 import '../../services/screens/map_location_picker_screen.dart';
+import '../../services/screens/parcel_picker_screen.dart';
 import '../../services/widgets/service_app_bar.dart';
 import '../../services/widgets/step_progress_bar.dart';
 import '../../services/widgets/wizard_field.dart';
 import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
 import '../bozor_step_route.dart';
+import '../data/cadastre_address.dart';
+import '../data/cadastre_autofill.dart';
 import '../data/regions_repository.dart';
 import '../models/bozor_draft.dart';
+import '../models/parcel_boundary.dart';
 import '../widgets/address_pin_field.dart';
 import '../widgets/option_picker_sheet.dart';
 import '../widgets/select_field.dart';
@@ -66,7 +89,10 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
   ];
 
   final GeocoderClient _geocoder = GeocoderClient();
-  bool _geocoding = false;
+
+  /// Xaritadan qaytgan natija maydonlarga ko'chirilmoqda (reyestr so'rovi
+  /// yoki reverse-geokod) — manzil qatorida aylanma turadi.
+  bool _autofilling = false;
 
   List<Region> _regions = const [];
   List<District> _districts = const [];
@@ -177,7 +203,44 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
     });
   }
 
-  Future<void> _pickOnMap() async {
+  /// ASOSIY yo'l — geoportal uchastkalari xaritasi.
+  ///
+  /// Qaytgan uchastkadan uchta narsa olinadi: kadastr raqami, chegara va
+  /// markaz nuqtasi. Keyin raqam bo'yicha davreestr so'raladi va BO'SH
+  /// maydonlar to'ldiriladi.
+  Future<void> _pickParcel() async {
+    final center = _a.boundary?.center ??
+        (_a.lat != null && _a.lng != null ? LatLng(_a.lat!, _a.lng!) : null);
+    final parcel = await Navigator.of(context).push<NgisParcel>(
+      MaterialPageRoute<NgisParcel>(
+        settings: bozorRoute('address/parcel'),
+        builder: (_) => ParcelPickerScreen(initialCenter: center),
+      ),
+    );
+    if (parcel == null || !mounted) return;
+
+    final boundary = ParcelBoundary.fromRings(parcel.parts);
+    final point = boundary?.center ?? parcel.center;
+    setState(() {
+      _a.cadastreNumber = parcel.cadastreNumber;
+      _a.boundary = boundary;
+      if (point != null) {
+        _a.lat = point.latitude;
+        _a.lng = point.longitude;
+      }
+      _autofilling = true;
+    });
+    try {
+      await _fillFromCadastre(parcel.cadastreNumber, point);
+    } finally {
+      if (mounted) setState(() => _autofilling = false);
+    }
+  }
+
+  /// IKKINCHI yo'l — erkin metka (eski xulq). Uchastka ma'lumoti endi shu
+  /// nuqtaga tegishli emas, shuning uchun u tozalanadi: aks holda xaritada
+  /// bir joy, chegarada esa boshqa uy ko'rinardi.
+  Future<void> _pickManually() async {
     final l = Localizations.localeOf(context);
     final lat = _a.lat;
     final lng = _a.lng;
@@ -193,26 +256,139 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
     );
     if (result == null || !mounted) return;
     setState(() {
+      _a.clearParcel();
       _a.lat = result.latitude;
       _a.lng = result.longitude;
-      _geocoding = true;
+      _autofilling = true;
     });
-    // Nuqtani manzil matniga aylantirib, maydonni avtomatik to'ldiramiz.
-    // `GeocoderClient` uchinchi tomon geokoderiga EMAS, backend proksisiga
-    // (`/api/v1/geo/reverse`) boradi — kalit ilovada saqlanmaydi.
     try {
-      final text = await _geocoder.reverse(result.latitude, result.longitude);
+      await _reverseGeocode(result, showError: true);
+    } finally {
+      if (mounted) setState(() => _autofilling = false);
+    }
+  }
+
+  /// Kadastr raqami bo'yicha reyestrdan so'rab, bo'sh maydonlarni to'ldiradi.
+  ///
+  /// Reyestr javob bermasa oqim TO'XTAMAYDI: nuqta reverse-geokodlanadi va
+  /// manzil matni baribir to'ladi. Uchastka raqami va chegarasi esa
+  /// saqlanib qoladi — ular xaritadan olingan, reyestrdan emas.
+  Future<void> _fillFromCadastre(String number, LatLng? point) async {
+    final l = Localizations.localeOf(context);
+    final session = await const AuthStorage().loadSession();
+    final token = session.token;
+    if (token == null || token.isEmpty) {
+      if (point != null) await _reverseGeocode(point);
+      return;
+    }
+    CadastreLookupResult? info;
+    try {
+      // Kesh ATAYLAB ishlatiladi (`forceRefresh` yo'q): bu e'lon uchun
+      // manzil, yuridik hujjat emas. Kesh javobni bir zumda beradi va
+      // davreestr so'rov limitiga urilish ehtimolini kamaytiradi.
+      info = await CadastreApiService().lookup(
+        cadastreNumber: number,
+        token: token,
+      );
+    } catch (_) {
+      // Reyestr javob bermadi — pastda nuqtadan manzil olamiz.
+      info = null;
+    }
+    if (!mounted) return;
+
+    final address = info?.address?.trim() ?? '';
+    if (address.isEmpty) {
+      if (point != null) await _reverseGeocode(point);
+      if (mounted) AppToast.error(context, _S.cadastreFailed(l));
+      return;
+    }
+    await _applyCadastre(info!);
+  }
+
+  /// Reyestr javobini maydonlarga yozadi — FAQAT bo'shlariga.
+  ///
+  /// Nimani to'ldirish kerakligini `buildCadastreAutofill` hal qiladi (sof
+  /// funksiya, o'z testlari bilan); bu yerda faqat qo'llash qoladi.
+  Future<void> _applyCadastre(CadastreLookupResult info) async {
+    final type = widget.draft.type;
+    if (type == null) return;
+    final plan = buildCadastreAutofill(
+      info: info,
+      type: type,
+      currentAddress: _address.text,
+      currentHouseNumber: _houseNumber.text,
+      currentApartmentNumber: _apartmentNumber.text,
+      hasRegion: _a.regionId != null,
+      hasDistrict: _a.districtId != null,
+      currentParams: widget.draft.params,
+    );
+    if (plan.isEmpty) return;
+
+    setState(() {
+      if (plan.address != null) _address.text = plan.address!;
+      if (plan.houseNumber != null) _houseNumber.text = plan.houseNumber!;
+      if (plan.apartmentNumber != null) {
+        _apartmentNumber.text = plan.apartmentNumber!;
+      }
+      widget.draft.params.addAll(plan.params);
+    });
+    // Viloyat/tuman tanlash TUMANLAR RO'YXATINI yuklaydi — kutiladi, aks
+    // holda aylanma to'ldirish tugamasdan o'chib qolardi.
+    await _applyPlaces(plan);
+  }
+
+  /// Viloyat va tumanni nom bo'yicha tanlaydi.
+  ///
+  /// Mos kelmasa JIMGINA o'tkazib yuboriladi — reyestr va bazadagi nomlar
+  /// har doim ham bir xil transliteratsiyada emas (masalan reyestr
+  /// "Sirg'ali", baza "Sergeli" deydi). Taxmin qilib noto'g'ri tuman
+  /// qo'yishdan ko'ra bo'sh qoldirgan ma'qul: foydalanuvchi bo'shligini
+  /// ko'radi, noto'g'risini esa yo'q.
+  Future<void> _applyPlaces(CadastreAutofill plan) async {
+    if (_a.regionId == null && _regions.isNotEmpty) {
+      final i = matchPlaceIndex(
+        [for (final r in _regions) r.name],
+        plan.regionName,
+      );
+      if (i == null) return;
+      final region = _regions[i];
+      setState(() {
+        _a.setRegion(region.id, region.name);
+        _districts = const [];
+      });
+      await _loadDistricts(region.id);
+      if (!mounted) return;
+    }
+    if (_a.districtId != null || _districts.isEmpty) return;
+    final j = matchPlaceIndex(
+      [for (final d in _districts) d.name],
+      plan.districtName,
+    );
+    if (j == null) return;
+    final district = _districts[j];
+    setState(() {
+      _a.districtId = district.id;
+      _a.districtName = district.name;
+    });
+  }
+
+  /// Nuqtani manzil matniga aylantiradi (faqat maydon BO'SH bo'lsa).
+  ///
+  /// `GeocoderClient` uchinchi tomon geokoderiga EMAS, backend proksisiga
+  /// (`/api/v1/geo/reverse`) boradi — kalit ilovada saqlanmaydi.
+  Future<void> _reverseGeocode(LatLng point, {bool showError = false}) async {
+    final l = Localizations.localeOf(context);
+    try {
+      final text = await _geocoder.reverse(point.latitude, point.longitude);
       if (!mounted) return;
       if (text != null && text.isNotEmpty) {
-        _address.text = text;
-      } else {
+        if (_address.text.trim().isEmpty) _address.text = text;
+      } else if (showError) {
         AppToast.error(context, _S.geocodeFailed(l));
       }
     } on GeocoderException {
       // Koordinata baribir saqlanadi — foydalanuvchi manzilni qo'lda yozadi.
-      if (mounted) AppToast.error(context, _S.geocodeFailed(l));
-    } finally {
-      if (mounted) setState(() => _geocoding = false);
+      if (mounted && showError) AppToast.error(context, _S.geocodeFailed(l));
     }
   }
 
@@ -293,16 +469,23 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
         controller: _address,
         placeholder: _S.addressHint(l),
         required: true,
-        onPickOnMap: _pickOnMap,
-        busy: _geocoding,
+        onPickOnMap: _pickParcel,
+        onPickManually: _pickManually,
+        manualLabel: _S.manualPin(l),
+        busy: _autofilling,
         point: _a.lat != null && _a.lng != null
             ? (lat: _a.lat!, lng: _a.lng!)
             : null,
         pointLabel: _S.markedOnMap(l),
+        cadastreNumber: _a.cadastreNumber,
+        cadastreLabel: _S.cadastreLabel(l),
         clearLabel: _S.clear(l),
+        // Nuqta bilan birga uchastka ham ketadi — ular bitta tanlovning
+        // natijasi, birini qoldirib ketish ma'nosiz holat yaratardi.
         onClearPoint: () => setState(() {
           _a.lat = null;
           _a.lng = null;
+          _a.clearParcel();
         }),
       ),
       AddressRow.landmark => WizardField(
@@ -466,6 +649,10 @@ class _S {
   static String clear(Locale l) => tr(l, 'bozor.common.clear');
   static String mapTitle(Locale l) => tr(l, 'bozor.address.map_title');
   static String mapSubtitle(Locale l) => tr(l, 'bozor.address.map_subtitle');
+  static String manualPin(Locale l) => tr(l, 'bozor.address.manual_pin');
+  static String cadastreLabel(Locale l) => tr(l, 'bozor.address.cadastre');
+  static String cadastreFailed(Locale l) =>
+      tr(l, 'bozor.address.cadastre_failed');
   static String floorTooHigh(Locale l) => tr(l, 'bozor.address.floor_too_high');
   static String geocodeFailed(Locale l) =>
       tr(l, 'bozor.address.geocode_failed');

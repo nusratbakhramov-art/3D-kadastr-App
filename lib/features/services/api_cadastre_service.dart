@@ -28,6 +28,7 @@ class CadastreLookupResult {
     this.objectTypeHint,
     this.totalArea,
     this.livingArea,
+    this.landArea,
     this.cadastreValue,
     this.hasRestrictions,
     this.restrictions = const [],
@@ -38,6 +39,11 @@ class CadastreLookupResult {
   final String? objectTypeHint;
   final double? totalArea; // m²
   final double? livingArea; // m²
+
+  /// Yer maydoni (m²) — faqat yeri bor obyektlarda.
+  /// Batafsil: [DavreestrLookupResult.landArea].
+  final double? landArea; // m²
+
   final double? cadastreValue; // so'm
 
   /// Obyektga ta'qiq/cheklov qo'yilganmi: `true`/`false` — reyestrdan aynan
@@ -56,6 +62,7 @@ class CadastreLookupResult {
         objectTypeHint: j['object_type_hint'] as String?,
         totalArea: (j['total_area'] as num?)?.toDouble(),
         livingArea: (j['living_area'] as num?)?.toDouble(),
+        landArea: (j['land_area'] as num?)?.toDouble(),
         cadastreValue: (j['cadastre_value'] as num?)?.toDouble(),
       );
 }
@@ -94,6 +101,7 @@ class CadastreApiService {
         objectTypeHint: r.objectTypeHint,
         totalArea: r.totalArea,
         livingArea: r.livingArea,
+        landArea: r.landArea,
         cadastreValue: r.cadastreValue,
         hasRestrictions: r.hasRestrictions,
         restrictions: r.restrictions,

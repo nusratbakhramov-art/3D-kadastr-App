@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../theme/color_tokens.dart';
+import '../data/bozor_draft_codec.dart';
 import '../models/bozor_listing.dart';
 
 class BozorDraftCard extends StatelessWidget {
@@ -37,6 +38,13 @@ class BozorDraftCard extends StatelessWidget {
     // (foydalanuvchi 1-qadamda chiqib ketgan) — bunda o'rniga izoh chiqadi.
     final title = draft.title ?? tr(l, 'bozor.draft.untitled');
     final subtitle = draft.address;
+    // Tahrir-qoralamasi ro'yxatda ASL e'lon bilan YONMA-YON turadi, ya'ni
+    // «Tugatilmagan» nishoni bilan u nusxa yaratilgandek ko'rinardi. Bu yerda
+    // nishon matni ayiradi: bosilganda yangi e'lon emas, o'sha e'lon
+    // tahrirlanadi.
+    final badge = editingListingIdOf(draft) != null
+        ? 'bozor.draft.badge_editing'
+        : 'bozor.draft.badge';
 
     return Material(
       color: card,
@@ -79,7 +87,7 @@ class BozorDraftCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          tr(l, 'bozor.draft.badge'),
+                          tr(l, badge),
                           style: const TextStyle(
                             fontFamily: 'MTSCompact',
                             fontWeight: FontWeight.w700,

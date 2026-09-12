@@ -5,9 +5,11 @@ import 'package:kadastr/features/bozor/data/bozor_draft_codec.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/widgets/pano_ready_banner.dart';
 import 'package:kadastr/features/bozor/models/bozor_listing.dart';
+import 'package:kadastr/features/bozor/models/parcel_boundary.dart';
 import 'package:kadastr/features/bozor/screens/bozor_address_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_params_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_price_step_screen.dart';
+import 'package:latlong2/latlong.dart';
 
 /// Qoralama kodeki — yozish (`submit` payload'i) va o'qish (resume) bir xil
 /// kalitlarni ishlatishini qotiradi.
@@ -36,7 +38,15 @@ BozorDraft _fullDraft() {
     ..floor = '5'
     ..totalFloors = '9'
     ..lat = 41.2995
-    ..lng = 69.2401;
+    ..lng = 69.2401
+    ..cadastreNumber = '10:09:01:01:02:5942'
+    ..boundary = ParcelBoundary.fromRings(const [
+      [
+        LatLng(41.311081, 69.240562),
+        LatLng(41.311081, 69.240800),
+        LatLng(41.311300, 69.240800),
+      ],
+    ]);
   d.params.addAll({
     'rooms_count': '3',
     'total_area': 72.5,
@@ -91,6 +101,15 @@ void main() {
       expect(after.address.totalFloors, '9');
       expect(after.address.lat, closeTo(41.2995, 1e-9));
       expect(after.address.lng, closeTo(69.2401, 1e-9));
+      // Geoportaldan tanlangan uchastka — qoralamaga qaytganda u ham
+      // tiklanishi kerak, aks holda chegara JIMGINA yo'qolardi.
+      expect(after.address.cadastreNumber, '10:09:01:01:02:5942');
+      expect(after.address.boundary, isNotNull);
+      expect(after.address.boundary!.parts.single, hasLength(3));
+      expect(
+        after.address.boundary!.parts.single.first.latitude,
+        closeTo(41.311081, 1e-9),
+      );
 
       expect(after.params['rooms_count'], '3');
       expect(after.params['total_area'], 72.5);

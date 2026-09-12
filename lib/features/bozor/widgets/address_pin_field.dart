@@ -3,10 +3,19 @@
 /// Dizayndagi `Адрес` qatori aynan shunday: oddiy input, ichida 32pt li
 /// tugmacha, unda qizil "map pin". Tugmacha bosilsa xarita ekrani ochiladi.
 ///
-/// Xaritadan nuqta tanlangach chaqiruvchi uni reverse-geokodlaydi va matn
-/// maydonini AVTOMATIK to'ldiradi ([busy] shu paytda aylanma ko'rsatadi).
-/// Koordinata maydon ostida alohida qatorda qoladi — manzil matni tahrirlansa
-/// ham nuqta saqlanib turadi.
+/// Xaritadan tanlangach chaqiruvchi manzil matnini AVTOMATIK to'ldiradi
+/// ([busy] shu paytda aylanma ko'rsatadi). Natija maydon ostida alohida
+/// qatorda qoladi — manzil matni tahrirlansa ham u saqlanib turadi.
+///
+/// ## Ikki yo'l
+///
+/// Asosiysi ([onPickOnMap]) — geoportal uchastkalari xaritasi: u kadastr
+/// raqamini ham, uy chegarasini ham beradi.
+///
+/// Ikkinchisi ([onPickManually]) — oddiy erkin metka. U ATAYLAB qoldirilgan:
+/// geoportal hamma obyektni qamramaydi (yangi qurilish, xatlovdan o'tmagan
+/// joy), va uchastka topilmagani uchun e'lon berish yo'li berkilib qolmasligi
+/// kerak.
 library;
 
 import 'package:flutter/material.dart';
@@ -27,14 +36,20 @@ class AddressPinField extends StatelessWidget {
     this.required = false,
     this.pointLabel,
     this.clearLabel,
+    this.cadastreNumber,
+    this.cadastreLabel,
+    this.onPickManually,
+    this.manualLabel,
   });
 
   final String label;
   final TextEditingController controller;
   final String placeholder;
+
+  /// Asosiy yo'l — geoportal uchastkalari xaritasi.
   final VoidCallback onPickOnMap;
 
-  /// Xaritadan qaytgan nuqta manzilga aylantirilmoqda — tugmacha o'rnida
+  /// Xaritadan qaytgan natija manzilga aylantirilmoqda — tugmacha o'rnida
   /// aylanma chiqadi va bosilmaydi.
   final bool busy;
 
@@ -46,6 +61,16 @@ class AddressPinField extends StatelessWidget {
   /// "Xaritada belgilandi" matni (tarjima chaqiruvchidan keladi).
   final String? pointLabel;
   final String? clearLabel;
+
+  /// Geoportaldan tanlangan uchastkaning raqami. Bo'lsa, ostidagi qatorda
+  /// koordinata O'RNIGA shu ko'rsatiladi: foydalanuvchi uchun
+  /// "10:09:01:01:02:5942" "41.31108, 69.24056" dan ancha ma'noli.
+  final String? cadastreNumber;
+  final String? cadastreLabel;
+
+  /// Ikkinchi yo'l — erkin metka. `null` bo'lsa qator umuman chizilmaydi.
+  final VoidCallback? onPickManually;
+  final String? manualLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +89,8 @@ class AddressPinField extends StatelessWidget {
 
     final radius = BorderRadius.circular(14);
     final p = point;
+    final cadastre = cadastreNumber?.trim();
+    final hasCadastre = cadastre != null && cadastre.isNotEmpty;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,13 +193,19 @@ class AddressPinField extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(Icons.check_circle_rounded,
+              const Icon(Icons.check_circle_rounded,
                   size: 15, color: AppColors.splashGreen),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '${pointLabel ?? ''} · '
-                  '${p.lat.toStringAsFixed(5)}, ${p.lng.toStringAsFixed(5)}',
+                  // Uchastka tanlangan bo'lsa kadastr raqami ko'rsatiladi:
+                  // u foydalanuvchi TANIYDIGAN ma'lumot, koordinata esa
+                  // yo'q. Nuqta baribir saqlangan — shunchaki ko'rsatilmaydi.
+                  hasCadastre
+                      ? '${cadastreLabel ?? ''} $cadastre'
+                      : '${pointLabel ?? ''} · '
+                          '${p.lat.toStringAsFixed(5)}, '
+                          '${p.lng.toStringAsFixed(5)}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -199,6 +232,36 @@ class AddressPinField extends StatelessWidget {
                   ),
                 ),
             ],
+          ),
+        ],
+        if (onPickManually != null) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: GestureDetector(
+              onTap: busy ? null : hapticSelect(onPickManually),
+              behavior: HitTestBehavior.opaque,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add_location_alt_outlined,
+                        size: 15, color: subColor),
+                    const SizedBox(width: 6),
+                    Text(
+                      manualLabel ?? '',
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                        color: subColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ],

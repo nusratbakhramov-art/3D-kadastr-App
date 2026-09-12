@@ -239,6 +239,7 @@ class DavreestrLookupResult {
     this.objectTypeHint,
     this.totalArea,
     this.livingArea,
+    this.landArea,
     this.cadastreValue,
     this.hasRestrictions,
     this.restrictions = const [],
@@ -249,6 +250,14 @@ class DavreestrLookupResult {
   final String? objectTypeHint;
   final double? totalArea;
   final double? livingArea;
+
+  /// Yer uchastkasining maydoni (m²) — "Hujjat bo'yicha umumiy yer maydoni".
+  ///
+  /// Faqat YERI BOR obyektlarda bo'ladi (yakka tartibdagi uy, uchastka);
+  /// ko'p qavatli uydagi xonadonda reyestr bu qatorni chizmaydi va bu yerda
+  /// `null` qoladi. [totalArea] dan alohida: u BINONING foydali maydoni.
+  final double? landArea;
+
   final double? cadastreValue;
 
   /// Obyektga ta'qiq/cheklov qo'yilganmi.
@@ -724,6 +733,7 @@ class DavreestrClient {
         objectTypeHint: j['object_type_hint'] as String?,
         totalArea: (j['total_area'] as num?)?.toDouble(),
         livingArea: (j['living_area'] as num?)?.toDouble(),
+        landArea: (j['land_area'] as num?)?.toDouble(),
         cadastreValue: (j['cadastre_value'] as num?)?.toDouble(),
         // `hasRestrictions` ATAYLAB berilmaydi (= null, "noma'lum"): kesh bu
         // maydonni saqlamaydi va manzil/maydondan farqli o'laroq ta'qiq
@@ -751,6 +761,7 @@ class DavreestrClient {
               'object_type_hint': r.objectTypeHint,
               'total_area': r.totalArea,
               'living_area': r.livingArea,
+              'land_area': r.landArea,
               'cadastre_value': r.cadastreValue,
             }),
           )
@@ -1121,7 +1132,14 @@ class DavreestrClient {
     final parsed = DavreestrLookupResult(
       cadastreNumber: cadastreNumber,
       address: grabAddress() ?? grabRow(const ['Manzil', 'Address', 'Адрес']),
-      objectTypeHint: grabRow(const ['Obyekt turi', 'Object type', 'Тип объекта']),
+      // ⚠️ Reyestr yorlig'i APOSTROF bilan — `Ob'ekt turi:`. Ro'yxatda faqat
+      // `Obyekt turi` turgani uchun bu maydon hech qachon to'lmagan.
+      objectTypeHint: grabRow(const [
+        "Ob'ekt turi",
+        'Obyekt turi',
+        'Object type',
+        'Тип объекта',
+      ]),
       // "Umumiy foydali maydoni" — bino umumiy foydali maydoni (m2).
       totalArea: toDecimal(grabRow(const [
         'Umumiy foydali maydoni',
@@ -1133,6 +1151,15 @@ class DavreestrClient {
         'Yashash maydoni',
         'Living area',
         'Жилая площадь',
+      ])),
+      // Yer maydoni. "Hujjat bo'yicha" AVVAL keladi: u hujjatdagi rasmiy
+      // raqam, "Amaldagi" esa o'lchovdagisi — e'lon uchun rasmiysi to'g'ri
+      // va u ko'pincha aynan bir xil.
+      landArea: toDecimal(grabRow(const [
+        "Hujjat bo'yicha umumiy yer maydoni",
+        'Amaldagi yer maydoni',
+        'Land area',
+        'Площадь земельного участка',
       ])),
       cadastreValue: toDecimal(grabRow(const [
         'Kadastr qiymati',

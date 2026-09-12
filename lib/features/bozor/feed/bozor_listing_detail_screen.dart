@@ -27,6 +27,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -48,6 +49,7 @@ import '../data/param_options.dart';
 import '../models/bozor_draft.dart';
 import '../models/bozor_listing.dart';
 import '../models/param_schema.dart';
+import '../widgets/listing_location_map.dart';
 import '../screens/bozor_type_step_screen.dart';
 
 class BozorListingDetailScreen extends StatefulWidget {
@@ -637,6 +639,21 @@ class _BozorListingDetailScreenState extends State<BozorListingDetailScreen> {
             rows: _addressRows(listing, locale),
           ),
         ),
+        // Xarita manzil kartochkasidan KEYIN: matnli manzil asosiy javob,
+        // xarita esa uni tasdiqlaydi. Nuqta ham, chegara ham bo'lmasa
+        // vidjet o'zi bo'sh qaytadi.
+        if (listing.latitude != null || listing.boundary != null) ...[
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ListingLocationMap(
+              point: listing.latitude != null && listing.longitude != null
+                  ? LatLng(listing.latitude!, listing.longitude!)
+                  : null,
+              boundary: listing.boundary,
+            ),
+          ),
+        ],
         const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),

@@ -15,6 +15,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../../core/i18n/app_translations.dart';
 import 'bozor_draft.dart';
+import 'parcel_boundary.dart';
 import 'tour_link.dart';
 
 /// Moderatsiya holati.
@@ -127,6 +128,8 @@ class BozorListing {
     this.totalFloors,
     this.latitude,
     this.longitude,
+    this.cadastreNumber,
+    this.boundary,
     this.rooms,
     this.areaSqm,
     this.params = const {},
@@ -184,6 +187,13 @@ class BozorListing {
   final int? totalFloors;
   final double? latitude;
   final double? longitude;
+
+  /// Geoportaldan tanlangan uchastkaning kadastr raqami — bo'lmasligi mumkin
+  /// (manzil qo'lda belgilangan e'lonlarda `null`).
+  final String? cadastreNumber;
+
+  /// O'sha uchastkaning chegarasi — e'lon sahifasidagi xaritada chiziladi.
+  final ParcelBoundary? boundary;
 
   /// Xonalar soni — `params.rooms_count` dan server hisoblab qo'ygan ustun.
   final int? rooms;
@@ -352,6 +362,8 @@ class BozorListing {
     totalFloors: _toInt(j['total_floors']),
     latitude: _toDouble(j['latitude']),
     longitude: _toDouble(j['longitude']),
+    cadastreNumber: _nonEmpty(j['cadastre_number']),
+    boundary: ParcelBoundary.fromGeoJson(j['boundary']),
     rooms: _toInt(j['rooms']),
     areaSqm: _toDouble(j['area_sqm']),
     params: (j['params'] as Map?)?.cast<String, dynamic>() ?? const {},
