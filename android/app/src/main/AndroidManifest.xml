@@ -10,48 +10,26 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Push xabarnomalar (Android 13+ runtime ruxsat). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Video capture (VideoCaptureActivity) va 360° panorama capture
-         (camera_android_camerax) — ikkalasi ham shu ruxsatga tayanadi. -->
+    <!-- Video capture (VideoCaptureActivity), 360° panorama capture
+         (ARCore) va rasm tanlash (image_picker) — hammasi shu ruxsatga
+         tayanadi.
+         ⚠️ Bu yerda `RECORD_AUDIO` ni merge'dan olib tashlaydigan blok
+         turardi: uni `camera_android_camerax` qo'shardi. O'sha plagin
+         (`camera` paketi) 2026-09-12 da olib tashlandi, ya'ni ruxsatni
+         endi hech kim so'ramaydi va chetlab o'tish ham kerak emas. -->
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- `camera_android_camerax` o'z manifestida RECORD_AUDIO so'raydi (u
-         video yozuvni ham qo'llab-quvvatlaydi). Ilova esa MIKROFONNI
-         ISHLATMAYDI: panorama capture faqat `takePicture()` chaqiradi, video
-         yozuv esa :app ning o'z CameraX kodi orqali ovozsiz ketadi.
-         Ruxsat qo'shilsa Play Console'da "Mikrofon" bo'lib ko'rinadi va
-         data-safety deklaratsiyasida audio yig'ish savolini tug'diradi —
-         yolg'on ruxsat. Shuning uchun merge paytida OLIB TASHLANADI. -->
-    <uses-permission
-        android:name="android.permission.RECORD_AUDIO"
-        tools:node="remove" />
-
     <!-- Kamera IXTIYORIY: kamerasiz qurilmada ham ilovaning qolgan qismi
-         (e'lonlar, xarita, arizalar) to'liq ishlaydi. -->
+         (e'lonlar, xarita, arizalar) to'liq ishlaydi.
+         ⚠️ Yonida `camera.any` ni `tools:replace` bilan majburiy emas
+         qiladigan blok turardi — u ham `camera_android_camerax` uchun edi. -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <!-- `camera_android_camerax` `camera.any` ni required="false" SIZ e'lon
-         qiladi, ya'ni sukut bo'yicha MAJBURIY bo'lib qoladi va Play kamerasiz
-         qurilmalarga ilovani umuman ko'rsatmaydi. `tools:replace` merge'da
-         plagin qiymatini bizniki bilan almashtiradi (`tools:node="remove"`
-         emas — feature'ning o'zi qolsin, faqat majburiyligi olinsin). -->
-    <uses-feature
-        android:name="android.hardware.camera.any"
-        android:required="false"
-        tools:replace="android:required" />
 
     <!-- 360° panorama capture ARCore'ga tayanadi. `required="false"` —
          ARCore'siz qurilmada ilovaning qolgani to'liq ishlaydi va 360
          bo'limi Dart tarafda umuman ko'rsatilmaydi. Majburiy qilsak Play
          ilovani ARCore'siz telefonlarga umuman ko'rsatmasdi. -->
     <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
-
-    <!-- Panorama capture kadr burchagini giroskop/akselerometrdan oladi
-         (dchs_motion_sensors). Sensor yo'q qurilmada faqat SHU ekran
-         ishlamaydi — ilovaning qolgani ishlaydi, demak majburiy emas.
-         Ochiq e'lon qilmasak ham Play ularni filtr sifatida olmaydi, lekin
-         ochiq required="false" niyatni qayd etadi va keyinchalik biror
-         plagin required="true" bilan qo'shsa merge ziddiyati ko'rinadi. -->
-    <uses-feature android:name="android.hardware.sensor.gyroscope" android:required="false" />
-    <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
 
     <!-- Faqat telefonlar uchun: Google Play'da planshet, soat (Wear OS),
          Android TV va Chromebook'larni chiqarib tashlaymiz. Telefon "hardware"

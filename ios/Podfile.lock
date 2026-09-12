@@ -3,10 +3,6 @@ PODS:
     - Flutter
   - app_links (6.4.1):
     - Flutter
-  - camera_avfoundation (0.0.1):
-    - Flutter
-  - dchs_motion_sensors (0.0.1):
-    - Flutter
   - DKImagePickerController/Core (4.3.9):
     - DKImagePickerController/ImageDataManager
     - DKImagePickerController/Resource
@@ -147,8 +143,6 @@ PODS:
 DEPENDENCIES:
   - app_badge_plus (from `.symlinks/plugins/app_badge_plus/ios`)
   - app_links (from `.symlinks/plugins/app_links/ios`)
-  - camera_avfoundation (from `.symlinks/plugins/camera_avfoundation/darwin`)
-  - dchs_motion_sensors (from `.symlinks/plugins/dchs_motion_sensors/ios`)
   - file_picker (from `.symlinks/plugins/file_picker/ios`)
   - firebase_core (from `.symlinks/plugins/firebase_core/ios`)
   - firebase_messaging (from `.symlinks/plugins/firebase_messaging/ios`)
@@ -188,10 +182,6 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/app_badge_plus/ios"
   app_links:
     :path: ".symlinks/plugins/app_links/ios"
-  camera_avfoundation:
-    :path: ".symlinks/plugins/camera_avfoundation/darwin"
-  dchs_motion_sensors:
-    :path: ".symlinks/plugins/dchs_motion_sensors/ios"
   file_picker:
     :path: ".symlinks/plugins/file_picker/ios"
   firebase_core:
@@ -230,8 +220,6 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   app_badge_plus: 30703d7e5b971046e0d004dcee48b54822f56892
   app_links: 3dbc685f76b1693c66a6d9dd1e9ab6f73d97dc0a
-  camera_avfoundation: 968a9a5323c79a99c166ad9d7866bfd2047b5a9b
-  dchs_motion_sensors: 1225b0995751d926daff45544e00a256f543065c
   DKImagePickerController: 946cec48c7873164274ecc4624d19e3da4c1ef3c
   DKPhotoGallery: b3834fecb755ee09a593d7c9e389d8b5d6deed60
   file_picker: a0560bc09d61de87f12d246fc47d2119e6ef37be

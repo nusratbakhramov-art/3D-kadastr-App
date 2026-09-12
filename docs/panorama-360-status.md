@@ -152,10 +152,36 @@ orientatsiyasida, aylantirilmasdan yuboriladi.
   yo'q, lekin tozalash backend seed'i bilan birga qilinishi kerak —
   bundle backenddan keladi, faqat mobil tarafdan o'chirish drift beradi.
 * `pano_source_sheet.dart` izohda turibdi (yuqoriga qarang).
-* `camera`, `dchs_motion_sensors` va `vector_math` paketlari `lib/` da
-  ENDI ISHLATILMAYDI (eski sensorli capture ular uchun edi). Ular bilan
-  birga `AndroidManifest.xml` dagi `RECORD_AUDIO`/`camera.any`/giroskop
-  bloklari ham keraksiz. Alohida tozalash.
+* ~~eski quvurning paketlari~~ — **tozalandi** (pastga qarang).
+
+### 3.4 Tozalangan: eski quvurning platforma izi (2026-09-12)
+
+`7a2c301` («360° uchun paketlar») qo'shgan TO'RTTA paket `lib/` da umuman
+import qilinmay qolgan edi va olib tashlandi: **`image`**, **`camera`**,
+**`dchs_motion_sensors`**, **`vector_math`**.
+
+Ular bilan birga ketgani:
+
+| Qayerda | Nima |
+|---|---|
+| `AndroidManifest.xml` | `RECORD_AUDIO` ni merge'dan chiqarib tashlaydigan blok (uni `camera_android_camerax` qo'shardi) |
+| `AndroidManifest.xml` | `camera.any` ni majburiy emas qiladigan `tools:replace` |
+| `AndroidManifest.xml` | giroskop/akselerometr `uses-feature` lari |
+| `ios/Runner/Info.plist` | `NSMotionUsageDescription` |
+| `pubspec.lock` | `camera_avfoundation`, `camera_android_camerax`, `camera_platform_interface`, `camera_web`, `stream_transform` |
+
+⚠️ **`NSMotionUsageDescription` nega xavfsiz olindi.** Uni faqat CoreMotion
+SENSOR API'si (`CMMotionManager` / `CMPedometer` / `CMAltimeter`) talab
+qiladi. Butun `Pods` va plagin manbalari tekshirildi: uni faqat
+`dchs_motion_sensors` va `camera_avfoundation` ishlatardi, ikkalasi ham
+ketdi. **ARKit bu kalitni talab qilmaydi** — unga
+`NSCameraUsageDescription` yetarli. (`PCScanKit` va `RoomPlanScanner`
+`CoreMotion` ni import qiladi, lekin faqat `CMAcceleration` STRUKTURASI
+uchun — u sensorga murojaat emas.)
+
+`camera-*` va `guava` gradle bog'liqliklari QOLDI: ularni `:app` ning o'z
+`VideoCaptureActivity` si ishlatadi. Versiyalar ham o'zgarmadi — tushirishning
+foydasi yo'q.
 
 ---
 
