@@ -228,6 +228,17 @@ foydasi yo'q.
 | `app/models/bozor_pano_job.py` | `BozorPanoJob`, holatlar: capturing/queued/stitching/done/error |
 | `scripts/ensure_bozor_pano_jobs.py` | idempotent DDL (alembic EMAS — ikkita revision deploy'ni buzadi) |
 
+⚠️ **PRODDAGI TUZOQ (2026-09-12 da bir marta tushdik).** Prodning o'z
+`docker-compose.override.yml` i bor, u rsync'dan chetlab o'tiladi va
+`app`/`celery`/`celery-beat`/`photogrammetry-worker` uchun
+`volumes: !override` ishlatadi — bazadagi ro'yxatni TO'LDIRMAY,
+ALMASHTIRADI. Shu sababli `docker-compose.yml` ga qo'shilgan
+`/data/panoramas` mount'i `app` ga yetib bormadi: API kadrlarni o'z
+konteyneri ichiga yozdi, worker bo'sh katalog ko'rdi, har panorama
+yiqildi. Tuzatish — override'ga ham qator qo'shish, keyin
+`docker compose up -d app`. Tekshirish:
+`docker compose config | grep -c kadastr-panoramas` (2 bo'lishi kerak).
+
 **Kadrlar vaqtinchalik:** muvaffaqiyatda **darhol**, xatoda **24 soatdan
 keyin** o'chiriladi.
 
