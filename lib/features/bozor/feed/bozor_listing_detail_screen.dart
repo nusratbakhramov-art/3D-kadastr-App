@@ -184,14 +184,35 @@ class _BozorListingDetailScreenState extends State<BozorListingDetailScreen> {
   /// Tahrirlash/arxivlash tugmalari.
   ///
   /// Ro'yxat HOLATGA bog'liq va serverdagi o'tishlar jadvaliga mos
-  /// (`bozor_listing.LISTING_TRANSITIONS`): tahrirlash faqat
-  /// `pending`/`rejected` da (server boshqasini 400 bilan rad etadi),
-  /// arxivlash esa `archived` dan tashqari hamma holatda — u OXIRGI holat,
-  /// undan qaytish yo'q.
+  /// (`bozor_listing.LISTING_TRANSITIONS`): server tahrirlashga
+  /// `pending`/`rejected` da ruxsat beradi (boshqasini 400 bilan rad
+  /// etadi), arxivlash esa `archived` dan tashqari hamma holatda — u
+  /// OXIRGI holat, undan qaytish yo'q.
+  ///
+  /// ⚠️ MODERATSIYADAGI (`pending`) E'LON TAHRIRLANMAYDI — 2026-09-12 da
+  /// ATAYLAB yopildi. Sabab: `draftFromListing` e'londagi MAVJUD fayllarni
+  /// (foto, planirovka, 360) faqat `existingMedia` ga soladi, sehrgar esa
+  /// uni umuman o'qimaydi — ya'ni tahrirlashda uchala qator ham BO'SH
+  /// chiqadi. Fayllar yo'qolmaydi (yuborishda `keep` bilan qaytariladi),
+  /// lekin foydalanuvchi ularni ko'rmaydi va eng muhimi: YANGI xonani
+  /// eskisiga TUR bilan bog'lay olmaydi — tur muharriri ham faqat
+  /// `description.panoramas` ni ko'radi.
+  ///
+  /// `rejected` ATAYLAB qoldirildi: rad etilgan e'lonni tuzatib bo'lmasa u
+  /// abadiy o'lik qolardi. U ham shu nosoz yo'ldan ketadi, lekin matn va
+  /// narxni tuzatish ishlaydi.
+  ///
+  /// QAYTARISH: `draftFromListing` da `role == 'panorama'` media'ni
+  /// `existingMedia` ga EMAS, `description.panoramas` +
+  /// `panoramaUrls` + `uploadedMedia` ga soling (va `existingMedia` dan
+  /// chiqaring — aks holda yuborishda ikki marta ketadi). Shundan keyin
+  /// pastdagi `pending` shartini qaytaring.
   List<Widget> _ownerActions(BozorListing listing) {
     final l = Localizations.localeOf(context);
     final canEdit =
-        listing.status == ListingStatus.pending ||
+        // TODO(bozor): media ko'rinadigan bo'lgach qaytarilsin —
+        // yuqoridagi izohga qarang.
+        // listing.status == ListingStatus.pending ||
         listing.status == ListingStatus.rejected;
     final canArchive = listing.status != ListingStatus.archived;
     return [

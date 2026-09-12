@@ -621,4 +621,48 @@ void main() {
         .toList();
     expect(pills, contains('78,5 bozor.unit.m²'));
   });
+
+  group('tahrirlash tugmasi — HOLATGA qarab', () {
+    /// ⚠️ NEGA BU TEST BOR. `pending` (moderatsiyadagi) e'lonni tahrirlash
+    /// 2026-09-12 da ATAYLAB yopildi: `draftFromListing` mavjud fayllarni
+    /// faqat `existingMedia` ga soladi, sehrgar esa uni o'qimaydi — ya'ni
+    /// tahrirlashda 360/foto/planirovka qatorlari BO'SH chiqadi va yangi
+    /// xonani eskisiga tur bilan bog'lab bo'lmaydi.
+    ///
+    /// `rejected` ATAYLAB qoldirilgan: usiz rad etilgan e'lon abadiy o'lik
+    /// qolardi. Shartni kimdir "tartibga solib" qaytarib qo'ymasin.
+    ///
+    /// Tugma IKONKA bo'yicha qidiriladi: bu test faylida tarjimalar
+    /// yuklanmaydi, ya'ni yorliq xom kalit bo'lib chiqadi.
+    Future<void> openOwned(WidgetTester tester, String status) async {
+      tallSurface(tester);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: BozorListingDetailScreen(
+            listingId: 7,
+            api: apiReturning(listing: listingJson(status: status)),
+            isOwner: true,
+          ),
+        ),
+      );
+      for (var i = 0; i < 8; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    testWidgets('MODERATSIYADAGI (pending) e\'londa tugma YO\'Q',
+        (tester) async {
+      await openOwned(tester, 'pending');
+      expect(find.byIcon(Icons.edit_outlined), findsNothing,
+          reason: 'moderatsiyadagi e\'lon tahrirlanmasligi kerak');
+      // Arxivlash QOLADI — u boshqa masala.
+      expect(find.byIcon(Icons.inventory_2_outlined), findsOneWidget);
+    });
+
+    testWidgets('RAD ETILGAN (rejected) e\'londa tugma BOR', (tester) async {
+      await openOwned(tester, 'rejected');
+      expect(find.byIcon(Icons.edit_outlined), findsOneWidget,
+          reason: 'rad etilgan e\'lonni tuzatib bo\'lmasa u o\'lik qoladi');
+    });
+  });
 }
