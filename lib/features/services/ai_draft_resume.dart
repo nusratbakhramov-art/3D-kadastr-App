@@ -8,7 +8,6 @@ import 'screens/ai_client_form_screen.dart';
 import 'screens/ai_intake_screen.dart';
 import 'screens/ai_location_screen.dart';
 import 'screens/ai_purpose_screen.dart';
-import 'screens/ai_start_screen.dart';
 
 /// Saqlangan qadam nomidan mos wizard ekranini quradi (skan qadamidan keyingi
 /// qadamlar). `scanJobId` — skan bor bo'lsa, cadastre qadamida "3D modelni
@@ -18,19 +17,9 @@ import 'screens/ai_start_screen.dart';
 /// resume mantig'i bir joyda.
 Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
   switch (step) {
-    // Xonalarni videoga olish qadami — ro'yxat ariza id bo'yicha SERVERDAN
-    // tiklanadi, ya'ni ilova yopilgan bo'lsa ham tayyor modellar ko'rinadi.
-    case 'video':
-      return AiStartScreen(
-        scan: bundle.scan,
-        draftId: bundle.draftId,
-        scanJobId: scanJobId,
-        // Bundle ham o'tadi: video qadamidan "Davom etish" bosilganda
-        // saqlangan kadastr/mijoz/joylashuv ma'lumotlari yo'qolmasin.
-        resumeBundle: bundle,
-      );
-    // Legacy drafts saved at the removed 'area' step resume straight into the
-    // cadastre step (which now owns the area, sourced from davreestr).
+    // Legacy drafts saved at the removed 'area' and 'video' steps resume
+    // straight into the cadastre step — it is the first step now, owns the
+    // area (from davreestr) and creates the draft when one is missing.
     case 'client':
       return AiClientFormScreen(bundle: bundle);
     case 'location':
@@ -56,15 +45,10 @@ Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
 }
 
 /// Wizard steps, in order. On resume we stack them up to the saved step so Back
-/// walks all the way to the first step (`video`) instead of exiting to
+/// walks all the way to the first step (`cadastre`) instead of exiting to
 /// Arizalar. Every screen rebuilds from the saved bundle: `cadastre` shows the
 /// saved davreestr result without a re-lookup (and owns the object area).
-///
-/// The `video` step is optional, so a draft can legitimately sit at a later
-/// step with no room video attached — resume follows the saved step and does
-/// not second-guess it against the 3DGS server.
 const List<String> _resumableChain = [
-  'video',
   'cadastre',
   'client',
   'location',
@@ -73,10 +57,18 @@ const List<String> _resumableChain = [
 ];
 
 /// The list of steps to push so the user lands on [currentStep] with a Back
-/// stack through the earlier bundle steps. For a non-chain step (cadastre/area/
-/// unknown) it's just that single screen.
+/// stack through the earlier bundle steps. For a non-chain step (area/unknown)
+/// it's just that single screen.
+///
+/// `video` — olib tashlangan qadamda saqlangan ESKI draftlar; ular kadastrdan
+/// ochiladi (marshrut nomi ham `ai/cadastre` bo'lsin, `ai/video` emas).
 List<String> _resumeStack(String? currentStep) {
-  final step = currentStep == 'payment' ? 'intake' : (currentStep ?? 'cadastre');
+  final raw = currentStep ?? 'cadastre';
+  final step = switch (raw) {
+    'payment' => 'intake',
+    'video' => 'cadastre',
+    _ => raw,
+  };
   final idx = _resumableChain.indexOf(step);
   if (idx < 0) return [step];
   return _resumableChain.sublist(0, idx + 1);

@@ -1,4 +1,12 @@
-/// AI Baholash wizardining 1-qadami — xonalarni videoga olish.
+/// Xonalarni videoga olish ekrani.
+///
+/// ⚠️ OQIMDA EMAS. Bu AI Baholash wizardining 1-qadami edi; qadam oqimdan
+/// olib tashlandi (skan intro → endi to'g'ridan kadastr qadamiga o'tadi) va
+/// ekranga ilovadan hech qanday yo'l qolmadi. Kod ataylab saqlanmoqda —
+/// qaytarish uchun `ai_scan_intro_screen.dart` va `ai_scan_process_screen.dart`
+/// dagi marshrutlarni `ai/start` ga qaytarish, qadam chiziqlarini (hozir 7)
+/// 8 ga ko'tarish va `ai_draft_resume.dart` zanjiriga `video` ni qo'shish
+/// yetarli. Quyidagi izohlar o'sha oqimni tasvirlaydi.
 ///
 /// Ekran ikki ishni bajaradi:
 /// 1. Xona-ma-xona video oladi: "Videoga olish" → qo'llanma varag'i (olti

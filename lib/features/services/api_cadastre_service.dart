@@ -16,6 +16,11 @@ import '../../core/api_config.dart';
 import '../auth/auth_http_client.dart';
 import 'data/davreestr_client.dart';
 
+/// Bitta ta'qiq/cheklov yozuvi. Model [DavreestrRestriction] bilan bitta —
+/// bu yerda faqat barqaror nom beriladi, ekranlar `davreestr_client.dart` ni
+/// import qilmasin.
+typedef CadastreRestriction = DavreestrRestriction;
+
 class CadastreLookupResult {
   const CadastreLookupResult({
     required this.cadastreNumber,
@@ -24,6 +29,8 @@ class CadastreLookupResult {
     this.totalArea,
     this.livingArea,
     this.cadastreValue,
+    this.hasRestrictions,
+    this.restrictions = const [],
   });
 
   final String cadastreNumber;
@@ -32,6 +39,14 @@ class CadastreLookupResult {
   final double? totalArea; // m²
   final double? livingArea; // m²
   final double? cadastreValue; // so'm
+
+  /// Obyektga ta'qiq/cheklov qo'yilganmi: `true`/`false` — reyestrdan aynan
+  /// hozir o'qildi, `null` — noma'lum (keshdan kelgan yoki draft'dan
+  /// tiklangan javob). Batafsil: [DavreestrLookupResult.hasRestrictions].
+  final bool? hasRestrictions;
+
+  /// Ta'qiq yozuvlari — [hasRestrictions] `true` bo'lganda to'ladi.
+  final List<CadastreRestriction> restrictions;
 
   /// Draft payload'dan qayta tiklash (resume). `bundle.toJson()['kadastr']`ga mos.
   factory CadastreLookupResult.fromJson(Map<String, dynamic> j) =>
@@ -80,6 +95,8 @@ class CadastreApiService {
         totalArea: r.totalArea,
         livingArea: r.livingArea,
         cadastreValue: r.cadastreValue,
+        hasRestrictions: r.hasRestrictions,
+        restrictions: r.restrictions,
       );
     } on DavreestrLookupException catch (e) {
       throw CadastreLookupException(e.message, statusCode: e.statusCode);

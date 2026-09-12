@@ -9,15 +9,15 @@ import '../../settings/settings_state.dart';
 import '../data/room_plan_scanner.dart';
 import '../widgets/scan_skip_button.dart';
 import '../widgets/service_app_bar.dart';
+import 'ai_cadastre_screen.dart';
 import 'ai_scan_process_screen.dart';
-import 'ai_start_screen.dart';
 
 /// AI Baholashning 1-qadami — 3D LiDAR skan.
 ///
 /// Oqim: bu ekran → mesh ko'rish → USDZ ga ishlash → kadastr raqami → ...
 /// LiDAR yo'q qurilmalarda (simulator / Pro bo'lmagan iPhone, Android) skan
 /// mumkin emas — bu qadam avtomatik o'tkazib yuboriladi va foydalanuvchi
-/// to'g'ridan wizardning birinchi qadamiga tushadi.
+/// to'g'ridan wizardning birinchi qadamiga (kadastr) tushadi.
 class AiScanIntroScreen extends StatefulWidget {
   const AiScanIntroScreen({super.key});
 
@@ -47,16 +47,16 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
   }
 
   /// Qurilma skanni qo'llamasa bu ekranda ushlab turishning ma'nosi yo'q —
-  /// darhol wizardning birinchi qadamiga (video olish) o'tamiz.
+  /// darhol wizardning birinchi qadamiga (kadastr) o'tamiz.
   /// [Navigator.pushReplacement] — orqaga bosilganda boshi berk ekranga
-  /// qaytmaslik uchun. LiDARsiz qurilmada draft AYNAN o'sha qadamda, birinchi
-  /// video yuklash oldidan yaratiladi: skan yo'qligi oqimni buzmaydi, chunki
-  /// baholash uchun kerakli o'lchov videodan chiqadi.
+  /// qaytmaslik uchun. LiDARsiz qurilmada draft AYNAN o'sha qadamda, kadastr
+  /// topilgach yaratiladi: skan yo'qligi oqimni buzmaydi, chunki baholash
+  /// uchun kerakli o'lchov davreestr'dan (`total_area`) chiqadi.
   void _skipUnsupported() {
     Navigator.of(context).pushReplacement(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/start'),
-        builder: (_) => const AiStartScreen(),
+        settings: const RouteSettings(name: 'ai/cadastre'),
+        builder: (_) => const AiCadastreScreen(),
       ),
     );
   }
@@ -69,8 +69,8 @@ class _AiScanIntroScreenState extends State<AiScanIntroScreen> {
     HapticFeedback.lightImpact();
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/start'),
-        builder: (_) => const AiStartScreen(),
+        settings: const RouteSettings(name: 'ai/cadastre'),
+        builder: (_) => const AiCadastreScreen(),
       ),
     );
   }

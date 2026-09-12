@@ -36,6 +36,7 @@ import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:http/http.dart' as http;
 
 import '../../../core/app_version.dart';
@@ -184,6 +185,51 @@ class _FailureReport {
   }
 }
 
+/// Bitta ta'qiq/cheklov yozuvi — davreestr natija sahifasidagi `ban-table`
+/// jadvalining bir qatori.
+///
+/// Hamma maydon matn: reyestr ularni erkin shaklda chiqaradi (sana `19.12.2025`
+/// ko'rinishida, tur esa ba'zan ruscha — `Ограничение`, `Письмо`). Bu yerda
+/// ular AYNAN reyestrdagidek saqlanadi va ekranda ham shundayligicha
+/// ko'rsatiladi: tarjima yoki normallashtirish yuridik ma'noni o'zgartirib
+/// yuborishi mumkin.
+class DavreestrRestriction {
+  const DavreestrRestriction({
+    this.number = '',
+    this.kind = '',
+    this.authority = '',
+    this.date = '',
+    this.documentNumber = '',
+    this.exchangeCode = '',
+  });
+
+  /// "Taqiq/cheklov raqami" — masalan `T6-1009-25-30048`.
+  final String number;
+
+  /// "Taqiq/cheklov turi" — masalan `Ограничение`, `Письмо`.
+  final String kind;
+
+  /// "Kim tomonidan" — masalan `Ген ПРОКУРАТУРА`, `Банк_запретов`.
+  final String authority;
+
+  /// "Sana" — `19.12.2025` ko'rinishida.
+  final String date;
+
+  /// "Ijro xujjatining raqami".
+  final String documentNumber;
+
+  /// "Ma'lumot almashuv orqali qo'yilganligi (almashuv kodi)" — ko'pincha bo'sh.
+  final String exchangeCode;
+
+  bool get isEmpty =>
+      number.isEmpty &&
+      kind.isEmpty &&
+      authority.isEmpty &&
+      date.isEmpty &&
+      documentNumber.isEmpty &&
+      exchangeCode.isEmpty;
+}
+
 /// Successful davreestr.uz lookup. Shape matches the existing
 /// `CadastreLookupResult` so the rest of the app needs no changes.
 class DavreestrLookupResult {
@@ -194,6 +240,8 @@ class DavreestrLookupResult {
     this.totalArea,
     this.livingArea,
     this.cadastreValue,
+    this.hasRestrictions,
+    this.restrictions = const [],
   });
 
   final String cadastreNumber;
@@ -202,6 +250,22 @@ class DavreestrLookupResult {
   final double? totalArea;
   final double? livingArea;
   final double? cadastreValue;
+
+  /// Obyektga ta'qiq/cheklov qo'yilganmi.
+  ///
+  /// * `true`  — natija sahifasida "Obyektga nisbatan ta'qiq va cheklovlar"
+  ///   qatori bor (va odatda [restrictions] ham to'lgan);
+  /// * `false` — obyekt topildi, lekin o'sha qator YO'Q. Reyestr toza
+  ///   obyektda bu qatorni umuman chizmaydi, ya'ni yo'qligi = "taqiq yo'q";
+  /// * `null`  — noma'lum. Backend keshidan kelgan javob shunday: kesh bu
+  ///   maydonni saqlamaydi, ta'qiq esa bugun qo'yilib ertaga olinadi —
+  ///   eskirgan "toza" javobni ko'rsatgandan ko'ra bilmaslikni tan olgan
+  ///   ma'qul. Ta'qiqni tekshirish ekrani shu sababli HAR DOIM
+  ///   `forceRefresh: true` bilan so'raydi.
+  final bool? hasRestrictions;
+
+  /// Ta'qiq yozuvlari — [hasRestrictions] `true` bo'lganda to'ladi.
+  final List<DavreestrRestriction> restrictions;
 
   /// Did the registry actually give us something the wizard can use?
   ///
@@ -661,6 +725,10 @@ class DavreestrClient {
         totalArea: (j['total_area'] as num?)?.toDouble(),
         livingArea: (j['living_area'] as num?)?.toDouble(),
         cadastreValue: (j['cadastre_value'] as num?)?.toDouble(),
+        // `hasRestrictions` ATAYLAB berilmaydi (= null, "noma'lum"): kesh bu
+        // maydonni saqlamaydi va manzil/maydondan farqli o'laroq ta'qiq
+        // o'zgarib turadi. Ta'qiqni tekshirish oqimi keshga umuman
+        // tushmaydi — `forceRefresh: true` bilan so'raydi.
       );
     } catch (_) {
       return null;
@@ -897,6 +965,41 @@ class DavreestrClient {
     return null;
   }
 
+  // Ta'qiq/cheklov bloki. Natija sahifasida u faqat CHEKLOV BOR obyektda
+  // chiziladi — toza obyektda `cad_search_bans` katakchasi umuman yo'q. Ya'ni
+  // "taqiq yo'q" degan xulosa qatorning YO'QLIGIdan chiqariladi, va shuning
+  // uchun u faqat qidiruvning o'zi muvaffaqiyatli bo'lgandagina ma'noga ega.
+  static final _bansStatusRe = RegExp(
+    r'cad_search_bans.{0,400}?</td>\s*<td[^>]*>(.*?)</td>',
+    caseSensitive: false,
+    dotAll: true,
+  );
+  static final _banTableRe = RegExp(
+    r'<table[^>]*class="[^"]*ban-table[^"]*"[^>]*>(.*?)</table>',
+    caseSensitive: false,
+    dotAll: true,
+  );
+  static final _banRowRe = RegExp(
+    r'<tr[^>]*>(.*?)</tr>',
+    caseSensitive: false,
+    dotAll: true,
+  );
+  static final _banCellRe = RegExp(
+    r'<td[^>]*>(.*?)</td>',
+    caseSensitive: false,
+    dotAll: true,
+  );
+
+  /// "Mavjud emas" / "yo'q" — reyestr bir kun qatorni HAR DOIM chizadigan
+  /// bo'lsa, inkorni matndan o'qiy olishimiz uchun. Bugun bu yo'l yurilmaydi.
+  static const _noBanPatterns = [
+    'mavjud emas',
+    "yo'q",
+    'yoq',
+    'нет',
+    'отсутств',
+  ];
+
   static bool _anyContains(String haystack, List<String> needles) {
     for (final n in needles) {
       if (haystack.contains(n)) return true;
@@ -978,7 +1081,44 @@ class DavreestrClient {
       return double.tryParse(cleaned);
     }
 
-    return DavreestrLookupResult(
+    // Ta'qiq va cheklovlar. Status katakchasi topilsa — blok bor; matnida
+    // inkor bo'lsa (bugun uchramaydi, lekin sayt o'zgarsa) "yo'q" deb
+    // o'qiymiz. Blok umuman bo'lmasa `false`: toza obyektda reyestr bu
+    // qatorni chizmaydi.
+    final bansStatus = _bansStatusRe.firstMatch(flat);
+    final bool hasBans;
+    if (bansStatus == null) {
+      hasBans = false;
+    } else {
+      final statusText = stripTags(bansStatus.group(1) ?? '').toLowerCase();
+      hasBans = !_anyContains(statusText, _noBanPatterns);
+    }
+
+    final restrictions = <DavreestrRestriction>[];
+    final banTable = _banTableRe.firstMatch(flat);
+    if (banTable != null) {
+      for (final row in _banRowRe.allMatches(banTable.group(1) ?? '')) {
+        // Sarlavha qatorida <td> yo'q (faqat <th>) — o'zidan-o'zi tushib
+        // qoladi, alohida <thead> kesish shart emas.
+        final cells = _banCellRe
+            .allMatches(row.group(1) ?? '')
+            .map((c) => stripTags(c.group(1) ?? ''))
+            .toList(growable: false);
+        if (cells.isEmpty) continue;
+        String at(int i) => i < cells.length ? cells[i] : '';
+        final entry = DavreestrRestriction(
+          number: at(0),
+          kind: at(1),
+          authority: at(2),
+          date: at(3),
+          documentNumber: at(4),
+          exchangeCode: at(5),
+        );
+        if (!entry.isEmpty) restrictions.add(entry);
+      }
+    }
+
+    final parsed = DavreestrLookupResult(
       cadastreNumber: cadastreNumber,
       address: grabAddress() ?? grabRow(const ['Manzil', 'Address', 'Адрес']),
       objectTypeHint: grabRow(const ['Obyekt turi', 'Object type', 'Тип объекта']),
@@ -999,6 +1139,30 @@ class DavreestrClient {
         'Cadastre value',
         'Кадастровая стоимость',
       ])),
+      // Bu javob AYNAN hozir reyestrdan o'qildi — ya'ni ta'qiq holati ma'lum.
+      // Keshdan kelgan javobda esa `null` qoladi (`_fetchCached`).
+      hasRestrictions: hasBans,
+      restrictions: List.unmodifiable(restrictions),
     );
+
+    // Sahifa natija sahifasi BO'LMASA (rad etilgan forma, rate-limit, reyestrda
+    // yo'q raqam) hamma maydon bo'sh chiqadi — va cheklov bloki ham yo'q, ya'ni
+    // `hasBans` `false` bo'ladi. Bu "ta'qiq yo'q" DEGANI EMAS: hech narsa
+    // o'qilmadi. Shunday javobni "toza" deb ko'rsatish ta'qiq tekshiruvidagi
+    // eng qimmat xato bo'lardi, shuning uchun holatni shu yerda `null`
+    // (noma'lum) ga qaytaramiz — chaqiruvchining ehtiyotkorligiga tayanmasdan.
+    if (!parsed.hasUsableData) {
+      return DavreestrLookupResult(cadastreNumber: cadastreNumber);
+    }
+    return parsed;
   }
+
+  /// Natija sahifasi parseri — testlar uchun ochilgan. Ishlab turgan kodda
+  /// [lookup] o'zi chaqiradi.
+  @visibleForTesting
+  static DavreestrLookupResult parseResultHtml(
+    String html,
+    String cadastreNumber,
+  ) =>
+      _parseResultHtml(html, cadastreNumber);
 }

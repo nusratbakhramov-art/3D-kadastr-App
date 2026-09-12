@@ -236,7 +236,7 @@ class _AiTargetPriceScreenState extends State<AiTargetPriceScreen> {
                 const SizedBox(height: 8),
                 const Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 8, activeIndex: 7),
+                  child: StepProgressBar(count: 7, activeIndex: 6),
                 ),
                 const SizedBox(height: 12),
                 Expanded(

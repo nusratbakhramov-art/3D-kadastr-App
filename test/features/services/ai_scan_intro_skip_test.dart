@@ -3,20 +3,20 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kadastr/core/i18n/app_translations.dart';
+import 'package:kadastr/features/services/screens/ai_cadastre_screen.dart';
 import 'package:kadastr/features/services/screens/ai_scan_intro_screen.dart';
-import 'package:kadastr/features/services/screens/ai_start_screen.dart';
+import 'package:kadastr/features/services/widgets/scan_skip_button.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// The dev-only scan skip on the AI Baholash intro screen. It must appear only
-/// when `.env` carries `admin=true` — production ships a `.env` without it.
+/// AI Baholash intro ekranidan skansiz chiqish.
 ///
-/// The skip now lands on the video step ([AiStartScreen]) exactly like a device
-/// without LiDAR does: that step is mandatory and owns the draft, so there is
-/// no longer a path into the wizard that bypasses it.
+/// Ikkala yo'l ham — foydalanuvchi "o'tkazib yuborish"ni bossa ham, qurilma
+/// LiDAR ni qo'llamasa ham — wizardning BIRINCHI qadamiga, kadastrga olib
+/// boradi. Ilgari bu yerda video qadami turardi; u oqimdan olib tashlangan va
+/// bu test uni qaytarib qo'yishga to'sqinlik qiladi.
 void main() {
   const channel = MethodChannel('kadastr/room_plan_scanner');
 
@@ -31,15 +31,18 @@ void main() {
         home: const AiScanIntroScreen(),
       );
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({});
-    // Skan qo'llab-quvvatlanadi deb ko'rsatamiz — aks holda ekran o'zini
-    // darhol video qadamiga almashtiradi va DEV tugmasi umuman chizilmaydi.
+  /// Qurilma LiDAR ni qo'llaydimi — nativ kanal shu bitta javob bilan
+  /// taqlid qilinadi.
+  void mockSupported({required bool supported}) {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       channel,
-      (call) async => call.method == 'isSupported' ? true : null,
+      (call) async => call.method == 'isSupported' ? supported : null,
     );
+  }
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
     appTranslationsNotifier.value = AppTranslations.fromJson(
       jsonDecode(File('assets/i18n/bundle.json').readAsStringSync())
           as Map<String, dynamic>,
@@ -47,46 +50,35 @@ void main() {
   });
 
   tearDown(() {
-    dotenv.clean();
     appTranslationsNotifier.value = AppTranslations.empty;
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
   });
 
-  String skipLabel() =>
-      tr(const Locale('uz'), 'services.ai.scan_intro.skip_scan_dev');
-
-  testWidgets('admin=true shows the skip and it opens the video step',
-      (tester) async {
-    dotenv.loadFromString(envString: 'admin=true');
+  testWidgets('«o\'tkazib yuborish» kadastr qadamini ochadi', (tester) async {
+    mockSupported(supported: true);
 
     await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
-    final skip = find.text(skipLabel());
+    final skip = find.byType(ScanSkipButton);
     expect(skip, findsOneWidget);
 
     await tester.tap(skip);
     await tester.pumpAndSettle();
 
-    expect(find.byType(AiStartScreen), findsOneWidget);
+    expect(find.byType(AiCadastreScreen), findsOneWidget);
   });
 
-  testWidgets('no admin key hides the skip', (tester) async {
-    dotenv.loadFromString(envString: '', isOptional: true);
+  testWidgets('LiDAR yo\'q qurilma — ekran o\'zini kadastrga almashtiradi',
+      (tester) async {
+    mockSupported(supported: false);
 
     await tester.pumpWidget(wrap());
     await tester.pumpAndSettle();
 
-    expect(find.text(skipLabel()), findsNothing);
-  });
-
-  testWidgets('admin=false hides the skip', (tester) async {
-    dotenv.loadFromString(envString: 'admin=false');
-
-    await tester.pumpWidget(wrap());
-    await tester.pumpAndSettle();
-
-    expect(find.text(skipLabel()), findsNothing);
+    expect(find.byType(AiCadastreScreen), findsOneWidget);
+    // pushReplacement — orqaga qaytadigan intro ekran qolmaydi.
+    expect(find.byType(AiScanIntroScreen), findsNothing);
   });
 }

@@ -8,6 +8,7 @@ import 'screens/kadastr/kadastr_area_screen.dart';
 import 'screens/online_calculator_screen.dart';
 import 'screens/service_placeholder_screen.dart';
 import 'screens/smeta/smeta_editor_screen.dart';
+import 'screens/taqiq_check_screen.dart';
 import 'widgets/service_card.dart';
 
 class ServicesScreen extends StatefulWidget {
@@ -240,10 +241,20 @@ class _ServicesScreenState extends State<ServicesScreen>
         Navigator.of(context).push(
           MaterialPageRoute<void>(builder: (_) => const SmetaEditorScreen()),
         );
-      case ServiceId.bozorAi:
       case ServiceId.taqiqCheck:
-        // Home'dagi yangi kartalar bilan bir xil: ekran hali yo'q va ikkalasi
-        // ham mehmonga yopiq — AI Baholash bilan bir xil login drawer.
+        // Home'dagi «Taqiqni tekshirish» kartasi bilan bir xil ekran, bir xil
+        // qulf: tekshiruv davreestr captchasini backend orqali yechadi, ya'ni
+        // token talab qiladi.
+        if (!await ensureLoggedIn(context)) {
+          return;
+        }
+        if (!context.mounted) return;
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const TaqiqCheckScreen()),
+        );
+      case ServiceId.bozorAi:
+        // Home'dagi karta bilan bir xil: ekran hali yo'q va mehmonga yopiq —
+        // AI Baholash bilan bir xil login drawer.
         if (!await ensureLoggedIn(context)) {
           return;
         }

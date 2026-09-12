@@ -214,8 +214,6 @@ class _Kadastr3dScreenState extends State<Kadastr3dScreen> {
                             isDark: isDark,
                             controller: _cadastreController,
                           ),
-                          const SizedBox(height: 10),
-                          _HelperLine(isDark: isDark),
                           if (_status == _LoadStatus.idle &&
                               _recent.isNotEmpty &&
                               _cadastreController.text.length <
@@ -500,40 +498,6 @@ class _CadastreMaskFormatter extends TextInputFormatter {
       text: formatted,
       selection:
           TextSelection.collapsed(offset: offset.clamp(0, formatted.length)),
-    );
-  }
-}
-
-class _HelperLine extends StatelessWidget {
-  const _HelperLine({required this.isDark});
-
-  final bool isDark;
-
-  @override
-  Widget build(BuildContext context) {
-    final l = Localizations.localeOf(context);
-    final restColor = isDark
-        ? Colors.white.withValues(alpha: 0.6)
-        : const Color(0xFF8A9097);
-    return Text.rich(
-      TextSpan(
-        style: TextStyle(
-          fontFamily: 'MTSText',
-          fontSize: 13,
-          height: 1.3,
-          color: restColor,
-        ),
-        children: [
-          const TextSpan(
-            text: 'davreest.uz',
-            style: TextStyle(
-              color: AppColors.splashGreen,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          TextSpan(text: tr(l, 'services.k3d.auto_fetch_suffix')),
-        ],
-      ),
     );
   }
 }

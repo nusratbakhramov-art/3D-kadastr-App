@@ -177,7 +177,7 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                     const SizedBox(height: 8),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: StepProgressBar(count: 8, activeIndex: 2),
+                      child: StepProgressBar(count: 7, activeIndex: 1),
                     ),
                     Expanded(
                       child: ListView(

@@ -99,6 +99,12 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   /// maqsad, intake). Rebuilt only when the cadastre number itself changes.
   AiBaholashBundle? _bundle;
 
+  /// Skan YO'Q yo'lda draft aynan shu ekranda tug'iladi (video qadami oqimdan
+  /// olib tashlangach, undan oldin draft yaratadigan qadam qolmadi). Future
+  /// eslab qolinadi: bir wizard yurishi uchun BITTA draft, va "Davom etish"
+  /// bosilganda u odatda allaqachon tayyor bo'ladi.
+  Future<int?>? _draftFuture;
+
   @override
   void initState() {
     super.initState();
@@ -281,6 +287,10 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
         _status = _LoadStatus.loaded;
         _errorMsg = null;
       });
+      // Draft ERTA boshlanadi — foydalanuvchi natijani o'qib turganda. Ataylab
+      // aynan shu yerda: kadastr topilgan payt oqimning birinchi jiddiy
+      // qadami, bo'sh raqam terib chiqib ketgan odam ortida ariza qoldirmaydi.
+      unawaited(_ensureDraft());
       // Remember it upstream so back→forward re-prefills instead of clearing.
       widget.onResolved?.call(result);
     } on CadastreLookupException catch (e) {
@@ -306,8 +316,23 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     }
   }
 
+  /// DRAFT arizani (bir marta) yaratadi. Skan qilingan yo'lda draft allaqachon
+  /// bor (`widget.draftId`) — u holda hech narsa qilinmaydi.
+  ///
+  /// `createAiDraft` login/tarmoq yo'q bo'lsa jim `null` qaytaradi; oqim
+  /// to'xtamaydi, shunchaki draft saqlanmaydi (ilgari video qadamida ham
+  /// shunday edi).
+  Future<int?> _ensureDraft() {
+    if (widget.draftId != null) return Future<int?>.value(widget.draftId);
+    return _draftFuture ??= createAiDraft(currentStep: 'cadastre');
+  }
+
   Future<void> _goNext(CadastreLookupResult info) async {
     HapticFeedback.lightImpact();
+    // Odatda kutish YO'Q: draft lookup muvaffaqiyatli tugaganda boshlangan va
+    // shu paytga qadar tayyor. Tarmoq sekin bo'lsagina bu yerda kutiladi.
+    final draftId = await _ensureDraft();
+    if (!mounted) return;
     // Reuse the bundle we already built (so downstream edits survive Back →
     // Davom etish). Rebuild only when the cadastre number actually changed —
     // a different property should legitimately reset the later steps.
@@ -316,11 +341,15 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     if (existing != null &&
         existing.kadastr.cadastreNumber == info.cadastreNumber) {
       bundle = existing;
+      // Resume bundle'da draft id bor; yangi yaratilgani esa faqat shu yerda
+      // ma'lum bo'ladi — aks holda keyingi qadamlar id'siz qolib, saqlash
+      // jimgina o'tkazib yuborilardi.
+      bundle.draftId ??= draftId;
     } else {
       bundle = AiBaholashBundle(
         kadastr: info,
         scan: widget.scan,
-        draftId: widget.draftId,
+        draftId: draftId,
         // Area now comes straight from the cadastre (total_area) — the manual
         // area step was removed. widget.areaM2 is only a resume fallback.
         areaM2: info.totalArea ?? widget.areaM2,
@@ -384,7 +413,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 8, activeIndex: 1),
+                      child: const StepProgressBar(count: 7, activeIndex: 0),
                     ),
                     if (widget.scanJobId != null) ...[
                       const SizedBox(height: 12),
@@ -425,8 +454,6 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                             isDark: isDark,
                             controller: _cadastreController,
                           ),
-                          const SizedBox(height: 10),
-                          _HelperLine(isDark: isDark, locale: l),
                           if (_status == _LoadStatus.idle &&
                               _recent.isNotEmpty &&
                               _cadastreController.text.length <
@@ -922,40 +949,6 @@ class _CadastreMaskFormatter extends TextInputFormatter {
   }
 }
 
-class _HelperLine extends StatelessWidget {
-  const _HelperLine({required this.isDark, required this.locale});
-
-  final bool isDark;
-  final Locale locale;
-
-  @override
-  Widget build(BuildContext context) {
-    final restColor = isDark
-        ? Colors.white.withValues(alpha: 0.6)
-        : const Color(0xFF8A9097);
-    return Text.rich(
-      TextSpan(
-        style: TextStyle(
-          fontFamily: 'MTSText',
-          fontSize: 13,
-          height: 1.3,
-          color: restColor,
-        ),
-        children: [
-          const TextSpan(
-            text: 'davreest.uz',
-            style: TextStyle(
-              color: AppColors.splashGreen,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          TextSpan(text: _CadastreStrings.helperSuffix(locale)),
-        ],
-      ),
-    );
-  }
-}
-
 class _PropertyInfoCardSkeleton extends StatefulWidget {
   const _PropertyInfoCardSkeleton({required this.isDark});
 
@@ -1320,9 +1313,6 @@ class _CadastreStrings {
       tr(l, 'services.ai.cadastre.property_info');
 
   static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
-
-  static String helperSuffix(Locale l) =>
-      tr(l, 'services.ai.cadastre.helper_suffix');
 
   static String signInFirst(Locale l) =>
       tr(l, 'services.ai.common.sign_in_first');
