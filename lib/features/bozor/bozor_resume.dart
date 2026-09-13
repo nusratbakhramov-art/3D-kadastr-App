@@ -54,8 +54,37 @@ Route<void> bozorResumeRoute(BozorDraft draft, WizardStep step) =>
 ///
 /// `draftId` tiklangan qoralamaga YOZILADI — keyingi qadam saqlashlari
 /// YANGI qatorni yaratmasin, o'sha qoralamani yangilasin.
+///
+/// ⚠️ OLDINGI QADAMLAR HAM STACK'GA QO'YILADI (animatsiyasiz). Ilgari faqat
+/// saqlangan qadam push qilinardi va u yerdagi «Ortga» (`maybePop`)
+/// foydalanuvchini oldingi qadamga emas, RO'YXATGA qaytarib yuborardi
+/// (prod, 2026-09-13). Endi 6-qadamdan «Ortga» → 5-qadam, header'dagi ←
+/// esa avvalgidek [closeBozorWizard] bilan butun oqimni yopadi — hamma
+/// marshrut `bozor/<qadam>` nomli.
 Future<void> openBozorDraft(BuildContext context, BozorDraftSummary summary) {
   final draft = draftFromPayload(summary.payload, draftId: summary.id);
   final step = wizardStepFromName(summary.currentStep);
-  return Navigator.of(context).push(bozorResumeRoute(draft, step));
+  return pushBozorDraftStack(Navigator.of(context), draft, step);
+}
+
+/// [step] gacha bo'lgan qadamlarni (o'zi ham) navigatorga qo'yadi; faqat
+/// oxirgisi animatsiya bilan. Sof navigatsiya — test uchun alohida.
+Future<void> pushBozorDraftStack(
+  NavigatorState nav,
+  BozorDraft draft,
+  WizardStep step,
+) {
+  final steps = draft.wizardSteps;
+  final safe = steps.contains(step) ? step : _fallbackStep(steps, step);
+  for (final prev in steps.takeWhile((s) => s != safe)) {
+    nav.push(
+      PageRouteBuilder<void>(
+        settings: bozorRoute(prev.name),
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (_, _, _) => bozorStepScreen(draft, prev),
+      ),
+    );
+  }
+  return nav.push(bozorResumeRoute(draft, safe));
 }

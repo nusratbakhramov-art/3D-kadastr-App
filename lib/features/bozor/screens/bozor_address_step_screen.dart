@@ -145,7 +145,16 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
   void _rebuild() => setState(() {});
 
   Future<void> _loadRegions() async {
-    final list = await widget.regionsRepository.regions();
+    final List<Region> list;
+    try {
+      list = await widget.regionsRepository.regions();
+    } catch (_) {
+      // Tarmoq yo'q / timeout: ilgari bu ushlanmasdi — istisno havoda qolib,
+      // maydon abadiy «Yuklanmoqda…» da turardi. Endi maydon ochiladi;
+      // bosilganda ro'yxat bo'sh bo'lsa qayta yuklanadi ([_pickRegion]).
+      if (mounted) setState(() => _loadingRegions = false);
+      return;
+    }
     if (!mounted) return;
     setState(() {
       _regions = list;
@@ -167,6 +176,12 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
 
   Future<void> _pickRegion() async {
     if (_loadingRegions) return;
+    if (_regions.isEmpty) {
+      // Oldingi yuklash yiqilgan — qayta urinamiz.
+      setState(() => _loadingRegions = true);
+      await _loadRegions();
+      if (!mounted || _regions.isEmpty) return;
+    }
     final l = Localizations.localeOf(context);
     final picked = await showOptionPickerSheet<Region>(
       context,
