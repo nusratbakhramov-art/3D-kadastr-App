@@ -604,6 +604,11 @@ class TermsDraft {
   /// ijobiy harakati bo'lishi kerak. ("Торг уместен" boshqa masala: u rozilik
   /// emas, sozlama, shuning uchun u dizayndagidek yoqilgan turadi.)
   bool accepted = false;
+
+  /// Rozilik berilgan «E'lon shartlari» hujjatining versiyasi
+  /// (`GET /legal/listing-terms` → `version`) — serverga `terms_version`
+  /// bo'lib ketadi, keyin qaysi matnga rozilik berilgani ma'lum bo'ladi.
+  String? acceptedVersion;
 }
 
 /// Sehrgar to'ldirib boradigan qoralama.

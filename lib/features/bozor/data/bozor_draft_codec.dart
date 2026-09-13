@@ -286,7 +286,11 @@ Map<String, dynamic> draftToPayload(
       'phones': c.phones.where((s) => s.isNotEmpty).toList(),
       if (c.email.isNotEmpty) 'email': c.email,
     },
-    'terms': {'tier': draft.terms.tier.code, 'accepted': draft.terms.accepted},
+    'terms': {
+      'tier': draft.terms.tier.code,
+      'accepted': draft.terms.accepted,
+      'terms_version': ?draft.terms.acceptedVersion,
+    },
   };
 }
 

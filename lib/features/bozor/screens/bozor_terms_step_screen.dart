@@ -1,7 +1,14 @@
-/// "Bozor AI" sehrgarining oxirgi qadami — `Условия размещения`.
+/// "Bozor AI" sehrgarining oxirgi qadami — «E'lon shartlari».
 ///
-/// Oltita variantda ham bir xil; farqi faqat qadam raqamida (`7/7` yoki
-/// "Boshqa noturar joy" da `6/6`).
+/// Ekranda BACKENDDAN kelgan «E'lon joylashtirish shartlari» matni
+/// (`GET /legal/listing-terms?lang=`, adminka «Shartlar» sahifasida
+/// tahrirlanadi) va uning ENG OSTIDA rozilik katakchasi. Katakcha
+/// belgilangandagina «Joylashtirish» yonadi; rozilik bilan birga hujjat
+/// versiyasi (`terms_version`) serverga ketadi.
+///
+/// Tariflar (Standart / Top) BU YERDA YO'Q (2026-09-13, mahsulot qarori):
+/// «Top» to'lov oqimi hali yo'q, ikkita karta foydalanuvchini chalg'itardi.
+/// `TermsDraft.tier` `standard` bo'lib qoladi — backend shuni kutadi.
 ///
 /// Pastdagi qator dizayndagidek: chapda "Oldindan ko'rish", o'ngda
 /// "Joylashtirish" — bu yerda "Ortga" YO'Q (dizaynda ham yo'q). Bir qadam
@@ -9,8 +16,13 @@
 /// tugma esa boshqa qadamlardagidek butun oqimni yopadi.
 library;
 
-import 'package:flutter/material.dart';
+import 'dart:convert';
 
+import 'package:flutter/material.dart';
+import 'package:flutter_widget_from_html_core/flutter_widget_from_html_core.dart';
+import 'package:http/http.dart' as http;
+
+import '../../../core/api_config.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../../../widgets/app_toast.dart';
@@ -24,18 +36,55 @@ import '../data/bozor_submit.dart';
 import '../data/pano_submit_gate.dart';
 import '../models/bozor_draft.dart';
 import '../models/bozor_validation.dart';
-import '../widgets/bozor_consent_row.dart';
 import '../widgets/draft_preview_sheet.dart';
-import '../widgets/tier_card.dart';
 import 'bozor_success_screen.dart';
 
+/// Backenddan kelgan «E'lon shartlari» hujjati.
+@immutable
+class ListingTermsDoc {
+  const ListingTermsDoc({
+    required this.title,
+    required this.html,
+    required this.version,
+  });
+
+  final String title;
+  final String html;
+  final String version;
+}
+
+/// Hujjatni oladi — test uchun almashtiriladi.
+typedef ListingTermsLoader = Future<ListingTermsDoc> Function(String lang);
+
+/// `GET /legal/listing-terms?lang=` — ommaviy, tokensiz.
+Future<ListingTermsDoc> fetchListingTerms(String lang) async {
+  final res = await http
+      .get(Uri.parse('${ApiConfig.baseUrl}/legal/listing-terms?lang=$lang'))
+      .timeout(const Duration(seconds: 20));
+  if (res.statusCode != 200) throw Exception('HTTP ${res.statusCode}');
+  final body = jsonDecode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+  return ListingTermsDoc(
+    title: (body['title'] ?? '').toString(),
+    html: (body['content'] ?? '').toString(),
+    version: (body['version'] ?? '').toString(),
+  );
+}
+
 class BozorTermsStepScreen extends StatefulWidget {
-  const BozorTermsStepScreen({super.key, required this.draft, this.submitter});
+  const BozorTermsStepScreen({
+    super.key,
+    required this.draft,
+    this.submitter,
+    this.termsLoader,
+  });
 
   final BozorDraft draft;
 
   /// Faqat testlar uchun — tarmoqqa chiqmasdan yuborishni almashtirish.
   final BozorSubmitter? submitter;
+
+  /// Faqat testlar uchun — hujjatni tarmoqsiz berish.
+  final ListingTermsLoader? termsLoader;
 
   @override
   State<BozorTermsStepScreen> createState() => _BozorTermsStepScreenState();
@@ -53,6 +102,19 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
   int _done = 0;
   int _total = 0;
 
+  ListingTermsDoc? _doc;
+  bool _docLoading = true;
+  bool _docFailed = false;
+  bool _docStarted = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_docStarted) return;
+    _docStarted = true;
+    _loadDoc();
+  }
+
   @override
   void dispose() {
     // Testdan berilgan bo'lsa uni yopish testning ishi.
@@ -60,21 +122,33 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
     super.dispose();
   }
 
-  void _showTierInfo(PlacementTier tier) {
-    // TODO(design): tariflarning mazmuni va "Top" narxi dizaynda yo'q.
-    AppToast.error(
-      context,
-      tr(Localizations.localeOf(context), 'bozor.terms.info_missing'),
-    );
+  Future<void> _loadDoc() async {
+    final lang = Localizations.localeOf(context).languageCode;
+    setState(() {
+      _docLoading = true;
+      _docFailed = false;
+    });
+    try {
+      final doc = await (widget.termsLoader ?? fetchListingTerms)(lang);
+      if (!mounted) return;
+      setState(() {
+        _doc = doc;
+        _docLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _docLoading = false;
+        _docFailed = true;
+      });
+    }
   }
 
-  void _openTerms() {
-    // TODO(backend): e'lon shartlari hujjati uchun manzil kerak.
-    // `/legal/terms` AI-baholash ofertasi — bu yerga to'g'ri kelmaydi.
-    AppToast.error(
-      context,
-      tr(Localizations.localeOf(context), 'bozor.terms.doc_missing'),
-    );
+  void _setAccepted(bool v) {
+    setState(() {
+      _t.accepted = v;
+      _t.acceptedVersion = v ? _doc?.version : null;
+    });
   }
 
   /// Fayllarni yuklaydi, keyin e'lonni yaratadi.
@@ -221,31 +295,16 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(16, 20, 16, 16),
                         children: [
-                          TierCard(
-                            label: tr(l, 'bozor.terms.tier_standard'),
-                            selected: _t.tier == PlacementTier.standard,
-                            onTap: () => setState(
-                              () => _t.tier = PlacementTier.standard,
-                            ),
-                            onInfo: () =>
-                                _showTierInfo(PlacementTier.standard),
-                          ),
-                          const SizedBox(height: 12),
-                          TierCard(
-                            label: tr(l, 'bozor.terms.tier_top'),
-                            selected: _t.tier == PlacementTier.top,
-                            showRocket: true,
-                            onTap: () =>
-                                setState(() => _t.tier = PlacementTier.top),
-                            onInfo: () => _showTierInfo(PlacementTier.top),
-                          ),
+                          _termsBody(l, isDark),
                           const SizedBox(height: 16),
-                          BozorConsentRow(
+                          // Katakcha HUJJATNING OSTIDA — o'qib bo'lgach.
+                          _ConsentCheckbox(
                             value: _t.accepted,
-                            onChanged: (v) => setState(() => _t.accepted = v),
-                            leadingText: tr(l, 'bozor.terms.consent_lead'),
-                            linkText: tr(l, 'bozor.terms.consent_link'),
-                            onOpenTerms: _openTerms,
+                            enabled: _doc != null,
+                            text:
+                                '${tr(l, 'bozor.terms.consent_lead')} '
+                                '${tr(l, 'bozor.terms.consent_link')}',
+                            onChanged: _setAccepted,
                           ),
                         ],
                       ),
@@ -288,6 +347,132 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+extension on _BozorTermsStepScreenState {
+  Widget _termsBody(Locale l, bool isDark) {
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+    final fill = isDark ? const Color(0xFF15191B) : Colors.white;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    Widget inner;
+    if (_docLoading) {
+      inner = const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(color: AppColors.splashGreen),
+        ),
+      );
+    } else if (_docFailed || _doc == null) {
+      inner = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            tr(l, 'bozor.terms.doc_failed'),
+            textAlign: TextAlign.center,
+            style: TextStyle(fontFamily: 'MTSText', fontSize: 14, color: fg),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: _loadDoc,
+            child: Text(tr(l, 'bozor.pano.flow.retry')),
+          ),
+        ],
+      );
+    } else {
+      final d = _doc!;
+      inner = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            d.title,
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: fg,
+            ),
+          ),
+          const SizedBox(height: 12),
+          HtmlWidget(
+            d.html,
+            textStyle: TextStyle(
+              fontFamily: 'MTSText',
+              fontSize: 14,
+              height: 1.45,
+              color: fg.withValues(alpha: 0.9),
+            ),
+          ),
+        ],
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: inner,
+    );
+  }
+}
+
+/// Rozilik katakchasi — hujjat ostida. Hujjat yuklanmaguncha o'chiq.
+class _ConsentCheckbox extends StatelessWidget {
+  const _ConsentCheckbox({
+    required this.value,
+    required this.enabled,
+    required this.text,
+    required this.onChanged,
+  });
+
+  final bool value;
+  final bool enabled;
+  final String text;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+    final fill = isDark ? const Color(0xFF20262A) : const Color(0xFFF3F5F7);
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: Material(
+        color: fill,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: enabled ? () => onChanged(!value) : null,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: value,
+                  onChanged: enabled ? (v) => onChanged(v ?? false) : null,
+                  activeColor: AppColors.splashGreen,
+                  checkColor: Colors.black,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    text,
+                    style: TextStyle(
+                      fontFamily: 'MTSText',
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                      color: fg,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
