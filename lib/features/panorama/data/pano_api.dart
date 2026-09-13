@@ -1,8 +1,13 @@
-/// 360° panorama tikish — backend klienti.
+/// 360° panorama SERVER tikishi — backend klienti. ⚠️ ESKI YO'L.
+///
+/// 2026-09-13 dan tikish TELEFONDA (`PanoCaptureChannel.stitch`), serverga
+/// faqat tayyor `pano.jpg` ketadi (`BozorApi.uploadMedia`). Bu klient FAQAT
+/// eski qoralamalardagi `job:<id>` havolalarni (`PendingPano`,
+/// `PanoJobWatcher`) tugatish uchun qolgan — yangi kod ishlatmasin.
 ///
 /// Oqim: [createJob] → har kadr uchun [uploadFrame] → [finish] → [status] ni
 /// tayyor bo'lguncha so'rash. Tikish serverda, alohida Celery navbatida
-/// (`app/tasks/bozor_pano_task.py`) — o'lchangan ~30 s.
+/// (`app/tasks/bozor_pano_task.py`) — prodda 7–9 daqiqa.
 ///
 /// Natija — ODDIY media kaliti (`listings/media/{user_id}/pano_*.jpg`), ya'ni
 /// e'lon uni yuklangan fotodan farqsiz qabul qiladi va `bozor_listing_media`

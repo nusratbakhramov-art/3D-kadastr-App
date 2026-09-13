@@ -38,7 +38,9 @@ import '../../../theme/color_tokens.dart';
 import '../../market/widgets/listing_cta_button.dart';
 import '../../market/widgets/listing_gallery_pager.dart';
 import '../../../core/haptics.dart';
+import '../../panorama/data/pano_capture_channel.dart';
 import '../../panorama/screens/pano_tour_screen.dart';
+import '../data/tour_native.dart';
 import '../../market/widgets/listing_info_card.dart';
 import '../../market/widgets/listing_meta_pills.dart';
 import '../../../widgets/app_toast.dart';
@@ -494,8 +496,33 @@ class _BozorListingDetailScreenState extends State<BozorListingDetailScreen> {
       if (m.role == 'panorama' && m.storageKey.isNotEmpty) m,
   ];
 
-  void _openTour(BozorListing listing) {
+  /// iOS'da NATIV tur (SceneKit), aks holda Dart `PanoTourScreen`.
+  Future<void> _openTour(BozorListing listing) async {
     final List<BozorListingMedia> panos = _panoramas(listing);
+    if (await PanoCaptureChannel.isSupported()) {
+      if (!mounted) return;
+      final l = Localizations.localeOf(context);
+      final roomN = tr(l, 'bozor.pano.tour.room_n');
+      await PanoCaptureChannel.tour(
+        context,
+        panoramas: <PanoTourRoom>[
+          for (var i = 0; i < panos.length; i++)
+            PanoTourRoom(
+              key: panos[i].storageKey,
+              // Xona nomi — egasi skan paytida bergan (`media.title`).
+              name: (panos[i].title ?? '').trim().isNotEmpty
+                  ? panos[i].title!.trim()
+                  : roomN.replaceFirst('%d', '${i + 1}'),
+              url: ApiConfig.resolveUrl(panos[i].url),
+            ),
+        ],
+        links: tourLinksToChannel(listing.tour),
+        startKey: panos.first.storageKey,
+        editable: false,
+      );
+      return;
+    }
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => PanoTourScreen(

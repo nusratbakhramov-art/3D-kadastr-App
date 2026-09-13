@@ -29,6 +29,7 @@ class MediaUploadRow extends StatelessWidget {
     required this.onRemove,
     this.onOpen,
     this.urlOf,
+    this.fileOf,
     this.statusOf,
   });
 
@@ -55,6 +56,10 @@ class MediaUploadRow extends StatelessWidget {
   /// Busiz eskiz `Image.file` ga tushib «hujjat» ikonkasiga aylanardi va
   /// foydalanuvchi panoramasi yuklanmagan deb o'ylardi.
   final String? Function(String path)? urlOf;
+
+  /// Havola uchun QURILMADAGI eskiz fayli (masalan tikilgan `preview.jpg`).
+  /// `local` holatda ishlatiladi; `null` — eskiz hali yo'q.
+  final String? Function(String path)? fileOf;
 
   /// Eskiz bosilganda nima ochilishi.
   ///
@@ -138,6 +143,7 @@ class MediaUploadRow extends StatelessWidget {
               itemBuilder: (context, i) => _Thumb(
                 path: paths[i],
                 url: urlOf?.call(paths[i]),
+                file: fileOf?.call(paths[i]),
                 status: statusOf?.call(paths[i]) ?? MediaItemStatus.ready,
                 onRemove: () => onRemove(i),
                 onOpen: () {
@@ -172,6 +178,11 @@ enum MediaItemStatus {
 
   /// Tayyorlash yiqildi — bosilsa qayta urinish taklif qilinadi.
   failed,
+
+  /// Telefonda saqlangan, hali yuklanmagan (360° kadrlar/tikilgan fayl) —
+  /// bosilsa davom etadi. [MediaUploadRow.fileOf] eskiz bersa u chiziladi,
+  /// bermasa «davom etish» belgisi.
+  local,
 }
 
 class _Thumb extends StatelessWidget {
@@ -181,6 +192,7 @@ class _Thumb extends StatelessWidget {
     required this.onOpen,
     required this.status,
     this.url,
+    this.file,
   });
 
   final MediaItemStatus status;
@@ -190,6 +202,7 @@ class _Thumb extends StatelessWidget {
   /// Bo'sh bo'lmasa — eskiz shu manzildan yuklanadi, [path] esa faqat
   /// kalit sifatida qoladi.
   final String? url;
+  final String? file;
   final VoidCallback onRemove;
   final VoidCallback onOpen;
 
@@ -227,6 +240,34 @@ class _Thumb extends StatelessWidget {
                         ),
                       ),
                     ),
+                    MediaItemStatus.local =>
+                      (file != null && File(file!).existsSync())
+                          ? Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                Image.file(File(file!), fit: BoxFit.cover),
+                                const Align(
+                                  alignment: Alignment.bottomRight,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(4),
+                                    child: Icon(
+                                      Icons.cloud_upload_outlined,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : _Placeholder(
+                              isDark: isDark,
+                              color: AppColors.splashGreen,
+                              child: const Icon(
+                                Icons.play_circle_outline_rounded,
+                                color: AppColors.splashGreen,
+                                size: 26,
+                              ),
+                            ),
                     MediaItemStatus.failed => _Placeholder(
                       isDark: isDark,
                       color: const Color(0xFFE0492A),

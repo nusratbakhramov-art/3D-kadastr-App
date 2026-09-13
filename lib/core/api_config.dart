@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ApiConfig {
@@ -5,10 +6,25 @@ class ApiConfig {
 
   /// Backend host (no path). Used for static assets, presigned URLs that
   /// come back relative, etc.
-  // PROD — telefon prod backendga ulanadi.
-  static const String serverBaseUrl = 'https://api.3dkadastr.uz';
-  // Dev (telefon → Mac LAN IP): 'http://192.168.1.64:8009'
-  // Dev (simulator only): 'http://localhost:8009'
+  ///
+  /// PROD — telefon prod backendga ulanadi. Lokal backend bilan sinash uchun
+  /// (debug YOKI profile build, kodga tegmasdan):
+  ///
+  ///     flutter run --dart-define=API_BASE_URL=http://192.168.4.123:8009
+  ///     flutter build ios --profile --dart-define=API_BASE_URL=http://…:8009
+  ///
+  /// Profile ham ruxsat etilgan: iOS 14+ da DEBUG ilova home screen'dan
+  /// ochilmaydi (faqat `flutter run` ostida), qurilmada mustaqil sinash
+  /// uchun profile kerak — u AOT, ya'ni tikish tezligi ham real.
+  /// Release'da define e'tiborsiz qoladi — `kReleaseMode` const bo'lgani
+  /// uchun bu ifoda ham const va prod URL kompilyatsiya vaqtida qotadi.
+  /// iOS'da LAN HTTP `NSAllowsLocalNetworking` bilan ochiq, Android debug'da
+  /// `network_security_config.xml` bilan.
+  static const String _prodBaseUrl = 'https://api.3dkadastr.uz';
+  static const String _debugOverride = String.fromEnvironment('API_BASE_URL');
+  static const String serverBaseUrl = !kReleaseMode && _debugOverride != ''
+      ? _debugOverride
+      : _prodBaseUrl;
 
   /// API prefix — versioned REST endpoints live here.
   static const String baseUrl = '$serverBaseUrl/api/v1';
@@ -27,8 +43,9 @@ class ApiConfig {
   /// restart — override it without rebuilding by putting
   /// `v2m_base_url=http://host:port` into `.env`.
   static String get v2mBaseUrl {
-    final override =
-        dotenv.isInitialized ? dotenv.maybeGet('v2m_base_url') : null;
+    final override = dotenv.isInitialized
+        ? dotenv.maybeGet('v2m_base_url')
+        : null;
     final url = (override != null && override.isNotEmpty)
         ? override
         : _v2mFallback;

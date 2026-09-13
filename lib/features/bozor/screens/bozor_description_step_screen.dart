@@ -8,6 +8,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -28,6 +29,9 @@ import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
 import '../data/bozor_draft_store.dart';
 import '../data/pano_job_watcher.dart';
+import '../data/tour_native.dart';
+import '../widgets/pano_rooms_sheet.dart';
+import '../../services/widgets/room_picker_sheet.dart';
 import '../models/bozor_draft.dart';
 import '../widgets/media_upload_row.dart';
 import 'bozor_contacts_step_screen.dart';
@@ -69,6 +73,10 @@ class _BozorDescriptionStepScreenState
   bool _pano360 = false;
 
   final PanoJobWatcher _watcher = PanoJobWatcher.instance;
+
+  /// Joriy oqimda `onCaptured` yozgan `local:` havola — yuklangach o'sha
+  /// o'rinda kalitga almashtirish uchun.
+  String? _lastCapturedRef;
 
   void _onPanoChanged() {
     if (mounted) setState(() {});
@@ -139,6 +147,10 @@ class _BozorDescriptionStepScreenState
   void _openPano(int index) {
     final l = Localizations.localeOf(context);
     final ref = _d.panoramas[index];
+    if (_d.localPanoramas.containsKey(ref)) {
+      unawaited(_resumeLocal(ref));
+      return;
+    }
     final p = _d.pendingPanoramas[ref];
     if (p == null) {
       _open360(index);
@@ -170,7 +182,15 @@ class _BozorDescriptionStepScreenState
     );
   }
 
-  void _open360(int index) {
+  /// Turni ochadi — iOS'da NATIV (SceneKit, Uy360 `TourViewerView`), aks
+  /// holda Dart `PanoTourScreen` (zaxira: Android / eski qurilma).
+  ///
+  /// Nativ tur «Yangi xona — hozir tushirish» amalini qaytarishi mumkin: u
+  /// paytda tur yopilgan bo'ladi, shu yerda capture → tikish → yuklash
+  /// oqimi yuritiladi, havola ikki tomonlama qo'shiladi va tur YANGI xonada
+  /// qayta ochiladi (`mergeNewRoomLinks`). Bekor qilinsa — foydalanuvchi
+  /// turgan xonada qayta ochiladi.
+  Future<void> _open360(int index) async {
     final l = Localizations.localeOf(context);
     // ⚠️ FAQAT TAYYORLARI. Kutilayotgan panoramaning tasviri hali yo'q —
     // uni turga qo'shsak ekran bo'sh sferada ochilardi. Tur baribir
@@ -183,6 +203,10 @@ class _BozorDescriptionStepScreenState
     if (ready.isEmpty) return;
     if (_d.pendingPanoramas.isNotEmpty) {
       AppToast.success(context, tr(l, 'bozor.pano.tour.wait'));
+    }
+    if (_pano360) {
+      await _openNativeTour(ready, startKey: _d.panoramas[index]);
+      return;
     }
     final start = ready.indexOf(_d.panoramas[index]);
     Navigator.of(context).push(
@@ -206,40 +230,254 @@ class _BozorDescriptionStepScreenState
     );
   }
 
-  /// 360° qo'shish: nativ suratga olish → serverda tikish → tayyor kalit.
+  /// Xona nomi: foydalanuvchi bergani (`panoramaNames`), bo'lmasa «Xona N».
+  String _roomName(Locale l, String key) =>
+      _d.roomName(key) ??
+      tr(
+        l,
+        'bozor.pano.tour.room_n',
+      ).replaceFirst('%d', '${_d.panoramas.indexOf(key) + 1}');
+
+  Future<void> _openNativeTour(
+    List<String> ready, {
+    required String startKey,
+  }) async {
+    var start = startKey;
+    while (mounted) {
+      final l = Localizations.localeOf(context);
+      final res = await PanoCaptureChannel.tour(
+        context,
+        panoramas: <PanoTourRoom>[
+          for (final String p in ready)
+            PanoTourRoom(
+              key: p,
+              name: _roomName(l, p),
+              url: _d.panoramaUrls[p] ?? p,
+            ),
+        ],
+        links: tourLinksToChannel(_d.tourLinks),
+        startKey: start,
+        editable: true,
+      );
+      if (!mounted || res == null) return;
+      setState(() {
+        _d.tourLinks
+          ..clear()
+          ..addAll(tourLinksFromChannel(res.links));
+      });
+      final action = res.newRoom;
+      if (action == null) return;
+
+      // «Yangi xona — hozir tushirish» — avval xona nomi.
+      if (_d.panoramas.length >= _maxPhotos) {
+        AppToast.error(context, _S.tooMany(l, _maxPhotos));
+        return;
+      }
+      final choice = await showRoomPickerSheet(
+        context,
+        title: tr(l, 'bozor.pano.rooms.name_title'),
+        hint: tr(l, 'bozor.pano.rooms.name_hint'),
+      );
+      if (!mounted) return;
+      if (choice == null) {
+        start = action.fromKey;
+        continue;
+      }
+      final key = await _captureAndStore(roomName: choice.label(l));
+      if (!mounted) return;
+      if (key == null) {
+        // Bekor yoki faqat saqlandi (qatorda `local:` turadi) — turgan
+        // xonaga qaytamiz; havola yuklangandan keyin qo'yiladi.
+        start = action.fromKey;
+        continue;
+      }
+      setState(() {
+        final merged = mergeNewRoomLinks(_d.tourLinks, action, key);
+        _d.tourLinks
+          ..clear()
+          ..addAll(merged);
+      });
+      saveBozorDraftInBackground(widget.draft, WizardStep.description);
+      ready.add(key);
+      start = key;
+    }
+  }
+
+  /// 360° qo'shish: nativ suratga olish → TELEFONDA tikish → yuklash →
+  /// tayyor kalit. Foydalanuvchi natijani `PanoCaptureFlow` ekranida
+  /// kutadi (~1–2 daqiqa), qaytganda panorama ALLAQACHON serverda.
   ///
   /// ⚠️ GALEREYADAN YUKLASH OLIB TASHLANDI (izohga olingan —
-  /// `pano_source_sheet.dart` ga qarang). Sabab: server tikish uchun har
-  /// kadrning KAMERA POZASINI talab qiladi, galereyadagi tayyor equirect'da
-  /// esa u yo'q. Qaytarish kerak bo'lsa o'sha fayldagi izohni oching va
-  /// bu yerga tanlov varag'ini qaytaring.
+  /// `pano_source_sheet.dart` ga qarang). Sabab: tikish har kadrning KAMERA
+  /// POZASINI talab qiladi, galereyadagi tayyor equirect'da esa u yo'q.
+  /// Qaytarish kerak bo'lsa o'sha fayldagi izohni oching va bu yerga tanlov
+  /// varag'ini qaytaring.
+  /// «360 foto qo'shish»: xona yo'q bo'lsa — to'g'ridan xona nomi so'raladi
+  /// va skan boshlanadi; bor bo'lsa — XONALAR varag'i (ro'yxat + «Yangi xona
+  /// skan qilish»). Har skan xonaga bog'lanadi — nom `panoramaNames` da.
   Future<void> _add360() async {
+    if (_d.panoramas.isEmpty) {
+      await _scanNewRoom();
+      return;
+    }
+    final l = Localizations.localeOf(context);
+    final res = await showPanoRoomsSheet(
+      context,
+      rooms: <PanoRoomItem>[
+        for (final String p in _d.panoramas)
+          PanoRoomItem(
+            name: _roomName(l, p),
+            status: _roomStatus(p),
+            url: _d.panoramaUrls[p],
+            file: _d.localPanoramas[p]?.previewPath,
+          ),
+      ],
+      canAdd: _d.panoramas.length < _maxPhotos,
+    );
+    if (!mounted || res == null) return;
+    if (res.newRoom) {
+      await _scanNewRoom();
+    } else {
+      _openPano(res.index);
+    }
+  }
+
+  PanoRoomStatus _roomStatus(String ref) {
+    final lp = _d.localPanoramas[ref];
+    if (lp != null) return lp.failed ? PanoRoomStatus.failed : PanoRoomStatus.local;
+    final p = _d.pendingPanoramas[ref];
+    if (p != null) return p.failed ? PanoRoomStatus.failed : PanoRoomStatus.pending;
+    return PanoRoomStatus.ready;
+  }
+
+  /// Xona nomini so'raydi (tayyor turlar + «Boshqa» erkin nom), keyin skan.
+  Future<void> _scanNewRoom() async {
     final l = Localizations.localeOf(context);
     if (_d.panoramas.length >= _maxPhotos) {
       AppToast.error(context, _S.tooMany(l, _maxPhotos));
       return;
     }
-    final outcome = await openPanoCapture(context);
-    if (!mounted || outcome == null) return;
-
-    // ⚠️ VAQTINCHALIK HAVOLA. Panorama hali tikilmagan (~7–9 daqiqa), lekin
-    // tartibdagi o'z o'rnini EGALLASHI kerak: foydalanuvchi qatorni ko'rib
-    // turibdi va keyin tur havolalari ham shu tartibga tayanadi.
-    // `PanoJobWatcher` tayyor bo'lgach AYNAN SHU O'RINDA haqiqiy kalitga
-    // almashtiradi.
-    final ref = PendingPano.refOf(outcome.jobId);
-    setState(() {
-      _d.panoramas.add(ref);
-      _d.pendingPanoramas[ref] = PendingPano(
-        jobId: outcome.jobId,
-        startedAt: DateTime.now(),
-      );
-    });
-    _watcher.watch(widget.draft);
-    if (mounted) AppToast.success(context, tr(l, 'bozor.pano.flow.queued'));
+    final choice = await showRoomPickerSheet(
+      context,
+      title: tr(l, 'bozor.pano.rooms.name_title'),
+      hint: tr(l, 'bozor.pano.rooms.name_hint'),
+    );
+    if (!mounted || choice == null) return;
+    final key = await _captureAndStore(roomName: choice.label(l));
+    if (!mounted || key == null) return;
+    AppToast.success(context, tr(l, 'bozor.pano.flow.ready'));
   }
 
-  /// Yiqilgan tikishni qaytadan navbatga qo'yadi.
+  /// Capture oqimini yuritadi va natijani qoralamaga yozadi.
+  ///
+  /// Qaytadi: yuklangan panoramaning S3 KALITI, yoki `null` (bekor / faqat
+  /// saqlandi). Ikkala holatda ham qoralama TO'G'RI holatda:
+  ///
+  ///  * capture tugashi bilan (`onCaptured`) `local:<uuid>` havola qatorga
+  ///    QO'SHILADI va qoralama diskka yoziladi — tikish paytida ilova o'lsa
+  ///    ham kadrlar egasiz qolmaydi;
+  ///  * yuklangach o'sha O'RINDA kalitga almashadi (uch qator — `panorama-360-
+  ///    status.md` §2.3: `panoramas`, `panoramaUrls`, `uploadedMedia`);
+  ///  * xato ekranidan chiqilsa `LocalPano` holati/xatosi yangilanadi va
+  ///    qatorda «davom etish» belgisi bilan turadi.
+  ///
+  /// [resumeDir] — saqlangan tushirishni davom ettirish (o'sha havola).
+  Future<String?> _captureAndStore({
+    String? resumeDir,
+    String? roomName,
+  }) async {
+    final outcome = await openPanoCapture(
+      context,
+      resumeDir: resumeDir,
+      onCaptured: (dir) {
+        if (!mounted) return;
+        final ref = LocalPano.refOf(dir);
+        _lastCapturedRef = ref;
+        setState(() {
+          if (!_d.panoramas.contains(ref)) _d.panoramas.add(ref);
+          _d.localPanoramas[ref] = LocalPano(
+            dir: dir,
+            stage: LocalPanoStage.captured,
+          );
+          if (roomName != null) _d.panoramaNames[ref] = roomName;
+        });
+        saveBozorDraftInBackground(widget.draft, WizardStep.description);
+      },
+    );
+    if (!mounted) return null;
+    switch (outcome) {
+      case PanoUploaded(:final storageKey, :final url):
+        final localRef = resumeDir == null ? null : LocalPano.refOf(resumeDir);
+        setState(() {
+          // Lokal havola turgan O'RINDA kalit — tartib saqlanadi.
+          final replace = localRef ?? _lastCapturedRef;
+          final idx = replace == null ? -1 : _d.panoramas.indexOf(replace);
+          if (idx >= 0) {
+            final old = _d.panoramas[idx];
+            _d.localPanoramas.remove(old);
+            // Xona nomi havola bilan birga ko'chadi.
+            final name = _d.panoramaNames.remove(old);
+            if (name != null) _d.panoramaNames[storageKey] = name;
+            _d.panoramas[idx] = storageKey;
+          } else if (!_d.panoramas.contains(storageKey)) {
+            _d.panoramas.add(storageKey);
+          }
+          if (roomName != null && !_d.panoramaNames.containsKey(storageKey)) {
+            _d.panoramaNames[storageKey] = roomName;
+          }
+          _d.panoramaUrls[storageKey] = url;
+          _d.uploadedMedia[storageKey] = storageKey;
+        });
+        _lastCapturedRef = null;
+        saveBozorDraftInBackground(widget.draft, WizardStep.description);
+        return storageKey;
+      case PanoSaved(:final dir, :final stitched, :final error):
+        final ref = LocalPano.refOf(dir);
+        setState(() {
+          if (!_d.panoramas.contains(ref)) _d.panoramas.add(ref);
+          if (roomName != null) _d.panoramaNames[ref] = roomName;
+          _d.localPanoramas[ref] = LocalPano(
+            dir: dir,
+            stage: error == null
+                ? (stitched ? LocalPanoStage.stitched : LocalPanoStage.captured)
+                : LocalPanoStage.failed,
+            error: error,
+          );
+        });
+        _lastCapturedRef = null;
+        saveBozorDraftInBackground(widget.draft, WizardStep.description);
+        return null;
+      case null:
+        return null;
+    }
+  }
+
+  /// Saqlangan tushirishni davom ettiradi (tikish yoki yuklash).
+  Future<void> _resumeLocal(String ref) async {
+    final lp = _d.localPanoramas[ref];
+    if (lp == null) return;
+    final l = Localizations.localeOf(context);
+    if (!Directory(lp.dir).existsSync()) {
+      // Katalog yo'q (iOS tozalagan / qurilma almashgan) — havola o'lik.
+      setState(() {
+        _d.panoramas.remove(ref);
+        _d.localPanoramas.remove(ref);
+      });
+      saveBozorDraftInBackground(widget.draft, WizardStep.description);
+      AppToast.error(context, tr(l, 'bozor.pano.view.err_missing'));
+      return;
+    }
+    final key = await _captureAndStore(resumeDir: lp.dir);
+    if (!mounted || key == null) return;
+    AppToast.success(context, tr(l, 'bozor.pano.flow.ready'));
+  }
+
+  /// Yiqilgan SERVER tikishini qaytadan navbatga qo'yadi.
+  ///
+  /// ⚠️ FAQAT ESKI QORALAMALAR UCHUN (2026-09-13 gacha, `job:<id>` havolali).
+  /// Yangi panoramalar telefonda tikiladi va `pendingPanoramas` ga umuman
+  /// tushmaydi — bu yo'l va `PanoJobWatcher` o'sha eski yozuvlar tugagach
+  /// olib tashlanadi.
   ///
   /// ⚠️ KADRLAR QAYTA YUBORILMAYDI. Server ularni 24 soat saqlaydi va
   /// `POST /pano/{id}/finish` XATO holatidagi ishni qaytadan yig'ib navbatga
@@ -380,7 +618,16 @@ class _BozorDescriptionStepScreenState
                             // Eskiz serverdan keladi — kadrlar o'chirilgan,
                             // lokal nusxa yo'q.
                             urlOf: (k) => _d.panoramaUrls[k],
+                            // Telefonda saqlangan tushirish: tikilgan bo'lsa
+                            // `preview.jpg` eskizi, bo'lmasa «davom» belgisi.
+                            fileOf: (k) => _d.localPanoramas[k]?.previewPath,
                             statusOf: (k) {
+                              final lp = _d.localPanoramas[k];
+                              if (lp != null) {
+                                return lp.failed
+                                    ? MediaItemStatus.failed
+                                    : MediaItemStatus.local;
+                              }
                               final p = _d.pendingPanoramas[k];
                               if (p == null) return MediaItemStatus.ready;
                               return p.failed
@@ -396,11 +643,22 @@ class _BozorDescriptionStepScreenState
                               // kelardi.
                               _d.panoramaUrls.remove(key);
                               _d.uploadedMedia.remove(key);
+                              _d.panoramaNames.remove(key);
                               // Kutilayotganini ham olib tashlaymiz — aks
                               // holda e'lon YUBORILMAS bo'lib qolardi:
                               // qatorda ko'rinmaydigan ish uni to'sib
                               // turardi.
                               _d.pendingPanoramas.remove(key);
+                              // Telefondagi kadrlar ham (75 MB) — egasiz
+                              // qolmasin.
+                              final lp = _d.localPanoramas.remove(key);
+                              if (lp != null) {
+                                unawaited(
+                                  Directory(lp.dir)
+                                      .delete(recursive: true)
+                                      .then<void>((_) {}, onError: (_) {}),
+                                );
+                              }
                               _d.tourLinks.removeWhere(
                                 (t) => t.from == key || t.to == key,
                               );

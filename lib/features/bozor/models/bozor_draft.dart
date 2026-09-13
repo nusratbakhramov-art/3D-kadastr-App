@@ -355,12 +355,16 @@ class ExistingMedia {
     required this.role,
     required this.sortOrder,
     required this.isCover,
+    this.title,
   });
 
   final String key;
   final String role;
   final int sortOrder;
   final bool isCover;
+
+  /// Xona nomi (panorama) — `PATCH` da qaytarib yuboriladi, yo'qolmasin.
+  final String? title;
 }
 
 /// 5-qadamning ma'lumotlari.
@@ -423,6 +427,61 @@ class PendingPano {
   );
 }
 
+/// Telefonda saqlangan, hali YUKLANMAGAN 360° tushirish.
+///
+/// Capture tugashi bilanoq qoralamaga yoziladi (tikish va yuklash hali
+/// oldinda) — ilova yopilsa, tikish yiqilsa yoki foydalanuvchi xato ekranidan
+/// chiqsa 30 nishonni aylanib chiqqan mehnat yo'qolmaydi: qatorda turadi va
+/// bosilganda YIQILGAN bosqichdan davom etadi (`PanoCaptureFlow(resumeDir:)`).
+///
+/// Kadrlar `Application Support/pano/<uuid>/` da (`PanoCapture.swift`) —
+/// `tmp/` emas, iOS uni tozalab yuborishi mumkin.
+@immutable
+class LocalPano {
+  const LocalPano({required this.dir, required this.stage, this.error});
+
+  /// Kadrlar (+ tikilgan bo'lsa `pano.jpg`, `preview.jpg`) katalogi.
+  final String dir;
+  final LocalPanoStage stage;
+
+  /// Oxirgi urinish xatosi (`stage == failed` da).
+  final String? error;
+
+  bool get failed => stage == LocalPanoStage.failed;
+  String get previewPath => '$dir/preview.jpg';
+  String get panoPath => '$dir/pano.jpg';
+
+  /// [DescriptionDraft.panoramas] dagi havola: `local:<katalog nomi>`.
+  /// S3 kaliti (`listings/media/…`) va `job:` bilan adashmaydi.
+  static String refOf(String dir) => 'local:${dir.split('/').last}';
+  static bool isRef(String ref) => ref.startsWith('local:');
+
+  LocalPano copyWith({LocalPanoStage? stage, String? error}) =>
+      LocalPano(dir: dir, stage: stage ?? this.stage, error: error);
+
+  Map<String, Object?> toJson() => {
+    'dir': dir,
+    'stage': stage.name,
+    if (error != null) 'error': error,
+  };
+
+  factory LocalPano.fromJson(Map<String, Object?> j) => LocalPano(
+    dir: (j['dir'] ?? '').toString(),
+    stage: LocalPanoStage.values.firstWhere(
+      (s) => s.name == j['stage'],
+      orElse: () => LocalPanoStage.captured,
+    ),
+    error: j['error']?.toString(),
+  );
+}
+
+/// [LocalPano] bosqichi.
+///
+/// `captured` — kadrlar bor, tikish kerak; `stitched` — `pano.jpg` tayyor,
+/// yuklash kerak; `failed` — oxirgi urinish yiqildi (qaysi bosqichda —
+/// katalogdagi `pano.jpg` borligidan bilinadi).
+enum LocalPanoStage { captured, stitched, failed }
+
 class DescriptionDraft {
   String text = '';
   final List<String> planFiles = [];
@@ -458,8 +517,26 @@ class DescriptionDraft {
   /// (`uploadedMedia` da kaliti yo'q).
   final Map<String, PendingPano> pendingPanoramas = {};
 
-  /// [panoramas] dagi havola hali tikilayotganmi.
-  bool isPending(String ref) => pendingPanoramas.containsKey(ref);
+  /// Telefonda saqlangan, hali yuklanmagan tushirishlar: `local:<uuid>`
+  /// havola → holat. [LocalPano] izohiga qarang.
+  final Map<String, LocalPano> localPanoramas = {};
+
+  /// Havola → XONA NOMI («Zal», «Oshxona»). Har skan xonaga bog'lanadi:
+  /// nom capture'dan OLDIN so'raladi, `local:` havola kalitga almashganda
+  /// nom ham ko'chadi, yuborishda `media[].title` bo'lib ketadi. Yo'q bo'lsa
+  /// UI «Xona N» deb ko'rsatadi.
+  final Map<String, String> panoramaNames = {};
+
+  /// [ref] xonasining nomi yoki `null`.
+  String? roomName(String ref) {
+    final n = panoramaNames[ref]?.trim();
+    return (n == null || n.isEmpty) ? null : n;
+  }
+
+  /// [panoramas] dagi havola hali TAYYOR EMASmi (serverda tikilayotgan yoki
+  /// telefonda yuklanmagan) — sfera/turga qo'shilmaydi.
+  bool isPending(String ref) =>
+      pendingPanoramas.containsKey(ref) || localPanoramas.containsKey(ref);
 
   /// Tikish yiqilgan panoramalar — qatorda QIZIL ko'rinadi.
   Iterable<String> get failedPanoramas => pendingPanoramas.entries

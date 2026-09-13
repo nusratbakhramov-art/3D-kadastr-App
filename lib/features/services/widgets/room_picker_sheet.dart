@@ -23,22 +23,30 @@ import '../models/ai_baholash_bundle.dart';
 import 'choice_tile.dart';
 
 /// Varaqni ochadi. Tanlangan xona qaytadi, bekor qilinsa `null`.
+///
+/// [title]/[hint] — matnni almashtirish (Bozor 360° sehrgari ham shu
+/// varaqni ishlatadi: u yerda «video/3D model» izohi to'g'ri kelmaydi).
 Future<RoomChoice?> showRoomPickerSheet(
   BuildContext context, {
   RoomKind? selected,
+  String? title,
+  String? hint,
 }) {
   return showModalBottomSheet<RoomChoice>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _RoomPickerSheet(selected: selected),
+    builder: (_) =>
+        _RoomPickerSheet(selected: selected, title: title, hint: hint),
   );
 }
 
 class _RoomPickerSheet extends StatefulWidget {
-  const _RoomPickerSheet({this.selected});
+  const _RoomPickerSheet({this.selected, this.title, this.hint});
 
   final RoomKind? selected;
+  final String? title;
+  final String? hint;
 
   @override
   State<_RoomPickerSheet> createState() => _RoomPickerSheetState();
@@ -131,7 +139,7 @@ class _RoomPickerSheetState extends State<_RoomPickerSheet> {
                   ),
                 ),
                 Text(
-                  _S.title(l),
+                  widget.title ?? _S.title(l),
                   style: TextStyle(
                     fontFamily: 'MTSCompact',
                     fontWeight: FontWeight.w700,
@@ -141,7 +149,7 @@ class _RoomPickerSheetState extends State<_RoomPickerSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  _S.hint(l),
+                  widget.hint ?? _S.hint(l),
                   style: TextStyle(
                     fontFamily: 'MTSText',
                     fontSize: 13,

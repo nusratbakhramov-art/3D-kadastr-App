@@ -10,6 +10,7 @@ import 'package:kadastr/features/bozor/models/tour_link.dart';
 /// unda bo'lmaydi. Foydalanuvchi 30 nishonni aylanib chiqqan mehnati
 /// yo'qoladi va buni hech kim sezmaydi.
 void main() {
+  _localGate();
   DescriptionDraft draft({
     List<String> panoramas = const [],
     Map<String, PendingPano> pending = const {},
@@ -46,7 +47,10 @@ void main() {
     // aytilishi kerak: kutish o'z-o'zidan o'tadi, xato esa o'tmaydi.
     final d = draft(
       panoramas: ['job:7', 'job:8'],
-      pending: {'job:7': p(7), 'job:8': p(8, error: 'tikib boʻlmadi')},
+      pending: {
+        'job:7': p(7),
+        'job:8': p(8, error: 'tikib boʻlmadi'),
+      },
     );
     expect(panoSubmitBlocker(d), 'bozor.pano.gate.failed');
   });
@@ -89,5 +93,21 @@ void main() {
       );
       expect(panoSubmitBlocker(d), 'bozor.pano.gate.pending');
     });
+  });
+}
+
+// ── Telefonda saqlangan (yuklanmagan) tushirish ───────────────────────────
+void _localGate() {
+  test('lokal (yuklanmagan) panorama yuborishni to\'sadi', () {
+    final d = DescriptionDraft();
+    d.panoramas.add('local:abc');
+    d.localPanoramas['local:abc'] = const LocalPano(
+      dir: '/x/abc',
+      stage: LocalPanoStage.captured,
+    );
+    expect(panoSubmitBlocker(d), 'bozor.pano.gate.local');
+    d.localPanoramas.clear();
+    d.panoramas.clear();
+    expect(panoSubmitBlocker(d), isNull);
   });
 }

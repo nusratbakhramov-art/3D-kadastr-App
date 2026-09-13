@@ -444,11 +444,14 @@ import RoomPlan
         }
       }
 
-      // 360° panorama — ARKit bilan yo'naltirilgan suratga olish.
+      // 360° panorama — ARKit bilan yo'naltirilgan suratga olish + TELEFONDA
+      // tikish.
       //
-      // Natija: `{dir, frames}` — Dart shu katalogdagi kadrlarni serverga
-      // yuklaydi (tikish SERVERDA, `panorama` Celery navbatida) va yuklagach
-      // katalogni o'zi o'chiradi. Bekor qilinsa `nil`.
+      // `start` → `{dir, frames}` (kadrlar + meta.json). Keyin Dart `stitch
+      // {dir, width, mode}` ni chaqiradi (`PanoStitch.swift` → `PanoCore/`),
+      // progress `progress {p, msg}` bilan TESKARI keladi, natija `{pano,
+      // preview, width, height, ...}`. Tayyor `pano.jpg` ni Dart serverga
+      // yuklaydi va katalogni o'zi o'chiradi. Bekor qilinsa `nil`.
       let panoChannel = FlutterMethodChannel(
         name: "kadastr/pano_capture",
         binaryMessenger: controller.binaryMessenger
@@ -477,6 +480,35 @@ import RoomPlan
           let args = call.arguments as? [String: Any]
           let strings = (args?["strings"] as? [String: String]) ?? [:]
           PanoCaptureCoordinator.shared.start(from: controller, strings: strings, result: result)
+
+        case "stitch":
+          guard #available(iOS 15, *) else {
+            result(FlutterError(code: "UNSUPPORTED", message: "iOS 15+ kerak", details: nil))
+            return
+          }
+          PanoStitchCoordinator.shared.stitch(
+            args: call.arguments as? [String: Any],
+            channel: panoChannel,
+            result: result
+          )
+
+        // Nativ tur (xonalarni bog'lash) va tikishdan keyingi natija ko'rish —
+        // `PanoTour.swift`. SwiftUI `presentationDetents` uchun iOS 16+.
+        case "tour", "preview":
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
+            return
+          }
+          guard #available(iOS 16, *) else {
+            result(FlutterError(code: "UNSUPPORTED", message: "iOS 16+ kerak", details: nil))
+            return
+          }
+          let args = call.arguments as? [String: Any]
+          if call.method == "tour" {
+            PanoTourCoordinator.shared.tour(args: args, from: controller, result: result)
+          } else {
+            PanoTourCoordinator.shared.preview(args: args, from: controller, result: result)
+          }
 
         default:
           result(FlutterMethodNotImplemented)

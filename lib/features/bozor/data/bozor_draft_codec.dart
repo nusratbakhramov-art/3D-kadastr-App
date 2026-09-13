@@ -173,6 +173,13 @@ Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
       'pending_panorama': {
         for (final e in d.pendingPanoramas.entries) e.key: e.value.toJson(),
       },
+      // TELEFONDA saqlangan tushirishlar (kadrlar diskda, yuklanmagan).
+      // Busiz ilova yopilib ochilganda `local:` havola egasiz qolardi.
+      'local_panorama': {
+        for (final e in d.localPanoramas.entries) e.key: e.value.toJson(),
+      },
+      // Xona nomlari (havola → nom).
+      'panorama_names': Map<String, String>.from(d.panoramaNames),
       // Allaqachon yuklangan fayllar — qayta urinish ularni takrorlamasin.
       'uploaded': Map<String, String>.from(d.uploadedMedia),
       // 360° tur havolalari. Qoralamada LOKAL YO'L bilan yotadi, ya'ni
@@ -190,6 +197,7 @@ Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
             'role': m.role,
             'sort_order': m.sortOrder,
             'is_cover': m.isCover,
+            'title': ?m.title,
           },
       ],
   };
@@ -309,6 +317,7 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
         role: (e['role'] ?? 'photo').toString(),
         sortOrder: _int(e['sort_order']) ?? 0,
         isCover: e['is_cover'] == true,
+        title: e['title']?.toString(),
       ),
     );
   }
@@ -385,6 +394,20 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
           e.key: PendingPano.fromJson(
             (e.value as Map).cast<String, Object?>(),
           ),
+    });
+  draft.description.localPanoramas
+    ..clear()
+    ..addAll({
+      for (final e in _map(local['local_panorama']).entries)
+        if (e.value is Map)
+          e.key: LocalPano.fromJson((e.value as Map).cast<String, Object?>()),
+    });
+  draft.description.panoramaNames
+    ..clear()
+    ..addAll({
+      for (final e in _map(local['panorama_names']).entries)
+        if (e.value != null && e.value.toString().trim().isNotEmpty)
+          e.key: e.value.toString(),
     });
   draft.description.uploadedMedia
     ..clear()
@@ -548,8 +571,17 @@ BozorDraft draftFromListing(BozorListing l) {
             role: m.role,
             sortOrder: m.sortOrder,
             isCover: m.isCover,
+            title: m.title,
           ),
     ]);
+  // Tahrirlashda xona nomlari sehrgar ro'yxatida ko'rinsin.
+  draft.description.panoramaNames
+    ..clear()
+    ..addAll({
+      for (final m in l.media)
+        if (m.role == 'panorama' && (m.title ?? '').trim().isNotEmpty)
+          m.storageKey: m.title!.trim(),
+    });
 
   draft.contacts
     ..name = l.contactName

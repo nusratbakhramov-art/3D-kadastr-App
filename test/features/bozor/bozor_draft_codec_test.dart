@@ -136,6 +136,35 @@ void main() {
       expect(after.terms.tier, PlacementTier.top);
     });
 
+    test('telefonda saqlangan tushirish (LocalPano) round-trip', () {
+      final before = _fullDraft();
+      before.description.panoramas.add('local:abc');
+      before.description.localPanoramas['local:abc'] = const LocalPano(
+        dir: '/x/pano/abc',
+        stage: LocalPanoStage.failed,
+        error: 'kam kadr',
+      );
+      final after = draftFromPayload(draftToDraftPayload(before), draftId: 1);
+      final lp = after.description.localPanoramas['local:abc'];
+      expect(lp, isNotNull);
+      expect(lp!.dir, '/x/pano/abc');
+      expect(lp.stage, LocalPanoStage.failed);
+      expect(lp.error, 'kam kadr');
+      expect(after.description.panoramas, contains('local:abc'));
+      expect(after.description.isPending('local:abc'), isTrue);
+    });
+
+    test('xona nomlari (panoramaNames) round-trip', () {
+      final before = _fullDraft();
+      before.description.panoramas.add('listings/media/3/p.jpg');
+      before.description.panoramaNames['listings/media/3/p.jpg'] = 'Oshxona';
+      before.description.panoramaNames['local:x'] = '   '; // bo'sh — tashlanadi
+      final after = draftFromPayload(draftToDraftPayload(before), draftId: 1);
+      expect(after.description.roomName('listings/media/3/p.jpg'), 'Oshxona');
+      expect(after.description.roomName('local:x'), isNull);
+      expect(after.description.panoramaNames.containsKey('local:x'), isFalse);
+    });
+
     test('payload IKKI marta o‘girilganda o‘zgarmaydi (barqaror)', () {
       final once = draftToDraftPayload(_fullDraft());
       final twice = draftToDraftPayload(draftFromPayload(once));
@@ -229,9 +258,9 @@ void main() {
       // uni `false` ga tushirib qo'ymaslik kerak.
       expect(draftFromPayload(const {}).price.negotiable, isTrue);
       expect(
-        draftFromPayload(const {'price': {'negotiable': false}})
-            .price
-            .negotiable,
+        draftFromPayload(const {
+          'price': {'negotiable': false},
+        }).price.negotiable,
         isFalse,
       );
     });
@@ -399,9 +428,17 @@ void _editTests() {
       expect(p.containsKey('property_type'), isFalse);
       expect(p.containsKey('terms'), isFalse);
       // Qolgan bo'limlar joyida.
-      expect(p.keys, containsAll(<String>[
-        'title', 'address', 'params', 'price', 'description', 'contacts',
-      ]));
+      expect(
+        p.keys,
+        containsAll(<String>[
+          'title',
+          'address',
+          'params',
+          'price',
+          'description',
+          'contacts',
+        ]),
+      );
     });
 
     test('media bo‘sh bo‘lsa `media` kaliti UMUMAN yuborilmaydi', () {
@@ -414,8 +451,12 @@ void _editTests() {
 
     test('media berilsa `media` yuboriladi', () {
       final p = draftToUpdatePayload(draftFromListing(_listing()), const [
-        {'key': 'listings/media/3/a.jpg', 'role': 'photo', 'sort_order': 0,
-         'is_cover': true},
+        {
+          'key': 'listings/media/3/a.jpg',
+          'role': 'photo',
+          'sort_order': 0,
+          'is_cover': true,
+        },
       ]);
       final d = p['description'] as Map;
       expect((d['media'] as List).length, 1);

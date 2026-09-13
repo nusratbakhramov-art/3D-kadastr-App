@@ -54,6 +54,7 @@ class BozorListingMedia {
     required this.storageKey,
     required this.url,
     this.thumbUrl,
+    this.title,
     this.isCover = false,
     this.sortOrder = 0,
   });
@@ -70,6 +71,9 @@ class BozorListingMedia {
 
   final String url;
   final String? thumbUrl;
+
+  /// Xona nomi (360° panorama), foto/planirovkada `null`.
+  final String? title;
   final bool isCover;
   final int sortOrder;
 
@@ -95,6 +99,7 @@ class BozorListingMedia {
         storageKey: (j['storage_key'] ?? '').toString(),
         url: (j['url'] ?? '').toString(),
         thumbUrl: _toStringOrNull(j['thumb_url']),
+        title: _toStringOrNull(j['title']),
         isCover: j['is_cover'] == true,
         sortOrder: _toInt(j['sort_order']) ?? 0,
       );

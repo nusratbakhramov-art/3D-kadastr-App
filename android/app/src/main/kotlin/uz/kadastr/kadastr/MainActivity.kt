@@ -97,14 +97,22 @@ class MainActivity : FlutterActivity() {
         }
 
         // 360° panorama capture — iOS'dagi `kadastr/pano_capture` kanalining
-        // egizagi (`ios/Runner/AppDelegate.swift`). Nativ taraf faqat KADR
-        // YIG'ADI; tikish serverda.
+        // egizagi (`ios/Runner/AppDelegate.swift`).
+        //
+        // ⚠️ ANDROID'DA YOPIQ (2026-09-13, mahsulot qarori). Tikish endi
+        // SERVERDA EMAS, TELEFONDA (iOS: `PanoStitch.swift` + C++ `PanoCore`).
+        // Android'ga yadro NDK orqali hali ko'chirilmagan, eski server yo'li
+        // esa o'chirilmoqda — shuning uchun `isSupported` HAR DOIM `false`:
+        // 360 qatori umuman ko'rinmaydi. ARCore capture kodi
+        // (`pano/PanoCaptureActivity.kt`, `resolveArCore`) SAQLANADI —
+        // yadro Android'ga kelganda `isSupported` ni `resolveArCore(result)`
+        // ga qaytarish yetadi.
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "kadastr/pano_capture"
         ).setMethodCallHandler { call, result ->
             when (call.method) {
-                "isSupported" -> resolveArCore(result)
+                "isSupported" -> result.success(false)
                 "start" -> startPanoCapture(call.argument("strings"), result)
                 else -> result.notImplemented()
             }

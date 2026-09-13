@@ -1,22 +1,31 @@
-/// 360° panorama: suratga olish → kadrlarni yuborish → EKRAN YOPILADI.
+/// 360° panorama: suratga olish → TELEFONDA tikish → tayyor faylni yuklash.
 ///
-/// ⚠️ TIKISH BU YERDA KUTILMAYDI. Ilgari foydalanuvchi natijani shu ekranda
-/// kutardi. O'lchov (prod `celery-panorama` logi, 2026-09-12) tikish
-/// **7–9 daqiqa** olishini ko'rsatdi:
+/// Uch bosqich, hammasi shu ekranda, foydalanuvchi natijani KUTADI:
 ///
-///     ish 7 → 420.5 s   ish 9  → 459.4 s   ish 15 → 567.1 s
-///     ish 8 → 451.2 s   ish 10 → 474.1 s
+///   1. nativ capture (ARKit, `PanoCapture.swift`) — 30 nishon, kadrlar +
+///      `meta.json` `tmp/pano/<uuid>/` ga;
+///   2. nativ tikish (`PanoStitch.swift` → C++ `PanoCore/`) — o'sha
+///      katalogga `pano.jpg`; progress + o'tgan vaqt ko'rsatiladi. iPhone 14
+///      Pro'da MVS "tez" preset ~1.5–2 daqiqa, rotatsiya-only 30–90 s;
+///   3. nativ natija ko'rish (`PanoTour.swift` `preview`) — sferada
+///      «Davom etish» / «Qayta tushirish» (Uy360 `LocalResultView`);
+///   4. `POST /listings/media role=panorama` — bitta JPEG (~2–4 MB) →
+///      S3 kaliti + URL. Kalit sehrgar qoralamasiga to'g'ridan yoziladi.
 ///
-/// Uchta xonaga bu yarim soatlik qotib turish demakdi. Endi ekran kadrlar
-/// yuborilishi bilan yopiladi va ISHNING RAQAMINI qaytaradi; tikilishini
-/// `PanoJobWatcher` fonda kuzatadi.
+/// ⚠️ ILGARI kadrlar serverga yuborilib u yerda tikilardi (`PanoApi`,
+/// `celery-panorama`) va bu prodda **7–9 daqiqa** olardi — shuning uchun
+/// oqim fonga (`PanoJobWatcher`, `PendingPano`) ko'chirilgan edi. Endi
+/// tikish telefonda va bir-ikki daqiqa, ya'ni kutish ekranga qaytdi va
+/// natija DARHOL kalit bo'ladi: `pendingPanoramas` YANGI panorama uchun
+/// yozilmaydi (eski qoralamalardagi `job:<id>` havolalar uchun watcher
+/// saqlanib qolgan).
 ///
-/// Nega bu ekran baribir kerak: nativ capture va kadrlarni yuklash — ikki
-/// bosqich va ikkalasining ham progressi bor. Ularni tavsif qadamiga solsak
-/// u ekran tarmoq holati bilan to'lib ketardi.
+/// Qayta urinish KADRLARNI QAYTA OLMAYDI: tikish yiqilsa kadrlar diskda,
+/// yuklash yiqilsa `pano.jpg` ham diskda — faqat yiqilgan bosqich
+/// takrorlanadi. Katalog FAQAT muvaffaqiyatli yuklashdan keyin o'chiriladi.
 library;
 
-import 'dart:convert';
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -24,37 +33,100 @@ import 'package:flutter/services.dart' show PlatformException;
 
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
-import '../data/pano_api.dart';
+import '../../bozor/data/bozor_api.dart';
 import '../data/pano_capture_channel.dart';
 
-/// Serverga topshirilgan tikish ishi.
+/// Oqim natijasi.
 ///
-/// ⚠️ Bu TAYYOR PANORAMA EMAS — kadrlar yuborildi va navbatga qo'yildi,
-/// xolos. Natija `PanoJobWatcher` orqali keladi.
-@immutable
-class PanoOutcome {
-  const PanoOutcome({required this.jobId});
-
-  /// `bozor_pano_jobs.id` — kuzatuv shu bo'yicha boradi.
-  final int jobId;
+/// [PanoUploaded] — hammasi tugadi, kalit tayyor. [PanoSaved] — kadrlar (va
+/// balki tikilgan `pano.jpg`) TELEFONDA saqlangan, lekin yuklanmagan:
+/// foydalanuvchi xato ekranidan chiqdi. Qoralama uni `LocalPano` qilib
+/// saqlaydi va keyin [openPanoCapture] `resumeDir` bilan davom ettiradi.
+/// `null` — capture'ning o'zi bekor qilingan (hech narsa yo'q).
+sealed class PanoOutcome {
+  const PanoOutcome();
 }
 
-/// Ekranni ochadi. Bekor qilinsa yoki yuklash yiqilsa `null`.
-Future<PanoOutcome?> openPanoCapture(BuildContext context) =>
-    Navigator.of(context).push<PanoOutcome>(
-      MaterialPageRoute<PanoOutcome>(builder: (_) => const PanoCaptureFlow()),
-    );
+/// Tayyor va YUKLANGAN panorama.
+///
+/// `storageKey` — `listings/media/{user_id}/….jpg`, e'longa SHU qo'shiladi;
+/// `url` — ko'rsatish uchun (eskiz, sfera).
+@immutable
+class PanoUploaded extends PanoOutcome {
+  const PanoUploaded({required this.storageKey, required this.url});
+
+  final String storageKey;
+  final String url;
+}
+
+/// Telefonda saqlangan, yuklanmagan tushirish.
+@immutable
+class PanoSaved extends PanoOutcome {
+  const PanoSaved({required this.dir, required this.stitched, this.error});
+
+  final String dir;
+
+  /// `pano.jpg` tayyormi (yuklash yiqilgan) yoki faqat kadrlar (tikish
+  /// yiqilgan / bekor).
+  final bool stitched;
+  final String? error;
+}
+
+/// Ekranni ochadi. [resumeDir] — avval saqlangan tushirish: capture
+/// o'tkazib yuboriladi, yiqilgan bosqichdan (tikish yoki yuklash) davom
+/// etadi. [onCaptured] — capture TUGASHI bilan (tikishdan OLDIN) katalog;
+/// chaqiruvchi shu zahoti qoralamaga yozadi — ilova tikish paytida o'lsa ham
+/// kadrlar egasiz qolmasin.
+Future<PanoOutcome?> openPanoCapture(
+  BuildContext context, {
+  String? resumeDir,
+  void Function(String dir)? onCaptured,
+}) => Navigator.of(context).push<PanoOutcome>(
+  MaterialPageRoute<PanoOutcome>(
+    builder: (_) =>
+        PanoCaptureFlow(resumeDir: resumeDir, onCaptured: onCaptured),
+  ),
+);
 
 /// Oqimning qaysi bosqichida turibmiz.
-///
-/// «Tikilmoqda» bosqichi YO'Q — u fonga ko'chdi.
-enum _Stage { capturing, uploading, failed }
+enum _Stage { capturing, stitching, previewing, uploading, failed }
+
+/// Nativ capture — test uchun almashtiriladi.
+typedef PanoCaptureFn = Future<PanoCaptureResult?> Function(BuildContext);
+
+/// Nativ natija ko'rish — test uchun almashtiriladi.
+typedef PanoPreviewFn =
+    Future<PanoPreviewAction> Function(BuildContext, String path);
+
+/// Nativ tikish — test uchun almashtiriladi.
+typedef PanoStitchFn =
+    Future<PanoStitchResult> Function({
+      required String dir,
+      void Function(double p, String msg)? onProgress,
+    });
 
 class PanoCaptureFlow extends StatefulWidget {
-  const PanoCaptureFlow({super.key, this.api});
+  const PanoCaptureFlow({
+    super.key,
+    this.resumeDir,
+    this.onCaptured,
+    this.api,
+    this.capture,
+    this.stitch,
+    this.preview,
+  });
 
-  /// Faqat testlar uchun.
-  final PanoApi? api;
+  /// Saqlangan tushirish katalogi — capture o'tkazib yuboriladi.
+  final String? resumeDir;
+
+  /// Capture tugashi bilan chaqiriladi (katalog). [openPanoCapture] izohi.
+  final void Function(String dir)? onCaptured;
+
+  /// Faqat testlar uchun — sukut bo'yicha haqiqiy kanal va `BozorApi`.
+  final BozorApi? api;
+  final PanoCaptureFn? capture;
+  final PanoStitchFn? stitch;
+  final PanoPreviewFn? preview;
 
   @override
   State<PanoCaptureFlow> createState() => PanoCaptureFlowState();
@@ -62,15 +134,42 @@ class PanoCaptureFlow extends StatefulWidget {
 
 /// ⚠️ OCHIQ (xususiy emas) FAQAT test uchun.
 class PanoCaptureFlowState extends State<PanoCaptureFlow> {
-  late final PanoApi _api = widget.api ?? PanoApi();
+  late final BozorApi _api = widget.api ?? BozorApi();
+  late final PanoCaptureFn _capture =
+      widget.capture ?? PanoCaptureChannel.start;
+  late final PanoStitchFn _stitch = widget.stitch ?? _defaultStitch;
+  late final PanoPreviewFn _preview = widget.preview ?? _defaultPreview;
+
+  static Future<PanoPreviewAction> _defaultPreview(
+    BuildContext context,
+    String path,
+  ) => PanoCaptureChannel.preview(context, path: path);
+
+  /// Nadir (oyoq osti) suratga OLINMAYDI — o'rniga shu disk-logo bosiladi
+  /// (`PanoCapture.swift` nishon to'ri, yadro `nadirLogoPath`).
+  static const String kNadirLogoAsset = 'assets/branding/nadir_logo.png';
+
+  static Future<PanoStitchResult> _defaultStitch({
+    required String dir,
+    void Function(double p, String msg)? onProgress,
+  }) => PanoCaptureChannel.stitch(
+    dir: dir,
+    logoAsset: kNadirLogoAsset,
+    onProgress: onProgress,
+  );
 
   _Stage _stage = _Stage.capturing;
   double _progress = 0;
   String _note = '';
   String? _error;
 
-  PanoCaptureResult? _capture;
+  PanoCaptureResult? _shot;
   bool _started = false;
+
+  // Tikish vaqti — foydalanuvchi «qotib qoldimi» deb o'ylamasin.
+  Timer? _ticker;
+  DateTime? _stitchStarted;
+  int _elapsedS = 0;
 
   @override
   void didChangeDependencies() {
@@ -84,107 +183,188 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
 
   @override
   void dispose() {
+    _ticker?.cancel();
     if (widget.api == null) _api.dispose();
     super.dispose();
   }
 
   Future<void> _run() async {
     try {
-      final shot = await PanoCaptureChannel.start(context);
+      final resume = widget.resumeDir;
+      if (resume != null && _shot == null && Directory(resume).existsSync()) {
+        // Saqlangan tushirish — capture yo'q, yiqilgan bosqichdan.
+        final frames = Directory(resume)
+            .listSync()
+            .where(
+              (f) => f.path.endsWith('.jpg') && !f.path.endsWith('pano.jpg'),
+            )
+            .length;
+        final shot = PanoCaptureResult(dir: resume, frames: frames);
+        _shot = shot;
+        final pano = _panoFile(shot);
+        if (pano.existsSync()) {
+          await _previewThenUpload(shot, pano);
+        } else {
+          await _stitchThenUpload(shot);
+        }
+        return;
+      }
+      final shot = await _capture(context);
       if (!mounted) return;
       if (shot == null) {
         Navigator.of(context).pop(); // bekor qilindi
         return;
       }
-      _capture = shot;
-      await _upload(shot);
+      _shot = shot;
+      widget.onCaptured?.call(shot.dir);
+      await _stitchThenUpload(shot);
     } on Object catch (e) {
       _fail(e);
     }
   }
 
-  Future<void> _upload(PanoCaptureResult shot) async {
-    setState(() {
-      _stage = _Stage.uploading;
-      _progress = 0;
-    });
+  /// Xato ekranidan chiqish: kadrlar bo'lsa ULAR SAQLANADI — qoralama
+  /// `LocalPano` qilib yozadi, keyin davom ettiriladi.
+  void _leave() {
+    final shot = _shot;
+    if (shot != null && shot.directory.existsSync()) {
+      Navigator.of(context).pop(
+        PanoSaved(
+          dir: shot.dir,
+          stitched: _panoFile(shot).existsSync(),
+          error: _error,
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pop();
+  }
 
-    final metaFile = File('${shot.dir}/meta.json');
-    if (!metaFile.existsSync()) {
+  File _panoFile(PanoCaptureResult shot) => File('${shot.dir}/pano.jpg');
+
+  Future<void> _stitchThenUpload(PanoCaptureResult shot) async {
+    if (!File('${shot.dir}/meta.json').existsSync()) {
       _fail(StateError('meta.json topilmadi'));
       return;
     }
-    final metas = (jsonDecode(await metaFile.readAsString()) as List)
-        .cast<Map<String, dynamic>>();
-    if (metas.isEmpty) {
-      _fail(StateError('kadrlar yoʻq'));
+    setState(() {
+      _stage = _Stage.stitching;
+      _progress = 0;
+      _note = '';
+      _elapsedS = 0;
+    });
+    _stitchStarted = DateTime.now();
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _stitchStarted == null) return;
+      setState(
+        () => _elapsedS = DateTime.now().difference(_stitchStarted!).inSeconds,
+      );
+    });
+
+    final result = await _stitch(
+      dir: shot.dir,
+      onProgress: (p, _) {
+        if (!mounted) return;
+        setState(() => _progress = p.clamp(0.0, 1.0));
+      },
+    );
+    _ticker?.cancel();
+    _ticker = null;
+    if (!mounted) return;
+    await _previewThenUpload(shot, File(result.panoPath));
+  }
+
+  /// Natijani sferada ko'rsatadi: qabul → yuklash; qayta tushirish → kadrlar
+  /// tashlanadi va capture qaytadan ochiladi (bu safar foydalanuvchi ONGLI
+  /// ravishda qaytadan aylanadi — sifat yoqmagani uchun).
+  Future<void> _previewThenUpload(PanoCaptureResult shot, File pano) async {
+    setState(() {
+      _stage = _Stage.previewing;
+      _note = '';
+    });
+    final action = await _preview(context, pano.path);
+    if (!mounted) return;
+    if (action == PanoPreviewAction.retake) {
+      await shot.cleanUp();
+      _shot = null;
+      if (!mounted) return;
+      setState(() => _stage = _Stage.capturing);
+      await _run();
       return;
     }
+    await _upload(shot, pano);
+  }
 
-    final job = await _api.createJob();
-
-    for (var i = 0; i < metas.length; i++) {
-      if (!mounted) return;
-      final m = metas[i];
-      final f = File('${shot.dir}/${m['file']}');
-      if (!f.existsSync()) continue;
-      await _api.uploadFrame(jobId: job.id, image: f, meta: m);
-      if (!mounted) return;
-      setState(() {
-        _progress = (i + 1) / metas.length;
-        _note = '${i + 1}/${metas.length}';
-      });
+  Future<void> _upload(PanoCaptureResult shot, File pano) async {
+    setState(() {
+      _stage = _Stage.uploading;
+      _progress = 0;
+      _note = '';
+    });
+    final uploaded = await _api.uploadMedia(
+      role: 'panorama',
+      paths: [pano.path],
+    );
+    if (!mounted) return;
+    if (uploaded.isEmpty) {
+      _fail(StateError('server kalit qaytarmadi'));
+      return;
     }
+    final m = uploaded.first;
 
-    await _api.finish(job.id);
+    // Panorama SERVERDA — kadrlar ham, `pano.jpg` ham endi kerak emas
+    // (bitta tushirish ~75 MB to'liq o'lchamli kadr). ⚠️ AYNAN SHU YERDA,
+    // yuklash MUVAFFAQIYATLI bo'lgandan keyin: ilgariroq o'chirsak qayta
+    // urinish uchun hech narsa qolmasdi.
+    await shot.cleanUp();
     if (!mounted) return;
-
-    // Kadrlar SERVERDA — telefondagi nusxa endi kerak emas (bitta tushirish
-    // ~6 MB, foydalanuvchi esa ketma-ket bir necha xona oladi).
-    //
-    // ⚠️ AYNAN SHU YERDA — `finish` MUVAFFAQIYATLI bo'lgandan keyin.
-    // Ilgariroq o'chirsak, `finish` tarmoq sababli yiqilganda qayta urinish
-    // uchun hech narsa qolmasdi. Serverdagi TIKISH yiqilsa esa lokal kadrlar
-    // baribir kerak emas: server ularni 24 soat saqlaydi va qayta urinish
-    // o'sha yerdan ketadi.
-    await _capture?.cleanUp();
-    if (!mounted) return;
-    Navigator.of(context).pop(PanoOutcome(jobId: job.id));
+    Navigator.of(context).pop(PanoUploaded(storageKey: m.key, url: m.url));
   }
 
   void _fail(Object e) {
+    _ticker?.cancel();
+    _ticker = null;
     if (!mounted) return;
     setState(() {
       _stage = _Stage.failed;
       // Nativ taraf xatoni `PlatformException` qilib qaytaradi (masalan
-      // ARCore o'rnatilmagan). Uning `toString()` i «PlatformException(
-      // CAPTURE_FAILED, …, null, null)» bo'ladi — foydalanuvchiga shu
+      // `STITCH_FAILED`). Uning `toString()` i «PlatformException(
+      // STITCH_FAILED, …, null, null)» bo'ladi — foydalanuvchiga shu
       // ko'rinishda chiqarish mumkin emas.
       _error = switch (e) {
-        PanoApiException(:final message) => message,
+        BozorApiException(:final message) => message,
         PlatformException(:final message?) => message,
         _ => e.toString(),
       };
     });
   }
 
+  /// Qayta urinish — faqat YIQILGAN bosqichdan.
   Future<void> _retry() async {
-    final shot = _capture;
+    final shot = _shot;
     setState(() => _error = null);
-    // Kadrlar hali diskda bo'lsa qaytadan suratga olmaymiz — faqat yuklashni
-    // takrorlaymiz. Bu eng qimmat qismni (foydalanuvchining 30 nishonni
-    // aylanib chiqishini) tejaydi.
-    if (shot != null && shot.directory.existsSync()) {
-      try {
-        await _upload(shot);
-      } on Object catch (e) {
-        _fail(e);
+    try {
+      if (shot != null && shot.directory.existsSync()) {
+        final pano = _panoFile(shot);
+        if (pano.existsSync()) {
+          // Tikish bo'lgan, yuklash yiqilgan — faqat yuklash.
+          await _upload(shot, pano);
+        } else {
+          // Kadrlar bor, tikish yiqilgan — 30 nishonni qayta aylanmaymiz.
+          await _stitchThenUpload(shot);
+        }
+      } else {
+        setState(() => _stage = _Stage.capturing);
+        await _run();
       }
-    } else {
-      setState(() => _stage = _Stage.capturing);
-      await _run();
+    } on Object catch (e) {
+      _fail(e);
     }
   }
+
+  static String _mmss(int s) =>
+      '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -194,10 +374,14 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
     final fg = isDark ? Colors.white : AppColors.textBlack;
 
     return PopScope(
-      // Kadrlar yuborilyapti — orqaga qaytish ularni yarim yo'lda qoldiradi
-      // va server hech qachon `finish` olmaydi. Ataylab bloklaymiz; chiqish
-      // yo'li xato holatida beriladi.
-      canPop: _stage == _Stage.failed,
+      // Tikish/yuklash ketyapti — orqaga qaytish ishni yarim yo'lda
+      // qoldiradi (nativ tikish baribir tugaydi, lekin natija yo'qoladi).
+      // Ataylab bloklaymiz; xato holatida orqaga surish ham `_leave` orqali
+      // — kadrlar SAQLANGAN holda (`PanoSaved`) chiqadi, `null` bilan emas.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop && _stage == _Stage.failed) _leave();
+      },
       child: Scaffold(
         backgroundColor: bg,
         body: SafeArea(
@@ -215,11 +399,17 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   }
 
   Widget _busyView(Locale l, Color fg) {
-    final title = _stage == _Stage.capturing
-        ? tr(l, 'bozor.pano.flow.opening')
-        : tr(l, 'bozor.pano.flow.uploading');
-    // Nativ ekran ochilayotganda progress noma'lum — aylanuvchi ko'rsatkich.
-    final value = _stage == _Stage.capturing ? null : _progress.clamp(0.0, 1.0);
+    final title = switch (_stage) {
+      _Stage.capturing || _Stage.previewing => tr(l, 'bozor.pano.flow.opening'),
+      _Stage.stitching => tr(l, 'bozor.pano.flow.stitching'),
+      _ => tr(l, 'bozor.pano.flow.uploading_pano'),
+    };
+    // Nativ ekran ochilayotganda va yuklashda progress noma'lum —
+    // aylanuvchi ko'rsatkich; tikishda yadro 0..1 beradi.
+    final value = _stage == _Stage.stitching ? _progress.clamp(0.0, 1.0) : null;
+    final note = _stage == _Stage.stitching
+        ? '${(_progress * 100).round()}% · ${_mmss(_elapsedS)}'
+        : _note;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -244,14 +434,26 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
             color: fg,
           ),
         ),
-        if (_note.isNotEmpty) ...[
+        if (note.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            _note,
+            note,
             style: TextStyle(
               fontFamily: 'MTSText',
               fontSize: 13,
               color: fg.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+        if (_stage == _Stage.stitching) ...[
+          const SizedBox(height: 16),
+          Text(
+            tr(l, 'bozor.pano.flow.stitch_hint'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'MTSText',
+              fontSize: 12,
+              color: fg.withValues(alpha: 0.45),
             ),
           ),
         ],
@@ -296,10 +498,7 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(tr(l, 'common.cancel')),
-          ),
+          TextButton(onPressed: _leave, child: Text(tr(l, 'common.cancel'))),
           const SizedBox(width: 12),
           FilledButton(
             onPressed: _retry,

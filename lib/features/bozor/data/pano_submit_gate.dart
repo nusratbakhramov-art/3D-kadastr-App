@@ -28,6 +28,9 @@ import '../models/tour_link.dart';
 String? panoSubmitBlocker(DescriptionDraft d) {
   if (d.failedPanoramas.isNotEmpty) return 'bozor.pano.gate.failed';
   if (d.workingPanoramas.isNotEmpty) return 'bozor.pano.gate.pending';
+  // Telefonda saqlangan, hali yuklanmagan tushirish — `bozor_submit` uni
+  // jimgina tashlab yuborardi (kaliti yo'q). Bosib davom ettirish kerak.
+  if (d.localPanoramas.isNotEmpty) return 'bozor.pano.gate.local';
   // Bitta panoramada tur tushunchasi yo'q — qo'shish tugmasi baribir
   // ko'rinadi, lekin talab qilinmaydi.
   if (d.panoramas.length >= 2 &&

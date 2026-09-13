@@ -40,13 +40,19 @@ void main() {
     d.description.panoramas.add(key);
     d.description.panoramaUrls[key] = 'https://cdn.test/$key';
     d.description.uploadedMedia[key] = key;
+    // Xona nomi — `media[].title` bo'lib ketishi kerak.
+    d.description.panoramaNames[key] = 'Zal';
     d.description.tourLinks.addAll(tour);
     return d;
   }
 
   /// `POST /listings/media` chaqirilsa — shartnoma buzilgan.
-  ({http.Client client, List<String> uploads, List<Map<String, dynamic>> created})
-      recorder() {
+  ({
+    http.Client client,
+    List<String> uploads,
+    List<Map<String, dynamic>> created,
+  })
+  recorder() {
     final uploads = <String>[];
     final created = <Map<String, dynamic>>[];
     final client = MockClient((req) async {
@@ -56,11 +62,17 @@ void main() {
       }
       if (req.url.path.endsWith('/listings/')) {
         created.add(jsonDecode(req.body) as Map<String, dynamic>);
-        return http.Response('{"id": 11, "status": "pending"}', 201,
-            headers: {'content-type': 'application/json; charset=utf-8'});
+        return http.Response(
+          '{"id": 11, "status": "pending"}',
+          201,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
       }
-      return http.Response('{}', 200,
-          headers: {'content-type': 'application/json; charset=utf-8'});
+      return http.Response(
+        '{}',
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
     });
     return (client: client, uploads: uploads, created: created);
   }
@@ -80,8 +92,9 @@ void main() {
 
   test('panorama media roʻyxatiga `role: panorama` bilan tushadi', () async {
     final r = recorder();
-    await BozorSubmitter(api: BozorApi(client: r.client))
-        .submit(draftWithServerPano());
+    await BozorSubmitter(
+      api: BozorApi(client: r.client),
+    ).submit(draftWithServerPano());
 
     expect(r.created, hasLength(1));
     final media = ((r.created.single['description'] as Map)['media'] as List)
@@ -91,6 +104,8 @@ void main() {
     expect(media.single['role'], 'panorama');
     // Muqova FAQAT foto bo'ladi — panorama lenta kartasida ko'rinmasin.
     expect(media.single['is_cover'], isFalse);
+    // Xona nomi serverga `title` bo'lib ketadi (backend `MediaIn.title`).
+    expect(media.single['title'], 'Zal');
   });
 
   test('tur havolasi kalit boʻyicha ishlaydi (oʻgirish kerak emas)', () {
@@ -99,9 +114,9 @@ void main() {
     // o'girish AYNIYAT bo'ladi (`uploaded[ref] ?? ref`). Shu ishlashi
     // shart, aks holda tur havolalari jimgina TASHLANADI.
     const key2 = 'listings/media/3/pano_8_1790.jpg';
-    final d = draftWithServerPano(tour: [
-      const TourLink(from: key, to: key2, yawDeg: 90, pitchDeg: 0),
-    ]);
+    final d = draftWithServerPano(
+      tour: [const TourLink(from: key, to: key2, yawDeg: 90, pitchDeg: 0)],
+    );
     d.description.panoramas.add(key2);
     d.description.uploadedMedia[key2] = key2;
 
@@ -125,7 +140,8 @@ void main() {
     expect(
       back.description.uploadedMedia[key],
       key,
-      reason: 'busiz davom ettirilgan qoralama panoramani QAYTA yuklashga '
+      reason:
+          'busiz davom ettirilgan qoralama panoramani QAYTA yuklashga '
           'urinadi va yiqiladi',
     );
   });

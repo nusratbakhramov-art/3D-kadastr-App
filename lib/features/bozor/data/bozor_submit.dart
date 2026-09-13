@@ -85,6 +85,9 @@ class BozorSubmitter {
           // Muqova — birinchi foto. Backend ham shu qoidaga tushadi, lekin
           // aniq aytib qo'ygan yaxshi.
           'is_cover': entry.key == 'photo' && i == 0,
+          // Xona nomi — faqat 360° da bor.
+          if (entry.key == 'panorama')
+            'title': ?d.roomName(entry.value[i]) ?? d.roomName(key),
         });
       }
     }
@@ -105,6 +108,10 @@ class BozorSubmitter {
             'role': m.role,
             'sort_order': m.sortOrder,
             'is_cover': m.isCover,
+            // Tahrirlashda mavjud panoramaning nomi ham qaytariladi —
+            // `PATCH` media'ni to'liq almashtiradi, nomsiz yuborsak o'chardi.
+            if (m.role == 'panorama')
+              'title': ?d.roomName(m.key) ?? m.title,
           },
       ];
       // Yangi fayl qo'shilmagan bo'lsa MEDIA UMUMAN yuborilmaydi: server
