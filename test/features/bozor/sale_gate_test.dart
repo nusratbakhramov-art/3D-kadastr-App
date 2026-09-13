@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -64,6 +65,44 @@ void main() {
     await openDealPicker(tester, apiReturning(saleEnabled: false));
     expect(find.byType(ChoiceTile), findsOneWidget);
     expect(find.text('bozor.deal.sale'), findsNothing);
+  });
+
+  testWidgets('picker javobdan OLDIN bosilsa — javobni kutib ikkalasini beradi', (
+    tester,
+  ) async {
+    // Prod 2026-09-13: ekran ochilib darhol bosilganda faqat «Ijaraga»
+    // chiqardi — ro'yxat bayroq kelmasdan qurilardi.
+    final gate = Completer<http.Response>();
+    final api = BozorApi(client: MockClient((_) => gate.future));
+    await tester.pumpWidget(MaterialApp(home: BozorTypeStepScreen(api: api)));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(SelectField).first,
+        matching: find.byType(InkWell),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    // Hali varaq yo'q — kutyapmiz.
+    expect(find.byType(ChoiceTile), findsNothing);
+    gate.complete(
+      http.Response(
+        jsonEncode({
+          'version': 1,
+          'deal_types': const [],
+          'kinds': const [],
+          'types': const [],
+          'kind_types': const <String, List<String>>{},
+          'top_tier_enabled': false,
+          'sale_enabled': true,
+        }),
+        200,
+        headers: const {'content-type': 'application/json; charset=utf-8'},
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(ChoiceTile), findsNWidgets(2));
   });
 
   testWidgets('sale_enabled: true — ikkala variant', (tester) async {

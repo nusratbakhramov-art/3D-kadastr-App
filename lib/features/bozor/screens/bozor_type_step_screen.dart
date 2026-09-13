@@ -70,15 +70,23 @@ class _BozorTypeStepScreenState extends State<BozorTypeStepScreen> {
   /// Bayroqni fonda o'qiydi. Ataylab `await` qilinmaydi va xato yutiladi:
   /// bu jimgina cheklov, foydalanuvchiga ko'rsatiladigan xato emas — aks holda
   /// offline foydalanuvchi sehrgarni umuman ocholmaydi.
-  Future<void> _loadSaleGate(String locale) async {
-    try {
-      final ref = await _api.reference(locale);
-      if (!mounted) return;
-      _applyGate(ref.saleEnabled);
-    } catch (_) {
-      // Sukut `false` bo'lib qoladi — ijara oqimi ishlashda davom etadi.
-      if (mounted) _applyGate(false);
-    }
+  /// Ketayotgan bayroq so'rovi — [_pickDeal] uni KUTADI. Aks holda ekran
+  /// ochilib 1–2 s ichida picker bosilsa ro'yxat javob kelmasdan quriladi va
+  /// bayroq yoqiq bo'lsa ham faqat «Ijaraga» ko'rinardi (prodda 2026-09-13
+  /// da aynan shu bo'ldi).
+  Future<void>? _gate;
+
+  Future<void> _loadSaleGate(String locale) {
+    return _gate = () async {
+      try {
+        final ref = await _api.reference(locale);
+        if (!mounted) return;
+        _applyGate(ref.saleEnabled);
+      } catch (_) {
+        // Sukut `false` bo'lib qoladi — ijara oqimi ishlashda davom etadi.
+        if (mounted) _applyGate(false);
+      }
+    }();
   }
 
   /// Bayroq javobi KELGANDAN keyin qo'llanadi.
@@ -109,6 +117,14 @@ class _BozorTypeStepScreenState extends State<BozorTypeStepScreen> {
 
   Future<void> _pickDeal() async {
     final l = Localizations.localeOf(context);
+    // Bayroq hali kelmagan bo'lsa — qisqa kutamiz; offline'da 3 s dan keyin
+    // ijara bilan davom etiladi (so'rov o'zi 20 s timeout bilan yiqilib
+    // `false` ni qo'yadi).
+    final gate = _gate;
+    if (gate != null) {
+      await gate.timeout(const Duration(seconds: 3), onTimeout: () {});
+      if (!mounted) return;
+    }
     final picked = await showOptionPickerSheet<DealType>(
       context,
       title: _S.dealLabel(l),
