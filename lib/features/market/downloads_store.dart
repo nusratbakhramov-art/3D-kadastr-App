@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'downloads_export.dart';
+
 /// Bitta yuklab olingan marketplace fayli haqidagi yozuv.
 ///
 /// [fileName] saqlanadi, TO'LIQ yo'l EMAS: iOS'da ilova konteyneri yo'li har
@@ -242,6 +244,16 @@ class MarketDownloads {
     }
     if (await target.exists()) await target.delete();
     await partial.rename(target.path);
+
+    // Android'da faylni umumiy Downloads papkasiga ham chiqaramiz — foydalanuvchi
+    // uni Samsung "Fayllar"da (Yaqinda/Yuklamalar) topsin. iOS'da bu no-op:
+    // Documents/Yuklamalar Files ilovasida allaqachon ko'rinadi. Hech qachon
+    // throw qilmaydi — asosiy saqlash muvaffaqiyatiga ta'sir qilmaydi.
+    await DownloadsExport.toDownloads(
+      path: target.path,
+      fileName: name,
+      format: format,
+    );
 
     final rec = MarketDownload(
       fileId: fileId,

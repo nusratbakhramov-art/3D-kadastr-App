@@ -15,6 +15,7 @@ import '../auth/widgets/login_required_sheet.dart';
 import '../home/user_profile.dart' show paymentsHidden;
 import '../settings/settings_state.dart';
 import 'api_marketplace_service.dart';
+import 'downloads_export.dart';
 import 'downloads_store.dart';
 import 'listing_3d_viewer_screen.dart';
 import 'models/market_listing.dart';
@@ -230,6 +231,28 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
       return;
     }
     await _downloadFormat(file);
+  }
+
+  /// Jild tugmasi — faylning saqlangan joyini ochadi (Android: Yuklamalar
+  /// ekrani; iOS: Files ilovasi). Ochib bo'lmasa, zaxira sifatida faylni
+  /// ulashish oynasini ko'rsatadi.
+  Future<void> _onOpenLocation(MarketListingFile file) async {
+    final rec = _downloads[file.id];
+    if (rec == null) return;
+    final dir = await MarketDownloads.directory();
+    final ok = await DownloadsExport.openLocation(folderPath: dir.path);
+    if (ok || !mounted) return;
+    final f = await MarketDownloads.fileFor(rec);
+    final exists = await f.exists();
+    if (!mounted || !exists) return;
+    final box = context.findRenderObject() as RenderBox?;
+    await Share.shareXFiles(
+      [XFile(f.path, name: rec.fileName)],
+      subject: _listing.title,
+      sharePositionOrigin: box != null
+          ? box.localToGlobal(Offset.zero) & box.size
+          : null,
+    );
   }
 
   Future<void> _downloadFormat(MarketListingFile file) async {
@@ -599,6 +622,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
                   downloadedFileIds: _downloads.keys.toSet(),
                   locked: !unlocked,
                   onTap: _onFileTap,
+                  onOpenLocation: _onOpenLocation,
                 ),
               ),
             ],

@@ -11,6 +11,7 @@ class ListingFormatsCard extends StatelessWidget {
     super.key,
     required this.files,
     required this.onTap,
+    this.onOpenLocation,
     this.downloadingFileId,
     this.downloadProgress,
     this.downloadedFileIds = const {},
@@ -27,6 +28,10 @@ class ListingFormatsCard extends StatelessWidget {
   /// Called when a row is tapped — receives the file. When [locked] the
   /// parent routes this into the purchase flow instead of downloading.
   final ValueChanged<MarketListingFile> onTap;
+
+  /// Yuklab olingan qatordagi jild tugmasi bosilganda — faylning saqlangan
+  /// joyini ochadi (Android: Yuklamalar ekrani; iOS: Files ilovasi).
+  final ValueChanged<MarketListingFile>? onOpenLocation;
 
   /// If non-null, that file's row shows progress.
   final int? downloadingFileId;
@@ -84,6 +89,12 @@ class ListingFormatsCard extends StatelessWidget {
               locked: locked,
               fg: fg,
               divider: divider,
+              onOpenLocation: onOpenLocation == null
+                  ? null
+                  : () {
+                      HapticFeedback.selectionClick();
+                      onOpenLocation!(f);
+                    },
               onTap: () {
                 // Yuklanayotgan qatorning o'zi bosilsa — bekor qilish; boshqa
                 // qatorlar shu vaqtda bloklanadi.
@@ -143,6 +154,7 @@ class _FileRow extends StatelessWidget {
     required this.fg,
     required this.divider,
     required this.onTap,
+    this.onOpenLocation,
   });
 
   final String format;
@@ -156,6 +168,7 @@ class _FileRow extends StatelessWidget {
   final Color fg;
   final Color divider;
   final VoidCallback onTap;
+  final VoidCallback? onOpenLocation;
 
   @override
   Widget build(BuildContext context) {
@@ -295,16 +308,46 @@ class _FileRow extends StatelessWidget {
         color: iconColor.withValues(alpha: 0.8),
       );
     }
-    return SvgPicture.asset(
-      downloaded
-          ? 'assets/icons/file-check.svg'
-          : 'assets/icons/file-download.svg',
+    if (!downloaded) {
+      return SvgPicture.asset(
+        'assets/icons/file-download.svg',
+        width: 21,
+        height: 21,
+        colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+      );
+    }
+    // Yuklab olingan: yashil belgidan tashqari, faylning saqlangan joyini
+    // ochadigan jild tugmasi. Jild tugmasi o'z tap'ini yutadi — qatorning
+    // asosiy tap'i (amallar oynasi) ishlamaydi.
+    final check = SvgPicture.asset(
+      'assets/icons/file-check.svg',
       width: 21,
       height: 21,
-      colorFilter: ColorFilter.mode(
-        downloaded ? okGreen : iconColor,
-        BlendMode.srcIn,
-      ),
+      colorFilter: ColorFilter.mode(okGreen, BlendMode.srcIn),
+    );
+    if (onOpenLocation == null) return check;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        InkWell(
+          onTap: onOpenLocation,
+          customBorder: const CircleBorder(),
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: SvgPicture.asset(
+                'assets/icons/folder-open.svg',
+                width: 21,
+                height: 21,
+                colorFilter: ColorFilter.mode(iconColor, BlendMode.srcIn),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 2),
+        check,
+      ],
     );
   }
 }
