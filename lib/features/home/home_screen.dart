@@ -14,6 +14,7 @@ import '../market/models/market_listing.dart';
 import '../market/listing_detail_screen.dart';
 import '../market/widgets/featured_carousel.dart';
 import '../chat/screens/chat_screen.dart';
+import 'widgets/fab_pulse.dart';
 import '../onboarding/onboarding_page_data.dart';
 import '../services/models/service_item.dart';
 import '../services/widgets/service_card.dart';
@@ -28,6 +29,8 @@ class HomeScreen extends StatefulWidget {
     this.onLoginTap,
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
+    this.onOpenBozorAi,
+    this.onOpenTaqiqCheck,
     this.onOpenMarket,
     this.onOpenKalkulyator,
     this.onOpenOrder,
@@ -40,6 +43,8 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onLoginTap;
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
+  final VoidCallback? onOpenBozorAi;
+  final VoidCallback? onOpenTaqiqCheck;
   final VoidCallback? onOpenMarket;
   final VoidCallback? onOpenKalkulyator;
   final VoidCallback? onOpenOrder;
@@ -96,7 +101,8 @@ class _HomeScreenState extends State<HomeScreen> {
     // Reverse == dragging content up (reading downward) → hide. Otherwise show,
     // except across the bottom stretch where the call block takes over. The
     // pixels<=0 guard stops a top overscroll bounce from sticking them hidden.
-    final show = pos.pixels <= 0 ||
+    final show =
+        pos.pixels <= 0 ||
         (!nearBottom && pos.userScrollDirection != ScrollDirection.reverse);
     // ValueNotifier already no-ops when the value is unchanged.
     _fabsVisible.value = show;
@@ -179,10 +185,14 @@ class _HomeScreenState extends State<HomeScreen> {
       // yashil (chap tomondagi qizil chat bilan juftlikda).
       floatingActionButton: _FabReveal(
         visible: _fabsVisible,
-        child: _ImageFab(
-          asset: 'assets/icons/ai-phone-icon.png',
-          onTap: hapticTap(_callSupport),
-          tooltip: tr(widget.locale, 'home.fab.call'),
+        child: FabPulse(
+          visible: _fabsVisible,
+          color: AppColors.callGreen,
+          child: _ImageFab(
+            asset: 'assets/icons/ai-phone-icon.png',
+            onTap: hapticTap(_callSupport),
+            tooltip: tr(widget.locale, 'home.fab.call'),
+          ),
         ),
       ),
       body: Stack(
@@ -237,6 +247,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       locale: widget.locale,
                       onOpenKadastr3d: widget.onOpenKadastr3d,
                       onOpenAiValuation: widget.onOpenAiValuation,
+                      onOpenBozorAi: widget.onOpenBozorAi,
+                      onOpenTaqiqCheck: widget.onOpenTaqiqCheck,
                       onOpenKalkulyator: widget.onOpenKalkulyator,
                     ),
                   ),
@@ -277,16 +289,20 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: 16,
             child: _FabReveal(
               visible: _fabsVisible,
-              child: _ImageFab(
-                asset: 'assets/icons/ai-chat-icon.png',
-                onTap: hapticTap(
-                  () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => ChatScreen(locale: widget.locale),
+              child: FabPulse(
+                visible: _fabsVisible,
+                color: AppColors.declineRed,
+                child: _ImageFab(
+                  asset: 'assets/icons/ai-chat-icon.png',
+                  onTap: hapticTap(
+                    () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => ChatScreen(locale: widget.locale),
+                      ),
                     ),
                   ),
+                  tooltip: tr(widget.locale, 'home.fab.assistant'),
                 ),
-                tooltip: tr(widget.locale, 'home.fab.assistant'),
               ),
             ),
           ),
@@ -323,7 +339,7 @@ class _ImageFab extends StatelessWidget {
   final VoidCallback? onTap;
   final String tooltip;
 
-  static const double _size = 56;
+  static const double size = fabSize;
 
   @override
   Widget build(BuildContext context) {
@@ -349,10 +365,10 @@ class _ImageFab extends StatelessWidget {
           ),
           child: Image.asset(
             asset,
-            width: _size,
-            height: _size,
+            width: size,
+            height: size,
             fit: BoxFit.contain,
-            cacheWidth: (_size * dpr).round(),
+            cacheWidth: (size * dpr).round(),
             filterQuality: FilterQuality.medium,
           ),
         ),
@@ -411,7 +427,9 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final titleColor = isDark ? Colors.white : AppColors.textBlack;
-    final subtitleColor = isDark ? Colors.white70 : AppColors.textBlack.withValues(alpha: 0.55);
+    final subtitleColor = isDark
+        ? Colors.white70
+        : AppColors.textBlack.withValues(alpha: 0.55);
     final linkColor = AppColors.splashGreen;
 
     return Row(
@@ -513,20 +531,25 @@ class _HomePatternBackground extends StatelessWidget {
 }
 
 /// The Home service grid — the rich dark cards brought over from the (removed)
-/// Services page: two square cards (AI Baholash, 3D kadastr) + one wide card
-/// (Kalkulyator), each with an accent glow and a 3D image. Market lives in the
-/// bottom tab + "Top modellar", so it's not a card here.
+/// Services page: two rows of square cards (AI Baholash + 3D kadastr, then
+/// Bozor AI + Taqiqni tekshirish) and one wide card (Kalkulyator), each with an
+/// accent glow and a 3D image. Market lives in the bottom tab + "Top modellar",
+/// so it's not a card here.
 class _CardsGrid extends StatelessWidget {
   const _CardsGrid({
     required this.locale,
     this.onOpenKadastr3d,
     this.onOpenAiValuation,
+    this.onOpenBozorAi,
+    this.onOpenTaqiqCheck,
     this.onOpenKalkulyator,
   });
 
   final Locale locale;
   final VoidCallback? onOpenKadastr3d;
   final VoidCallback? onOpenAiValuation;
+  final VoidCallback? onOpenBozorAi;
+  final VoidCallback? onOpenTaqiqCheck;
   final VoidCallback? onOpenKalkulyator;
 
   @override
@@ -546,6 +569,25 @@ class _CardsGrid extends StatelessWidget {
       subtitle: _CardStrings.aiValuationSub(l),
       asset: 'assets/images/services/ai.png',
       accent: const Color(0xFF7C3AED),
+      layout: ServiceLayout.square,
+    );
+    // Row 2. Accents stay off the row-1 hues (purple / brand green) so the four
+    // glows read as four services, not two pairs; the artwork is the same 3D
+    // icon family as ai.png, re-cropped to the ~88% fill the card expects.
+    final bozorAi = ServiceItem(
+      id: ServiceId.bozorAi,
+      title: _CardStrings.bozorAi(l),
+      subtitle: _CardStrings.bozorAiSub(l),
+      asset: 'assets/images/services/bozor-ai.png',
+      accent: const Color(0xFFF59E0B),
+      layout: ServiceLayout.square,
+    );
+    final taqiq = ServiceItem(
+      id: ServiceId.taqiqCheck,
+      title: _CardStrings.taqiqCheck(l),
+      subtitle: _CardStrings.taqiqCheckSub(l),
+      asset: 'assets/images/services/taqiq.png',
+      accent: const Color(0xFFF43F5E),
       layout: ServiceLayout.square,
     );
     final calculator = ServiceItem(
@@ -601,6 +643,27 @@ class _CardsGrid extends StatelessWidget {
             ),
             const SizedBox(height: gap),
             SizedBox(
+              height: squareHeight,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: ServiceCard(
+                      item: bozorAi,
+                      onTap: onOpenBozorAi ?? () {},
+                    ),
+                  ),
+                  const SizedBox(width: gap),
+                  Expanded(
+                    child: ServiceCard(
+                      item: taqiq,
+                      onTap: onOpenTaqiqCheck ?? () {},
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: gap),
+            SizedBox(
               height: wideHeight,
               width: double.infinity,
               child: ServiceCard(
@@ -629,6 +692,14 @@ class _CardStrings {
   static String calculator(Locale l) => tr(l, 'home.card.calculator');
 
   static String calculatorSub(Locale l) => tr(l, 'home.card.calculator_sub');
+
+  static String bozorAi(Locale l) => tr(l, 'home.card.bozor_ai');
+
+  static String bozorAiSub(Locale l) => tr(l, 'home.card.bozor_ai_sub');
+
+  static String taqiqCheck(Locale l) => tr(l, 'home.card.taqiq_check');
+
+  static String taqiqCheckSub(Locale l) => tr(l, 'home.card.taqiq_check_sub');
 }
 
 class _HomeScreenStrings {

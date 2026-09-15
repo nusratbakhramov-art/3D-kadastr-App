@@ -1,4 +1,6 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!-- Backend API'ga ulanish uchun. Flutter buni faqat debug/profile
          manifestga avtomatik qo'shadi — release APK'da internet bo'lmasligi
          uchun shu yerda ham e'lon qilamiz. -->
@@ -8,6 +10,26 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <!-- Push xabarnomalar (Android 13+ runtime ruxsat). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Video capture (VideoCaptureActivity), 360° panorama capture
+         (ARCore) va rasm tanlash (image_picker) — hammasi shu ruxsatga
+         tayanadi.
+         ⚠️ Bu yerda `RECORD_AUDIO` ni merge'dan olib tashlaydigan blok
+         turardi: uni `camera_android_camerax` qo'shardi. O'sha plagin
+         (`camera` paketi) 2026-09-12 da olib tashlandi, ya'ni ruxsatni
+         endi hech kim so'ramaydi va chetlab o'tish ham kerak emas. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+
+    <!-- Kamera IXTIYORIY: kamerasiz qurilmada ham ilovaning qolgan qismi
+         (e'lonlar, xarita, arizalar) to'liq ishlaydi.
+         ⚠️ Yonida `camera.any` ni `tools:replace` bilan majburiy emas
+         qiladigan blok turardi — u ham `camera_android_camerax` uchun edi. -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!-- 360° panorama capture ARCore'ga tayanadi. `required="false"` —
+         ARCore'siz qurilmada ilovaning qolgani to'liq ishlaydi va 360
+         bo'limi Dart tarafda umuman ko'rsatilmaydi. Majburiy qilsak Play
+         ilovani ARCore'siz telefonlarga umuman ko'rsatmasdi. -->
+    <uses-feature android:name="android.hardware.camera.ar" android:required="false" />
 
     <!-- Faqat telefonlar uchun: Google Play'da planshet, soat (Wear OS),
          Android TV va Chromebook'larni chiqarib tashlaymiz. Telefon "hardware"
@@ -65,6 +87,42 @@
                 <data android:scheme="kadastr3d" android:host="market"/>
             </intent-filter>
         </activity>
+        <!-- ARCore IXTIYORIY (`optional`): ilova ARCore'siz ham to'liq
+             ishlaydi, faqat 360° bo'limi ko'rinmaydi. `required` qilinsa Play
+             Store ARCore'ni majburan o'rnatardi va qo'llamaydigan
+             qurilmalarga ilova umuman tushmasdi. -->
+        <meta-data android:name="com.google.ar.core" android:value="optional" />
+
+        <!-- 360° panorama capture (ARCore). Portretga qulflangan: nishonlar
+             va reticle shu yo'nalishga qarab joylashtirilgan, aylanishda
+             GL sirt va sessiya qayta qurilardi. exported EMAS. -->
+        <activity
+            android:name=".pano.PanoCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="keyboardHidden|keyboard|locale|layoutDirection|fontScale|uiMode" />
+
+        <!-- Debug-only video recorder (0.5x/0.6x + HD). Flutter'dagi tugma
+             faqat kDebugMode'da ko'rinadi; exported EMAS. -->
+        <activity
+            android:name=".VideoCaptureActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode" />
+        <!-- Debug-only: tizim kamera ilovasi videoni shu papkaga yozadi
+             (MainActivity.startSystemCamera). Authority image_picker'niki
+             (${applicationId}.flutter.image_provider) bilan to'qnashmaydi. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.videocapture.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/video_capture_paths" />
+        </provider>
         <!-- FCM: app fonда kelgan push qaysi kanalga tushishini belgilaydi
              (PushNotifications._channel bilan bir xil id). -->
         <meta-data
@@ -85,6 +143,11 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Debug-only: qurilmaning kamera ilovasini topish uchun
+             (MainActivity.startSystemCamera → grantUriPermission sikli). -->
+        <intent>
+            <action android:name="android.media.action.VIDEO_CAPTURE"/>
         </intent>
         <!-- Bosh sahifadagi "qo'ng'iroq" tugmasi tel: orqali terish ilovasini
              ochishi uchun (Android 11+ package visibility). -->

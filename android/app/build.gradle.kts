@@ -82,4 +82,55 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+
+    // ── CameraX ────────────────────────────────────────────────────────────
+    // Endi YAGONA iste'molchi — :app ning o'z `VideoCaptureActivity` si
+    // (debug-only video yozuv, eng past zoom 0.5x/0.6x + HD).
+    //
+    // ⚠️ Ilgari ikkinchi iste'molchi bor edi: `camera_android_camerax`
+    // plagini (`camera` paketi orqali, eski qurilmadagi panorama capture
+    // uchun). U 2026-09-12 da olib tashlandi — 360° capture endi NATIV
+    // (ARCore). Versiya 1.6.0 da QOLDIRILDI: 1.4.2 ga tushirishning
+    // foydasi yo'q va `VideoCaptureActivity` allaqachon shunga qarab
+    // yozilgan.
+    val cameraxVersion = "1.6.0"
+    implementation("androidx.camera:camera-core:$cameraxVersion")
+    implementation("androidx.camera:camera-camera2:$cameraxVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
+    implementation("androidx.camera:camera-video:$cameraxVersion")
+    implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation("androidx.activity:activity-ktx:1.9.3")
+
+    // CameraX ning `ListenableFuture` i uchun guava. video_player_android
+    // (media3 1.9.x) guava'ni `implementation` sifatida olib keladi — u :app
+    // ning compile classpath'iga CHIQMAYDI, lekin butun grafda
+    // `com.google.guava:listenablefuture` ni BO'SH artefaktga
+    // (9999.0-empty-to-avoid-conflict-with-guava) ko'taradi. Natijada
+    // VideoCaptureActivity.kt "Cannot access class 'ListenableFuture'" deb
+    // kompilyatsiya bo'lmay qolardi. Guava'ni ochiq qo'shib sinfni qaytaramiz.
+    //
+    // ⚠️ 33.5.0 ni ilgari `camera_android_camerax 0.7.2` tortardi; u ketdi,
+    // lekin versiya QOLDIRILDI — media3 pastroq so'raydi va tushirishning
+    // foydasi yo'q. media3 guava'dan faqat `ListenableFuture`/`Futures` ni
+    // oladi, ular 33.x ichida barqaror.
+    implementation("com.google.guava:guava:33.5.0-android")
+
+    // ── ARCore — 360° panorama capture ──────────────────────────────────────
+    // Nativ capture (`pano/PanoCaptureActivity.kt`) har kadr bilan KAMERA
+    // POZASINI (`camera.pose`) va `intrinsics` ni oladi; serverdagi tikish
+    // aynan shularga tayanadi. Flutter'ning `camera` paketi ikkalasini ham
+    // bermaydi — shuning uchun ekran nativ.
+    //
+    // ⚠️ Bu bog'liqlik ilovani ARCore'siz qurilmalarda CHEKLAMAYDI:
+    // manifestda `com.google.ar.core` = `optional` va `camera.ar` majburiy
+    // emas. Qurilma qo'llamasa Dart tarafda 360 bo'limi umuman chizilmaydi
+    // (`PanoCaptureChannel.isSupported`).
+    implementation("com.google.ar:core:1.49.0")
+
+    // Sof JVM testlari (`src/test/kotlin`). Hozircha faqat panorama
+    // capture'ning platformadan MUSTAQIL qismlari uchun: YUV→NV21 o'girish
+    // va nishon panjarasi. Ikkalasi ham indeks/burchak arifmetikasi, ya'ni
+    // xatosi faqat qurilmada ko'rinadigan tur. Ishga tushirish:
+    //     cd android && ./gradlew :app:testDebugUnitTest
+    testImplementation("junit:junit:4.13.2")
 }

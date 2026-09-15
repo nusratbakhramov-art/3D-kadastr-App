@@ -6,12 +6,25 @@ import '../../../theme/app_colors.dart';
 class ListingInfoCard extends StatelessWidget {
   const ListingInfoCard({
     super.key,
-    required this.priceUzs,
+    this.priceUzs = 0,
+    this.priceText,
     required this.title,
     this.description,
   });
 
+  /// So'mdagi narx — 0 yoki kichigi "Bepul" nishoniga aylanadi (3D katalog
+  /// modellari shunday: bepul yoki so'mda).
   final int priceUzs;
+
+  /// TAYYOR narx satri. Berilsa [priceUzs] umuman qaralmaydi va "Bepul"
+  /// nishoni ham chiqmaydi.
+  ///
+  /// Kerak, chunki "Bozor AI" e'lonlarida narx so'mdan boshqa valyutada
+  /// bo'lishi mumkin va davri bor ("4 500 000 so'm/oy") — bu kartaning
+  /// o'zidagi formatlash bunga qodir emas, e'lon modeli esa allaqachon shu
+  /// satrni yasab beradi.
+  final String? priceText;
+
   final String title;
   final String? description;
 
@@ -34,7 +47,18 @@ class ListingInfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (priceUzs <= 0)
+          if (priceText != null)
+            Text(
+              priceText!,
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                height: 1.3,
+                color: fg,
+              ),
+            )
+          else if (priceUzs <= 0)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               decoration: BoxDecoration(

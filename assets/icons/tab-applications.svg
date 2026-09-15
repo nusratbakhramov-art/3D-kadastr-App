@@ -1,7 +1,11 @@
-<!-- Arizalar — clipboard with an approved check cut out of the board. The clip
-     is kept narrow (~40% of the board) and the board's corners tight, so the
-     silhouette reads as a clipboard rather than a lidded jar. -->
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M10.4 1.5h3.2c.88 0 1.6.72 1.6 1.6v1.4c0 .88-.72 1.6-1.6 1.6h-3.2c-.88 0-1.6-.72-1.6-1.6V3.1c0-.88.72-1.6 1.6-1.6z" fill="#565756"/>
-<path fill-rule="evenodd" clip-rule="evenodd" d="M6.6 4.6h10.8a2.2 2.2 0 012.2 2.2v13a2.2 2.2 0 01-2.2 2.2H6.6a2.2 2.2 0 01-2.2-2.2v-13a2.2 2.2 0 012.2-2.2zm1.315 9.258L11.056 17.13 16.334 10.703 14.866 9.497 10.945 14.271 9.285 12.542 7.915 13.858z" fill="#565756"/>
+<!-- Arizalar — the my.gov.uz mark (three stacked tiles with the approved
+     check), lifted from the official logo on Wikimedia Commons and cropped to
+     the mark: the "my.gov.uz" wordmark that follows it is dropped. The mark is
+     66x66; the viewBox pads it out to 75 so it sits at ~21/24 like the other
+     tabs instead of filling its box. Brand colours are baked in — the nav
+     renders this tab untinted. -->
+<svg width="24" height="24" viewBox="-4.5 -4.5 75 75" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M 5.873,0 l 25.366,0 a 5.891,5.891 0 0,1 5.873,5.873 l 0,0.976 L 14.636,6.849 a 7.811,7.811 0 0,0 -5.527,2.3 l -0.006,0.007 a 7.81,7.81 0 0,0 -2.3,5.527 l 0,22.43 l -0.929,0 a 5.889,5.889 0 0,1 -5.873,-5.873 L 0.001,5.873 A 5.89,5.89 0 0,1 5.873,0 Z" fill="#4ec1f1" fill-rule="evenodd"/>
+<path d="M 14.636,8.575 L 41.013,8.575 a 6.125,6.125 0 0,1 6.107,6.107 l 0,0.724 l -23.2,0 a 8.124,8.124 0 0,0 -6.413,2.634 a 10.362,10.362 0 0,0 -2.221,6.991 l 0,22.135 l -0.646,0 a 6.126,6.126 0 0,1 -6.107,-6.107 L 8.533,14.683 A 6.125,6.125 0 0,1 14.636,8.575 Z" fill="#71b164" fill-rule="evenodd"/>
+<path d="M 23.916,17.134 l 35.053,0 a 6.928,6.928 0 0,1 6.908,6.908 l 0,35.05 a 6.928,6.928 0 0,1 -6.908,6.908 L 23.916,66 a 6.928,6.928 0 0,1 -6.908,-6.908 l 0,-34.06 c 0,-4.941 2.347,-7.9 6.908,-7.9 Z m 10.144,32.015 c -0.464,-0.517 -1.894,-4.565 -4.027,-5.671 c -1.078,-0.559 -4.135,2.013 -4.481,3.444 c -0.179,0.743 0.57,1.357 0.925,1.825 a 26.035,26.035 0 0,1 3.374,5.309 c 0.891,1.617 1.013,2.3 3.193,2.577 c 2.645,-0.088 2.825,0.116 3.9,-1.594 a 33.042,33.042 0 0,0 2.286,-3.5 c 5.855,-10.185 10.8,-15.98 19.275,-24.124 l 0.591,-2.229 a 84.845,84.845 0 0,0 -23.563,22.365 C 35.155,48.102 34.822,49.081 34.06,49.149 Z" fill="#008ddb" fill-rule="evenodd"/>
 </svg>

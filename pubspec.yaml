@@ -1,10 +1,14 @@
 name: kadastr
 description: "Kadastr — Flutter starter."
 publish_to: 'none'
-version: 1.0.5+29
+version: 1.0.5+47
 
 environment:
-  sdk: ^3.10.1
+  # Pol `dchs_motion_sensors 2.0.2` uchun ^3.10.1 dan ko'tarilgan edi; o'sha
+  # paket olib tashlandi, lekin pol QOLDIRILDI — tushirishning foydasi yo'q
+  # (bu ilova, kutubxona emas) va tushirish CI'da yashirin ziddiyat ochishi
+  # mumkin.
+  sdk: ^3.11.0
 
 dependencies:
   flutter:
@@ -30,6 +34,8 @@ dependencies:
   url_launcher: ^6.3.0
   in_app_review: ^2.0.9
   cached_network_image: ^3.4.1
+  # Xarita tile'lari uchun alohida disk keshi (parcel_basemap.dart).
+  flutter_cache_manager: ^3.4.1
   webview_flutter: ^4.10.0
   app_links: ^6.3.2
   firebase_core: ^4.10.0
@@ -40,6 +46,19 @@ dependencies:
   flutter_widget_from_html_core: ^0.16.0
   flutter_dotenv: ^6.0.1
   gpt_markdown: ^1.1.8
+  # Splash intro roligi (assets/branding/splash/intro.mp4) — ovoz bilan.
+  video_player: ^2.9.2
+
+  # ── 360° panorama (docs/panorama-360-plan.md) ────────────────────────────
+  # ⚠️ BU YERDA TO'RTTA PAKET TURARDI va 2026-09-12 da OLIB TASHLANDI:
+  #    `image`, `camera`, `dchs_motion_sensors`, `vector_math`.
+  #    Hammasi `7a2c301` («360° uchun paketlar») da qurilmada tikish uchun
+  #    qo'shilgan edi. Tikish endi SERVERDA, capture esa NATIV (ARKit /
+  #    ARCore) — ya'ni to'rttasi ham `lib/` da umuman import qilinmay qoldi.
+  #    Ular bilan birga ketgani: Android manifestidagi `RECORD_AUDIO`
+  #    chetlab o'tishi va `camera.any` almashtiruvi, giroskop/akselerometr
+  #    `uses-feature` lari, iOS'dagi `NSMotionUsageDescription`.
+  #    Qaytarish kerak bo'lsa — `git show 7a2c301 -- pubspec.yaml`.
 
 dev_dependencies:
   flutter_test:
@@ -96,12 +115,14 @@ flutter_launcher_icons:
   adaptive_icon_background: "#034112"
   adaptive_icon_foreground: "assets/branding/appicon.png"
 
+# DIQQAT: iOS LaunchScreen.storyboard va Android launch_background.xml QO'LDA
+# tahrirlangan (VideoSplashScreen darhol ochilishi uchun tekis #040E07 fon,
+# naqsh/logo yo'q). `dart run flutter_native_splash:create` ularni qayta
+# yozadi — quyidagi sozlama shu sababli intro roligining rangiga moslangan.
 flutter_native_splash:
-  color: "#00E135"
-  image: "assets/branding/appicon.png"
+  color: "#040E07"
   android_12:
-    color: "#00E135"
-    image: "assets/branding/appicon.png"
+    color: "#040E07"
   android: true
   ios: true
   web: false

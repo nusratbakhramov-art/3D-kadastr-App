@@ -1,0 +1,366 @@
+/// 360° SFERA RENDERI — ekvirektangulyar tasvirni ichkaridan ko'rsatadi.
+///
+/// Bu yerda EKRAN yo'q, faqat geometriya va bo'yoqchi: [projectSphere],
+/// [SphereMesh], [ViewBasis], [SpherePainter]. Ekran — `pano_tour_screen.dart`
+/// (u bitta panorama uchun ham ishlaydi va tasvirni fayldan ham, tarmoqdan
+/// ham oladi). Alohida bir panoramalik ekran BOR EDI va o'chirildi: u faqat
+/// LOKAL fayl o'qirdi, panoramalar esa endi serverda tikiladi.
+///
+/// NEGA PAKET EMAS. Rejada `panorama_viewer` ko'rsatilgan edi, lekin uning
+/// renderer'i `flutter_cube 0.1.1` — Dart 2 davri paketi, ta'mirlanmaydi
+/// va ikkalasi ham platforma sozlamalariga tegadi. Bu yerda kerak bo'lgan
+/// narsa esa butunlay sof Dart: to'rni `Canvas.drawVertices` ga berish
+/// kifoya, qolganini Skia GPU'da bajaradi.
+///
+/// USUL. Sfera bir marta to'rga bo'linadi (uzunlik × kenglik), har
+/// tugunning TEKSTURA koordinatasi QOTIB qoladi, har kadrda esa faqat
+/// tugunlar aylantirilib ekranga proyeksiya qilinadi.
+///
+/// ⚠️ CHOK SHU SABABLI YO'Q. Ekran to'ri bilan qilinganda chokni kesib
+/// o'tgan uchburchakda `u` 0.99 dan 0.01 ga sakraydi va Skia ORALIQNI
+/// interpolyatsiya qilib butun tasvirni teskarisiga surtib yuboradi. To'r
+/// sferada qurilgani uchun `lon = 0` va `lon = 2π` AYRIM tugunlar bo'ladi,
+/// ya'ni bunday uchburchak umuman yuzaga kelmaydi.
+///
+/// ⚠️ TEKSTURA INTERPOLYATSIYASI AFFIN, perspektiv-to'g'ri EMAS —
+/// `drawVertices` shunday ishlaydi. Xato uchburchakning ekrandagi
+/// kattaligiga bog'liq, shuning uchun to'r ZICH ([_lonSteps] × [_latSteps]):
+/// eng kichik FOV'da ham bitta uchburchak ekranning kichik qismini
+/// egallaydi va egrilik ko'rinmaydi.
+library;
+
+import 'dart:math' as math;
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+
+/// To'r zichligi. Ko'paytirish aniqlikni oshiradi va narxi chiziqli —
+/// 96×48 da 4 657 tugun, bu kadr uchun hech narsa.
+const int _lonSteps = 96;
+const int _latSteps = 48;
+
+/// Ko'rish burchagi chegaralari (vertikal, gradus).
+///
+/// Pastki chegara — eng kuchli yaqinlashtirish. 25° dan pastda
+/// ekvirektangulyar tasvirning o'z rezolyutsiyasi tugaydi va
+/// yaqinlashtirish faqat piksellarni kattalashtiradi.
+const double kMinFovDeg = 25;
+const double kMaxFovDeg = 100;
+const double kInitialFovDeg = 75;
+
+/// Balandlik chegarasi.
+///
+/// ⚠️ AYNAN ±90 GA YETKAZILMAYDI: qutbda ko'rish o'qi dunyo «yuqorisi»
+/// bilan ustma-ust tushadi va o'ng tomon vektori nolga aylanadi —
+/// tasvir bir kadrga aylanib ketardi.
+const double kMaxPitchDeg = 89;
+
+/// Sferani ichkaridan chizadi.
+///
+/// Ajratilgan va ochiq: butun geometriya shu yerda va uni ekransiz,
+/// telefonsiz tekshirish mumkin ([projectSphere]).
+class SpherePainter extends CustomPainter {
+  const SpherePainter({
+    required this.image,
+    required this.yawDeg,
+    required this.pitchDeg,
+    required this.fovDeg,
+  });
+
+  final ui.Image image;
+  final double yawDeg;
+  final double pitchDeg;
+  final double fovDeg;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+
+    final SphereMesh? mesh = projectSphere(
+      size: size,
+      yawDeg: yawDeg,
+      pitchDeg: pitchDeg,
+      fovDeg: fovDeg,
+      imageW: image.width,
+      imageH: image.height,
+    );
+    if (mesh == null) return;
+
+    final Paint paint = Paint()
+      ..shader = ui.ImageShader(
+        image,
+        // ⚠️ Gorizontal bo'yicha TAKRORLASH: ko'rish chokni kesib
+        // o'tganda tekstura koordinatasi tasvir enidan chiqadi va
+        // `clamp` o'shanda chekka piksel ustunini cho'zib yuborardi.
+        ui.TileMode.repeated,
+        // Vertikal bo'yicha esa qisish TO'G'RI: qutbdan narida hech
+        // narsa yo'q, takrorlash tasvirni ag'darib qo'yardi.
+        ui.TileMode.clamp,
+        Matrix4.identity().storage,
+        filterQuality: FilterQuality.low,
+      );
+
+    canvas.drawVertices(
+      ui.Vertices.raw(
+        ui.VertexMode.triangles,
+        mesh.positions,
+        textureCoordinates: mesh.texCoords,
+        indices: mesh.indices,
+      ),
+      // Manba tekstura bilan to'liq almashtiriladi.
+      BlendMode.src,
+      paint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(SpherePainter old) =>
+      old.yawDeg != yawDeg ||
+      old.pitchDeg != pitchDeg ||
+      old.fovDeg != fovDeg ||
+      !identical(old.image, image);
+}
+
+/// Ko'rish bazisi — sfera ham, TUGMALAR ham aynan shundan proyeksiya
+/// qilinadi.
+///
+/// ⚠️ AJRATILGANINING SABABI SHU. Tugmalar (360° tur o'tish nuqtalari)
+/// sfera ustiga Flutter widget'i bo'lib qo'yiladi, ya'ni ularning
+/// ekrandagi o'rni ALOHIDA hisoblanadi. Ikki hisob bir-biridan ozgina
+/// farq qilsa tugma foydalanuvchi qo'ygan joydan suriladi — va bu jim
+/// bo'ladi: hech narsa yiqilmaydi, shunchaki eshik ustidagi tugma
+/// devorda turadi.
+@immutable
+class ViewBasis {
+  const ViewBasis({
+    required this.fx,
+    required this.fy,
+    required this.fz,
+    required this.rx,
+    required this.rz,
+    required this.ux,
+    required this.uy,
+    required this.uz,
+    required this.focal,
+    required this.cx,
+    required this.cy,
+  });
+
+  /// Qarayotgan yo'nalish.
+  final double fx, fy, fz;
+
+  /// Ekranning o'ngi. `ry` har doim NOL — `worldUp × f` ning y'i
+  /// soddalashib yo'qoladi, shuning uchun saqlanmaydi.
+  final double rx, rz;
+
+  /// Ekranning yuqorisi.
+  final double ux, uy, uz;
+
+  final double focal;
+  final double cx, cy;
+
+  /// `null` — tuval o'lchanmagan yoki qutbda (o'ng tomon vektori nol).
+  static ViewBasis? of({
+    required Size size,
+    required double yawDeg,
+    required double pitchDeg,
+    required double fovDeg,
+  }) {
+    // Tuval hali o'lchanmagan bo'lishi mumkin (birinchi kadr). Fokus
+    // masofasi o'shanda nolga aylanadi va HAMMA tugun (0, 0) ga
+    // tushardi — chizilgan narsa bitta nuqta bo'lardi.
+    if (size.isEmpty) return null;
+
+    const double deg = math.pi / 180;
+    final double yaw = yawDeg * deg;
+    final double pitch = pitchDeg.clamp(-kMaxPitchDeg, kMaxPitchDeg) * deg;
+
+    final double cp = math.cos(pitch);
+    final double fx = cp * math.sin(yaw);
+    final double fy = math.sin(pitch);
+    final double fz = cp * math.cos(yaw);
+
+    // r = normalize(worldUp × f). `worldUp = (0, 1, 0)` bo'lgani uchun
+    // ko'paytma soddalashadi va uzunligi `cos(pitch)` ga teng — shuning
+    // uchun qutbda nolga aylanadi va balandlik chegaralangan.
+    final double rl = math.sqrt(fz * fz + fx * fx);
+    if (rl < 1e-9) return null;
+    final double rx = fz / rl;
+    final double rz = -fx / rl;
+
+    // u = f × r. `r` ning y'i nol, shuning uchun ko'paytma qisqaradi:
+    //   f × r = (fy·rz,  fz·rx − fx·rz,  −fy·rx)
+    //
+    // ⚠️ `rx` bilan `rz` ni almashtirib yuborish OSON va natijasi jim:
+    // `u` endi `f` ga perpendikulyar bo'lmaydi (tekshirildi: pitch 45°
+    // da `f·u = 0.5`), ya'ni yuqoriga yoki pastga qaraganda manzara
+    // qiyshayib ketadi. Gorizontda esa hammasi to'g'ri ko'rinadi —
+    // shuning uchun buni faqat balandlikka qarab sinash tutadi.
+    return ViewBasis(
+      fx: fx,
+      fy: fy,
+      fz: fz,
+      rx: rx,
+      rz: rz,
+      ux: fy * rz,
+      uy: fz * rx - fx * rz,
+      uz: -fy * rx,
+      focal: size.height / 2 / math.tan(fovDeg * deg / 2),
+      cx: size.width / 2,
+      cy: size.height / 2,
+    );
+  }
+
+  /// Sferadagi yo'nalishni ekran nuqtasiga. `null` — KAMERA ORQASIDA.
+  ///
+  /// Orqadagi nuqtani chizish mumkin emas: uning proyeksiyasi ekranning
+  /// qarama-qarshi tomonida paydo bo'ladi, ya'ni orqangizdagi xonaning
+  /// tugmasi oldingizda turardi.
+  Offset? projectDeg(double lonDeg, double latDeg) {
+    const double deg = math.pi / 180;
+    final double lat = latDeg * deg;
+    final double lon = lonDeg * deg;
+    final double cl = math.cos(lat);
+    final double dx = cl * math.sin(lon);
+    final double dy = math.sin(lat);
+    final double dz = cl * math.cos(lon);
+
+    final double zc = dx * fx + dy * fy + dz * fz;
+    if (zc <= 1e-3) return null;
+
+    final double xc = dx * rx + dz * rz;
+    final double yc = dx * ux + dy * uy + dz * uz;
+    return Offset(cx + focal * (xc / zc), cy - focal * (yc / zc));
+  }
+}
+
+/// Chizishga tayyor to'r.
+class SphereMesh {
+  const SphereMesh({
+    required this.positions,
+    required this.texCoords,
+    required this.indices,
+  });
+
+  /// Ekran koordinatalari, `[x0, y0, x1, y1, …]`.
+  final Float32List positions;
+
+  /// Tekstura koordinatalari — TASVIR PIKSELLARIDA (`ImageShader`
+  /// birligi), 0..1 da emas.
+  final Float32List texCoords;
+
+  final Uint16List indices;
+
+  int get vertexCount => positions.length ~/ 2;
+  int get triangleCount => indices.length ~/ 3;
+}
+
+/// Sferani ekranga proyeksiya qiladi.
+///
+/// Har tugun uchun: dunyo yo'nalishi → kamera fazosi → ekran nuqtasi.
+/// Kamera fazosi shu yerda OCHIQ quriladi (`o'ng`, `yuqori`, `oldinga`)
+/// va suratga olish tomonidagi kelishuvdan MUSTAQIL — u kamera X'ini
+/// chapga qaratadi va bu yerga ko'chirilsa tasvir ko'zguda chiqardi.
+///
+/// `null` — ko'rinadigan uchburchak qolmadi.
+SphereMesh? projectSphere({
+  required Size size,
+  required double yawDeg,
+  required double pitchDeg,
+  required double fovDeg,
+  required int imageW,
+  required int imageH,
+  int lonSteps = _lonSteps,
+  int latSteps = _latSteps,
+}) {
+  final ViewBasis? basis = ViewBasis.of(
+    size: size,
+    yawDeg: yawDeg,
+    pitchDeg: pitchDeg,
+    fovDeg: fovDeg,
+  );
+  if (basis == null) return null;
+
+  final double fx = basis.fx, fy = basis.fy, fz = basis.fz;
+  final double rx = basis.rx, rz = basis.rz;
+  final double ux = basis.ux, uy = basis.uy, uz = basis.uz;
+  final double focal = basis.focal;
+  final double cx = basis.cx;
+  final double cy = basis.cy;
+
+  final int cols = lonSteps + 1;
+  final int rows = latSteps + 1;
+  final int n = cols * rows;
+
+  final positions = Float32List(n * 2);
+  final texCoords = Float32List(n * 2);
+  // Kamera orqasidagi tugun proyeksiya qilinmaydi — uning ekrandagi
+  // o'rni ma'nosiz va uchburchakni cho'zib yuborardi.
+  final visible = List<bool>.filled(n, false);
+
+  // Uzunlik ustunlari qatordan qatorga TAKRORLANADI, ya'ni ichki
+  // tsiklda hisoblash har kadrda 9 000 ga yaqin ortiqcha sin/cos
+  // degani — bu ishorat davomida har kadrda qayta yuriladi.
+  final sinLon = Float32List(cols);
+  final cosLon = Float32List(cols);
+  for (int i = 0; i < cols; i++) {
+    final double lon = i / lonSteps * 2 * math.pi;
+    sinLon[i] = math.sin(lon);
+    cosLon[i] = math.cos(lon);
+  }
+
+  for (int j = 0; j < rows; j++) {
+    // Kenglik: yuqoridan pastga, `+90` … `−90` — ekvirektangulyar
+    // tasvirning o'z tartibi.
+    final double lat = math.pi / 2 - j / latSteps * math.pi;
+    final double clat = math.cos(lat);
+    final double slat = math.sin(lat);
+    final double v = j / latSteps * imageH;
+
+    for (int i = 0; i < cols; i++) {
+      final int k = j * cols + i;
+
+      final double dx = clat * sinLon[i];
+      final double dy = slat;
+      final double dz = clat * cosLon[i];
+
+      final double zc = dx * fx + dy * fy + dz * fz;
+      texCoords[k * 2] = i / lonSteps * imageW;
+      texCoords[k * 2 + 1] = v;
+      // 1e-3 — nol emas: ko'rish tekisligiga juda yaqin tugun
+      // bo'lingandan keyin ulkan koordinata berardi.
+      if (zc <= 1e-3) continue;
+
+      final double xc = dx * rx + dz * rz;
+      final double yc = dx * ux + dy * uy + dz * uz;
+
+      positions[k * 2] = cx + focal * (xc / zc);
+      positions[k * 2 + 1] = cy - focal * (yc / zc);
+      visible[k] = true;
+    }
+  }
+
+  // Faqat TO'RT burchagi ham ko'rinadigan katakcha chiziladi. Qisman
+  // ko'rinadiganini kesish kerak bo'lardi; katakchalar mayda va ular
+  // ko'rish konusidan ancha tashqarida yotadi, ya'ni tashlab yuborish
+  // ekranda hech narsa qoldirmaydi.
+  final indices = <int>[];
+  for (int j = 0; j < latSteps; j++) {
+    for (int i = 0; i < lonSteps; i++) {
+      final int a = j * cols + i;
+      final int b = a + 1;
+      final int c = a + cols;
+      final int d = c + 1;
+      if (!visible[a] || !visible[b] || !visible[c] || !visible[d]) continue;
+      indices..addAll(<int>[a, b, c])..addAll(<int>[b, d, c]);
+    }
+  }
+  if (indices.isEmpty) return null;
+
+  return SphereMesh(
+    positions: positions,
+    texCoords: texCoords,
+    indices: Uint16List.fromList(indices),
+  );
+}

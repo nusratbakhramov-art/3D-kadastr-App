@@ -1,3 +1,4 @@
+import AVFoundation
 import Flutter
 import UIKit
 import ARKit
@@ -13,6 +14,16 @@ import RoomPlan
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+
+    // Splash intro roligining ovozi (VideoSplashScreen) uchun audio sessiya.
+    // `.ambient` — jimlik (Ring/Silent) tugmasini HURMAT qiladi, `.mixWithOthers`
+    // esa foydalanuvchining musiqasini to'xtatmaydi. iOS ning standarti bo'lgan
+    // `.soloAmbient` boshqa ilovalarning ovozini uzib qo'yardi.
+    // Ovoz jimlik rejimida HAM eshitilishi kerak bo'lsa — `.ambient` o'rniga
+    // `.playback` qo'yiladi (lekin bu App Store'da "startda ovoz portlaydi"
+    // shikoyatiga olib keladi).
+    try? AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
+
 
     // Phase 8.1: Auto-process scan from env var (simulator iteration uchun).
     // Misol: xcrun simctl launch booted uz.kadastr.kadastr --setenv KADASTR_AUTO_PROCESS=3 \
@@ -427,6 +438,101 @@ import RoomPlan
           } else {
             result(FlutterError(code: "UNSUPPORTED", message: "Skan iOS 17+ qurilma talab qiladi", details: nil))
           }
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      // 360° panorama — ARKit bilan yo'naltirilgan suratga olish + TELEFONDA
+      // tikish.
+      //
+      // `start` → `{dir, frames}` (kadrlar + meta.json). Keyin Dart `stitch
+      // {dir, width, mode}` ni chaqiradi (`PanoStitch.swift` → `PanoCore/`),
+      // progress `progress {p, msg}` bilan TESKARI keladi, natija `{pano,
+      // preview, width, height, ...}`. Tayyor `pano.jpg` ni Dart serverga
+      // yuklaydi va katalogni o'zi o'chiradi. Bekor qilinsa `nil`.
+      let panoChannel = FlutterMethodChannel(
+        name: "kadastr/pano_capture",
+        binaryMessenger: controller.binaryMessenger
+      )
+      panoChannel.setMethodCallHandler { [weak controller] call, result in
+        switch call.method {
+        case "isSupported":
+          // ARKit dunyo-kuzatuvi A9+ talab qiladi; simulyatorda false.
+          if #available(iOS 15, *) {
+            result(PanoCaptureCoordinator.shared.isSupported)
+          } else {
+            result(false)
+          }
+
+        case "start":
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
+            return
+          }
+          guard #available(iOS 15, *) else {
+            result(FlutterError(code: "UNSUPPORTED", message: "iOS 15+ kerak", details: nil))
+            return
+          }
+          // Matnlar Dart'dan keladi — ilova uch tilli, Swift'da i18n
+          // takrorlanmasin.
+          let args = call.arguments as? [String: Any]
+          let strings = (args?["strings"] as? [String: String]) ?? [:]
+          PanoCaptureCoordinator.shared.start(from: controller, strings: strings, result: result)
+
+        case "stitch":
+          guard #available(iOS 15, *) else {
+            result(FlutterError(code: "UNSUPPORTED", message: "iOS 15+ kerak", details: nil))
+            return
+          }
+          PanoStitchCoordinator.shared.stitch(
+            args: call.arguments as? [String: Any],
+            channel: panoChannel,
+            result: result
+          )
+
+        // Nativ tur (xonalarni bog'lash) va tikishdan keyingi natija ko'rish —
+        // `PanoTour.swift`. SwiftUI `presentationDetents` uchun iOS 16+.
+        case "tour", "preview":
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
+            return
+          }
+          guard #available(iOS 16, *) else {
+            result(FlutterError(code: "UNSUPPORTED", message: "iOS 16+ kerak", details: nil))
+            return
+          }
+          let args = call.arguments as? [String: Any]
+          if call.method == "tour" {
+            PanoTourCoordinator.shared.tour(args: args, from: controller, result: result)
+          } else {
+            PanoTourCoordinator.shared.preview(args: args, from: controller, result: result)
+          }
+
+        default:
+          result(FlutterMethodNotImplemented)
+        }
+      }
+
+      // Debug-only video capture — 0.5x (ultra-wide) 1080p HD. Flutter'dagi
+      // tugma faqat kDebugMode'da ko'rinadi; kanal esa har doim ro'yxatda
+      // turadi (release build'da hech kim chaqirmaydi).
+      let videoCaptureChannel = FlutterMethodChannel(
+        name: "kadastr/video_capture",
+        binaryMessenger: controller.binaryMessenger
+      )
+      videoCaptureChannel.setMethodCallHandler { [weak controller] call, result in
+        switch call.method {
+        case "isSupported":
+          result(VideoCaptureCoordinator.isSupported)
+
+        case "record":
+          guard let controller = controller else {
+            result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
+            return
+          }
+          VideoCaptureCoordinator.shared.start(from: controller, result: result)
 
         default:
           result(FlutterMethodNotImplemented)

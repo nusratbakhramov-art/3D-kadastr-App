@@ -48,14 +48,21 @@ class ListingCtaButton extends StatelessWidget {
             child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                  height: 1.2,
-                  color: fg,
+              // Joy yetganda hech narsa o'zgarmaydi; tor qatorga qo'yilganda
+              // (masalan yonida "Ortga" tugmasi bo'lgan qadam paneli) matn
+              // kesiladi, Row esa toshib ketmaydi.
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'MTSCompact',
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    height: 1.2,
+                    color: fg,
+                  ),
                 ),
               ),
               const SizedBox(width: 8),

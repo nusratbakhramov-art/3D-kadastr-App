@@ -89,8 +89,22 @@ class _ServiceCardState extends State<ServiceCard>
         ),
         elevation: 10,
         shadowColor: item.accent.withValues(alpha: 0.30),
+        // RIPPLE YO'Q — ataylab. Karta bosilganini uchta narsa bilan
+        // bildiradi: `PressableScale` (butun karta kichrayadi), logoning
+        // sakrashi va `mediumImpact` haptikasi. Ustiga Material ripple'i
+        // qo'shilsa to'rtinchi signal bo'lardi va u eng yomoni: `highlightColor`
+        // qorong'i karta ustiga oqish parda tashlab, rangli glow va 3D
+        // logoni bir zumga yuvib yuboradi.
+        //
+        // `InkWell` ATAYLAB qoldirilgan (GestureDetector o'rniga): u
+        // semantikani beradi — skrinrider kartani TUGMA deb o'qiydi va
+        // klaviatura fokusi ishlaydi. Faqat siyohi ko'rinmas qilingan.
         child: InkWell(
           onTap: _handleTap,
+          splashFactory: NoSplash.splashFactory,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          focusColor: Colors.transparent,
           child: Stack(
             children: [
               // Accent glow — anchored to the SAME corner as the 3D image
@@ -156,7 +170,10 @@ class _ServiceCardState extends State<ServiceCard>
                   children: [
                     Text(
                       item.title,
-                      maxLines: 1,
+                      // Kvadrat kartada ikki qator: "Taqiqni tekshirish" kabi
+                      // uzun nom 19pt da bitta qatorga sig'maydi va kesilardi.
+                      // Keng kartada bitta qator — u yerda joy yetarli.
+                      maxLines: isWide ? 1 : 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontFamily: 'MTSCompact',

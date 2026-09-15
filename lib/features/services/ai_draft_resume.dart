@@ -17,8 +17,9 @@ import 'screens/ai_purpose_screen.dart';
 /// resume mantig'i bir joyda.
 Widget aiStepScreen(AiBaholashBundle bundle, String? step, int? scanJobId) {
   switch (step) {
-    // Legacy drafts saved at the removed 'area' step resume straight into the
-    // cadastre step (which now owns the area, sourced from davreestr).
+    // Legacy drafts saved at the removed 'area' and 'video' steps resume
+    // straight into the cadastre step — it is the first step now, owns the
+    // area (from davreestr) and creates the draft when one is missing.
     case 'client':
       return AiClientFormScreen(bundle: bundle);
     case 'location':
@@ -56,10 +57,18 @@ const List<String> _resumableChain = [
 ];
 
 /// The list of steps to push so the user lands on [currentStep] with a Back
-/// stack through the earlier bundle steps. For a non-chain step (cadastre/area/
-/// unknown) it's just that single screen.
+/// stack through the earlier bundle steps. For a non-chain step (area/unknown)
+/// it's just that single screen.
+///
+/// `video` — olib tashlangan qadamda saqlangan ESKI draftlar; ular kadastrdan
+/// ochiladi (marshrut nomi ham `ai/cadastre` bo'lsin, `ai/video` emas).
 List<String> _resumeStack(String? currentStep) {
-  final step = currentStep == 'payment' ? 'intake' : (currentStep ?? 'cadastre');
+  final raw = currentStep ?? 'cadastre';
+  final step = switch (raw) {
+    'payment' => 'intake',
+    'video' => 'cadastre',
+    _ => raw,
+  };
   final idx = _resumableChain.indexOf(step);
   if (idx < 0) return [step];
   return _resumableChain.sublist(0, idx + 1);

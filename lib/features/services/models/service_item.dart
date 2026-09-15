@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/i18n/app_translations.dart';
 
-enum ServiceId { kadastr3d, aiValuation, calculator, smetaPro }
+enum ServiceId { kadastr3d, aiValuation, calculator, smetaPro, bozorAi, taqiqCheck }
 
 class ServiceItem {
   const ServiceItem({

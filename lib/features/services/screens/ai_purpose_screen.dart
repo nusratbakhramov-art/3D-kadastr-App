@@ -10,13 +10,13 @@ import 'package:flutter/services.dart';
 
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../ai_draft_saver.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/choice_tile.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import '../widgets/wizard_nav_bar.dart';
 import 'ai_intake_screen.dart';
 
 class AiPurposeScreen extends StatefulWidget {
@@ -227,6 +227,9 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
                   child: ServiceAppBar(
                     title: _PurposeStrings.title(l),
                     subtitle: _PurposeStrings.subtitle(l),
+                    // Bu tugma butun oqimni yopadi — bitta qadam
+                    // orqaga EMAS. Qadamma-qadam qaytish pastda.
+                    onBack: () => closeAiWizard(context),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -294,10 +297,10 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: ListingCtaButton(
-                    label: _PurposeStrings.continueLabel(l),
-                    enabled: true,
-                    onTap: _next,
+                  child: WizardNavBar(
+                    onBack: () => Navigator.of(context).maybePop(),
+                    onContinue: _next,
+                    continueLabel: _PurposeStrings.continueLabel(l),
                   ),
                 ),
               ],

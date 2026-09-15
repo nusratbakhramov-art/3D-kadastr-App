@@ -153,6 +153,8 @@ class _AiScanProcessScreenState extends State<AiScanProcessScreen> {
     scanKey ??= await _uploadUsdz(r.usdzPath);
 
     // Skandan keyin DRAFT ariza (skan kaliti + to'liq to'plam + keyingi qadam).
+    // Qadam — 'cadastre': skan tugagach foydalanuvchi AYNAN shu qadamga
+    // tushadi (video qadami oqimdan olib tashlandi).
     final draftId = await createAiDraft(
       currentStep: 'cadastre',
       scanUsdzKey: scanKey,

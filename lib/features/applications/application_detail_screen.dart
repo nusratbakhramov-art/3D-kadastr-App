@@ -19,6 +19,7 @@ import '../auth/auth_storage.dart';
 import '../settings/settings_state.dart';
 import '../scans/splat_viewer_screen.dart';
 import '../services/ai_draft_resume.dart';
+import '../services/widgets/room_models_section.dart';
 import '../services/api_ai_valuation_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
 import '../services/models/ai_baholash_bundle.dart' show RoomKind;
@@ -689,6 +690,9 @@ class _AiFullDetailState extends State<_AiFullDetail> {
           _SectionHeader(title: sections[i].$1),
           _flatRowsCard(context, lang, sections[i].$2),
         ],
+        // Xonalarning 3D modellari — 3DGS serveridan ariza id bo'yicha.
+        // Video olinmagan arizalarda bo'lim o'zini ko'rsatmaydi.
+        RoomModelsSection(arizaId: widget.jobId),
         if (summary != null && summary.isNotEmpty) ...[
           const SizedBox(height: 8),
           _SectionHeader(

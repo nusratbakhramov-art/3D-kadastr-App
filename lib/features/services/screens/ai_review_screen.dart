@@ -14,11 +14,11 @@ import 'package:flutter/services.dart';
 
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
-import '../../market/widgets/listing_cta_button.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../widgets/file_preview_gallery.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
+import '../widgets/wizard_nav_bar.dart';
 import '../widgets/wizard_review_section.dart';
 import 'ai_target_price_screen.dart';
 
@@ -76,6 +76,9 @@ class _AiReviewScreenState extends State<AiReviewScreen> {
                   child: ServiceAppBar(
                     title: _S.title(l),
                     subtitle: _S.subtitle(l),
+                    // Bu tugma butun oqimni yopadi — bitta qadam
+                    // orqaga EMAS. Qadamma-qadam qaytish pastda.
+                    onBack: () => closeAiWizard(context),
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -168,10 +171,10 @@ class _AiReviewScreenState extends State<AiReviewScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                  child: ListingCtaButton(
-                    label: _S.calculate(l),
-                    enabled: true,
-                    onTap: () => _submit(context),
+                  child: WizardNavBar(
+                    onBack: () => Navigator.of(context).maybePop(),
+                    onContinue: () => _submit(context),
+                    continueLabel: _S.calculate(l),
                   ),
                 ),
               ],

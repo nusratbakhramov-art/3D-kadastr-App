@@ -1,0 +1,25 @@
+# PCScanKit — vendor C kutubxonalari (Vendor/lib/libjpeg.a, libpng.a) framework
+# ichki ishi; ularning simvollari EKSPORT QILINMAYDI.
+#
+# NEGA. Runner'ga OpenCV (SwiftPM `opencv-spm`, PanoCore uchun) STATIK
+# ulanadi va o'zining libjpeg-turbo/libpng'ini olib keladi. PCScanKit shu
+# nomdagi `_jpeg_*`/`_png_*` ni dinamik eksport qilganda linker OpenCV'ning
+# chaqiruvlarini archive o'rniga PCScanKit'ga bog'lardi (dylib eksporti
+# archive a'zosidan oldin topiladi). Runtime'da OpenCV boshqa versiyadagi
+# libjpeg-turbo 3.0.4 ga tushib, `jpeg_CreateDecompress` "Wrong JPEG library
+# version" bilan yiqilardi → `cv::imread` bo'sh → 360° tikish "no frame
+# projected onto the sphere" (2026-09-13, iPhone 14 Pro). Uy360 ilovasida
+# PCScanKit yo'q, shuning uchun u yerda ishlagan.
+#
+# Tekshiruv: `nm build/ios/iphoneos/Runner.app/Runner | grep _jpeg_CreateDecompress`
+# → `t`/`T` (o'zida), `U` EMAS.
+_jpeg_*
+_jinit_*
+_j12init_*
+_j16init_*
+_jcopy_*
+_jzero_far
+_jround_up
+_jdiv_round_up
+_jsimd_*
+_png_*

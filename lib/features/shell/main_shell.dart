@@ -23,7 +23,10 @@ import '../profile/profile_screen.dart';
 import '../services/screens/ai_scan_intro_screen.dart';
 import '../services/screens/kadastr/kadastr_area_screen.dart';
 import '../services/screens/online_calculator_screen.dart';
+import '../bozor/feed/bozor_home_screen.dart';
+import '../services/screens/taqiq_check_screen.dart';
 import '../settings/settings_screen.dart';
+import '../../theme/app_colors.dart';
 import 'app_bottom_nav.dart';
 
 class MainShell extends StatefulWidget {
@@ -224,9 +227,14 @@ class _MainShellState extends State<MainShell> {
       return;
     }
     if (!mounted) return;
-    await Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const AiScanIntroScreen()));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        // Nom SHART: oqimni yopish (`closeAiWizard`) `ai/` bilan
+        // boshlanmaydigan birinchi marshrutgacha poplaydi.
+        settings: const RouteSettings(name: 'ai/scan-intro'),
+        builder: (_) => const AiScanIntroScreen(),
+      ),
+    );
   }
 
   void _openCombinedCalc() {
@@ -242,6 +250,38 @@ class _MainShellState extends State<MainShell> {
     // → "Ariza topshirish". "3D kadastr" karta shu yerga.
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => const OnlineCalculatorScreen()),
+    );
+  }
+
+  /// Home'dagi «Bozor AI» kartasi — sehrgarni EMAS, e'lonlar ekranini ochadi
+  /// («E'lonlar» + «Mening e'lonlarim» tablari). Sehrgarga o'sha ekranning
+  /// ichidagi «E'lon qo'shish» tugmasi orqali o'tiladi.
+  ///
+  /// ⚠️ Marshrutga `bozorRoute(...)` BERILMAYDI: `closeBozorWizard()` `bozor/`
+  /// prefiksli hamma marshrutni pop qiladi, ya'ni shu prefiks bilan push
+  /// qilsak sehrgar tugagach foydalanuvchi lentaga emas, Home'ga tushib
+  /// qolardi.
+  ///
+  /// AI Baholash kabi mehmonga YOPIQ: lenta, «Mening e'lonlarim» va e'lon
+  /// qo'shish — hammasi token talab qiladi, shuning uchun xom 401 o'rniga
+  /// kirishdan oldin login drawer chiqadi.
+  Future<void> _openBozorAi() async {
+    if (!await ensureLoggedIn(context, storage: widget.authStorage)) return;
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const BozorHomeScreen()),
+    );
+  }
+
+  /// «Taqiqni tekshirish» — shaxsiy kadastr ma'lumoti bo'yicha so'rov, shuning
+  /// uchun Bozor AI / AI Baholash bilan bir xil login drawer bilan qulflanadi.
+  /// (Tekshiruvning o'zi ham token talab qiladi: davreestr captchasi backend
+  /// orqali yechiladi.)
+  Future<void> _openTaqiqCheck() async {
+    if (!await ensureLoggedIn(context, storage: widget.authStorage)) return;
+    if (!mounted) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const TaqiqCheckScreen()),
     );
   }
 
@@ -266,6 +306,8 @@ class _MainShellState extends State<MainShell> {
             // "3D kadastr" karta → xizmatlar ro'yxati kalkulyatori.
             onOpenKadastr3d: _openServiceList,
             onOpenAiValuation: _openAiValuation,
+            onOpenBozorAi: _openBozorAi,
+            onOpenTaqiqCheck: _openTaqiqCheck,
             onOpenMarket: _openMarketTab,
             // "Kalkulyator" karta → birlashgan (maydon → xizmatlar) kalkulyator.
             onOpenKalkulyator: _openCombinedCalc,
@@ -300,25 +342,56 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
+/// Pastki panel tablari — TEST uchun ochiq.
+///
+/// Ro'yxatning o'zi `_ShellStrings` ichida xususiy; bu yerda faqat unga
+/// kirish nuqtasi. Sabab: tablarning RANGI jimgina qaytadigan narsa —
+/// tint berilmasa Market va Arizalar o'z brend ranglarini (qizil, ko'k)
+/// chiqaradi va buni `analyze` ham, boshqa testlar ham ko'rmaydi.
+@visibleForTesting
+List<AppBottomNavItem> shellNavItems(Locale locale) =>
+    _ShellStrings.items(locale);
+
 class _ShellStrings {
   const _ShellStrings._();
 
+  // Each tab keeps one fixed colour — nothing here reacts to which tab is
+  // selected.
+  //
+  // Market va Arizalar ilgari TINTSIZ edi: ular korzinka.uz va my.gov.uz
+  // belgilari va o'z brend ranglarini SVG ichida olib yuradi (qizil va
+  // ko'k). Panel esa shu sababli uch xil rangli bo'lib ko'rinardi. Endi
+  // ikkalasi ham Asosiy bilan bir xil yashilga bo'yaladi.
+  //
+  // ⚠️ `BlendMode.srcIn` ikonkani BITTA rangga tekislaydi. Bu ikkalasida
+  // ham tekshirilgan: Market bir rangli edi, Arizalar esa uch rangli, lekin
+  // uning plitkalari oq ORALIQ bilan ajralgan va "bajarildi" belgisi
+  // KESIK (teshik) — shuning uchun tekislangach ham tuzilishi o'qiladi.
+  // Yangi ko'p rangli ikonka qo'shilsa — avval shunday tekshirib ko'ring.
   static List<AppBottomNavItem> items(Locale locale) => [
     AppBottomNavItem(
       label: _home(locale),
       iconAsset: 'assets/icons/tab-home.svg',
+      tintLight: AppColors.brandGreen,
+      tintDark: AppColors.splashGreen,
     ),
     AppBottomNavItem(
       label: _market(locale),
       iconAsset: 'assets/icons/tab-market.svg',
+      tintLight: AppColors.brandGreen,
+      tintDark: AppColors.splashGreen,
     ),
     AppBottomNavItem(
       label: _applications(locale),
       iconAsset: 'assets/icons/tab-applications.svg',
+      tintLight: AppColors.brandGreen,
+      tintDark: AppColors.splashGreen,
     ),
     AppBottomNavItem(
       label: _profile(locale),
       iconAsset: 'assets/icons/tab-profile.svg',
+      tintLight: AppColors.textBlack,
+      tintDark: Colors.white,
     ),
   ];
 

@@ -19,17 +19,29 @@ class ListingMetaPills extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: [
-        _Pill(iconAsset: 'assets/icons/map.svg', text: district),
-        _Pill(iconAsset: 'assets/icons/ruler-triangle.svg', text: '$areaM2 m²'),
+        ListingMetaPill(iconAsset: 'assets/icons/map.svg', text: district),
+        ListingMetaPill(
+          iconAsset: 'assets/icons/ruler-triangle.svg',
+          text: '$areaM2 m²',
+        ),
       ],
     );
   }
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({required this.iconAsset, required this.text});
+/// Bitta yumaloq "nishon" — tuman, maydon, xona soni va shunga o'xshash qisqa
+/// fakt uchun.
+///
+/// [ListingMetaPills] ning ichidan chiqarilgan: "Bozor AI" e'lonida nishonlar
+/// to'plami boshqa (viloyat+tuman, xona soni, mulk turi — ba'zilari YO'Q
+/// bo'lishi mumkin), shuning uchun u qatorni o'zi yig'adi, lekin nishonning
+/// ko'rinishi bitta joyda qoladi.
+class ListingMetaPill extends StatelessWidget {
+  const ListingMetaPill({super.key, this.iconAsset, required this.text});
 
-  final String iconAsset;
+  /// Ikonkasiz nishon ham bo'ladi (masalan mulk turi) — `null` bo'lsa faqat
+  /// matn chiziladi.
+  final String? iconAsset;
   final String text;
 
   @override
@@ -54,8 +66,10 @@ class _Pill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset(iconAsset, width: 16, height: 16),
-          const SizedBox(width: 8),
+          if (iconAsset != null) ...[
+            SvgPicture.asset(iconAsset!, width: 16, height: 16),
+            const SizedBox(width: 8),
+          ],
           Text(
             text,
             style: TextStyle(

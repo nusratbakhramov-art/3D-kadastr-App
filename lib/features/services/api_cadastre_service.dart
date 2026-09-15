@@ -16,6 +16,11 @@ import '../../core/api_config.dart';
 import '../auth/auth_http_client.dart';
 import 'data/davreestr_client.dart';
 
+/// Bitta ta'qiq/cheklov yozuvi. Model [DavreestrRestriction] bilan bitta —
+/// bu yerda faqat barqaror nom beriladi, ekranlar `davreestr_client.dart` ni
+/// import qilmasin.
+typedef CadastreRestriction = DavreestrRestriction;
+
 class CadastreLookupResult {
   const CadastreLookupResult({
     required this.cadastreNumber,
@@ -23,7 +28,10 @@ class CadastreLookupResult {
     this.objectTypeHint,
     this.totalArea,
     this.livingArea,
+    this.landArea,
     this.cadastreValue,
+    this.hasRestrictions,
+    this.restrictions = const [],
   });
 
   final String cadastreNumber;
@@ -31,7 +39,20 @@ class CadastreLookupResult {
   final String? objectTypeHint;
   final double? totalArea; // m²
   final double? livingArea; // m²
+
+  /// Yer maydoni (m²) — faqat yeri bor obyektlarda.
+  /// Batafsil: [DavreestrLookupResult.landArea].
+  final double? landArea; // m²
+
   final double? cadastreValue; // so'm
+
+  /// Obyektga ta'qiq/cheklov qo'yilganmi: `true`/`false` — reyestrdan aynan
+  /// hozir o'qildi, `null` — noma'lum (keshdan kelgan yoki draft'dan
+  /// tiklangan javob). Batafsil: [DavreestrLookupResult.hasRestrictions].
+  final bool? hasRestrictions;
+
+  /// Ta'qiq yozuvlari — [hasRestrictions] `true` bo'lganda to'ladi.
+  final List<CadastreRestriction> restrictions;
 
   /// Draft payload'dan qayta tiklash (resume). `bundle.toJson()['kadastr']`ga mos.
   factory CadastreLookupResult.fromJson(Map<String, dynamic> j) =>
@@ -41,6 +62,7 @@ class CadastreLookupResult {
         objectTypeHint: j['object_type_hint'] as String?,
         totalArea: (j['total_area'] as num?)?.toDouble(),
         livingArea: (j['living_area'] as num?)?.toDouble(),
+        landArea: (j['land_area'] as num?)?.toDouble(),
         cadastreValue: (j['cadastre_value'] as num?)?.toDouble(),
       );
 }
@@ -79,7 +101,10 @@ class CadastreApiService {
         objectTypeHint: r.objectTypeHint,
         totalArea: r.totalArea,
         livingArea: r.livingArea,
+        landArea: r.landArea,
         cadastreValue: r.cadastreValue,
+        hasRestrictions: r.hasRestrictions,
+        restrictions: r.restrictions,
       );
     } on DavreestrLookupException catch (e) {
       throw CadastreLookupException(e.message, statusCode: e.statusCode);

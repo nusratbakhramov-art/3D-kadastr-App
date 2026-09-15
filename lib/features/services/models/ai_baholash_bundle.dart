@@ -256,6 +256,35 @@ enum RoomKind {
   };
 }
 
+/// Videoga olinayotgan xona: turi va — [RoomKind.other] bo'lsa —
+/// foydalanuvchi bergan nom.
+///
+/// Sakkizta qat'iy tur har qanday xonadonni qoplamaydi (ish xonasi, ayvon,
+/// garaj...), nomsiz "Boshqa" lar esa ro'yxatda bir-biridan farq qilmaydi —
+/// shu sababli "Boshqa" tanlanganda nom so'raladi.
+class RoomChoice {
+  const RoomChoice(this.kind, {this.name});
+
+  final RoomKind kind;
+
+  /// Faqat [RoomKind.other] da to'ladi. `null` — turning tarjimasi
+  /// ishlatilsin degani.
+  final String? name;
+
+  /// Ekranda ko'rinadigan nom.
+  String label(Locale l) {
+    final n = name?.trim();
+    return n == null || n.isEmpty ? kind.label(l) : n;
+  }
+
+  /// Serverga yuboriladigan yorliq uchun nom — tarjimasiz, chunki yozuv
+  /// admin ro'yxatida qoladi va ilova tiliga bog'liq bo'lmasligi kerak.
+  String get labelUz {
+    final n = name?.trim();
+    return n == null || n.isEmpty ? kind.labelUz : n;
+  }
+}
+
 class AiClientInfo {
   const AiClientInfo({
     required this.name,

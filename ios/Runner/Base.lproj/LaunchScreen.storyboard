@@ -16,25 +16,22 @@
                     <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
-                            <!-- Top-right pattern: square = screen width -->
-                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchPatternTR" translatesAutoresizingMaskIntoConstraints="NO" id="ptr-aa-001"/>
-                            <!-- Bottom-left pattern: square = screen width -->
-                            <imageView userInteractionEnabled="NO" contentMode="scaleAspectFill" image="LaunchPatternBL" translatesAutoresizingMaskIntoConstraints="NO" id="pbl-bb-002"/>
-                            <!-- Logo intentionally omitted: 3D logo animatsiyasi Flutter splashда pastdan ko'tariladi -->
+                            <!-- Bo'sh: launch screen faqat bitta tekis rang.
+
+                                 Ilova ochilishi bilan DARHOL intro roligi
+                                 (VideoSplashScreen) ko'rinishi kerak, shuning
+                                 uchun bu ekran rolikning birinchi kadri bilan
+                                 bir xil qorong'i rangda — foydalanuvchi hech
+                                 qanday o'tishni sezmaydi.
+
+                                 Eski yashil launch screen (LaunchPatternTR /
+                                 LaunchPatternBL naqshlari + #00E135 fon)
+                                 shu yerda edi. Imageset'lar
+                                 Assets.xcassets ichida turibdi, qaytarish
+                                 uchun faqat shu blokni tiklash kifoya. -->
                         </subviews>
-                        <color key="backgroundColor" red="0" green="0.882352941" blue="0.207843137" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
-                        <constraints>
-                            <!-- Pattern TR -->
-                            <constraint firstItem="ptr-aa-001" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="ptr-top"/>
-                            <constraint firstAttribute="trailing" secondItem="ptr-aa-001" secondAttribute="trailing" id="ptr-trail"/>
-                            <constraint firstItem="ptr-aa-001" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" id="ptr-w"/>
-                            <constraint firstItem="ptr-aa-001" firstAttribute="height" secondItem="ptr-aa-001" secondAttribute="width" id="ptr-h"/>
-                            <!-- Pattern BL -->
-                            <constraint firstItem="pbl-bb-002" firstAttribute="bottom" secondItem="Ze5-6b-2t3" secondAttribute="bottom" id="pbl-bot"/>
-                            <constraint firstItem="pbl-bb-002" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="pbl-lead"/>
-                            <constraint firstItem="pbl-bb-002" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" id="pbl-w"/>
-                            <constraint firstItem="pbl-bb-002" firstAttribute="height" secondItem="pbl-bb-002" secondAttribute="width" id="pbl-h"/>
-                        </constraints>
+                        <!-- #040E07 — intro roligining eng qorong'i cheti. -->
+                        <color key="backgroundColor" red="0.015686275" green="0.054901961" blue="0.027450980" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                     </view>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
@@ -42,8 +39,4 @@
             <point key="canvasLocation" x="53" y="375"/>
         </scene>
     </scenes>
-    <resources>
-        <image name="LaunchPatternTR" width="1404" height="1404"/>
-        <image name="LaunchPatternBL" width="1500" height="1396"/>
-    </resources>
 </document>

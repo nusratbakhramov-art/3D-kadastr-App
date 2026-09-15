@@ -26,6 +26,8 @@ import 'features/settings/theme_storage.dart';
 import 'features/settings/settings_state.dart';
 import 'features/shell/main_shell.dart';
 import 'features/splash/animated_splash_screen.dart';
+import 'features/splash/blueprint_splash_screen.dart';
+import 'features/splash/video_splash_screen.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 
@@ -173,8 +175,18 @@ class _AppRoot extends StatefulWidget {
 
 enum _Stage { splash, onboarding, home }
 
+/// Mavjud splash ekranlari — [_AppRootState._splashKind] bilan tanlanadi.
+///   [video]     — `assets/branding/splash/intro.mp4` roligi (ovoz bilan).
+///   [blueprint] — neon uy o'zini chizadigan CustomPainter sahnasi.
+///   [animated]  — eng eski: logo pastdan ko'tarilib aylanadi.
+enum _SplashKind { video, blueprint, animated }
+
 class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
   _Stage _stage = _Stage.splash;
+
+  /// Qaysi splash ishlaydi. Eski variantlarning HECH BIRI o'chirilmagan —
+  /// shu bitta konstantani almashtirish yetarli.
+  static const _SplashKind _splashKind = _SplashKind.video;
   bool? _onboardingDone;
 
   // Re-entrancy guard — parallel requests can all trip a failed refresh at once.
@@ -330,8 +342,22 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
       child: switch (_stage) {
         _Stage.splash => Container(
           key: const ValueKey('splash'),
-          color: AppColors.splashGreen,
-          child: AnimatedSplashScreen(onComplete: _handleSplashComplete),
+          // Video splash launch screen bilan bir xil qorong'i rangdan
+          // boshlanadi; eski ikki splash esa native yashildan chiqadi.
+          color: _splashKind == _SplashKind.video
+              ? VideoSplashScreen.launchColor
+              : AppColors.splashGreen,
+          child: switch (_splashKind) {
+            _SplashKind.video => VideoSplashScreen(
+              onComplete: _handleSplashComplete,
+            ),
+            _SplashKind.blueprint => BlueprintSplashScreen(
+              onComplete: _handleSplashComplete,
+            ),
+            _SplashKind.animated => AnimatedSplashScreen(
+              onComplete: _handleSplashComplete,
+            ),
+          },
         ),
         _Stage.onboarding => OnboardingScreen(
           key: const ValueKey('onboarding'),

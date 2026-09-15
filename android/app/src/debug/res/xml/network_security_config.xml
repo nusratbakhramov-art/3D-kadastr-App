@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   DEBUG-ONLY tarmoq sozlamasi. Android 9+ da HTTP (cleartext) sukut bo'yicha
-  bloklanadi, shuning uchun telefon Mac'dagi lokal backendga ulana olmaydi.
-  Bu yerda faqat LAN manzillariga ruxsat beramiz — release APK bu faylni
-  KO'RMAYDI (src/debug overlay), ya'ni prod build hamon HTTPS-only.
+  bloklanadi. Release APK bu faylni KO'RMAYDI (src/debug overlay) — prod
+  build hamon HTTPS-only.
+
+  Nega hammasiga ruxsat: v2m (3DGS) serveri Vast.ai instance'ida ishlaydi va
+  uning IP:port'i har qayta ishga tushirishda o'zgaradi. Aniq manzillar
+  ro'yxati har safar qo'lda yangilanishi kerak bo'lardi. v2m barqaror domen +
+  TLS olgach (reja 2.7), bu faylni yana aniq ro'yxatga qaytarish kerak.
 -->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Mac (dev server) — `ipconfig getifaddr en0` bilan tekshiring. -->
-        <domain includeSubdomains="false">192.168.1.67</domain>
-        <!-- Android emulyatori host'ni shu manzilda ko'radi. -->
-        <domain includeSubdomains="false">10.0.2.2</domain>
-        <domain includeSubdomains="false">localhost</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="true" />
 </network-security-config>

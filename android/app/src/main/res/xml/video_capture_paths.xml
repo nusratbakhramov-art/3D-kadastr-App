@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug-only system camera capture — cacheDir/video/ ni kamera ilovasiga
+     yozish uchun ochadi (FileProvider, MainActivity.startSystemCamera). -->
+<paths>
+    <cache-path name="video_capture" path="video/" />
+</paths>
