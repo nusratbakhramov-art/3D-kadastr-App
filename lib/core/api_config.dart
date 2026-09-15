@@ -3,10 +3,19 @@ class ApiConfig {
 
   /// Backend host (no path). Used for static assets, presigned URLs that
   /// come back relative, etc.
-  // PROD — telefon prod backendga ulanadi.
-  static const String serverBaseUrl = 'https://api.3dkadastr.uz';
-  // Dev (telefon → Mac LAN IP): 'http://192.168.1.64:8009'
-  // Dev (simulator only): 'http://localhost:8009'
+  // PROD by default — a release build with no --dart-define stays on prod, so
+  // master is still safe to build from.
+  //
+  // Local backend, without editing this file:
+  //   simulator:  flutter run --dart-define=KADASTR_SERVER=http://localhost:8009
+  //   real phone: flutter run --dart-define=KADASTR_SERVER=http://<mac-lan-ip>:8009
+  //               (a phone also needs that IP added to NSExceptionDomains in
+  //                ios/Runner/Info.plist — loopback is already covered by
+  //                NSAllowsLocalNetworking)
+  static const String serverBaseUrl = String.fromEnvironment(
+    'KADASTR_SERVER',
+    defaultValue: 'https://api.3dkadastr.uz',
+  );
 
   /// API prefix — versioned REST endpoints live here.
   static const String baseUrl = '$serverBaseUrl/api/v1';
