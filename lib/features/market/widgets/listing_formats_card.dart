@@ -12,8 +12,8 @@ class ListingFormatsCard extends StatelessWidget {
     required this.files,
     required this.onTap,
     this.onOpenLocation,
-    this.downloadingFileId,
-    this.downloadProgress,
+    this.activeProgress = const {},
+    this.queuedFileIds = const {},
     this.downloadedFileIds = const {},
     this.locked = false,
   });
@@ -26,18 +26,19 @@ class ListingFormatsCard extends StatelessWidget {
   final Set<int> downloadedFileIds;
 
   /// Called when a row is tapped — receives the file. When [locked] the
-  /// parent routes this into the purchase flow instead of downloading.
+  /// parent routes this into the purchase flow instead of downloading; while a
+  /// row is downloading/queued, tapping it cancels that one.
   final ValueChanged<MarketListingFile> onTap;
+
+  /// Hozir yuklanayotgan fayllar (fileId → ulush 0..1, `null` = aylanma).
+  final Map<int, double?> activeProgress;
+
+  /// Navbatda turgan (hali boshlanmagan) fayllar.
+  final Set<int> queuedFileIds;
 
   /// Yuklab olingan qatordagi jild tugmasi bosilganda — faylning saqlangan
   /// joyini ochadi (Android: Yuklamalar ekrani; iOS: Files ilovasi).
   final ValueChanged<MarketListingFile>? onOpenLocation;
-
-  /// If non-null, that file's row shows progress.
-  final int? downloadingFileId;
-
-  /// Yuklab olish ulushi (0..1). `null` bo'lsa — noaniq (aylanma) indikator.
-  final double? downloadProgress;
 
   /// Paid model the user hasn't bought yet — rows show a lock cue (formats are
   /// previewed so the buyer sees what they get, but tapping prompts purchase).
@@ -83,8 +84,9 @@ class ListingFormatsCard extends StatelessWidget {
               name: _formatName(locale, f.format),
               size: sizeLabel(f.fileSize),
               sizeBytes: f.fileSize,
-              loading: downloadingFileId == f.id,
-              progress: downloadingFileId == f.id ? downloadProgress : null,
+              loading: activeProgress.containsKey(f.id),
+              progress: activeProgress[f.id],
+              queued: queuedFileIds.contains(f.id),
               downloaded: downloadedFileIds.contains(f.id),
               locked: locked,
               fg: fg,
@@ -96,11 +98,8 @@ class ListingFormatsCard extends StatelessWidget {
                       onOpenLocation!(f);
                     },
               onTap: () {
-                // Yuklanayotgan qatorning o'zi bosilsa — bekor qilish; boshqa
-                // qatorlar shu vaqtda bloklanadi.
-                if (downloadingFileId != null && downloadingFileId != f.id) {
-                  return;
-                }
+                // Har qanday qator bosilishi mumkin: bo'sh → navbatga qo'shadi,
+                // yuklanayotgan/navbatdagi → o'sha bittasini bekor qiladi.
                 HapticFeedback.selectionClick();
                 onTap(f);
               },
@@ -149,6 +148,7 @@ class _FileRow extends StatelessWidget {
     required this.sizeBytes,
     required this.loading,
     required this.progress,
+    required this.queued,
     required this.downloaded,
     required this.locked,
     required this.fg,
@@ -163,6 +163,7 @@ class _FileRow extends StatelessWidget {
   final int sizeBytes;
   final bool loading;
   final double? progress;
+  final bool queued;
   final bool downloaded;
   final bool locked;
   final Color fg;
@@ -258,7 +259,7 @@ class _FileRow extends StatelessWidget {
     );
   }
 
-  /// Hajm, yoki yuklab olinayotgan bo'lsa jarayon, yoki "yuklandi".
+  /// Hajm, yoki navbatda/yuklanayotgan bo'lsa jarayon, yoki "yuklandi".
   String _subtitle(Locale locale) {
     if (loading) {
       final p = progress;
@@ -266,11 +267,20 @@ class _FileRow extends StatelessWidget {
       final done = ListingFormatsCard.sizeLabel((sizeBytes * p).round());
       return '${(p * 100).round()}% · $done / $size';
     }
+    if (queued) return '$size · ${tr(locale, 'market.download.queued')}';
     if (downloaded) return '$size · ${tr(locale, 'market.download.done')}';
     return size;
   }
 
   Widget _trailing(Color iconColor, Color okGreen, Color track) {
+    // Navbatda — hali boshlanmagan: soat belgisi + bosilsa navbatdan chiqadi.
+    if (queued) {
+      return SizedBox(
+        width: 26,
+        height: 26,
+        child: Icon(Icons.schedule_rounded, size: 20, color: iconColor),
+      );
+    }
     if (loading) {
       return SizedBox(
         width: 26,

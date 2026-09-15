@@ -46,26 +46,52 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
     with WidgetsBindingObserver {
   late final MarketplaceApiService _api;
   late MarketListing _listing = widget.listing;
-  int? _downloadingFileId;
 
   /// Shu model bo'yicha allaqachon yuklab olingan fayllar (fileId → yozuv).
   Map<int, MarketDownload> _downloads = const {};
 
-  /// Joriy yuklab olishning bajarilgan ulushi (0..1). Server `Content-Length`
-  /// bermasa `null` — qator aylanma indikator ko'rsatadi.
-  double? _downloadProgress;
+  /// Faol + navbatdagi yuklab olishlar (fileId → vazifa). Telegram uslubi: bir
+  /// vaqtda [_maxConcurrent] tagacha yuklanadi, qolgani navbatda turadi va
+  /// slot bo'shashi bilan o'zi boshlanadi. Har bir qator o'z progress
+  /// halqasini ko'rsatadi.
+  final Map<int, _DlTask> _tasks = {};
 
-  /// Joriy yuklab olish klienti — bekor qilish uchun saqlanadi: `close()`
-  /// oqimni uzadi va `saveStream` chala `.part` faylni o'chirib tashlaydi.
-  http.Client? _downloadClient;
+  /// Bir vaqtda nechta yuklab olish. `.max` fayllar 1.5 GB'gacha — telefon
+  /// tarmog'i/diski uchun 3 xavfsiz cheg'ara.
+  static const int _maxConcurrent = 3;
 
-  /// Uzilish foydalanuvchi tomonidan bo'ldimi — shunda xato toast'i
-  /// ko'rsatilmaydi.
-  bool _downloadCancelled = false;
+  /// Bitta faylni bekor qiladi (faol bo'lsa oqimni uzadi, navbatda bo'lsa
+  /// shunchaki olib tashlaydi). `saveStream` chala `.part` faylni o'chiradi.
+  void _cancelTask(int fileId) {
+    final t = _tasks[fileId];
+    if (t == null) return;
+    t.cancelled = true;
+    if (t.status == _DlStatus.queued) {
+      setState(() => _tasks.remove(fileId));
+      _pump();
+    } else {
+      t.client?.close();
+    }
+  }
 
-  void _cancelDownload() {
-    _downloadCancelled = true;
-    _downloadClient?.close();
+  /// Navbatdan bo'sh slotlarni to'ldiradi.
+  void _pump() {
+    while (true) {
+      final active =
+          _tasks.values.where((t) => t.status == _DlStatus.active).length;
+      if (active >= _maxConcurrent) break;
+      _DlTask? next;
+      for (final t in _tasks.values) {
+        if (t.status == _DlStatus.queued) {
+          next = t;
+          break;
+        }
+      }
+      if (next == null) break;
+      next.status = _DlStatus.active;
+      unawaited(_runTask(next));
+    }
+    if (mounted) setState(() {});
   }
 
   /// Bepul yoki sotib olingan — yuklab olish/3D ochiq. Aks holda — locked
@@ -94,6 +120,12 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
 
   @override
   void dispose() {
+    // Ekran yopilsa faol yuklab olishlarni uzamiz — osilib qolgan klient/oqim
+    // qolmasin (`saveStream` chala `.part` faylni tozalaydi).
+    for (final t in _tasks.values) {
+      t.cancelled = true;
+      t.client?.close();
+    }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -214,13 +246,12 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
   /// Chip bosilganda: yuklab olingan bo'lsa — amallar oynasi, aks holda yuklab
   /// olish.
   Future<void> _onFileTap(MarketListingFile file) async {
-    // Shu fayl hozir yuklanmoqda — bosilishi bekor qilish demak.
-    if (_downloadingFileId == file.id) {
-      _cancelDownload();
+    // Yuklanayotgan yoki navbatdagi fayl bosilsa — o'sha bittasi bekor bo'ladi
+    // (qolganlariga tegmaydi).
+    if (_tasks.containsKey(file.id)) {
+      _cancelTask(file.id);
       return;
     }
-    // Boshqa fayl yuklanayotgan bo'lsa — ikkinchisini boshlamaymiz.
-    if (_downloadingFileId != null) return;
     if (!_unlocked) {
       await _onBuy();
       return;
@@ -230,7 +261,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
       await _showDownloadedSheet(file, existing);
       return;
     }
-    await _downloadFormat(file);
+    await _enqueueDownload(file);
   }
 
   /// Jild tugmasi — faylning saqlangan joyini ochadi (Android: Yuklamalar
@@ -255,16 +286,11 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
     );
   }
 
-  Future<void> _downloadFormat(MarketListingFile file) async {
-    if (_downloadingFileId != null) return;
-    // Pullik va hali sotib olinmagan — chip ko'rinadi, lekin bosilganda
-    // yuklab olish o'rniga sotib olish oqimi ochiladi.
-    if (!_unlocked) {
-      await _onBuy();
-      return;
-    }
-    final id = _listing.backendId;
-    if (id == null) {
+  /// Faylni navbatga qo'shadi (login/gate bir marta shu yerda tekshiriladi),
+  /// so'ng bo'sh slot bo'lsa [_pump] uni darhol boshlaydi.
+  Future<void> _enqueueDownload(MarketListingFile file) async {
+    if (_tasks.containsKey(file.id) || _downloads.containsKey(file.id)) return;
+    if (_listing.backendId == null) {
       AppToast.error(
         context,
         tr(localeNotifier.value, 'market.viewer.model_id_not_found'),
@@ -280,25 +306,27 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
       return;
     }
     if (!mounted) return;
-    final session = await widget.authStorage.loadSession();
-    final token = session.token;
-    if (token == null) return;
-    setState(() {
-      _downloadingFileId = file.id;
-      _downloadProgress = null;
-      _downloadCancelled = false;
-    });
+    setState(() => _tasks[file.id] = _DlTask(file));
+    _pump();
+  }
+
+  /// Bitta navbat vazifasini bajaradi: URL oladi, oqim bilan saqlaydi, tugagach
+  /// (muvaffaqiyat/xato/bekor) o'zini navbatdan olib tashlab, keyingisini
+  /// boshlaydi.
+  Future<void> _runTask(_DlTask task) async {
+    final file = task.file;
+    final id = _listing.backendId;
     try {
+      if (id == null) return;
+      final session = await widget.authStorage.loadSession();
+      final token = session.token;
+      if (token == null) return;
       final info = await _api.getDownloadUrl(
         modelId: id,
         fileId: file.id,
         token: token,
       );
-      // `Documents/Yuklamalar` ichiga — vaqtinchalik papkaga emas: iOS `tmp`ni
-      // istalgan vaqtda tozalaydi, ya'ni 1.5 GB `.max` fayl yo'qolib, keyingi
-      // safar qaytadan yuklab olinardi.
-      final rec = await _saveStreamed(id, file, info.url);
-
+      final rec = await _saveStreamedTask(task, id, info.url);
       if (!mounted) return;
       setState(() => _downloads = {..._downloads, rec.fileId: rec});
       AppToast.success(
@@ -306,22 +334,17 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
         '${rec.fileName} — ${tr(localeNotifier.value, 'market.download.saved')}',
       );
     } catch (e) {
-      if (!mounted) return;
       // Foydalanuvchi o'zi bekor qildi — bu xato emas.
-      if (!_downloadCancelled) {
+      if (mounted && !task.cancelled) {
         AppToast.error(
           context,
           '${tr(localeNotifier.value, 'market.listing.download_error')}: $e',
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _downloadingFileId = null;
-          _downloadProgress = null;
-          _downloadCancelled = false;
-        });
-      }
+      _tasks.remove(file.id);
+      if (mounted) setState(() {});
+      _pump();
     }
   }
 
@@ -487,7 +510,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
         );
       case 'redownload':
         setState(() => _downloads = {..._downloads}..remove(rec.fileId));
-        await _downloadFormat(file);
+        await _enqueueDownload(file);
       case 'delete':
         await MarketDownloads.remove(rec.fileId);
         if (!mounted) return;
@@ -500,11 +523,12 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
   ///
   /// Butun javobni xotiraga yig'maymiz — `.max` fayllar 1.5 GB'gacha bo'ladi,
   /// bunday hajm qurilmada ilovani o'ldiradi.
-  Future<MarketDownload> _saveStreamed(
+  Future<MarketDownload> _saveStreamedTask(
+    _DlTask task,
     int modelId,
-    MarketListingFile file,
     String src,
   ) async {
+    final file = task.file;
     Future<MarketDownload> saveFrom(
       Stream<List<int>> stream, {
       int totalBytes = 0,
@@ -523,14 +547,14 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
                 final percent = (received * 100 ~/ totalBytes).clamp(0, 100);
                 if (percent == lastPercent || !mounted) return;
                 lastPercent = percent;
-                setState(() => _downloadProgress = percent / 100);
+                setState(() => task.progress = percent / 100);
               },
       );
     }
 
     if (src.startsWith('http://') || src.startsWith('https://')) {
       final client = http.Client();
-      _downloadClient = client;
+      task.client = client;
       try {
         final res = await client
             .send(http.Request('GET', Uri.parse(src)))
@@ -544,7 +568,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
         );
       } finally {
         client.close();
-        _downloadClient = null;
+        task.client = null;
       }
     }
     if (src.startsWith('file://')) {
@@ -617,8 +641,14 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: ListingFormatsCard(
                   files: listing.files,
-                  downloadingFileId: _downloadingFileId,
-                  downloadProgress: _downloadProgress,
+                  activeProgress: {
+                    for (final t in _tasks.values)
+                      if (t.status == _DlStatus.active) t.file.id: t.progress,
+                  },
+                  queuedFileIds: {
+                    for (final t in _tasks.values)
+                      if (t.status == _DlStatus.queued) t.file.id,
+                  },
                   downloadedFileIds: _downloads.keys.toSet(),
                   locked: !unlocked,
                   onTap: _onFileTap,
@@ -680,6 +710,28 @@ String marketGroupDigits(int v) {
 /// havola iOS'da ilovani ochadi — qo'shimcha sozlash kerak emas.
 String? marketListingLink(int? backendId) =>
     backendId == null ? null : 'https://api.3dkadastr.uz/market/$backendId';
+
+/// Ko'p faylli yuklab olishdagi bitta vazifa holati.
+enum _DlStatus { queued, active }
+
+/// Bitta faylning yuklab olish vazifasi — navbat + faol holatni birga tutadi
+/// (Telegram uslubidagi ko'p yuklab olish uchun).
+class _DlTask {
+  _DlTask(this.file);
+
+  final MarketListingFile file;
+  _DlStatus status = _DlStatus.queued;
+
+  /// Bajarilgan ulush (0..1). `null` — server `Content-Length` bermagan
+  /// (aylanma indikator).
+  double? progress;
+
+  /// Faol yuklab olish klienti — bekor qilishda `close()` oqimni uzadi.
+  http.Client? client;
+
+  /// Foydalanuvchi bekor qildimi — shunda xato toast'i ko'rsatilmaydi.
+  bool cancelled = false;
+}
 
 /// iOS action-sheet qatori: chapda yorliq, o'ngda belgi, tepasida ingichka
 /// ajratgich.
