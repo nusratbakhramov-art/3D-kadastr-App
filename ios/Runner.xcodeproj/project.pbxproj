@@ -489,7 +489,6 @@
 				35C195BE9DD6BFA97429B623 /* uy360_pipeline.cpp */,
 				3D5889587F218A21C4666009 /* UyStitcher.mm */,
 			);
-			name = PanoCore;
 			path = PanoCore;
 			sourceTree = "<group>";
 		};
@@ -1177,7 +1176,7 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = KHGXWF53U9;
 				ENABLE_BITCODE = NO;
 				GCC_OPTIMIZATION_LEVEL = s;
@@ -1432,7 +1431,7 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = KHGXWF53U9;
 				ENABLE_BITCODE = NO;
 				GCC_OPTIMIZATION_LEVEL = s;
@@ -1469,7 +1468,7 @@
 				CODE_SIGN_ENTITLEMENTS = Runner/Runner.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 29;
+				CURRENT_PROJECT_VERSION = 50;
 				DEVELOPMENT_TEAM = KHGXWF53U9;
 				ENABLE_BITCODE = NO;
 				GCC_OPTIMIZATION_LEVEL = s;

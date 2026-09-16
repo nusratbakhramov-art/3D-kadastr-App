@@ -1,7 +1,7 @@
 name: kadastr
 description: "Kadastr — Flutter starter."
 publish_to: 'none'
-version: 1.0.5+47
+version: 1.0.5+50
 
 environment:
   # Pol `dchs_motion_sensors 2.0.2` uchun ^3.10.1 dan ko'tarilgan edi; o'sha
