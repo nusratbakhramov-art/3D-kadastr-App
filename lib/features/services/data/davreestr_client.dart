@@ -364,6 +364,28 @@ class DavreestrClient {
     'obyekt turi:',
   ];
 
+  /// A rejected search must be RETRIED with a fresh captcha.
+  ///
+  /// ⚠️ NEGA ALOHIDA VA SOF. davreestr rad etishni `302 → /uz` bilan
+  /// qaytaradi va sababini KEYINGI sahifa yuklanishiga flash qiladi. Agar
+  /// o'sha sahifada ham sabab bo'lmasa, bizda hech qanday belgi qolmaydi —
+  /// va ilgari aynan shunda urinish bekorga sarflanardi: captcha xato
+  /// bo'lsa ham sikl qayta urinmasdi.
+  ///
+  /// Qoida: 302 kelgan, lekin TANIB BO'LADIGAN sabab topilmagan bo'lsa —
+  /// captcha deb hisoblab qayta uriniladi. Tanilgan sabab (rate limit,
+  /// topilmadi, ochiq «maxfiy kod noto») o'z shoxiga ketadi va bu yerga
+  /// tushmaydi.
+  @visibleForTesting
+  static bool shouldRetryRejected({
+    required bool isRedirect,
+    required String bodyLower,
+  }) =>
+      isRedirect &&
+      !_anyContains(bodyLower, _rateLimitPatterns) &&
+      !_anyContains(bodyLower, _captchaWrongPatterns) &&
+      !_anyContains(bodyLower, _notFoundPatterns);
+
   /// Resolve a cadastre number to property data.
   ///
   /// Fast path: the backend cache (`GET /davreestr/lookup`) — a prior
@@ -521,7 +543,33 @@ class DavreestrClient {
           cookies,
           extraHeaders: searchHeaders,
         );
-        final searchBody = search.body;
+        // ⚠️ 302 NI KUZATIB BORAMIZ. davreestr HAR QANDAY rad etishni
+        // `302 → /uz` bilan qaytaradi va SABABINI keyingi sahifa
+        // yuklanishiga flash qiladi. 302 ning o'z tanasi esa atigi
+        // «Redirecting to …» — unda na «maxfiy kod noto», na «topilmadi»,
+        // na rate-limit matni bor.
+        //
+        // Busiz pastdagi tasnif HECH QAYSI shoxga tushmasdi va eng
+        // muhimi — CAPTCHA XATO ekani bilinmay, qayta urinish sikli
+        // umuman ishga tushmasdi: urinish bekorga sarflanib,
+        // foydalanuvchi «Ma'lumot olib bo'lmadi» ni ko'rardi. Aynan shu
+        // «302 ko'p beryapti» shikoyatining sababi.
+        //
+        // Ergashish muvaffaqiyatli holatga ham FOYDA: sayt bir kun
+        // Post/Redirect/Get ga o'tsa, natija sahifasi shu yerda o'qiladi.
+        var searchBody = search.body;
+        if (search.isRedirect) {
+          final loc = search.headers[HttpHeaders.locationHeader];
+          final target = (loc == null || loc.isEmpty)
+              ? homeUri
+              : homeUri.resolve(loc);
+          try {
+            searchBody = (await _get(httpClient, target, cookies)).body;
+          } on DavreestrLookupException {
+            // Flash sahifasi ham kelmasa — asl (bo'sh) tana bilan davom
+            // etamiz va pastdagi 302 shoxi ushlaydi.
+          }
+        }
 
         /// This attempt's request/response, for whichever branch below decides
         /// it failed. Headers are logged WITHOUT the session cookie value.
@@ -552,6 +600,16 @@ class DavreestrClient {
         // 5) Classify response.
         final lower = _htmlUnescape(searchBody).toLowerCase();
 
+        // 302 dan keyin sabab topilmasa — deyarli har doim captcha.
+        // Davreestr rad etish sababini har doim ham flash qilmaydi, lekin
+        // rad etishning o'zi 302 bilan keladi, ya'ni urinishni TUGAGAN deb
+        // hisoblash noto'g'ri: yangi captcha bilan qayta urinish odatda
+        // o'tadi.
+        final redirectedWithoutReason = shouldRetryRejected(
+          isRedirect: search.isRedirect,
+          bodyLower: lower,
+        );
+
         if (_anyContains(lower, _rateLimitPatterns)) {
           logSearch(
             _Kind.rateLimited,
@@ -565,10 +623,17 @@ class DavreestrClient {
           );
         }
 
-        if (_anyContains(lower, _captchaWrongPatterns)) {
+        if (_anyContains(lower, _captchaWrongPatterns) ||
+            redirectedWithoutReason) {
           // Wrong captcha — server rotates token, but session stays.
           lastError = 'Captcha xato';
-          logSearch(_Kind.captchaWrong, 'Captcha kodi rad etildi');
+          logSearch(
+            _Kind.captchaWrong,
+            redirectedWithoutReason
+                ? 'Forma rad etildi (302, sabab aytilmadi) — captcha deb '
+                    'hisoblab qayta urinamiz'
+                : 'Captcha kodi rad etildi',
+          );
           final refreshed = _extractCsrf(searchBody);
           if (refreshed != null) token = refreshed;
           continue;
