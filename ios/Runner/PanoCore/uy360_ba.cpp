@@ -2,6 +2,7 @@
 #include "uy360_ba.hpp"
 
 #include <opencv2/core.hpp>
+#include <opencv2/calib3d.hpp>
 #include <opencv2/features.hpp>
 #include <opencv2/flann.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -416,6 +417,21 @@ int estimateEssential(const std::vector<cv::Point2d>& xa, const std::vector<cv::
             maxIter = std::min(maxIter, std::max(need, it + 1));
         }
     }
+    // The calibrated five-point solver also works on sparse, near-planar overlaps
+    // where an eight-point sample often degenerates. Keep its hypothesis only if
+    // the rotation agrees with the sensor prior and its consensus is stronger.
+    cv::Mat nativeMask;
+    cv::Mat nativeE = cv::findEssentialMat(xa, xb, Matx33d::eye(), cv::RANSAC, 0.999, thr, 2000, nativeMask);
+    if (nativeE.cols == 3 && nativeE.rows == 3) {
+        Matx33d E(nativeE), R1, R2;
+        rotationsFromEssential(E, R1, R2);
+        const double dR = std::min(rotAngleDeg(R1, Rprior), rotAngleDeg(R2, Rprior));
+        if (dR < 8) {
+            std::vector<char> mask;
+            int count = classifyE(E, xa, xb, thr2, mask);
+            if (count > best) { best = count; bestE = E; inl = mask; }
+        }
+    }
     // A degenerate 8-point solution can collect a few more inliers with a rotation that is
     // nowhere near the prior (the caller rejects such pairs). Prefer the rotation-consistent
     // hypothesis when the winner disagrees with the prior by more than 25°.
@@ -791,14 +807,17 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
     // pivot model p = R·(0, 0, −L): the phone is held ~L in front of the body, so consecutive
     // 30° shots have a ~10 cm baseline. Only an initialisation — the prior on p is loose and
     // the LM recovers the real motion from the tracks (verified against ARKit captures).
+    bool sensorNeedsTranslation = false;
     if (opt.relRotSigmaDeg > 0) {
         double spread = 0;
         for (int i = 1; i < n; ++i) spread = std::max(spread, cv::norm(cams[i].p0 - cams[0].p0));
         if (spread < 0.01) {
+            sensorNeedsTranslation = true;
             const double L = 0.2;
             for (int i = 0; i < n; ++i) {
                 cams[i].p0 = cams[i].R0 * Vec3d(0, 0, -L);
-                out[i].p = cv::Vec3f((float)cams[i].p0[0], (float)cams[i].p0[1], (float)cams[i].p0[2]);
+                // This is a solver seed, not measured motion. Keep `out` at the input pose
+                // so an unsuccessful solve cannot return the invented 20 cm baseline.
             }
             report(0.0f, "BA: pivot init (no translation in the poses)");
         }
@@ -867,6 +886,8 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
         bool ok = false;
         int inliers = 0;
         double dRdeg = 0;           // image-estimated vs prior relative rotation
+        Vec3d displacementInJ;     // i → j baseline, expressed in camera j axes
+        bool positionOK = false;
         Matx33d RjiEst;             // R_jᵀ R_i from the essential matrix (ARKit/world axes)
         std::vector<std::pair<int, int>> corr;  // (kp index in i, kp index in j)
     };
@@ -931,6 +952,32 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
                             pr.inliers = cnt;
                             pr.dRdeg = dR;
                             pr.RjiEst = d1 <= d2 ? R1w : R2w;
+                            // E = [t]x R determines the baseline direction; choose its sign
+                            // by requiring matched points to lie in front of both cameras.
+                            cv::Mat ew, eu, evt;
+                            cv::SVD::compute(cv::Mat(E), ew, eu, evt);
+                            Vec3d t(eu.at<double>(0, 2), eu.at<double>(1, 2), eu.at<double>(2, 2));
+                            Matx33d rel = Sflip * pr.RjiEst * Sflip;
+                            int positive = 0, negative = 0;
+                            std::vector<double> parallaxes;
+                            for (size_t k = 0; k < xa.size(); ++k) if (inl[k]) {
+                                Vec3d a = rel * Vec3d(xa[k].x, xa[k].y, 1), b(xb[k].x, xb[k].y, 1);
+                                a *= 1 / cv::norm(a); b *= 1 / cv::norm(b);
+                                const double ab = a.dot(b), den = 1 - ab * ab;
+                                if (den < 1e-7) continue;
+                                const double at = a.dot(t), bt = b.dot(t);
+                                const double da = (ab * bt - at) / den, db = (bt - ab * at) / den;
+                                positive += da > 0 && db > 0;
+                                negative += da < 0 && db < 0;
+                                parallaxes.push_back(std::acos(std::clamp(ab, -1.0, 1.0)) * 180 / M_PI);
+                            }
+                            if (negative > positive) t = -t;
+                            pr.displacementInJ = -(Sflip * t);
+                            if (!parallaxes.empty()) {
+                                std::sort(parallaxes.begin(), parallaxes.end());
+                                pr.positionOK = std::max(positive, negative) >= cnt * 0.7 &&
+                                    parallaxes[parallaxes.size() / 2] > 0.3 && dR < 8;
+                            }
                             pr.corr.clear();
                             for (size_t k = 0; k < good.size(); ++k)
                                 if (inl[k]) pr.corr.push_back({good[k].queryIdx, good[k].trainIdx});
@@ -986,6 +1033,45 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
             }
             pairsDone = 0;
             runPairs(true);
+        }
+    }
+
+    if (opt.sensorTranslationInit && sensorNeedsTranslation) {
+        // Fit a position graph before triangulation. An assumed body pivot can place
+        // real correspondences behind the camera and discard all tracks of a view.
+        int edges = 0;
+        for (const auto& pr : results) edges += pr.ok && pr.positionOK;
+        cv::Mat A = cv::Mat::zeros(3 * (edges + n), 3 * n, CV_64F);
+        cv::Mat b = cv::Mat::zeros(A.rows, 1, CV_64F);
+        int row = 0;
+        for (size_t k = 0; k < pairs.size(); ++k) {
+            const auto& pr = results[k];
+            if (!pr.ok || !pr.positionOK) continue;
+            const int i = pairs[k].first, j = pairs[k].second;
+            // Rotation averaging above may have updated R0 since this pair was matched.
+            const Vec3d d = cams[j].R0 * pr.displacementInJ;
+            const Matx33d W = Matx33d::eye() - 0.95 * (d * d.t());
+            const double length = std::clamp(cv::norm(cams[j].p0 - cams[i].p0), 0.05, 0.3);
+            const double weight = std::sqrt(std::min(pr.inliers, 100) / 50.0);
+            for (int r = 0; r < 3; ++r) {
+                for (int c = 0; c < 3; ++c) {
+                    A.at<double>(row + r, 3 * i + c) = -weight * W(r, c);
+                    A.at<double>(row + r, 3 * j + c) = weight * W(r, c);
+                }
+                b.at<double>(row + r) = weight * 0.05 * d[r] * length;
+            }
+            row += 3;
+        }
+        for (int i = 0; i < n; ++i) for (int r = 0; r < 3; ++r) {
+            A.at<double>(row, 3 * i + r) = 0.02;
+            b.at<double>(row++) = 0.02 * cams[i].p0[r];
+        }
+        cv::Mat x;
+        if (edges >= n && cv::solve(A, b, x, cv::DECOMP_SVD)) {
+            for (int i = 0; i < n; ++i) {
+                cams[i].p0 = Vec3d(x.at<double>(3 * i), x.at<double>(3 * i + 1), x.at<double>(3 * i + 2));
+                if (debugOn()) std::fprintf(stderr, "position init %d: %.3f %.3f %.3f\n", i, cams[i].p0[0], cams[i].p0[1], cams[i].p0[2]);
+            }
         }
     }
 
@@ -1108,6 +1194,10 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
         std::vector<int> perCam(n, 0);
         for (const Obs& o : prob.obs) ++perCam[o.cam];
         for (int c = 0; c < n; ++c) prob.fixedCam[c] = perCam[c] < kMinObsPerCamera;
+        if (stats) {
+            stats->cameraObservations = perCam;
+            for (int c = 0; c < n; ++c) stats->constrainedCameras += !prob.fixedCam[c];
+        }
         // With the relative-rotation chain (sensor poses) a weak camera is not frozen: its rotation
         // is carried by the chain + the absolute tilt prior, its position by the pivot fill below.
         if (prob.relRotSigma > 0)
@@ -1160,6 +1250,21 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
         if (!progressed) break;
     }
     double medAfter = prob.medianReproj();
+    {
+        std::vector<double> depths;
+        for (const Obs& o : prob.obs) {
+            const Vec3d q = prob.R[o.cam].t() * (prob.X[o.pt] - prob.p[o.cam]);
+            if (-q[2] > 0) depths.push_back(-q[2]);
+        }
+        std::sort(depths.begin(), depths.end());
+        if (stats && !depths.empty()) {
+            stats->depth10 = depths[depths.size()/10];
+            stats->medianDepth = depths[depths.size()/2];
+            stats->depth95 = depths[depths.size()*19/20];
+        }
+        if (debugOn() && !depths.empty()) std::fprintf(stderr, "BA depth q05 %.3f q10 %.3f median %.3f q90 %.3f q95 %.3f\n",
+            depths[depths.size()/20], depths[depths.size()/10], depths[depths.size()/2], depths[depths.size()*9/10], depths[depths.size()*19/20]);
+    }
     if (prob.relRotSigma > 0) {
         // Pivot fill for weak cameras (sensor poses only). The phone moves with the body, so
         // p ≈ c + R·d (c = body pivot, d = lever arm in camera axes) describes the well-observed

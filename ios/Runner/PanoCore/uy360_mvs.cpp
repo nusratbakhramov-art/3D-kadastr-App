@@ -210,6 +210,7 @@ struct Sweep {
     int win = 5, gfR = 8;
     float gfEps = 1e-3f;
     int minViews = 2;
+    bool cullInvisibleNeighbours = true;
     cv::Mat I;                         // float blurred grey of frame i
     cv::Mat mI5, vI5, mI8, varI8;      // box statistics of I (ZNCC radius / guided radius)
     std::vector<cv::Mat> nbrF;         // float blurred grey of the neighbours
@@ -252,6 +253,30 @@ struct Sweep {
         const int margin = win;
         const int bandRows = 48;
         const int nBands = (H + bandRows - 1) / bandRows;
+        std::vector<cv::Rect2d> bounds(nb, cv::Rect2d(0, 0, W, H));
+        if (cullInvisibleNeighbours) for (int a = 0; a < nb; ++a) {
+            // H maps target pixels into the neighbour. Map the neighbour's
+            // padded image rectangle back once per plane. With no projective
+            // pole inside that rectangle, its extrema occur at the corners.
+            // The padding conservatively includes nearest-neighbour rounding,
+            // interpolation and the correlation window; depth samples are unchanged.
+            cv::Matx33d inverse = Hs[a][k].inv();
+            double xmin = 1e30, ymin = 1e30, xmax = -1e30, ymax = -1e30;
+            double sign = 0; bool bounded = true;
+            for (double y : {-2., nbrF[a].rows + 1.}) for (double x : {-2., nbrF[a].cols + 1.}) {
+                cv::Vec3d point = inverse * cv::Vec3d(x, y, 1);
+                if (std::abs(point[2]) < 1e-8 || (sign != 0 && sign * point[2] <= 0)) { bounded = false; break; }
+                sign = point[2];
+                double u = point[0] / point[2], v = point[1] / point[2];
+                if (!std::isfinite(u) || !std::isfinite(v)) { bounded = false; break; }
+                xmin = std::min(xmin, u); xmax = std::max(xmax, u);
+                ymin = std::min(ymin, v); ymax = std::max(ymax, v);
+            }
+            if (bounded) {
+                double pad = win + 2;
+                bounds[a] = cv::Rect2d(xmin - pad, ymin - pad, xmax - xmin + 2 * pad, ymax - ymin + 2 * pad);
+            }
+        }
         cv::parallel_for_(cv::Range(0, nBands), [&](const cv::Range& rg) {
             cv::Mat Wj, mask, t1, t2, t3, tmp, b1, b2, cnt;
             for (int b = rg.start; b < rg.end; ++b) {
@@ -263,26 +288,33 @@ struct Sweep {
                 b2.create(rows, W, CV_32F); b2.setTo(std::numeric_limits<float>::infinity());
                 cnt.create(rows, W, CV_8U); cnt.setTo(0);
                 for (int a = 0; a < nb; ++a) {
-                    cv::Matx33d Hb = Hs[a][k] * cv::Matx33d(1, 0, 0, 0, 1, (double)ya, 0, 0, 1);
-                    cv::warpPerspective(nbrF[a], Wj, Hb, cv::Size(W, rows), cv::INTER_LINEAR | cv::WARP_INVERSE_MAP,
+                    const auto& bound = bounds[a];
+                    if (bound.x >= W || bound.x + bound.width < 0 ||
+                        bound.y >= yb || bound.y + bound.height < ya) continue;
+                    int xa = std::max(0, int(std::max(0., std::floor(bound.x))));
+                    int xb = std::min(W, int(std::min(double(W), std::ceil(bound.x + bound.width))));
+                    if (xb <= xa) continue;
+                    int columns = xb - xa;
+                    cv::Matx33d Hb = Hs[a][k] * cv::Matx33d(1, 0, (double)xa, 0, 1, (double)ya, 0, 0, 1);
+                    cv::warpPerspective(nbrF[a], Wj, Hb, cv::Size(columns, rows), cv::INTER_LINEAR | cv::WARP_INVERSE_MAP,
                                         cv::BORDER_CONSTANT, cv::Scalar(0));
-                    cv::warpPerspective(nbrOnes[a], mask, Hb, cv::Size(W, rows), cv::INTER_NEAREST | cv::WARP_INVERSE_MAP,
+                    cv::warpPerspective(nbrOnes[a], mask, Hb, cv::Size(columns, rows), cv::INTER_NEAREST | cv::WARP_INVERSE_MAP,
                                         cv::BORDER_CONSTANT, cv::Scalar(0));
                     cv::erode(mask, mask, kernel);  // = box(mask) > 0.999
                     box(Wj, t1, win);               // mean of the warped neighbour
                     cv::multiply(Wj, Wj, tmp); box(tmp, t2, win);  // mean of W²
-                    cv::multiply(Ib, Wj, tmp); box(tmp, t3, win);  // mean of I·W
+                    cv::multiply(Ib.colRange(xa, xb), Wj, tmp); box(tmp, t3, win);  // mean of I·W
                     for (int y = 0; y < rows; ++y) {
                         const float* mw = t1.ptr<float>(y);
                         const float* bww = t2.ptr<float>(y);
                         const float* biw = t3.ptr<float>(y);
-                        const float* mi = mI5.ptr<float>(ya + y);
-                        const float* vi = vI5.ptr<float>(ya + y);
+                        const float* mi = mI5.ptr<float>(ya + y) + xa;
+                        const float* vi = vI5.ptr<float>(ya + y) + xa;
                         const uint8_t* mk = mask.ptr<uint8_t>(y);
-                        float* B1 = b1.ptr<float>(y);
-                        float* B2 = b2.ptr<float>(y);
-                        uint8_t* CN = cnt.ptr<uint8_t>(y);
-                        for (int x = 0; x < W; ++x) {
+                        float* B1 = b1.ptr<float>(y) + xa;
+                        float* B2 = b2.ptr<float>(y) + xa;
+                        uint8_t* CN = cnt.ptr<uint8_t>(y) + xa;
+                        for (int x = 0; x < columns; ++x) {
                             if (!mk[x]) continue;
                             const float vw = std::max(bww[x] - mw[x] * mw[x], 0.f);
                             const float cov = biw[x] - mi[x] * mw[x];
@@ -763,6 +795,7 @@ std::vector<DepthMap> computeDepthMaps(const std::vector<FrameInput>& frames, co
     std::vector<FrameEst> est(n);
     Sweep sweep;
     sweep.win = opt.winRadius; sweep.gfR = opt.gfRadius; sweep.gfEps = opt.gfEps; sweep.minViews = opt.minViews;
+    sweep.cullInvisibleNeighbours = opt.cullInvisibleNeighbours;
     SgmWta sgm;
     sgm.inv0 = inv0; sgm.invStep = invStep; sgm.invLast = invLast; sgm.invStep15 = invStep15;
     sgm.costMaxU = (int)std::lround(opt.costMax * kCostScale);

@@ -1,6 +1,10 @@
+#include <map>
 #include "uy360_stitch.hpp"
 
 #include <opencv2/opencv.hpp>
+#if CV_VERSION_MAJOR >= 5
+#include <opencv2/geometry/2d.hpp>
+#endif
 #include <opencv2/stitching/detail/blenders.hpp>
 #include <opencv2/stitching/detail/seam_finders.hpp>
 
@@ -9,7 +13,9 @@
 #include <chrono>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <numeric>
+#include <limits>
 
 namespace uy360 {
 namespace {
@@ -101,7 +107,7 @@ static std::vector<Matx33f> refineRotations(const std::vector<FrameInput>& frame
     std::vector<FeatureSet> feats(n);
     for (int i = 0; i < n; ++i) {
         if (progress) progress(0.02f + 0.10f * i / n, "Feature'lar " + std::to_string(i + 1) + "/" + std::to_string(n));
-        Mat img = cv::imread(frames[i].path, cv::IMREAD_REDUCED_GRAYSCALE_4);
+        Mat img = imreadForWidth(frames[i].path, opt.refineSmallWidth, frames[i].imageWidth, false);
         if (img.empty()) continue;
         if (img.cols > opt.refineSmallWidth)
             cv::resize(img, img, Size(opt.refineSmallWidth, img.rows * opt.refineSmallWidth / img.cols), 0, 0, cv::INTER_AREA);
@@ -219,6 +225,8 @@ struct Warp {
     Rect box;
     Mat img;  // 8UC3
     Mat w;    // 32F feather weight (0 = no data)
+    bool supplemental = false;
+    Mat planarDistance; // panorama-ray distance for verified foreground surfaces; 0 elsewhere
 };
 
 // Canvas boxes covered by a frame. A frame may need two boxes (it straddles the
@@ -296,9 +304,11 @@ static bool renderWarpDepth(const Canvas& C, const Matx33f& R, const Vec3f& p, c
     const Matx33f Rt = R.t();
     const int w = img.cols, h = img.rows;
     const Vec3f off = p - Cpos;
+    const Vec3f cameraOffset = Rt * off;
     const float fxd = dm.fx, fyd = dm.fy, cxd = dm.cx, cyd = dm.cy;
     const int dw = dm.z.cols, dh = dm.z.rows;
     Mat mapx(box.height, box.width, CV_32F), mapy(box.height, box.width, CV_32F), wgt(box.height, box.width, CV_32F);
+    if (!dm.planarMask.empty()) out.planarDistance = Mat::zeros(box.height, box.width, CV_32F);
     std::atomic<int> validTotal{0};
     // rows are independent: parallel over row stripes (this loop was ~40 % of the depth stitch)
     cv::parallel_for_(cv::Range(0, box.height), [&](const cv::Range& rg) {
@@ -311,7 +321,10 @@ static bool renderWarpDepth(const Canvas& C, const Matx33f& R, const Vec3f& p, c
             const Vec3f d = C.dir(box.x + x, box.y + y);
             float t = -1.f;
             Vec3f Xc = Rt * d;
-            for (int it = 0; it < 3; ++it) {
+            Vec3f planePoint;
+            bool onPlane = depthPlanePoint(dm, Xc, cameraOffset, planePoint);
+            bool onWall = !onPlane && depthWallPoint(dm, Xc, cameraOffset, planePoint);
+            for (int it = 0; !onPlane && !onWall && it < 3; ++it) {
                 if (t >= 0.f) Xc = Rt * (t * d - off);
                 const float zc = -Xc[2];
                 if (zc <= 1e-3f) { t = 50.f; continue; }
@@ -324,7 +337,7 @@ static bool renderWarpDepth(const Canvas& C, const Matx33f& R, const Vec3f& p, c
                 const Vec3f Pw = R * Pc + off;             // relative to the panorama centre
                 t = std::sqrt(Pw.dot(Pw));
             }
-            Xc = Rt * (t * d - off);
+            Xc = (onPlane || onWall) ? planePoint : Rt * (t * d - off);
             const float zc = -Xc[2];
             bool okp = zc > 1e-3f;
             float u = -1, v = -1;
@@ -336,7 +349,10 @@ static bool renderWarpDepth(const Canvas& C, const Matx33f& R, const Vec3f& p, c
                 okp = u >= 0 && u <= w - 1 && v >= 0 && v <= h - 1 && ud >= 0 && ud <= dw - 1 && vd >= 0 && vd <= dh - 1;
                 if (okp) {
                     const float zs = sampleBilinear(dm.z, ud, vd);
-                    okp = std::fabs(zs - zc) < std::max(0.06f, 0.06f * zc);
+                    // An iterative point landing inside the plane without the
+                    // exact intersection is a false solution at its boundary.
+                    const bool iterativePlane = !onPlane && depthPlaneContains(dm, ud, vd);
+                    okp = !iterativePlane && (onPlane || onWall || std::fabs(zs - zc) < std::max(0.06f, 0.06f * zc));
                 }
             }
             if (okp) {
@@ -346,6 +362,7 @@ static bool renderWarpDepth(const Canvas& C, const Matx33f& R, const Vec3f& p, c
                 float dv = std::min(v, (h - 1) - v) / (h * feather);
                 float tt = clampf(std::min(du, dv), 0.f, 1.f);
                 mw[x] = tt * tt * (3 - 2 * tt);
+                if (onPlane) out.planarDistance.at<float>(y, x) = cv::norm(planePoint + cameraOffset);
                 ++valid;
             } else {
                 mx[x] = -1;
@@ -404,12 +421,40 @@ static bool renderWarp(const Canvas& C, const Matx33f& R, float fx, float fy, fl
 }
 
 static void accumulate(Mat& acc, Mat& wacc, const Warp& wp) {
-    Mat img32;
-    wp.img.convertTo(img32, CV_32FC3);
-    Mat w3;
-    cv::merge(std::vector<Mat>{wp.w, wp.w, wp.w}, w3);
-    acc(wp.box) += img32.mul(w3);
-    wacc(wp.box) += wp.w;
+    cv::parallel_for_(cv::Range(0, wp.box.height), [&](const cv::Range& rows) {
+        for (int y = rows.start; y < rows.end; ++y) {
+            const auto* source = wp.img.ptr<cv::Vec3b>(y);
+            const float* weights = wp.w.ptr<float>(y);
+            auto* color = acc.ptr<Vec3f>(wp.box.y + y) + wp.box.x;
+            float* total = wacc.ptr<float>(wp.box.y + y) + wp.box.x;
+            for (int x = 0; x < wp.box.width; ++x) {
+                color[x] += Vec3f(source[x]) * weights[x];
+                total[x] += weights[x];
+            }
+        }
+    });
+}
+
+static float overlapGain(const Mat& color, const Mat& weights, const Warp& warp) {
+    cv::Vec3d canvasSum(0, 0, 0), imageSum(0, 0, 0);
+    int count = 0;
+    for (int y = 0; y < warp.box.height; ++y) {
+        const auto* accumulated = color.ptr<Vec3f>(warp.box.y + y) + warp.box.x;
+        const float* previous = weights.ptr<float>(warp.box.y + y) + warp.box.x;
+        const float* own = warp.w.ptr<float>(y);
+        const auto* image = warp.img.ptr<cv::Vec3b>(y);
+        for (int x = 0; x < warp.box.width; ++x) if (previous[x] > .05f && own[x] > .05f) {
+            for (int c = 0; c < 3; ++c) {
+                canvasSum[c] += accumulated[x][c] / previous[x];
+                imageSum[c] += image[x][c];
+            }
+            ++count;
+        }
+    }
+    if (count <= 2000) return 1;
+    float a = float((canvasSum[0] + canvasSum[1] + canvasSum[2]) / count) / 3;
+    float b = float((imageSum[0] + imageSum[1] + imageSum[2]) / count) / 3;
+    return clampf((a + 1) / (b + 1), .6f, 1.6f);
 }
 
 static Mat composite(const Mat& acc, const Mat& wacc) {
@@ -527,10 +572,21 @@ static bool seamBlend(std::vector<Warp>& warps, const Canvas& C, int bands, int 
         cv::resize(mS, mask, Size(wp.box.width, wp.box.height), 0, 0, cv::INTER_NEAREST);
         cv::dilate(mask, mask, kernel);
         mask &= (wp.w > 0.f);
-        if (cv::countNonZero(mask) == 0) continue;
+        Rect support = cv::boundingRect(mask);
+        if (support.empty()) continue;
+        // Build pyramids only near the chosen seam. Keep the complete filter
+        // support at every level and preserve its sample phase, so cropping
+        // unused black margins does not change the blended pixels.
+        int tile = 1 << std::min(12, std::max(0, bands));
+        int padding = 6 * tile;
+        int x0 = std::max(0, (support.x - padding) / tile * tile);
+        int y0 = std::max(0, (support.y - padding) / tile * tile);
+        int x1 = std::min(wp.img.cols, ((support.x + support.width + padding + tile - 1) / tile) * tile);
+        int y1 = std::min(wp.img.rows, ((support.y + support.height + padding + tile - 1) / tile) * tile);
+        Rect crop(x0, y0, x1 - x0, y1 - y0);
         Mat img16;
-        wp.img.convertTo(img16, CV_16SC3);
-        blender.feed(img16, mask, Point(wp.box.x, wp.box.y));
+        wp.img(crop).convertTo(img16, CV_16SC3);
+        blender.feed(img16, mask(crop), Point(wp.box.x + crop.x, wp.box.y + crop.y));
         ++fed;
     }
     if (fed == 0) return false;
@@ -760,11 +816,122 @@ static void stampNadirLogo(Mat& pano, const std::string& logoPath, float capDeg)
     }
 }
 
+// Composite only the small, independently verified fixture surfaces. A coherent
+// observation owns the interior; other views complete its photographic coverage.
+// All pixels still come from the capture, with no generative filling.
+static void compositeStructuralPatches(Mat& panorama, const Canvas& C, const Vec3f& center,
+                                      const std::vector<FrameInput>& frames, const std::vector<Matx33f>& rotations,
+                                      const std::vector<DepthMap>* depths) {
+    if (!depths) return;
+    std::map<int, std::vector<std::pair<int, RectifiedPatch>>> groups;
+    for (size_t i = 0; i < depths->size(); ++i)
+        for (const auto& p : (*depths)[i].patches) groups[p.group].emplace_back(int(i), p);
+    for (auto& entry : groups) {
+        const auto& shape = entry.second.front().second;
+        Vec3f normal = shape.axisU.cross(shape.axisV);
+        float offset = normal.dot(shape.center - center);
+        auto intersection = [&](int x, int y, Vec3f& point) {
+            Vec3f direction = C.dir(x + C.pad, y);
+            float denominator = normal.dot(direction);
+            if (std::abs(denominator) < 1e-6f) return 0.f;
+            float t = offset / denominator;
+            if (t <= 0) return 0.f;
+            point = center + direction * t;
+            Vec3f local = point - shape.center;
+            float u = std::abs(local.dot(shape.axisU)), v = std::abs(local.dot(shape.axisV));
+            float border = std::min(shape.halfExtent[0] + shape.margin - u, shape.halfExtent[1] + shape.margin - v);
+            return clampf(border / (shape.margin * .5f), 0.f, 1.f);
+        };
+        int x0 = C.W, y0 = C.H, x1 = 0, y1 = 0;
+        // A ceiling patch can contain the pole and cross the longitude seam.
+        // Find its actual spherical support instead of bounding only four corners.
+        for (int y = 0; y < C.H; y += 4) for (int x = 0; x < C.W; x += 4) {
+            Vec3f point;
+            if (intersection(x, y, point) <= 0) continue;
+            x0 = std::min(x0, x); y0 = std::min(y0, y); x1 = std::max(x1, x); y1 = std::max(y1, y);
+        }
+        if (x1 <= x0 || y1 <= y0) continue;
+        x0 = std::max(0, x0 - 4); y0 = std::max(0, y0 - 4);
+        x1 = std::min(C.W, x1 + 5); y1 = std::min(C.H, y1 + 5);
+        Rect box(x0, y0, x1 - x0, y1 - y0);
+        std::vector<std::pair<double, size_t>> order;
+        for (size_t j = 0; j < entry.second.size(); ++j) {
+            const auto& item = entry.second[j]; const auto& frame = frames[item.first];
+            const auto Rt = rotations[item.first].t(); double score = 0;
+            for (int y = y0; y < y1; y += 8) for (int x = x0; x < x1; x += 8) {
+                Vec3f point;
+                if (intersection(x, y, point) < .99f) continue;
+                Vec3f camera = Rt * (point - item.second.cameraPosition);
+                if (-camera[2] <= 1e-4f) continue;
+                float u = frame.fx * camera[0] / -camera[2] + frame.cx;
+                float v = frame.cy - frame.fy * camera[1] / -camera[2];
+                if (shape.group < 0 && !depthPlaneContains((*depths)[item.first],
+                        u * (*depths)[item.first].z.cols / frame.imageWidth,
+                        v * (*depths)[item.first].z.rows / frame.imageHeight)) continue;
+                if (u > frame.imageWidth * .02 && u < frame.imageWidth * .98 &&
+                    v > frame.imageHeight * .02 && v < frame.imageHeight * .98) score += 1;
+            }
+            order.emplace_back(score, j);
+        }
+        std::stable_sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+        Mat color = Mat::zeros(box.size(), CV_32FC3), coverage = Mat::zeros(box.size(), CV_32F);
+        Mat mapx(box.size(), CV_32F), mapy(box.size(), CV_32F), alpha(box.size(), CV_32F);
+        for (const auto& ranked : order) {
+            if (ranked.first < 1) continue;
+            const auto& item = entry.second[ranked.second]; const auto& frame = frames[item.first];
+            Mat image = imreadForWidth(frame.path, std::min(frame.imageWidth, C.W / 2), frame.imageWidth, true);
+            if (image.empty()) continue;
+            float sx = float(image.cols) / frame.imageWidth, sy = float(image.rows) / frame.imageHeight;
+            const auto Rt = rotations[item.first].t();
+            cv::parallel_for_(cv::Range(0, box.height), [&](const cv::Range& rows) {
+                for (int y = rows.start; y < rows.end; ++y) for (int x = 0; x < box.width; ++x) {
+                    Vec3f point; float support = intersection(box.x + x, box.y + y, point);
+                    float u = -1, v = -1, weight = 0;
+                    if (support > 0 && coverage.at<float>(y, x) < .9999f) {
+                        Vec3f camera = Rt * (point - item.second.cameraPosition);
+                        if (-camera[2] > 1e-4f) {
+                            u = sx * (frame.fx * camera[0] / -camera[2] + frame.cx);
+                            v = sy * (frame.cy - frame.fy * camera[1] / -camera[2]);
+                            float border = std::min({u, image.cols - 1.f - u, v, image.rows - 1.f - v});
+                            float ramp = clampf(border / (std::min(image.cols, image.rows) * .025f), 0.f, 1.f);
+                            weight = ramp * ramp * (3 - 2 * ramp) * (1 - coverage.at<float>(y, x));
+                        }
+                    }
+                    mapx.at<float>(y, x) = u; mapy.at<float>(y, x) = v; alpha.at<float>(y, x) = weight;
+                }
+            });
+            Mat warped; cv::remap(image, warped, mapx, mapy, cv::INTER_LINEAR, cv::BORDER_CONSTANT);
+            for (int y = 0; y < box.height; ++y) for (int x = 0; x < box.width; ++x) {
+                float weight = alpha.at<float>(y, x);
+                color.at<Vec3f>(y, x) += Vec3f(warped.at<cv::Vec3b>(y, x)) * weight;
+                coverage.at<float>(y, x) += weight;
+            }
+        }
+        cv::parallel_for_(cv::Range(0, box.height), [&](const cv::Range& rows) {
+            for (int y = rows.start; y < rows.end; ++y) for (int x = 0; x < box.width; ++x) {
+                float cov = coverage.at<float>(y, x);
+                if (cov < .99f) continue;
+                Vec3f point; float alpha = intersection(box.x + x, box.y + y, point);
+                auto& pixel = panorama.at<cv::Vec3b>(box.y + y, box.x + x);
+                Vec3f value = Vec3f(pixel) * (1 - alpha) + color.at<Vec3f>(y, x) * (alpha / cov);
+                pixel = cv::Vec3b(cv::saturate_cast<uchar>(value[0]), cv::saturate_cast<uchar>(value[1]), cv::saturate_cast<uchar>(value[2]));
+            }
+        });
+    }
+}
+
 static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vector<Matx33f>& R, const std::vector<Vec3f>& P,
                          const std::vector<DepthMap>* depths, const Options& opt, const std::string& panoPath,
                          const std::string& previewPath, const Progress& progress, Result res,
                          std::chrono::steady_clock::time_point t0) {
     try {
+        auto profileTime = std::chrono::steady_clock::now();
+        const bool profile = std::getenv("UY360_PROFILE") != nullptr;
+        auto mark = [&](const char* stage) {
+            auto now = std::chrono::steady_clock::now();
+            if (profile) std::fprintf(stderr, "stitch %s: %.3fs\n", stage, std::chrono::duration<double>(now - profileTime).count());
+            profileTime = now;
+        };
         const int n = (int)frames.size();
         Vec3f Cpos(0, 0, 0);
         for (int i = 0; i < n; ++i) Cpos += P[i];
@@ -777,7 +944,16 @@ static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vecto
         int used = 0;
         for (int i = 0; i < n; ++i) {
             if (progress) progress(0.2f + 0.4f * i / n, "Kadr " + std::to_string(i + 1) + "/" + std::to_string(n));
-            Mat img = cv::imread(frames[i].path, cv::IMREAD_COLOR);
+            int decodeWidth = frames[i].imageWidth;
+            if (opt.sourceOversampling > 0 && std::min(frames[i].fx, frames[i].fy) > 0) {
+                // Decode at sufficient angular density for the output sphere.
+                // JPEG's DCT downsampling avoids materialising a 48 MP bitmap
+                // when its additional samples cannot reach a 6K panorama.
+                float needed = C.W / (2 * kPi) * opt.sourceOversampling;
+                decodeWidth = std::min(decodeWidth, std::max(1, int(std::ceil(frames[i].imageWidth * needed /
+                                                  std::min(frames[i].fx, frames[i].fy)))));
+            }
+            Mat img = imreadForWidth(frames[i].path, decodeWidth, frames[i].imageWidth, true);
             if (img.empty()) continue;
             const float sx = (float)img.cols / frames[i].imageWidth, sy = (float)img.rows / frames[i].imageHeight;
             const float fx = frames[i].fx * sx, fy = frames[i].fy * sy, cx = frames[i].cx * sx, cy = frames[i].cy * sy;
@@ -798,17 +974,10 @@ static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vecto
                     okw = renderWarp(C, R[i], fx, fy, cx, cy, img, box, opt.feather, wp);
                 }
                 if (!okw) continue;
+                wp.supplemental = frames[i].supplemental;
                 if (opt.gainComp && used > 0) {
-                    Mat ov = (wacc(box) > 0.05f) & (wp.w > 0.05f);
-                    if (cv::countNonZero(ov) > 2000) {
-                        Mat w3;
-                        cv::merge(std::vector<Mat>{wacc(box), wacc(box), wacc(box)}, w3);
-                        Mat canvas = acc(box) / cv::max(w3, 1e-6f);
-                        cv::Scalar cm = cv::mean(canvas, ov), mm = cv::mean(wp.img, ov);
-                        float cmean = float(cm[0] + cm[1] + cm[2]) / 3.f, mmean = float(mm[0] + mm[1] + mm[2]) / 3.f;
-                        float g = clampf((cmean + 1.f) / (mmean + 1.f), 0.6f, 1.6f);
-                        wp.img.convertTo(wp.img, CV_8UC3, g);
-                    }
+                    float g = overlapGain(acc, wacc, wp);
+                    if (g != 1) wp.img.convertTo(wp.img, CV_8UC3, g);
                 }
                 accumulate(acc, wacc, wp);
                 warps.push_back(std::move(wp));
@@ -818,6 +987,121 @@ static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vecto
         }
         if (used == 0) throw std::runtime_error("no frame projected onto the sphere");
         res.frames = used;
+        mark("projection+exposure");
+        if (!opt.localAlign) acc.release();
+
+        // A verified foreground surface occludes unmodelled background views.
+        // Color-only graph cuts can otherwise splice a distant glass edge into
+        // a textureless screen. Protect only observed pixels with usable feather
+        // support, choosing the nearest plane if several surfaces overlap.
+        bool havePlanes = std::any_of(warps.begin(), warps.end(), [](const Warp& w) { return !w.planarDistance.empty(); });
+        Mat verifiedPlane, planeColor, planeColorMask;
+        Rect planeBox;
+        if (havePlanes) {
+            Mat nearest(C.H, C.We, CV_32F, cv::Scalar(std::numeric_limits<float>::infinity()));
+            for (const auto& wp : warps) {
+                if (wp.planarDistance.empty() || wp.supplemental) continue;
+                Mat region = nearest(wp.box);
+                for (int y = 0; y < region.rows; ++y) for (int x = 0; x < region.cols; ++x) {
+                    float d = wp.planarDistance.at<float>(y, x);
+                    if (d > 0 && wp.w.at<float>(y, x) > opt.seamMinWeight)
+                        region.at<float>(y, x) = std::min(region.at<float>(y, x), d);
+                }
+            }
+            for (auto& wp : warps) {
+                Mat region = nearest(wp.box);
+                for (int y = 0; y < region.rows; ++y) for (int x = 0; x < region.cols; ++x) {
+                    float nearestD = region.at<float>(y, x);
+                    if (!std::isfinite(nearestD)) continue;
+                    float ownD = wp.planarDistance.empty() ? 0 : wp.planarDistance.at<float>(y, x);
+                    if (ownD <= 0 || ownD > nearestD * 1.02f) wp.w.at<float>(y, x) = 0;
+                }
+            }
+            verifiedPlane = nearest < std::numeric_limits<float>::infinity();
+
+            // Reflections on a verified plane change with the source viewpoint.
+            // Give its broadest observation a coherent interior; other views
+            // fill only its missing edges. A color cut alone can otherwise splice
+            // a bright reflection into an otherwise dark screen or glass panel.
+            std::vector<std::pair<int, size_t>> planeOrder;
+            for (size_t i = 0; i < warps.size(); ++i) {
+                const auto& wp = warps[i];
+                if (wp.planarDistance.empty() || wp.supplemental) continue;
+                int area = cv::countNonZero((wp.planarDistance > 0.f) & (wp.w > opt.seamMinWeight));
+                if (area) planeOrder.emplace_back(area, i);
+            }
+            std::stable_sort(planeOrder.begin(), planeOrder.end(), [](const auto& a, const auto& b) {
+                return a.first > b.first;
+            });
+            planeBox = cv::boundingRect(verifiedPlane);
+            if (!planeBox.empty()) {
+                Mat color = Mat::zeros(planeBox.size(), CV_32FC3);
+                Mat alpha = Mat::zeros(planeBox.size(), CV_32F);
+                const float transition = std::max(4.f, C.W * .015f);
+                for (const auto& entry : planeOrder) {
+                    const auto& wp = warps[entry.second];
+                    Mat valid = (wp.planarDistance > 0.f) & (wp.w > 0.f), padded, distance;
+                    cv::copyMakeBorder(valid, padded, 1, 1, 1, 1, cv::BORDER_CONSTANT, cv::Scalar(0));
+                    cv::distanceTransform(padded, distance, cv::DIST_L2, 3);
+                    const Rect overlap = planeBox & wp.box;
+                    for (int y = overlap.y; y < overlap.y + overlap.height; ++y)
+                        for (int x = overlap.x; x < overlap.x + overlap.width; ++x) {
+                            const int sx = x - wp.box.x, sy = y - wp.box.y;
+                            if (!valid.at<uchar>(sy, sx)) continue;
+                            float t = std::min(1.f, distance.at<float>(sy + 1, sx + 1) / transition);
+                            float a = std::min(wp.w.at<float>(sy, sx), t * t * (3 - 2 * t));
+                            float& total = alpha.at<float>(y - planeBox.y, x - planeBox.x);
+                            a *= 1 - total;
+                            color.at<Vec3f>(y - planeBox.y, x - planeBox.x) += Vec3f(wp.img.at<cv::Vec3b>(sy, sx)) * a;
+                            total += a;
+                        }
+                }
+                // The geometry of these observations already agrees. Feather
+                // only the changes of viewpoint; a graph cut through a reflection
+                // creates a sharp artificial edge even with exact geometry.
+                planeColor = composite(color, alpha);
+                planeColorMask = (alpha > 1e-5f) & verifiedPlane(planeBox);
+            }
+            Mat covered = Mat::zeros(C.H, C.We, CV_8U);
+            // Preserve a narrow overlap for the multiband transition at the
+            // dominant view's boundary, without reopening its whole interior.
+            const Mat overlapKernel = Mat::ones(5, 5, CV_8U);
+            for (const auto& entry : planeOrder) {
+                auto& wp = warps[entry.second];
+                Mat interior;
+                cv::erode(covered(wp.box), interior, overlapKernel);
+                wp.w.setTo(0, interior & (wp.planarDistance > 0.f));
+                covered(wp.box) |= (wp.planarDistance > 0.f) & (wp.w > opt.seamMinWeight);
+            }
+        }
+
+        // Build the base panorama before adding weak elevation views. Their pose
+        // is mostly carried by priors, so close objects can be displaced by tens
+        // of pixels. They still fill the ceiling/floor beyond base coverage, but
+        // cannot splice displaced foreground into the already covered room.
+        Mat reliableCoverage = Mat::zeros(C.H, C.We, CV_8U);
+        bool haveFallback = false;
+        for (const auto& wp : warps) {
+            if (!wp.supplemental) reliableCoverage(wp.box) |= (wp.w > opt.seamMinWeight);
+            else haveFallback = true;
+        }
+        if (haveFallback) {
+            // Leave a small overlap for multiband blending at the coverage boundary.
+            cv::erode(reliableCoverage, reliableCoverage, Mat::ones(5, 5, CV_8U));
+            for (auto& wp : warps) {
+                if (wp.supplemental) wp.w.setTo(0, reliableCoverage(wp.box));
+            }
+        }
+        // The color sum is only needed by the optional alignment diagnostic.
+        // Rebuild coverage once after all ownership masks have been applied.
+        if (havePlanes || haveFallback) {
+            wacc.setTo(0);
+            if (opt.localAlign) acc.setTo(0);
+            for (const auto& wp : warps) {
+                if (opt.localAlign) accumulate(acc, wacc, wp);
+                else wacc(wp.box) += wp.w;
+            }
+        }
 
         const int cutRow = opt.nadirCutDeg > 0 ? int(C.H * (1 - opt.nadirCutDeg / 180.f)) : C.H;
         auto applyNadirCut = [&]() {
@@ -829,9 +1113,8 @@ static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vecto
             wacc.rowRange(cutRow, C.H).setTo(0);
         };
         applyNadirCut();
-        Mat featherOut = composite(acc, wacc);
-
         if (opt.localAlign && used >= 2) {
+            Mat featherOut = composite(acc, wacc);
             std::string notes;
             const float shifts[2] = {C.W * 0.025f, C.W * 0.015f};
             for (int it = 0; it < 2; ++it) {
@@ -853,7 +1136,28 @@ static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vecto
             wp.img.copyTo(bestImg(wp.box), better);
             wp.w.copyTo(bestW(wp.box), better);
         }
-        Mat out = bestImg.clone();
+        Mat out = bestImg;
+        bestW.release();
+        mark("surface ownership");
+#ifndef NDEBUG
+        // Opt-in device diagnostics, next to a debug replay's separate output.
+        // These reveal whether a seam originates in projection or blending.
+        if (std::getenv("UY360_STITCH_DIAGNOSTICS")) {
+            cv::imwrite(panoPath + ".best.png", bestImg);
+            cv::imwrite(panoPath + ".coverage.png", wacc > 1e-3f);
+            if (havePlanes) {
+                cv::imwrite(panoPath + ".planes.png", verifiedPlane);
+                for (size_t i = 0; i < warps.size(); ++i) {
+                    const auto& wp = warps[i];
+                    const auto name = panoPath + ".warp-" + std::to_string(i) + "-" +
+                        std::to_string(wp.box.x) + "-" + std::to_string(wp.box.y);
+                    cv::imwrite(name + ".png", wp.img);
+                    cv::imwrite(name + ".valid.png", wp.w > 0.f);
+                    if (!wp.planarDistance.empty()) cv::imwrite(name + ".plane.png", wp.planarDistance > 0.f);
+                }
+            }
+        }
+#endif
         res.blend = "best-frame";
         if (opt.seams && used >= 2) {
             if (progress) progress(0.76f, "Choklarni topish");
@@ -867,13 +1171,21 @@ static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vecto
                 res.blend = std::string("best-frame (seam failed: ") + e.what() + ")";
             }
         }
+        if (!planeColor.empty()) {
+            planeColor.copyTo(out(planeBox), planeColorMask);
+            res.blend += "+plane-feather";
+        }
         warps.clear();
+        mark("seams+blend");
 
         // fold the periodic extension back to W columns
         if (progress) progress(0.9f, "Tikuvni yopish");
         std::vector<int> path = wrapSeamPath(out(Rect(C.pad + C.W - C.pad, 0, C.pad, C.H)), out(Rect(0, 0, C.pad, C.H)));
         out = foldCanvas(out, C.W, C.pad, path);
         wacc = foldCanvas(wacc, C.W, C.pad, path);
+
+        compositeStructuralPatches(out, C, Cpos, frames, R, depths);
+        mark("wrap+structural patches");
 
         Mat holes8 = (wacc < 1e-3f);
         res.coverage = 1.f - float(cv::countNonZero(holes8)) / float(holes8.total());
@@ -898,6 +1210,25 @@ static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vecto
 
         if (!opt.nadirLogoPath.empty()) stampNadirLogo(out, opt.nadirLogoPath, opt.nadirLogoDeg);
 
+        if (opt.sharpening > 0) {
+            Mat gray, blurred;
+            cv::cvtColor(out, gray, cv::COLOR_BGR2GRAY);
+            cv::GaussianBlur(gray, blurred, Size(0, 0), .7);
+            cv::parallel_for_(cv::Range(0, out.rows), [&](const cv::Range& rows) {
+                for (int y = rows.start; y < rows.end; ++y) {
+                    auto* row = out.ptr<cv::Vec3b>(y);
+                    const auto* original = gray.ptr<uchar>(y); const auto* smooth = blurred.ptr<uchar>(y);
+                    for (int x = 0; x < out.cols; ++x) {
+                        int detail = int(original[x]) - smooth[x];
+                        if (std::abs(detail) < 3) continue;
+                        float delta = clampf(detail * opt.sharpening, -3.f, 3.f);
+                        for (int c = 0; c < 3; ++c) row[x][c] = cv::saturate_cast<uchar>(row[x][c] + delta);
+                    }
+                }
+            });
+        }
+        mark("fill+detail");
+
         if (progress) progress(0.98f, "Saqlash");
         cv::imwrite(panoPath, out, {cv::IMWRITE_JPEG_QUALITY, 90});
         if (!previewPath.empty()) {
@@ -905,6 +1236,7 @@ static Result stitchImpl(const std::vector<FrameInput>& frames, const std::vecto
             cv::resize(out, prev, Size(1024, 512), 0, 0, cv::INTER_AREA);
             cv::imwrite(previewPath, prev, {cv::IMWRITE_JPEG_QUALITY, 80});
         }
+        mark("save");
         res.width = C.W;
         res.height = C.H;
         res.depthFrames = depthFrames;

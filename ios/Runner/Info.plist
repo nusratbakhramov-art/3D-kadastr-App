@@ -111,13 +111,8 @@
 	<string>Xaritada obyekt joylashuvini avtomatik aniqlash uchun joriy joylashuv kerak.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Xaritada obyekt joylashuvini avtomatik aniqlash uchun joriy joylashuv kerak.</string>
-	<!-- ⚠️ Bu yerda `NSMotionUsageDescription` turardi (`dchs_motion_sensors`
-	     uchun). 2026-09-12 da olib tashlandi: CoreMotion SENSOR API'sini
-	     (CMMotionManager / CMPedometer / CMAltimeter) endi hech kim
-	     chaqirmaydi — uni faqat `dchs_motion_sensors` va
-	     `camera_avfoundation` ishlatardi, ikkalasi ham ketdi. ARKit'ning
-	     o'zi bu kalitni TALAB QILMAYDI, unga `NSCameraUsageDescription`
-	     yetarli. -->
+	<key>NSMotionUsageDescription</key>
+	<string>360° ultra-keng panorama suratlarini to'g'ri yo'naltirish uchun telefonning harakat sensori kerak.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Hisobot va skan natijalarini foto galereyaga saqlash uchun ruxsat kerak.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -115,7 +115,12 @@ enum PanoImageLoader {
         if let p = path, FileManager.default.fileExists(atPath: p), let img = UIImage(contentsOfFile: p) {
             return img
         }
-        guard let u = url, let remote = URL(string: u) else { throw LoadError.missing }
+        guard let u = url, !u.isEmpty else { throw LoadError.missing }
+        // A storage key identifies a room; it is not a downloadable URL. Never
+        // hand a relative key or a deleted local path to URLSession.
+        guard let remote = URL(string: u),
+              ["https", "http"].contains(remote.scheme?.lowercased() ?? ""),
+              remote.host?.isEmpty == false else { throw LoadError.invalidSource }
         let cached = cachedFile(for: u)
         if let img = UIImage(contentsOfFile: cached.path) { return img }
         let (data, resp) = try await URLSession.shared.data(from: remote)
@@ -127,7 +132,7 @@ enum PanoImageLoader {
         return img
     }
 
-    enum LoadError: Error { case missing, network(Int), decode }
+    enum LoadError: Error { case missing, invalidSource, network(Int), decode }
 }
 
 // MARK: - Sfera ko'ruvchisi
@@ -160,6 +165,7 @@ struct PanoramaSceneView: UIViewRepresentable {
         let material = SCNMaterial()
         material.lightingModel = .constant
         material.isDoubleSided = true
+        material.diffuse.contents = UIColor.black
         // Ichkaridan qaralganda tekstura ko'zguda — gorizontal aylantiramiz.
         material.diffuse.wrapS = .repeat
         material.diffuse.contentsTransform = SCNMatrix4Mult(SCNMatrix4MakeScale(-1, 1, 1), SCNMatrix4MakeTranslation(1, 0, 0))
@@ -379,6 +385,7 @@ struct PanoTourView: View {
     @State private var loading = false
     @State private var loadError: String?
     @State private var loadToken = 0
+    @State private var retryAttempt = 0
 
     @State private var editing = false
     @State private var history: [String] = []
@@ -418,27 +425,38 @@ struct PanoTourView: View {
 
     var body: some View {
         ZStack {
-            PanoramaSceneView(image: image,
+            // Match the working local preview: create the SceneKit sphere with
+            // its texture already available. A nil texture renders solid white
+            // and also hides white loading/error UI when a download fails.
+            if let image {
+                PanoramaSceneView(image: image,
                               hotspots: currentLinks,
                               labels: labels,
                               initialDirection: entryDirection,
                               onHotspotTap: { hs in hotspotTapped(hs) },
                               onFreeTap: { yaw, pitch in freeTapped(yaw: yaw, pitch: pitch) })
                 .ignoresSafeArea()
-            if loading {
+            }
+            if loading || (image == nil && loadError == nil) {
                 ProgressView().scaleEffect(1.5).tint(.white)
             } else if let e = loadError {
                 VStack(spacing: 12) {
-                    Image(systemName: "photo").font(.system(size: 44)).foregroundStyle(.secondary)
+                    Image(systemName: "photo").font(.system(size: 44)).foregroundStyle(.white)
                     Text(e).font(.headline).foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                    Button(s("retry", "Qayta urinish")) { retryAttempt += 1 }
+                        .buttonStyle(.borderedProminent)
+                        .accessibilityIdentifier("pano.retry")
                 }
+                .padding(24)
+                .accessibilityIdentifier("pano.error")
             }
             if flash { Color.black.ignoresSafeArea().transition(.opacity) }
             overlay
         }
-        .background(Color.black)
+        .background(Color.black.ignoresSafeArea())
         .statusBarHidden(true)
-        .task(id: currentKey) { await load() }
+        .task(id: [currentKey, String(retryAttempt)]) { await load() }
         .sheet(isPresented: Binding(get: { pendingTap != nil }, set: { if !$0 { pendingTap = nil } })) {
             targetPicker
         }
@@ -456,6 +474,7 @@ struct PanoTourView: View {
         .sheet(isPresented: $showRooms) { roomsSheet }
     }
 
+    @MainActor
     private func load() async {
         loadToken += 1
         let token = loadToken
@@ -465,11 +484,25 @@ struct PanoTourView: View {
         image = nil   // bir vaqtda BITTA dekod qilingan tasvir (xotira)
         do {
             let img = try await PanoImageLoader.load(path: r.path, url: r.url)
-            guard token == loadToken else { return }
+            guard !Task.isCancelled, token == loadToken, r.key == currentKey else { return }
             image = img
         } catch {
-            guard token == loadToken else { return }
-            loadError = s("err_network", "Yuklab bo'lmadi")
+            guard !Task.isCancelled, token == loadToken, r.key == currentKey else { return }
+            switch error {
+            case PanoImageLoader.LoadError.missing:
+                loadError = s("err_missing", "Fayl endi qurilmada yo'q")
+            case PanoImageLoader.LoadError.invalidSource:
+                loadError = s("err", "Panoramani ochib bo'lmadi")
+            case PanoImageLoader.LoadError.decode:
+                loadError = s("err_decode", "Fayl buzilgan")
+            case PanoImageLoader.LoadError.network(let status):
+                loadError = "\(s("err_network", "Yuklab bo'lmadi")) (HTTP \(status))"
+            default:
+                loadError = "\(s("err_network", "Yuklab bo'lmadi")) (\((error as NSError).code))"
+            }
+            // No URL query, auth token or device file path in diagnostics.
+            NSLog("[PanoViewer] image load failed: source=%@ domain=%@ code=%ld",
+                  r.url == nil ? "local" : "remote", (error as NSError).domain, (error as NSError).code)
         }
         loading = false
     }
@@ -746,7 +779,7 @@ struct PanoPreviewView: View {
 // MARK: - Koordinator (Flutter kanali)
 
 /// `tour` va `preview` metodlarini ochadi; natija bir marta qaytariladi.
-@available(iOS 16.0, *)
+@available(iOS 15.0, *)
 final class PanoTourCoordinator {
     static let shared = PanoTourCoordinator()
 
@@ -770,6 +803,7 @@ final class PanoTourCoordinator {
         presenter.present(vc, animated: true)
     }
 
+    @available(iOS 16.0, *)
     func tour(args: [String: Any]?, from presenter: UIViewController, result: @escaping FlutterResult) {
         guard pending == nil else {
             result(FlutterError(code: "BUSY", message: "Tur allaqachon ochiq", details: nil))

@@ -30,7 +30,12 @@ struct MvsOptions {
     int planes = 96;           // depth planes, linear in inverse depth (server-validated: 96)
     float zMin = 0.6f, zMax = 12.f;
     int neighbours = 6;
-    float maxAngleDeg = 60.f;  // max angle between optical axes of i and a neighbour
+    /// Max angle between the optical axes of a frame and a neighbour it may be matched against.
+    /// 60° was tuned for the 30-shot ARKit grid, where it still leaves ~7 neighbours per frame. The
+    /// 16-shot ultra-wide grid is 45° apart with its rings 64° away, so 60° threw the rings out and
+    /// left 2–3 neighbours — measured on a room capture, confident depth rose from 3.2 % to 15.2 %
+    /// at 75° for 1.2 s more, and the ARKit grid improved slightly too (9.5 % → 9.8 %).
+    float maxAngleDeg = 75.f;
     float minBaselineM = 0.05f;
     int winRadius = 5;         // ZNCC window radius
     float blurSigma = 1.f;     // Gaussian blur of the grey images before matching
@@ -41,6 +46,7 @@ struct MvsOptions {
     float sgmP1 = 0.05f, sgmP2 = 0.4f;  // semi-global penalties (P2 = 0 disables SGM)
     int gfRadius = 8;          // guided filter radius for the cost slices (0 = off)
     float gfEps = 1e-3f;
+    bool cullInvisibleNeighbours = true; // crop only provably empty projective overlap, retaining filter support
 
     /// ~3× faster depth (phones): 756 px working width, 64 planes, 5 neighbours. Walls, doors
     /// and furniture stay straight; only small nearby objects get a coarser depth.

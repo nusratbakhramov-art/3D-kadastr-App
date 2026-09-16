@@ -1,23 +1,15 @@
 //
 //  PanoStitch.swift — 360° panoramani TELEFONNING O'ZIDA tikish.
 //
-//  `PanoCapture.swift` yozgan `tmp/pano/<uuid>/{frame_N.jpg, meta.json}` ni
-//  `PanoCore/` (Uy360 C++ yadrosi, `UyStitcher.mm` ko'prigi) bilan tikadi va
-//  `pano.jpg` + `preview.jpg` ni o'sha katalogga yozadi. Dart tayyor faylni
-//  `POST /listings/media role=panorama` ga yuklaydi — SERVERDA TIKISH YO'Q.
+//  Both capture paths save frames and metadata in Application Support/pano/<uuid>.
+//  Astra 0.5 PanoCore (via UyStitcher.mm) produces pano.jpg + preview.jpg locally.
+//  Both JPEGs are validated before publication; Dart uploads only pano.jpg.
 //
-//  Nega telefonda: prodda server tikishi 7–9 daqiqa olardi (celery-panorama
-//  o'lchovi, 2026-09-12); yadro iPhone 14 Pro'da MVS "tez" preset bilan
-//  ~1.5–2 daqiqa, rotatsiya-only rejimda 30–90 s.
-//
-//  Rejimlar (`mode`):
-//    "mvs"  — BA (pozalar) → plane-sweep chuqurlik → chuqurlik bo'yicha
-//             reproyeksiya. Parallaks (devor/eshik chetlari chokda uzilishi)
-//             yo'qoladi. Xotira cho'qqisi ~1 GB.
-//    "fast" — faqat rotatsiya (SIFT refine + graph-cut chok). Tez, lekin qo'l
-//             siljigan joylarda chok buziladi.
-//    "auto" — RAM ≥ 5.5 GB bo'lsa "mvs", aks holda "fast" (4 GB qurilmada
-//             jetsam xavfi). Sukut shu.
+//  Exact poseSource "sensors:coremotion" selects high-quality sensor BA/MVS,
+//  planar/structural processing and 6144×3072 output. Weak reconstruction falls
+//  back to rotation. Legacy ARKit keeps 4096×2048 and auto/mvs/fast selection;
+//  auto selects MVS at ≥5.5 GB RAM. Capture count never selects the pipeline.
+//  Device performance for the integrated ultra-wide path still needs measurement.
 //
 //  Progress Dart'ga o'sha `kadastr/pano_capture` kanali orqali TESKARI
 //  yo'nalishda keladi: `progress {p, msg}` (asosiy oqimda, ≥ 150 ms oraliq).
@@ -26,6 +18,7 @@
 
 import Flutter
 import Foundation
+import ImageIO
 import UIKit
 
 @available(iOS 15.0, *)
@@ -40,16 +33,36 @@ final class PanoStitchCoordinator {
     /// 6 GB; iPhone 12/13 (4 GB) da MVS cho'qqisi jetsam chegarasiga yaqin.
     private static let mvsMinRAM: UInt64 = 5_500_000_000
 
-    static func resolveMode(_ requested: String?) -> String {
+    static func resolveMode(_ requested: String?,
+                            physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) -> String {
         switch requested ?? "auto" {
         case "mvs": return "mvs"
         case "fast": return "fast"
         default:
-            return ProcessInfo.processInfo.physicalMemory >= mvsMinRAM ? "mvs" : "fast"
+            return physicalMemory >= mvsMinRAM ? "mvs" : "fast"
         }
     }
 
-    /// `args`: `dir` (majburiy), `width` (default 4096), `mode` (auto|mvs|fast),
+    struct ProcessingOptions {
+        let sensorPoses: Bool
+        let highQuality: Bool
+        let width: Int
+        let mode: String
+
+        init(metas: [PanoFrameMeta], width: Int? = nil, mode: String? = nil,
+             physicalMemory: UInt64 = ProcessInfo.processInfo.physicalMemory) {
+            // Saved pose provenance, never the number of shots, selects the pipeline.
+            sensorPoses = metas.contains { $0.poseSource == "sensors:coremotion" }
+            highQuality = sensorPoses
+            self.width = width.flatMap { $0 > 0 ? $0 : nil } ?? (sensorPoses ? 6144 : 4096)
+            // Sensor BA decides whether images support translation/depth. The core
+            // retains sensor orientations and falls back to rotation when they do not.
+            self.mode = sensorPoses ? "mvs" : resolveMode(mode, physicalMemory: physicalMemory)
+        }
+    }
+
+    /// `args`: `dir` (majburiy), `width` (ARKit 4096 / CoreMotion 6144),
+    /// `mode` (auto|mvs|fast, legacy ARKit only),
     /// `logoAsset` (ixtiyoriy — Flutter asset kaliti, nadir'ga bosiladigan disk).
     func stitch(args: [String: Any]?, channel: FlutterMethodChannel, result: @escaping FlutterResult) {
         guard !running else {
@@ -69,8 +82,8 @@ final class PanoStitchCoordinator {
             return
         }
 
-        let width = (args?["width"] as? Int).flatMap { $0 > 0 ? $0 : nil } ?? 4096
-        let mode = Self.resolveMode(args?["mode"] as? String)
+        let options = ProcessingOptions(metas: metas, width: args?["width"] as? Int,
+                                        mode: args?["mode"] as? String)
         let logoPath = (args?["logoAsset"] as? String).flatMap { Self.bundlePath(forFlutterAsset: $0) }
 
         // `UyStitcher` kutadigan shakl: {path, transform[16], intrinsics[4],
@@ -115,8 +128,20 @@ final class PanoStitchCoordinator {
         }
 
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            let r = Self.run(mode: mode, frames: frames, width: width, pano: pano,
-                             preview: preview, logoPath: logoPath, progress: progress)
+            let work = dir.appendingPathComponent(".stitch-\(UUID().uuidString)", isDirectory: true)
+            var r: [String: Any]
+            do {
+                try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
+                defer { try? FileManager.default.removeItem(at: work) }
+                r = Self.run(options: options, frames: frames, pano: work.appendingPathComponent("pano.jpg").path,
+                             preview: work.appendingPathComponent("preview.jpg").path,
+                             logoPath: logoPath, progress: progress)
+                if r["ok"] as? Bool == true {
+                    try Self.publishOutput(from: work, to: dir, width: r["width"] as? Int ?? 0)
+                }
+            } catch {
+                r = ["ok": false, "error": error.localizedDescription]
+            }
             let wall = Date().timeIntervalSince(started)
             DispatchQueue.main.async {
                 self?.running = false
@@ -129,20 +154,49 @@ final class PanoStitchCoordinator {
                     return
                 }
                 result(Self.payload(r, pano: pano, preview: preview, frames: frames.count,
-                                    seconds: wall, mode: mode))
+                                    seconds: wall, mode: options.mode))
             }
         }
     }
 
-    private static func run(mode: String, frames: [[String: Any]], width: Int, pano: String,
+    /// Publish only complete JPEGs. pano.jpg is the final commit point, so an
+    /// interrupted native encoder cannot leave a partial result for draft resume.
+    static func publishOutput(from work: URL, to dir: URL, width: Int) throws {
+        guard width > 0, completeJPEG(work.appendingPathComponent("pano.jpg"), width: width, height: width / 2),
+              completeJPEG(work.appendingPathComponent("preview.jpg"), width: 1024, height: 512) else {
+            throw NSError(domain: "PanoStitch", code: 1,
+                          userInfo: [NSLocalizedDescriptionKey: "Panorama JPEG outputs are incomplete"])
+        }
+        for name in ["preview.jpg", "pano.jpg"] {
+            try Data(contentsOf: work.appendingPathComponent(name), options: .mappedIfSafe)
+                .write(to: dir.appendingPathComponent(name), options: .atomic)
+        }
+    }
+
+    private static func completeJPEG(_ url: URL, width: Int, height: Int) -> Bool {
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
+              data.starts(with: [0xff, 0xd8]), data.suffix(2).elementsEqual([0xff, 0xd9]),
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              props[kCGImagePropertyPixelWidth] as? Int == width,
+              props[kCGImagePropertyPixelHeight] as? Int == height else { return false }
+        return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceThumbnailMaxPixelSize: 32,
+        ] as CFDictionary) != nil
+    }
+
+    private static func run(options: ProcessingOptions, frames: [[String: Any]], pano: String,
                             preview: String, logoPath: String?,
                             progress: @escaping (Float, String) -> Void) -> [String: Any] {
-        if mode == "mvs" {
-            return UyStitcher.stitchMVSFrames(frames, width: Int32(width), highQuality: false,
+        if options.mode == "mvs" {
+            return UyStitcher.stitchMVSFrames(frames, width: Int32(options.width),
+                                              highQuality: options.highQuality,
+                                              sensorPoses: options.sensorPoses,
                                               panoPath: pano, previewPath: preview,
                                               logoPath: logoPath, progress: progress)
         }
-        return UyStitcher.stitchFrames(frames, width: Int32(width), panoPath: pano,
+        return UyStitcher.stitchFrames(frames, width: Int32(options.width), panoPath: pano,
                                        previewPath: preview, logoPath: logoPath, progress: progress)
     }
 

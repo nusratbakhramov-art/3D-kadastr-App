@@ -41,9 +41,16 @@ import 'bozor_contacts_step_screen.dart';
 const int _maxPhotos = 20;
 
 class BozorDescriptionStepScreen extends StatefulWidget {
-  const BozorDescriptionStepScreen({super.key, required this.draft});
+  const BozorDescriptionStepScreen({
+    super.key,
+    required this.draft,
+    this.openCapture = openPanoCapture,
+  });
 
   final BozorDraft draft;
+
+  /// Capture chegarasi — testlarda nativ kamera va yuklashni almashtirish uchun.
+  final PanoCaptureOpener openCapture;
 
   @override
   State<BozorDescriptionStepScreen> createState() =>
@@ -63,20 +70,11 @@ class _BozorDescriptionStepScreenState
 
   DescriptionDraft get _d => widget.draft.description;
 
-  /// Qurilma 360° suratga olishni qo'llaydimi.
-  ///
-  /// Sukut `false` — javob kelmaguncha qator KO'RSATILMAYDI. Eski sensorli
-  /// oqim o'chirilgan va galereyadan yuklash ham olib tashlangan, ya'ni
-  /// qo'llab-quvvatlanmagan qurilmada taklif qiladigan muqobil yo'q:
-  /// bosilib xato beradigan tugma ko'rsatgandan ko'ra umuman
-  /// ko'rsatmaslik tushunarli.
-  bool _pano360 = false;
+  // Capture availability must not hide existing rooms or choose the viewer.
+  PanoCaptureMode? _captureMode;
+  bool _nativePanoViewer = false;
 
   final PanoJobWatcher _watcher = PanoJobWatcher.instance;
-
-  /// Joriy oqimda `onCaptured` yozgan `local:` havola — yuklangach o'sha
-  /// o'rinda kalitga almashtirish uchun.
-  String? _lastCapturedRef;
 
   void _onPanoChanged() {
     if (mounted) setState(() {});
@@ -111,8 +109,14 @@ class _BozorDescriptionStepScreenState
   }
 
   Future<void> _probe360() async {
-    final ok = await PanoCaptureChannel.isSupported();
-    if (mounted && ok != _pano360) setState(() => _pano360 = ok);
+    final mode = await PanoCaptureChannel.preferredCaptureMode();
+    final viewer = await PanoCaptureChannel.isViewerSupported();
+    if (mounted) {
+      setState(() {
+        _captureMode = mode;
+        _nativePanoViewer = viewer;
+      });
+    }
   }
 
   void _onTitle() =>
@@ -138,7 +142,7 @@ class _BozorDescriptionStepScreenState
 
   /// 360° ni SFERADA ochadi va turni tahrirlash imkonini beradi.
   ///
-  /// Havolalar S3 KALITI bilan yotadi — panorama serverda tikilgan va
+  /// Havolalar S3 KALITI bilan yotadi — tayyor panorama yuklangan va
   /// sehrgarga tayyor kaliti bilan qaytgan. `resolveTourLinks` shu sababli
   /// ayniyat bo'ladi (`uploaded[ref] ?? ref`), lekin u baribir chaqiriladi:
   /// o'chirilgan panoramaga qolib ketgan havolani filtrlaydi.
@@ -204,7 +208,7 @@ class _BozorDescriptionStepScreenState
     if (_d.pendingPanoramas.isNotEmpty) {
       AppToast.success(context, tr(l, 'bozor.pano.tour.wait'));
     }
-    if (_pano360) {
+    if (_nativePanoViewer) {
       await _openNativeTour(ready, startKey: _d.panoramas[index]);
       return;
     }
@@ -305,7 +309,7 @@ class _BozorDescriptionStepScreenState
 
   /// 360° qo'shish: nativ suratga olish → TELEFONDA tikish → yuklash →
   /// tayyor kalit. Foydalanuvchi natijani `PanoCaptureFlow` ekranida
-  /// kutadi (~1–2 daqiqa), qaytganda panorama ALLAQACHON serverda.
+  /// kutadi, qaytganda panorama ALLAQACHON serverda.
   ///
   /// ⚠️ GALEREYADAN YUKLASH OLIB TASHLANDI (izohga olingan —
   /// `pano_source_sheet.dart` ga qarang). Sabab: tikish har kadrning KAMERA
@@ -332,7 +336,7 @@ class _BozorDescriptionStepScreenState
             file: _d.localPanoramas[p]?.previewPath,
           ),
       ],
-      canAdd: _d.panoramas.length < _maxPhotos,
+      canAdd: _captureMode != null && _d.panoramas.length < _maxPhotos,
     );
     if (!mounted || res == null) return;
     if (res.newRoom) {
@@ -386,20 +390,51 @@ class _BozorDescriptionStepScreenState
     String? resumeDir,
     String? roomName,
   }) async {
-    final outcome = await openPanoCapture(
+    // Holat bitta oqimga tegishli. Retake katalogni almashtiradi, lekin
+    // xona nomi va ro'yxatdagi o'rni yangi tushirishga o'tadi.
+    final initialRef = resumeDir == null ? null : LocalPano.refOf(resumeDir);
+    String? activeRef = initialRef;
+    var insertAt = initialRef == null
+        ? _d.panoramas.length
+        : _d.panoramas.indexOf(initialRef);
+    if (insertAt < 0) insertAt = _d.panoramas.length;
+    var activeRoomName =
+        roomName ?? (initialRef == null ? null : _d.roomName(initialRef));
+
+    void storeLocal(String dir, LocalPanoStage stage, {String? error}) {
+      final ref = LocalPano.refOf(dir);
+      activeRef = ref;
+      if (!_d.panoramas.contains(ref)) {
+        _d.panoramas.insert(insertAt.clamp(0, _d.panoramas.length), ref);
+      }
+      _d.localPanoramas[ref] = LocalPano(dir: dir, stage: stage, error: error);
+      if (activeRoomName != null) _d.panoramaNames[ref] = activeRoomName!;
+    }
+
+    final outcome = await widget.openCapture(
       context,
       resumeDir: resumeDir,
       onCaptured: (dir) {
         if (!mounted) return;
+        setState(() => storeLocal(dir, LocalPanoStage.captured));
+        saveBozorDraftInBackground(widget.draft, WizardStep.description);
+      },
+      onDiscarded: (dir) {
+        if (!mounted) return;
         final ref = LocalPano.refOf(dir);
-        _lastCapturedRef = ref;
+        if (ref != activeRef) return;
         setState(() {
-          if (!_d.panoramas.contains(ref)) _d.panoramas.add(ref);
-          _d.localPanoramas[ref] = LocalPano(
-            dir: dir,
-            stage: LocalPanoStage.captured,
-          );
-          if (roomName != null) _d.panoramaNames[ref] = roomName;
+          final index = _d.panoramas.indexOf(ref);
+          if (index >= 0) {
+            insertAt = index;
+            _d.panoramas.removeAt(index);
+          }
+          activeRoomName = _d.panoramaNames.remove(ref) ?? activeRoomName;
+          _d.localPanoramas.remove(ref);
+          _d.panoramaUrls.remove(ref);
+          _d.uploadedMedia.remove(ref);
+          _d.tourLinks.removeWhere((link) => link.from == ref || link.to == ref);
+          activeRef = null;
         });
         saveBozorDraftInBackground(widget.draft, WizardStep.description);
       },
@@ -407,10 +442,9 @@ class _BozorDescriptionStepScreenState
     if (!mounted) return null;
     switch (outcome) {
       case PanoUploaded(:final storageKey, :final url):
-        final localRef = resumeDir == null ? null : LocalPano.refOf(resumeDir);
         setState(() {
           // Lokal havola turgan O'RINDA kalit — tartib saqlanadi.
-          final replace = localRef ?? _lastCapturedRef;
+          final replace = activeRef;
           final idx = replace == null ? -1 : _d.panoramas.indexOf(replace);
           if (idx >= 0) {
             final old = _d.panoramas[idx];
@@ -420,31 +454,30 @@ class _BozorDescriptionStepScreenState
             if (name != null) _d.panoramaNames[storageKey] = name;
             _d.panoramas[idx] = storageKey;
           } else if (!_d.panoramas.contains(storageKey)) {
-            _d.panoramas.add(storageKey);
+            _d.panoramas.insert(
+              insertAt.clamp(0, _d.panoramas.length),
+              storageKey,
+            );
           }
-          if (roomName != null && !_d.panoramaNames.containsKey(storageKey)) {
-            _d.panoramaNames[storageKey] = roomName;
+          if (activeRoomName != null &&
+              !_d.panoramaNames.containsKey(storageKey)) {
+            _d.panoramaNames[storageKey] = activeRoomName!;
           }
           _d.panoramaUrls[storageKey] = url;
           _d.uploadedMedia[storageKey] = storageKey;
         });
-        _lastCapturedRef = null;
         saveBozorDraftInBackground(widget.draft, WizardStep.description);
         return storageKey;
       case PanoSaved(:final dir, :final stitched, :final error):
-        final ref = LocalPano.refOf(dir);
         setState(() {
-          if (!_d.panoramas.contains(ref)) _d.panoramas.add(ref);
-          if (roomName != null) _d.panoramaNames[ref] = roomName;
-          _d.localPanoramas[ref] = LocalPano(
-            dir: dir,
-            stage: error == null
+          storeLocal(
+            dir,
+            error == null
                 ? (stitched ? LocalPanoStage.stitched : LocalPanoStage.captured)
                 : LocalPanoStage.failed,
             error: error,
           );
         });
-        _lastCapturedRef = null;
         saveBozorDraftInBackground(widget.draft, WizardStep.description);
         return null;
       case null:
@@ -481,7 +514,7 @@ class _BozorDescriptionStepScreenState
   ///
   /// ⚠️ KADRLAR QAYTA YUBORILMAYDI. Server ularni 24 soat saqlaydi va
   /// `POST /pano/{id}/finish` XATO holatidagi ishni qaytadan yig'ib navbatga
-  /// qo'yadi — ya'ni foydalanuvchi 30 nishonni qaytadan aylanmaydi.
+  /// qo'yadi — ya'ni foydalanuvchi qaytadan surat olmaydi.
   Future<void> _retryPano(String ref) async {
     final p = _d.pendingPanoramas[ref];
     if (p == null) return;
@@ -607,9 +640,9 @@ class _BozorDescriptionStepScreenState
                             onRemove: (i) =>
                                 setState(() => _d.photos.removeAt(i)),
                           ),
-                          // Qurilma ARKit/ARCore ni qo'llamasa qator UMUMAN
-                          // chizilmaydi — `_pano360` izohiga qarang.
-                          if (_pano360) ...[
+                          // Existing rooms stay accessible even when capture
+                          // is unavailable; viewer capability is independent.
+                          if (_captureMode != null || _d.panoramas.isNotEmpty) ...[
                           const SizedBox(height: 12),
                           MediaUploadRow(
                             label: _S.add360(l),

@@ -3,9 +3,10 @@
 > ⚠️ **BU HUJJAT TARIX — 2026-09-12 dan boshlab AMALDA EMAS.**
 >
 > Undagi asosiy qaror — panoramani **telefonda, sof Dart bilan** tikish —
-> bekor qilindi. Endi telefon faqat kadr yig'adi (nativ AR sessiyasi), tikish
-> esa **serverda** bajariladi. Quyidagi 23 qadamning 1–18 va 21-qadamlari
-> shu bilan birga o'chirildi.
+> bekor qilindi. Server tikishi ham keyinchalik almashtirildi. 2026-09-16
+> holatida iOS **Astra 0.5 ultra-wide/CoreMotion** bilan suratga oladi va
+> **nativ C++/OpenCV yadrosida, qurilmada** tikadi; ARKit zaxira yo'lidir.
+> Quyidagi reja va o'lchovlar tarixiy ma'lumot, amaldagi talablar emas.
 >
 > **AMALDAGI HOLAT → [panorama-360-status.md](panorama-360-status.md)**
 >

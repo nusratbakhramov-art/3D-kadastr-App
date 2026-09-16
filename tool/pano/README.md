@@ -1,7 +1,10 @@
 # `tool/pano` — 360° panorama ishining regressiya bazasi
 
-Bu papka [docs/panorama-360-plan.md](../../docs/panorama-360-plan.md) dagi
-23 qadamli ish uchun. Har qadamdan keyin:
+Amaldagi Astra 0.5 oqimi va tekshirish buyruqlari:
+[panorama-360-status.md](../../docs/panorama-360-status.md).
+
+Quyidagi baza **2026-09-10 dagi tarixiy o'lchov**; bugungi test natijasi emas.
+`baseline.sh` saqlangan umumiy regressiya yordamchisi:
 
 ```bash
 bash tool/pano/baseline.sh
@@ -110,16 +113,16 @@ Warning va info faqat sanaladi — ular yuqoridagi baza bilan solishtiriladi.
 
 ---
 
-## Nima bo'ldi: tikish SERVERGA ko'chdi (2026-09-12)
+## Tarix: tikish serverga ko'chirilgan davr (2026-09-12)
 
 Bu papkada qurilmada tikishni o'lchaydigan ikkita benchmark
 (`bench_decode.sh`, `bench_stitch.sh`) va ularning MIL-0/MIL-1 qaror
 darvozalari turardi. Ular **o'chirildi**, chunki javob berilgan savolni
 o'lchardi: sof Dart bilan telefonda tikish tashlab yuborildi.
 
-Endi telefon faqat KADR YIG'ADI (iOS: ARKit, `ios/Runner/PanoCapture.swift`)
-va ularni serverga yuboradi; tikish `kadastr-backend` da, alohida `panorama`
-Celery navbatida bajariladi. Shu sababli:
+O'sha paytda telefon faqat kadr yig'ib serverga yuborardi; tikish alohida
+`panorama` Celery navbatida bajarilardi. Bu oqim keyinchalik qurilmadagi
+Astra C++ yadrosi bilan almashtirildi. O'sha tarixiy o'zgarishda:
 
 * `lib/features/panorama/stitch/**`, `math/rotation.dart`, sensorga tayangan
   capture ekrani va ularning testlari o'chirildi;

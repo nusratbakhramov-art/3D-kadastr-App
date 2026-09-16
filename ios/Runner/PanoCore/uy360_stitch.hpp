@@ -3,7 +3,7 @@
 // Same algorithm as server/stitch.py minus the AI steps (person removal, LaMa):
 //   1. rotation refinement (SIFT + gyro-gated matches, Kabsch / Gauss-Seidel)
 //   2. pose-seeded warp onto a periodic equirect canvas, feather weights, scalar gain
-//   3. two-pass DIS optical-flow local alignment (parallax)
+//   3. depth reprojection for parallax; weak elevation views supplement base coverage
 //   4. graph-cut seams + multi-band blend, "best frame" fill where seams leave gaps
 //   5. fold the ±180° wrap along a DP seam
 //   6. zenith/nadir holes: nadir = radial mirror of the floor, zenith = Telea inpaint,
@@ -27,6 +27,7 @@ struct FrameInput {
     float fx = 0, fy = 0, cx = 0, cy = 0;  // intrinsics for imageWidth × imageHeight
     int imageWidth = 0, imageHeight = 0;
     float targetPitch = 0;            // radians, informational
+    bool supplemental = false;       // weak elevation view: fill coverage beyond the base panorama
 };
 
 struct Options {
@@ -47,6 +48,8 @@ struct Options {
     int seamWidth = 1024;      // seam finder resolution (1536 → 1024: −60 % graph-cut time, no visible change)
     int refineSmallWidth = 1000;
     int alignMaxSide = 1024;
+    float sourceOversampling = 1.5f; // decoded source samples per output angular pixel; 0 = full JPEG
+    float sharpening = .2f;         // small, bounded luminance detail enhancement; 0 = off
 };
 
 struct Result {

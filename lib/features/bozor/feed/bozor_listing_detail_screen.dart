@@ -520,7 +520,7 @@ class _BozorListingDetailScreenState extends State<BozorListingDetailScreen> {
   /// iOS'da NATIV tur (SceneKit), aks holda Dart `PanoTourScreen`.
   Future<void> _openTour(BozorListing listing) async {
     final List<BozorListingMedia> panos = _panoramas(listing);
-    if (await PanoCaptureChannel.isSupported()) {
+    if (await PanoCaptureChannel.isViewerSupported()) {
       if (!mounted) return;
       final l = Localizations.localeOf(context);
       final roomN = tr(l, 'bozor.pano.tour.room_n');

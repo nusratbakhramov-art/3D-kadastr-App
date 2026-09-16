@@ -12,10 +12,11 @@
 //      hajmi). Endi bu MUMKIN EMAS: yadro (`uy360_types.hpp::imreadForWidth`)
 //      DCT-reduce dekod darajasini `imageWidth` (ASL o'lcham) bo'yicha
 //      tanlaydi — kichik JPEG bilan BA/MVS kadrlari 4× kichik dekodlanib,
-//      keyin kattalashtirilardi va chuqurlik xira chiqardi. Disk: 30 kadr
-//      ~75 MB, `Application Support/pano/` da, yuklangach Dart o'chiradi.
-//   3. LiDAR chuqurligi OLINMAYDI: server uni sukut bo'yicha ishlatmaydi
-//      (`use_depth=False`), lekin u yuklashga ~5.5 MB qo'shardi.
+//      keyin kattalashtirilardi va chuqurlik xira chiqardi. Kadrlar
+//      `Application Support/pano/` da, yuklangach Dart o'chiradi.
+//   3. LiDAR chuqurligi OLINMAYDI; yadro tasvirlardan chuqurlik hisoblaydi.
+//   4. ARKit compatibility grid: 28 required targets + one optional zenith.
+//      Supported devices prefer PanoUltraWideCapture's 17-target path.
 //
 //  Natija: `Application Support/pano/<uuid>/` ichida `frame_N.jpg` +
 //  `meta.json` (DOIMIY — qoralamada `LocalPano` sifatida saqlanadi). Dart shu
@@ -29,67 +30,6 @@ import SceneKit
 import SwiftUI
 import UIKit
 
-// MARK: - Nishonlar
-
-/// Sferadagi bitta nishon. Burchaklar radianda; yaw 0 = dunyo −Z (ARKit'ning
-/// boshlang'ich oldi), pitch + = yuqori.
-struct PanoTarget: Identifiable, Hashable {
-    let id: Int
-    let yaw: Float
-    let pitch: Float
-    let optional: Bool
-
-    var direction: SIMD3<Float> {
-        SIMD3(cos(pitch) * sin(yaw), sin(pitch), -cos(pitch) * cos(yaw))
-    }
-}
-
-enum PanoTargetGrid {
-    /// Gorizontda 12 (30°), +45° da 8, −45° da 8, zenit ixtiyoriy. NADIR YO'Q:
-    /// eng pastki qism (oyoq osti) suratga olinmaydi — tikishda o'sha joyga
-    /// «3D kadastr» disk-logosi bosiladi (`PanoStitch.swift` → `nadirLogoPath`,
-    /// yadro 28° qopqoqni logo bilan yopadi, −45° qatori esa 45°+34° gacha
-    /// yetadi, ya'ni bo'shliq qolmaydi).
-    /// Portret asosiy linza ≈ 55°×69° FOV → hamma joyda ≥30% ustma-ustlik.
-    static func build() -> [PanoTarget] {
-        var out: [PanoTarget] = []
-        func add(_ yawDeg: Float, _ pitchDeg: Float, optional: Bool = false) {
-            out.append(PanoTarget(
-                id: out.count,
-                yaw: yawDeg * .pi / 180,
-                pitch: pitchDeg * .pi / 180,
-                optional: optional
-            ))
-        }
-        for k in 0..<12 { add(Float(k) * 30, 0) }
-        for k in 0..<8 { add(Float(k) * 45 + 22.5, 45) }
-        for k in 0..<8 { add(Float(k) * 45 + 22.5, -45) }
-        add(0, 89, optional: true)
-        return out
-    }
-}
-
-/// Har kadrning pozasi/intrinsics'i — `meta.json` qatori.
-///
-/// ⚠️ Nomlar `PanoStitch.swift` (→ `PanoCore/UyStitcher.mm`) o'qiydigan
-/// nomlar; server `pano_stitch.py` ham aynan shu sxemani kutadi. `transform`
-/// — camera→world 4×4, COLUMN-MAJOR.
-struct PanoFrameMeta: Codable {
-    var index: Int
-    var targetId: Int
-    var targetYaw: Float
-    var targetPitch: Float
-    var transform: [Float]
-    var intrinsics: [Float]      // fx, fy, cx, cy — `imageWidth×imageHeight` uchun
-    var imageWidth: Int          // ASL o'lcham (intrinsics shunga tegishli)
-    var imageHeight: Int
-    var pixelWidth: Int          // yozilgan JPEG'ning haqiqiy o'lchami
-    var pixelHeight: Int
-    var timestamp: Double
-    var highRes: Bool
-    var file: String
-}
-
 // MARK: - Kontroller
 
 /// ARKit sessiyasini boshqaradi: nishonlarni ekranga proyeksiya qiladi,
@@ -98,8 +38,8 @@ struct PanoFrameMeta: Codable {
 /// ko'radi), joy qulfini yuritadi va kadrni pozasi bilan diskka yozadi.
 ///
 /// MANBA: Uy360 `CaptureController` (`360/ios/Uy360/CaptureController.swift`)
-/// — farqlar: matnlar `strings` dan, LiDAR yo'q, roll talabi yo'q (30 nishonli
-/// portret to'rida hamma `.any`), joy chegarasi sozlamasiz 6 sm.
+/// — farqlar: matnlar `strings` dan, LiDAR yo'q, roll talabi yo'q,
+/// joy chegarasi sozlamasiz 6 sm.
 final class PanoCaptureController: NSObject, ObservableObject, ARSessionDelegate {
     struct Dot: Identifiable {
         let id: Int
@@ -856,6 +796,14 @@ final class PanoCaptureCoordinator: NSObject {
 
     var isSupported: Bool { ARWorldTrackingConfiguration.isSupported }
 
+    static func canCapture(trackingSupported: Bool, authorization: AVAuthorizationStatus) -> Bool {
+        trackingSupported && authorization != .denied && authorization != .restricted
+    }
+
+    var isAvailable: Bool {
+        Self.canCapture(trackingSupported: isSupported, authorization: AVCaptureDevice.authorizationStatus(for: .video))
+    }
+
     /// Tushirishlar ildizi (zaxiradan chiqarilgan).
     static var panoRoot: URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -876,6 +824,10 @@ final class PanoCaptureCoordinator: NSObject {
         }
         guard isSupported else {
             result(FlutterError(code: "UNSUPPORTED", message: "Qurilma ARKit'ni qoʻllamaydi", details: nil))
+            return
+        }
+        guard isAvailable else {
+            result(FlutterError(code: "CAMERA_PERMISSION", message: "Kameraga ruxsat berilmadi", details: nil))
             return
         }
         // `Application Support/pano/<uuid>` — DOIMIY. Ilgari `tmp/` edi; endi

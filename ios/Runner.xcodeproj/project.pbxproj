@@ -7,6 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CD0550000000000000000002 /* PanoViewerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0550000000000000000001 /* PanoViewerTests.swift */; };
+		CD0540000000000000000006 /* PanoUltraWideCaptureTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0540000000000000000005 /* PanoUltraWideCaptureTests.swift */; };
+		CD0540000000000000000004 /* PanoUltraWideCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0540000000000000000003 /* PanoUltraWideCaptureView.swift */; };
+		CD0540000000000000000002 /* PanoUltraWideCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0540000000000000000001 /* PanoUltraWideCapture.swift */; };
+		CD053000000000000000000B /* PanoStitchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD053000000000000000000A /* PanoStitchTests.swift */; };
+		CD0530000000000000000009 /* PlanarGeometryTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = CD0530000000000000000008 /* PlanarGeometryTests.mm */; settings = {COMPILER_FLAGS = "-O2"; }; };
+		CD0530000000000000000007 /* StitchingTests.mm in Sources */ = {isa = PBXBuildFile; fileRef = CD0530000000000000000006 /* StitchingTests.mm */; settings = {COMPILER_FLAGS = "-O2"; }; };
+		CD0530000000000000000005 /* uy360_structural.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CD0530000000000000000004 /* uy360_structural.cpp */; settings = {COMPILER_FLAGS = "-O2"; }; };
+		CD0530000000000000000002 /* uy360_planar.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CD0530000000000000000001 /* uy360_planar.cpp */; settings = {COMPILER_FLAGS = "-O2"; }; };
+		CD0520000000000000000001 /* CaptureGeometry.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0520000000000000000002 /* CaptureGeometry.swift */; };
+		CD0520000000000000000003 /* CaptureGeometryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD0520000000000000000004 /* CaptureGeometryTests.swift */; };
 		01A7272BBC7CC21460EDC13D /* StructurePlanes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78671AEEDCBD84FD70B44DE6 /* StructurePlanes.swift */; };
 		02F48BD88A6BE2F5851E1A51 /* PoissonService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88B7BB2178F3916F88606784 /* PoissonService.swift */; };
 		0686A2BE90ADBC1C5031BB06 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 911EA7F8E5DF33296BEB487A /* LibraryView.swift */; };
@@ -148,6 +159,18 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		CD0550000000000000000001 /* PanoViewerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanoViewerTests.swift; sourceTree = "<group>"; };
+		CD0540000000000000000005 /* PanoUltraWideCaptureTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanoUltraWideCaptureTests.swift; sourceTree = "<group>"; };
+		CD0540000000000000000003 /* PanoUltraWideCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanoUltraWideCaptureView.swift; sourceTree = "<group>"; };
+		CD0540000000000000000001 /* PanoUltraWideCapture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanoUltraWideCapture.swift; sourceTree = "<group>"; };
+		CD053000000000000000000A /* PanoStitchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanoStitchTests.swift; sourceTree = "<group>"; };
+		CD0530000000000000000008 /* PlanarGeometryTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = PlanarGeometryTests.mm; sourceTree = "<group>"; };
+		CD0530000000000000000006 /* StitchingTests.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = StitchingTests.mm; sourceTree = "<group>"; };
+		CD0530000000000000000004 /* uy360_structural.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = uy360_structural.cpp; sourceTree = "<group>"; };
+		CD0530000000000000000003 /* uy360_planar.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = uy360_planar.hpp; sourceTree = "<group>"; };
+		CD0530000000000000000001 /* uy360_planar.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = uy360_planar.cpp; sourceTree = "<group>"; };
+		CD0520000000000000000002 /* CaptureGeometry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureGeometry.swift; sourceTree = "<group>"; };
+		CD0520000000000000000004 /* CaptureGeometryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CaptureGeometryTests.swift; sourceTree = "<group>"; };
 		007386094BD73F6F526C4323 /* TSDFIntegrator.metal */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.metal; path = TSDFIntegrator.metal; sourceTree = "<group>"; };
 		00E9C1F44190E5268C1E41F7 /* DebugLog.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DebugLog.swift; sourceTree = "<group>"; };
 		022489A5159F7B941ECC79E0 /* DenseDepthStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DenseDepthStore.swift; sourceTree = "<group>"; };
@@ -415,6 +438,12 @@
 			isa = PBXGroup;
 			children = (
 				331C807B294A618700263BE5 /* RunnerTests.swift */,
+				CD0550000000000000000001 /* PanoViewerTests.swift */,
+				CD053000000000000000000A /* PanoStitchTests.swift */,
+				CD0530000000000000000008 /* PlanarGeometryTests.mm */,
+				CD0530000000000000000006 /* StitchingTests.mm */,
+				CD0520000000000000000004 /* CaptureGeometryTests.swift */,
+				CD0540000000000000000005 /* PanoUltraWideCaptureTests.swift */,
 			);
 			path = RunnerTests;
 			sourceTree = "<group>";
@@ -482,6 +511,9 @@
 				B76C8EFF02440D163C4A689B /* uy360_ba.hpp */,
 				895F44392936629FC11EDF88 /* uy360_mvs.hpp */,
 				BB4DA153118D7DD8464BAE29 /* uy360_pipeline.hpp */,
+				CD0530000000000000000004 /* uy360_structural.cpp */,
+				CD0530000000000000000003 /* uy360_planar.hpp */,
+				CD0530000000000000000001 /* uy360_planar.cpp */,
 				D796DF8787F8C3C6C54C3484 /* UyStitcher.h */,
 				A19CF7C37939BC17887F615C /* uy360_stitch.cpp */,
 				A36C98898B9393BCA0BA3D0E /* uy360_ba.cpp */,
@@ -591,6 +623,9 @@
 				C33A06A29ED8D1040C96D021 /* PCScanBridge.swift */,
 				0278CEF4681F6B92532A789C /* VideoCaptureRecorder.swift */,
 				A035B99CD3D245248D3AB566 /* PanoCapture.swift */,
+				CD0520000000000000000002 /* CaptureGeometry.swift */,
+				CD0540000000000000000003 /* PanoUltraWideCaptureView.swift */,
+				CD0540000000000000000001 /* PanoUltraWideCapture.swift */,
 				6E8C40AD51EE3933F8CC329B /* PanoCore */,
 				F648D7AFA8CF24D3A969DF1E /* PanoStitch.swift */,
 				933C6E55AF384530331C1F00 /* PanoTour.swift */,
@@ -912,6 +947,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */,
+				CD0550000000000000000002 /* PanoViewerTests.swift in Sources */,
+				CD053000000000000000000B /* PanoStitchTests.swift in Sources */,
+				CD0530000000000000000009 /* PlanarGeometryTests.mm in Sources */,
+				CD0530000000000000000007 /* StitchingTests.mm in Sources */,
+				CD0520000000000000000003 /* CaptureGeometryTests.swift in Sources */,
+				CD0540000000000000000006 /* PanoUltraWideCaptureTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1009,10 +1050,15 @@
 				EB20FB0822A738195E831DC3 /* PCScanBridge.swift in Sources */,
 				73658B117252E27FC8074755 /* VideoCaptureRecorder.swift in Sources */,
 				0ED5F2B692E6454A8082BE3F /* PanoCapture.swift in Sources */,
+				CD0520000000000000000001 /* CaptureGeometry.swift in Sources */,
+				CD0540000000000000000004 /* PanoUltraWideCaptureView.swift in Sources */,
+				CD0540000000000000000002 /* PanoUltraWideCapture.swift in Sources */,
 				A2D6BB5EA93CFA7B2929435C /* uy360_stitch.cpp in Sources */,
 				F8334701F0E0C56295F1E82F /* uy360_ba.cpp in Sources */,
 				925F68927BA140A93EBAF4E1 /* uy360_mvs.cpp in Sources */,
 				73ED6037D14710F7356AB4F6 /* uy360_pipeline.cpp in Sources */,
+				CD0530000000000000000005 /* uy360_structural.cpp in Sources */,
+				CD0530000000000000000002 /* uy360_planar.cpp in Sources */,
 				A6C6AB5DA51390BF893FCF72 /* UyStitcher.mm in Sources */,
 				D4D692929983253AD67956CE /* PanoStitch.swift in Sources */,
 				9AE611DC267A5F9408CBDCB2 /* PanoTour.swift in Sources */,
@@ -1206,6 +1252,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = FC68AA764C6718864843519D /* Pods-RunnerTests.debug.xcconfig */;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1224,6 +1271,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = D239B79296615AB1D014B2E1 /* Pods-RunnerTests.release.xcconfig */;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -1240,6 +1288,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 6DEC7F24591D1B80DE2FB5C2 /* Pods-RunnerTests.profile.xcconfig */;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++17";
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;

@@ -4,7 +4,7 @@
 /// [SphereMesh], [ViewBasis], [SpherePainter]. Ekran — `pano_tour_screen.dart`
 /// (u bitta panorama uchun ham ishlaydi va tasvirni fayldan ham, tarmoqdan
 /// ham oladi). Alohida bir panoramalik ekran BOR EDI va o'chirildi: u faqat
-/// LOKAL fayl o'qirdi, panoramalar esa endi serverda tikiladi.
+/// LOKAL fayl o'qirdi; tur esa lokal natija va yuklangan URL bilan ishlaydi.
 ///
 /// NEGA PAKET EMAS. Rejada `panorama_viewer` ko'rsatilgan edi, lekin uning
 /// renderer'i `flutter_cube 0.1.1` — Dart 2 davri paketi, ta'mirlanmaydi

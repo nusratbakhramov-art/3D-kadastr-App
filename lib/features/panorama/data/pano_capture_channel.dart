@@ -1,17 +1,13 @@
-/// Nativ 360° suratga olish + TELEFONDA tikish — platforma kanali.
+/// Native panorama capture, processing and viewing on `kadastr/pano_capture`.
 ///
-/// Ekranning O'ZI nativ (iOS: ARKit, `ios/Runner/PanoCapture.swift`), chunki
-/// har kadr bilan KAMERA POZASI kerak: `transform` (camera→world 4×4) va
-/// `intrinsics`. Flutter'ning `camera` paketi ikkalasini ham bermaydi.
+/// Production chooses Astra ultra-wide/CoreMotion capture when its camera,
+/// motion, permission and sensor-processing capabilities are available; ARKit
+/// remains the fallback. Viewer support is independent of capture support.
 ///
-/// Tikish ham nativ ([stitch] → `ios/Runner/PanoStitch.swift` → C++
-/// `PanoCore/`, Uy360 yadrosi). Serverga faqat TAYYOR `pano.jpg` ketadi
-/// (`POST /listings/media role=panorama`). Ilgari kadrlar serverga
-/// yuborilib, u yerda tikilardi (`PanoApi`) — prodda 7–9 daqiqa olgani
-/// uchun voz kechildi.
-///
-/// ⚠️ Android'da [isSupported] HAR DOIM `false` (nativ tarafda) — yadro
-/// hali NDK'ga ko'chirilmagan, 360 qatori ko'rinmaydi.
+/// Both paths save camera-to-world transforms, intrinsics and JPEGs locally.
+/// [stitch] invokes Astra's C++ core through `PanoStitch.swift`; Dart uploads
+/// only the finished `pano.jpg` through the existing listing media API.
+/// Android capture remains unavailable until its native processing port is ready.
 library;
 
 import 'dart:io';
@@ -20,6 +16,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/i18n/app_translations.dart';
+
+/// Native capture paths. Production selects ultra-wide when available, then ARKit.
+enum PanoCaptureMode { arkit, ultrawide }
+
+/// Separate from panorama viewer support. Not-determined camera permission can
+/// be requested on start; denied/restricted permission makes capture unavailable.
+@immutable
+class PanoUltraWideCapability {
+  const PanoUltraWideCapability({
+    required this.available,
+    required this.cameraAuthorization,
+    this.reason,
+  });
+
+  final bool available;
+  final String cameraAuthorization;
+  final String? reason;
+}
 
 /// Telefonda tikish natijasi (`stitch` javobi).
 @immutable
@@ -48,7 +62,8 @@ class PanoStitchResult {
   /// Tikish vaqti (devor soati, s) — tashxis uchun.
   final double seconds;
 
-  /// Amalda ishlatilgan rejim: `mvs` | `fast`.
+  /// Selected pipeline: `mvs` | `fast`. Sensor MVS may fall back to rotation
+  /// when image evidence is insufficient for translation/depth.
   final String mode;
 
   File get panoFile => File(panoPath);
@@ -73,9 +88,8 @@ class PanoCaptureResult {
 
   /// Kadrlar va `meta.json` turgan katalog.
   ///
-  /// ⚠️ VAQTINCHALIK (`tmp/`). Yuklash tugagach [cleanUp] bilan o'chiriladi —
-  /// bitta tushirish ~6 MB, va foydalanuvchi ketma-ket bir necha xona
-  /// oladi.
+  /// Persistent `Application Support/pano/<uuid>` directory, retained for draft
+  /// recovery. [cleanUp] removes it after upload, retake or explicit deletion.
   final String dir;
 
   /// Nechta kadr olindi.
@@ -89,7 +103,8 @@ class PanoCaptureResult {
       final d = directory;
       if (d.existsSync()) await d.delete(recursive: true);
     } on FileSystemException {
-      // Tozalash yiqilsa e'lon baribir yuboriladi — OS `tmp` ni o'zi tozalaydi.
+      // Best effort: a cleanup failure must not discard a successful upload.
+      // This persistent directory can remain on disk if deletion fails.
     }
   }
 }
@@ -173,14 +188,8 @@ class PanoTourResult {
 abstract final class PanoCaptureChannel {
   static const MethodChannel _channel = MethodChannel('kadastr/pano_capture');
 
-  /// Qurilma 360° suratga olishni qo'llaydimi.
-  ///
-  /// iOS: ARKit dunyo-kuzatuvi (A9+, simulyatorda `false`).
-  /// Android: hozircha HAR DOIM `false` (`MainActivity.kt`) — yuqoriga qarang.
-  ///
-  /// `false` bo'lsa 360 bo'limi UMUMAN ko'rsatilmaydi (mahsulot qarori):
-  /// eski sensorli oqim o'chirilgan va galereyadan yuklash ham olib
-  /// tashlangan, ya'ni taklif qiladigan muqobil yo'q.
+  /// Legacy ARKit hardware query. New callers must use the separate capture,
+  /// processing and viewer capabilities below.
   static Future<bool> isSupported() async {
     try {
       return await _channel.invokeMethod<bool>('isSupported') ?? false;
@@ -192,43 +201,207 @@ abstract final class PanoCaptureChannel {
     }
   }
 
+  /// Whether this build can process saved CoreMotion captures. Independent of
+  /// ARKit, ultra-wide camera/permission, and viewer availability.
+  static Future<bool> isSensorProcessingSupported() async {
+    try {
+      return await _channel.invokeMethod<bool>('isSensorProcessingSupported') ??
+          false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// ARKit tracking and camera permission, independent of ultra-wide and viewer.
+  static Future<bool> isARKitCaptureSupported() =>
+      _supports('isARKitCaptureSupported');
+
+  /// Native tour viewer availability; viewing never requires camera permission.
+  static Future<bool> isViewerSupported() => _supports('isViewerSupported');
+
+  static Future<bool> _supports(String method) async {
+    try {
+      return await _channel.invokeMethod<bool>(method) ?? false;
+    } on PlatformException {
+      return false;
+    } on MissingPluginException {
+      return false;
+    }
+  }
+
+  /// Recheck on each capture so changes to camera permission are respected.
+  /// Undetermined permission is requestable; native capture prompts on start.
+  static Future<PanoCaptureMode?> preferredCaptureMode() async {
+    final ultraWide = await ultraWideCapability();
+    if (ultraWide.available && await isSensorProcessingSupported()) {
+      return PanoCaptureMode.ultrawide;
+    }
+    return await isARKitCaptureSupported() ? PanoCaptureMode.arkit : null;
+  }
+
+  /// Production entry. Explicit [start] remains available for either capture path.
+  static Future<PanoCaptureResult?> startPreferred(BuildContext context) async {
+    final locale = Localizations.localeOf(context);
+    final mode = await preferredCaptureMode();
+    if (!context.mounted) return null;
+    if (mode == null) {
+      throw PlatformException(
+        code: 'NO_CAPTURE_MODE',
+        message: tr(locale, 'bozor.pano.cap.err_unavailable'),
+      );
+    }
+    try {
+      return await start(context, mode: mode);
+    } on PlatformException catch (error) {
+      // A capability can change between the query and native presentation.
+      // Never restart after cancellation, a capture failure, or interruption.
+      const unavailable = {
+        'UNSUPPORTED',
+        'UNSUPPORTED_IOS',
+        'NO_ULTRAWIDE_CAMERA',
+        'NO_DEVICE_MOTION',
+      };
+      if (mode == PanoCaptureMode.ultrawide &&
+          unavailable.contains(error.code) &&
+          await isARKitCaptureSupported()) {
+        if (!context.mounted) return null;
+        return start(context, mode: PanoCaptureMode.arkit);
+      }
+      rethrow;
+    }
+  }
+
+  /// Check capture hardware/permission without opening the camera or prompting.
+  static Future<PanoUltraWideCapability> ultraWideCapability() async {
+    try {
+      final raw = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'ultraWideCapability',
+      );
+      return PanoUltraWideCapability(
+        available: raw?['available'] == true,
+        cameraAuthorization: (raw?['cameraAuthorization'] ?? 'unknown')
+            .toString(),
+        reason: raw?['reason']?.toString(),
+      );
+    } on MissingPluginException {
+      return const PanoUltraWideCapability(
+        available: false,
+        cameraAuthorization: 'unknown',
+        reason: 'UNSUPPORTED',
+      );
+    } on PlatformException catch (error) {
+      return PanoUltraWideCapability(
+        available: false,
+        cameraAuthorization: 'unknown',
+        reason: error.code,
+      );
+    }
+  }
+
   /// Nativ ekranni ochadi. Foydalanuvchi bekor qilsa `null`.
   ///
   /// Matnlar SHU YERDA tarjima qilinadi va nativ tarafga uzatiladi — Swift va
   /// Kotlin'da i18n takrorlanmasin.
-  static Future<PanoCaptureResult?> start(BuildContext context) async {
+  static Future<PanoCaptureResult?> start(
+    BuildContext context, {
+    PanoCaptureMode? mode,
+  }) async {
     final l = Localizations.localeOf(context);
-    final raw = await _channel.invokeMethod<Map<Object?, Object?>>('start', {
-      'strings': <String, String>{
-        'tracking': tr(l, 'bozor.pano.cap.tracking'),
-        'moved': tr(l, 'bozor.pano.cap.moved'),
-        'ar_error': tr(l, 'bozor.pano.cap.ar_error'),
-        'skip_poles': tr(l, 'bozor.pano.cap.skip_poles'),
-        'finish': tr(l, 'bozor.pano.cap.finish'),
-        'finish_title': tr(l, 'bozor.pano.cap.finish_title'),
-        'finish_body': tr(l, 'bozor.pano.cap.finish_body'),
-        'finish_yes': tr(l, 'bozor.pano.cap.finish_yes'),
-        'finish_no': tr(l, 'bozor.pano.cap.finish_no'),
-        'hint': tr(l, 'bozor.pano.cap.hint'),
-        // Joy qulfi (Uy360 UI): qaytish ko'rsatmasi va pufakcha yorliqlari.
-        'return_to': tr(l, 'bozor.pano.cap.return_to'),
-        'dir_right': tr(l, 'bozor.pano.cap.dir_right'),
-        'dir_left': tr(l, 'bozor.pano.cap.dir_left'),
-        'dir_forward': tr(l, 'bozor.pano.cap.dir_forward'),
-        'dir_back': tr(l, 'bozor.pano.cap.dir_back'),
-        'dir_up': tr(l, 'bozor.pano.cap.dir_up'),
-        'dir_down': tr(l, 'bozor.pano.cap.dir_down'),
-        'in_place': tr(l, 'bozor.pano.cap.in_place'),
-        'off_place': tr(l, 'bozor.pano.cap.off_place'),
-        'early_finish': tr(l, 'bozor.pano.cap.early_finish'),
-      },
-    });
+    if (mode == PanoCaptureMode.ultrawide) {
+      // Older native builds/platforms must not silently ignore the requested mode.
+      final capability = await ultraWideCapability();
+      if (!capability.available) {
+        throw PlatformException(
+          code: capability.reason ?? 'UNSUPPORTED',
+          message: tr(
+            l,
+            _captureErrorKey(capability.reason ?? 'UNSUPPORTED') ??
+                'bozor.pano.cap.err_unavailable',
+          ),
+        );
+      }
+    }
+    final raw = await _channel
+        .invokeMethod<Map<Object?, Object?>>('start', {
+          'mode': ?mode?.name,
+          'strings': <String, String>{
+            'tracking': tr(l, 'bozor.pano.cap.tracking'),
+            'moved': tr(l, 'bozor.pano.cap.moved'),
+            'ar_error': tr(l, 'bozor.pano.cap.ar_error'),
+            'skip_poles': tr(l, 'bozor.pano.cap.skip_poles'),
+            'finish': tr(l, 'bozor.pano.cap.finish'),
+            'finish_title': tr(l, 'bozor.pano.cap.finish_title'),
+            'finish_body': tr(l, 'bozor.pano.cap.finish_body'),
+            'finish_yes': tr(l, 'bozor.pano.cap.finish_yes'),
+            'finish_no': tr(l, 'bozor.pano.cap.finish_no'),
+            'hint': tr(l, 'bozor.pano.cap.hint'),
+            // Joy qulfi (Uy360 UI): qaytish ko'rsatmasi va pufakcha yorliqlari.
+            'return_to': tr(l, 'bozor.pano.cap.return_to'),
+            'dir_right': tr(l, 'bozor.pano.cap.dir_right'),
+            'dir_left': tr(l, 'bozor.pano.cap.dir_left'),
+            'dir_forward': tr(l, 'bozor.pano.cap.dir_forward'),
+            'dir_back': tr(l, 'bozor.pano.cap.dir_back'),
+            'dir_up': tr(l, 'bozor.pano.cap.dir_up'),
+            'dir_down': tr(l, 'bozor.pano.cap.dir_down'),
+            'in_place': tr(l, 'bozor.pano.cap.in_place'),
+            'off_place': tr(l, 'bozor.pano.cap.off_place'),
+            'early_finish': tr(l, 'bozor.pano.cap.early_finish'),
+            'uw_hint': tr(l, 'bozor.pano.cap.uw_hint'),
+            'uw_level': tr(l, 'bozor.pano.cap.uw_level'),
+            'uw_retry': tr(l, 'bozor.pano.cap.uw_retry'),
+            for (final key in [
+              'permission',
+              'unavailable',
+              'interrupted',
+              'camera',
+              'motion',
+              'storage',
+              'photo',
+              'busy',
+            ])
+              'err_$key': tr(l, 'bozor.pano.cap.err_$key'),
+            'close': tr(l, 'common.close'),
+          },
+        })
+        .catchError((Object error) {
+          if (error is PlatformException) {
+            final key = _captureErrorKey(error.code);
+            if (key != null) {
+              throw PlatformException(
+                code: error.code,
+                message: tr(l, key),
+                details: error.details,
+              );
+            }
+          }
+          throw error;
+        });
     if (raw == null) return null;
     return PanoCaptureResult(
       dir: (raw['dir'] ?? '').toString(),
       frames: (raw['frames'] as num?)?.toInt() ?? 0,
     );
   }
+
+  static String? _captureErrorKey(String code) => switch (code) {
+    'CAMERA_PERMISSION' => 'bozor.pano.cap.err_permission',
+    'UNSUPPORTED' ||
+    'UNSUPPORTED_IOS' ||
+    'NO_ULTRAWIDE_CAMERA' ||
+    'NO_CAPTURE_MODE' => 'bozor.pano.cap.err_unavailable',
+    'CAPTURE_INTERRUPTED' ||
+    'CAMERA_INTERRUPTED' => 'bozor.pano.cap.err_interrupted',
+    'CAMERA_FAILED' => 'bozor.pano.cap.err_camera',
+    'NO_DEVICE_MOTION' ||
+    'MOTION_FAILED' ||
+    'MOTION_UNAVAILABLE' => 'bozor.pano.cap.err_motion',
+    'IO' || 'CAPTURE_IO' => 'bozor.pano.cap.err_storage',
+    'CAPTURE_FAILED' => 'bozor.pano.cap.err_photo',
+    'BUSY' => 'bozor.pano.cap.err_busy',
+    _ => null,
+  };
 
   // ── Nativ tur va natija ko'rish (`PanoTour.swift`) ───────────────────────
 
@@ -253,6 +426,9 @@ abstract final class PanoCaptureChannel {
     'view_hint': tr(l, 'bozor.pano.view.hint'),
     'err': tr(l, 'bozor.pano.view.err'),
     'err_network': tr(l, 'bozor.pano.view.err_network'),
+    'err_missing': tr(l, 'bozor.pano.view.err_missing'),
+    'err_decode': tr(l, 'bozor.pano.view.err_decode'),
+    'retry': tr(l, 'common.retry'),
     'cancel': tr(l, 'common.cancel'),
     'close': tr(l, 'common.close'),
     'preview_title': tr(l, 'bozor.pano.preview.title'),
@@ -329,9 +505,11 @@ abstract final class PanoCaptureChannel {
   /// [dir] dagi kadrlarni (`frame_N.jpg` + `meta.json`) shu qurilmada tikadi;
   /// `pano.jpg` va `preview.jpg` o'sha katalogga yoziladi.
   ///
-  /// [mode]: `auto` (RAM ≥ 5.5 GB → `mvs`, aks holda `fast`), `mvs`
-  /// (chuqurlik bilan — parallaks yo'q, ~1.5–2 daq), `fast` (faqat
-  /// rotatsiya, 30–90 s). [width] — chiqish kengligi (balandlik = ½).
+  /// Legacy ARKit [mode]: `auto` (RAM ≥ 5.5 GB → `mvs`, otherwise `fast`),
+  /// `mvs`, or `fast`. CoreMotion metadata selects high-quality sensor BA/MVS
+  /// with evidence-based rotation fallback, regardless of [mode].
+  /// Omit [width] to use native metadata defaults: ARKit 4096, CoreMotion 6144.
+  /// Explicit widths override either default; output height is half the width.
   /// [logoAsset] — nadir'ga bosiladigan brend diski (Flutter asset kaliti).
   ///
   /// [onProgress] asosiy oqimda, 0..1 + yadroning qisqa xabari (inglizcha,
@@ -340,7 +518,7 @@ abstract final class PanoCaptureChannel {
   /// Xato — `PlatformException` (`NO_FRAMES`, `STITCH_FAILED`, `BUSY`).
   static Future<PanoStitchResult> stitch({
     required String dir,
-    int width = 4096,
+    int? width,
     String mode = 'auto',
     String? logoAsset,
     void Function(double p, String msg)? onProgress,
@@ -350,7 +528,7 @@ abstract final class PanoCaptureChannel {
     try {
       final raw = await _channel.invokeMethod<Map<Object?, Object?>>('stitch', {
         'dir': dir,
-        'width': width,
+        'width': ?width,
         'mode': mode,
         'logoAsset': ?logoAsset,
       });

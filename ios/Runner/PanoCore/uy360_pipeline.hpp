@@ -1,5 +1,5 @@
-// Full on-device "MVS" pipeline = the parallax fix that matched Teleport on the server:
-//   1. bundleAdjustPoses  (uy360_ba)   — ARKit poses → drift-free 6-DoF poses
+// Full on-device MVS pipeline:
+//   1. bundleAdjustPoses  (uy360_ba)   — refine camera rotations and positions from images
 //   2. computeDepthMaps   (uy360_mvs)  — per-frame depth from motion (no LiDAR, no ML)
 //   3. stitchWithDepth    (uy360_stitch) — re-project every frame from one centre through its depth
 // One call for the iOS bridge, the Android JNI and the desktop CLI.
@@ -9,6 +9,7 @@
 #include "uy360_mvs.hpp"
 #include "uy360_stitch.hpp"
 #include "uy360_types.hpp"
+#include "uy360_planar.hpp"
 
 #include <string>
 #include <vector>
@@ -19,14 +20,21 @@ struct PipelineOptions {
     BAOptions ba;
     MvsOptions mvs;
     bool runBA = true;   // false → use the raw frame transforms as poses
-    /// Poses come from a phone's gyro/accelerometer fusion (Android without ARCore): rotation
-    /// approximate, positions unknown → BAOptions::forSensorPoses() is used instead of `ba`.
+    /// Poses come from a phone's gyro/accelerometer fusion (Android without ARCore, or the iOS
+    /// ultra-wide path): rotation approximate, positions unknown → BAOptions::forSensorPoses()
+    /// is used instead of `ba`.
     bool sensorPoses = false;
+    /// false → skip depth-from-motion and stitch rotation-only with the (BA-corrected) poses.
+    /// Sensor captures also fall back to rotation-only when too few cameras have
+    /// triangulated observations to constrain their translations.
+    bool runMVS = true;
+    bool regularizePlanes = true; // shared upright rectangle constraints for sensor captures
 };
 
 struct PipelineStats {
     BAStats ba;
     MvsStats mvs;
+    PlanarStats planar;
     double baSeconds = 0, mvsSeconds = 0, stitchSeconds = 0;
     int depthFrames = 0;
 };

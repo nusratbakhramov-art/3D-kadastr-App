@@ -21,10 +21,20 @@ NS_ASSUME_NONNULL_BEGIN
 + (NSDictionary<NSString *, id> *)stitchMVSFrames:(NSArray<NSDictionary<NSString *, id> *> *)frames
                                             width:(int)width
                                       highQuality:(BOOL)highQuality
+                                      sensorPoses:(BOOL)sensorPoses
                                          panoPath:(NSString *)panoPath
                                       previewPath:(NSString *)previewPath
                                         logoPath:(NSString *_Nullable)logoPath
                                          progress:(void (^_Nullable)(float fraction, NSString *message))progress;
+
+/// DIAGNOSTICS ONLY — do not show these numbers to the user. Runs the bundle adjustment
+/// (sensor-pose priors) over the given frames and reports the spread of the recovered camera
+/// positions. For gyro captures there is no metric anchor: the scale is set by the BA's position
+/// prior, not measured, so the "metres" are indicative at best. An in-capture lock built on this
+/// reported drift while the phone was demonstrably still, and was removed.
+/// Returns {ok, count, radiusM, lastOffsetM, maxPairM, seconds, points, error}.
++ (NSDictionary<NSString *, id> *)poseDriftForFrames:(NSArray<NSDictionary<NSString *, id> *> *)frames
+                                             baWidth:(int)baWidth;
 
 @end
 

@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kadastr/core/i18n/app_translations.dart';
 import 'package:kadastr/features/panorama/data/pano_capture_channel.dart';
@@ -12,7 +13,7 @@ import 'package:kadastr/features/panorama/data/pano_capture_channel.dart';
 /// ⚠️ NEGA BU TEST BOR. `dir` va `frames` kalitlari uch joyda QO'LDA
 /// yozilgan: `PanoCapture.swift`, `MainActivity.kt` va shu fayl. Bittasida
 /// adashilsa Dart `dir: ''` oladi, `meta.json` topilmaydi va oqim
-/// «kadrlar yo'q» deb yiqiladi — foydalanuvchi 30 nishonni aylanib
+/// «kadrlar yo'q» deb yiqiladi — foydalanuvchi nishonlarni aylanib
 /// chiqqandan KEYIN. Test qurilmasiz ishlaydi: kanal mock qilinadi.
 void main() {
   const channel = MethodChannel('kadastr/pano_capture');
@@ -43,6 +44,8 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         locale: const Locale('uz'),
+        supportedLocales: const [Locale('uz'), Locale('ru'), Locale('en')],
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
         home: Builder(
           builder: (c) {
             ctx = c;
@@ -85,6 +88,7 @@ void main() {
     expect(res, isNotNull);
     expect(res!.dir, '/data/pano/abc');
     expect(res.frames, 28);
+    expect(args!.containsKey('mode'), isFalse); // Legacy callers keep ARKit.
 
     // Matnlar SHU YERDA tarjima qilinadi — Swift va Kotlin'da i18n yo'q.
     final strings = (args!['strings'] as Map).cast<String, String>();
@@ -116,9 +120,379 @@ void main() {
     }
   });
 
+  testWidgets('sensor processing support is independent of capture support', (
+    tester,
+  ) async {
+    mock((call) async {
+      switch (call.method) {
+        case 'isSupported':
+          return false;
+        case 'ultraWideCapability':
+          return {
+            'available': false,
+            'cameraAuthorization': 'denied',
+            'reason': 'CAMERA_PERMISSION',
+          };
+        case 'isSensorProcessingSupported':
+          return true;
+        default:
+          fail('Unexpected capability query: ${call.method}');
+      }
+    });
+    expect(await PanoCaptureChannel.isSupported(), isFalse);
+    expect((await PanoCaptureChannel.ultraWideCapability()).available, isFalse);
+    expect(await PanoCaptureChannel.isSensorProcessingSupported(), isTrue);
+  });
+
+  testWidgets('old native builds report sensor processing unavailable', (
+    tester,
+  ) async {
+    mock((_) async => throw MissingPluginException());
+    expect(await PanoCaptureChannel.isSensorProcessingSupported(), isFalse);
+  });
+
+  testWidgets('sensor processing capability failures are controlled', (
+    tester,
+  ) async {
+    mock((_) async => throw PlatformException(code: 'UNSUPPORTED'));
+    expect(await PanoCaptureChannel.isSensorProcessingSupported(), isFalse);
+  });
+
   testWidgets('start — bekor qilinsa null', (tester) async {
     mock((_) async => null);
     expect(await PanoCaptureChannel.start(await contextOf(tester)), isNull);
+  });
+
+  for (final ultraWide in [false, true]) {
+    for (final processing in [false, true]) {
+      for (final arkit in [false, true]) {
+        testWidgets(
+          'preferred capture UW=$ultraWide processing=$processing ARKit=$arkit',
+          (tester) async {
+            mock(
+              (call) async => switch (call.method) {
+                'ultraWideCapability' => {
+                  'available': ultraWide,
+                  'cameraAuthorization': 'authorized',
+                },
+                'isSensorProcessingSupported' => processing,
+                'isARKitCaptureSupported' => arkit,
+                _ => fail('Capture selection must not query ${call.method}'),
+              },
+            );
+            expect(
+              await PanoCaptureChannel.preferredCaptureMode(),
+              ultraWide && processing
+                  ? PanoCaptureMode.ultrawide
+                  : arkit
+                  ? PanoCaptureMode.arkit
+                  : null,
+            );
+          },
+        );
+      }
+    }
+  }
+
+  testWidgets('viewer support does not depend on capture or permission', (
+    tester,
+  ) async {
+    mock((call) async {
+      expect(call.method, 'isViewerSupported');
+      return true;
+    });
+    expect(await PanoCaptureChannel.isViewerSupported(), isTrue);
+  });
+
+  testWidgets('unavailable capabilities fail closed', (tester) async {
+    mock((_) async => throw MissingPluginException());
+    expect(await PanoCaptureChannel.isViewerSupported(), isFalse);
+    expect(await PanoCaptureChannel.isARKitCaptureSupported(), isFalse);
+    expect(await PanoCaptureChannel.preferredCaptureMode(), isNull);
+    await expectLater(
+      PanoCaptureChannel.startPreferred(await contextOf(tester)),
+      throwsA(
+        isA<PlatformException>()
+            .having((e) => e.code, 'code', 'NO_CAPTURE_MODE')
+            .having(
+              (e) => e.message,
+              'message',
+              tr(const Locale('uz'), 'bozor.pano.cap.err_unavailable'),
+            ),
+      ),
+    );
+  });
+
+  testWidgets(
+    'production capture falls back to ARKit on unsupported hardware',
+    (tester) async {
+      mock(
+        (call) async => switch (call.method) {
+          'ultraWideCapability' => {
+            'available': false,
+            'cameraAuthorization': 'authorized',
+            'reason': 'NO_ULTRAWIDE_CAMERA',
+          },
+          'isARKitCaptureSupported' => true,
+          'start' => (() {
+            expect((call.arguments as Map)['mode'], 'arkit');
+            return {'dir': '/data/pano/legacy', 'frames': 28};
+          })(),
+          _ => fail('Unexpected query ${call.method}'),
+        },
+      );
+      final result = await PanoCaptureChannel.startPreferred(
+        await contextOf(tester),
+      );
+      expect(result!.frames, 28);
+    },
+  );
+
+  testWidgets('capability lost before presentation falls back once', (
+    tester,
+  ) async {
+    final starts = <String>[];
+    mock((call) async {
+      if (call.method == 'ultraWideCapability') return {'available': true};
+      if (call.method == 'isSensorProcessingSupported' ||
+          call.method == 'isARKitCaptureSupported') {
+        return true;
+      }
+      final mode = (call.arguments as Map)['mode'] as String;
+      starts.add(mode);
+      if (mode == 'ultrawide') {
+        throw PlatformException(code: 'NO_ULTRAWIDE_CAMERA');
+      }
+      return null;
+    });
+    expect(
+      await PanoCaptureChannel.startPreferred(await contextOf(tester)),
+      isNull,
+    );
+    expect(starts, ['ultrawide', 'arkit']);
+  });
+
+  for (final failure in [
+    null,
+    'CAMERA_PERMISSION',
+    'CAPTURE_INTERRUPTED',
+    'CAPTURE_IO',
+  ]) {
+    testWidgets(
+      'production capture never restarts after ${failure ?? 'cancel'}',
+      (tester) async {
+        var starts = 0;
+        mock((call) async {
+          if (call.method == 'ultraWideCapability') return {'available': true};
+          if (call.method == 'isSensorProcessingSupported') return true;
+          expect(call.method, 'start');
+          starts++;
+          if (failure != null) throw PlatformException(code: failure);
+          return null;
+        });
+        final future = PanoCaptureChannel.startPreferred(
+          await contextOf(tester),
+        );
+        if (failure == null) {
+          expect(await future, isNull);
+        } else {
+          await expectLater(
+            future,
+            throwsA(
+              isA<PlatformException>().having((e) => e.code, 'code', failure),
+            ),
+          );
+        }
+        expect(starts, 1);
+      },
+    );
+  }
+
+  testWidgets('explicit ultra-wide probes capability and passes mode', (
+    tester,
+  ) async {
+    final methods = <String>[];
+    Map<Object?, Object?>? args;
+    mock((call) async {
+      methods.add(call.method);
+      if (call.method == 'ultraWideCapability') {
+        return {'available': true, 'cameraAuthorization': 'notDetermined'};
+      }
+      args = call.arguments as Map<Object?, Object?>;
+      return {'dir': '/data/pano/sensor', 'frames': 17};
+    });
+    final result = await PanoCaptureChannel.start(
+      await contextOf(tester),
+      mode: PanoCaptureMode.ultrawide,
+    );
+    expect(methods, ['ultraWideCapability', 'start']);
+    expect(args!['mode'], 'ultrawide');
+    expect(result!.dir, '/data/pano/sensor');
+    expect(result.frames, 17);
+    expect(
+      (args!['strings'] as Map).keys,
+      containsAll(['uw_hint', 'uw_level', 'uw_retry', 'close']),
+    );
+  });
+
+  testWidgets('explicit ARKit skips ultra-wide capability', (tester) async {
+    mock((call) async {
+      expect(call.method, 'start');
+      expect((call.arguments as Map)['mode'], 'arkit');
+      return null;
+    });
+    expect(
+      await PanoCaptureChannel.start(
+        await contextOf(tester),
+        mode: PanoCaptureMode.arkit,
+      ),
+      isNull,
+    );
+  });
+
+  testWidgets('unsupported ultra-wide never silently starts legacy capture', (
+    tester,
+  ) async {
+    mock((call) async {
+      expect(call.method, 'ultraWideCapability');
+      return {
+        'available': false,
+        'cameraAuthorization': 'authorized',
+        'reason': 'NO_ULTRAWIDE_CAMERA',
+      };
+    });
+    await expectLater(
+      PanoCaptureChannel.start(
+        await contextOf(tester),
+        mode: PanoCaptureMode.ultrawide,
+      ),
+      throwsA(
+        isA<PlatformException>().having(
+          (error) => error.code,
+          'code',
+          'NO_ULTRAWIDE_CAMERA',
+        ),
+      ),
+    );
+  });
+
+  testWidgets('camera permission errors propagate from ultra-wide start', (
+    tester,
+  ) async {
+    mock((call) async {
+      if (call.method == 'ultraWideCapability') {
+        return {'available': true, 'cameraAuthorization': 'notDetermined'};
+      }
+      throw PlatformException(code: 'CAMERA_PERMISSION');
+    });
+    await expectLater(
+      PanoCaptureChannel.start(
+        await contextOf(tester),
+        mode: PanoCaptureMode.ultrawide,
+      ),
+      throwsA(
+        isA<PlatformException>().having(
+          (error) => error.code,
+          'code',
+          'CAMERA_PERMISSION',
+        ),
+      ),
+    );
+  });
+
+  testWidgets(
+    'capture errors use the app locale and send localized native states',
+    (tester) async {
+      final ctx = await contextOf(tester);
+      mock((call) async {
+        final strings = ((call.arguments as Map)['strings'] as Map)
+            .cast<String, String>();
+        for (final key in [
+          'permission',
+          'unavailable',
+          'interrupted',
+          'camera',
+          'motion',
+          'storage',
+          'photo',
+          'busy',
+        ]) {
+          expect(
+            strings['err_$key'],
+            tr(const Locale('uz'), 'bozor.pano.cap.err_$key'),
+          );
+          expect(strings['err_$key'], isNot(startsWith('bozor.')));
+        }
+        throw PlatformException(
+          code: 'CAPTURE_INTERRUPTED',
+          message: 'Native fallback',
+          details: {'test': true},
+        );
+      });
+      await expectLater(
+        PanoCaptureChannel.start(ctx, mode: PanoCaptureMode.arkit),
+        throwsA(
+          isA<PlatformException>()
+              .having(
+                (e) => e.message,
+                'message',
+                tr(const Locale('uz'), 'bozor.pano.cap.err_interrupted'),
+              )
+              .having((e) => e.details, 'details', {'test': true}),
+        ),
+      );
+      for (final locale in ['en', 'ru', 'uz']) {
+        for (final key in [
+          'permission',
+          'unavailable',
+          'interrupted',
+          'camera',
+          'motion',
+          'storage',
+          'photo',
+          'busy',
+        ]) {
+          expect(
+            tr(Locale(locale), 'bozor.pano.cap.err_$key'),
+            isNot(startsWith('bozor.')),
+          );
+        }
+      }
+    },
+  );
+
+  testWidgets('ultra-wide capability is separate from legacy support', (
+    tester,
+  ) async {
+    mock((call) async {
+      if (call.method == 'isSupported') return true;
+      return {
+        'available': false,
+        'cameraAuthorization': 'denied',
+        'reason': 'CAMERA_PERMISSION',
+      };
+    });
+    expect(await PanoCaptureChannel.isSupported(), isTrue);
+    final capability = await PanoCaptureChannel.ultraWideCapability();
+    expect(capability.available, isFalse);
+    expect(capability.cameraAuthorization, 'denied');
+    expect(capability.reason, 'CAMERA_PERMISSION');
+  });
+
+  testWidgets('old native builds report ultra-wide unavailable', (
+    tester,
+  ) async {
+    mock((_) async => throw MissingPluginException());
+    final capability = await PanoCaptureChannel.ultraWideCapability();
+    expect(capability.available, isFalse);
+    expect(capability.reason, 'UNSUPPORTED');
+  });
+
+  testWidgets('capability query failure is controlled', (tester) async {
+    mock((_) async => throw PlatformException(code: 'CAPABILITY_FAILED'));
+    final capability = await PanoCaptureChannel.ultraWideCapability();
+    expect(capability.available, isFalse);
+    expect(capability.reason, 'CAPABILITY_FAILED');
   });
 
   testWidgets('stitch — argumentlar va natija, progress TESKARI keladi', (
@@ -157,7 +531,7 @@ void main() {
     );
 
     expect(args!['dir'], '/tmp/pano/x');
-    expect(args!['width'], 4096);
+    expect(args!.containsKey('width'), isFalse);
     expect(args!['mode'], 'auto');
     expect(args!.containsKey('logoAsset'), isFalse);
     expect(r.panoPath, '/tmp/pano/x/pano.jpg');
@@ -165,6 +539,50 @@ void main() {
     expect(r.frames, 28);
     expect(r.mode, 'mvs');
     expect(got, [(0.42, 'MVS: depth 3/28')]);
+  });
+
+  testWidgets('stitch leaves sensor defaults to native saved metadata', (
+    tester,
+  ) async {
+    mock((call) async {
+      expect(call.method, 'stitch');
+      expect(call.arguments, {'dir': '/data/pano/sensor', 'mode': 'auto'});
+      return {
+        'pano': '/data/pano/sensor/pano.jpg',
+        'preview': '/data/pano/sensor/preview.jpg',
+        'width': 6144,
+        'height': 3072,
+        'frames': 17,
+        'mode': 'mvs',
+      };
+    });
+    final result = await PanoCaptureChannel.stitch(dir: '/data/pano/sensor');
+    expect(result.width, 6144);
+    expect(result.height, 3072);
+    expect(result.frames, 17);
+    expect(result.mode, 'mvs');
+    expect(result.panoPath, '/data/pano/sensor/pano.jpg');
+    expect(result.previewPath, '/data/pano/sensor/preview.jpg');
+  });
+
+  testWidgets('stitch retains explicit width mode and logo overrides', (
+    tester,
+  ) async {
+    mock((call) async {
+      expect(call.arguments, {
+        'dir': '/data/pano/x',
+        'width': 2048,
+        'mode': 'fast',
+        'logoAsset': 'assets/branding/nadir_logo.png',
+      });
+      return {'pano': '/data/pano/x/pano.jpg'};
+    });
+    await PanoCaptureChannel.stitch(
+      dir: '/data/pano/x',
+      width: 2048,
+      mode: 'fast',
+      logoAsset: 'assets/branding/nadir_logo.png',
+    );
   });
 
   testWidgets('stitch — nativ xato PlatformException bo\'lib chiqadi', (

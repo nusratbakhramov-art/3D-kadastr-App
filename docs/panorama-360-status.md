@@ -1,255 +1,224 @@
-# 360° panorama — HOLAT va DAVOMI
+# iOS 360 panorama — Astra 0.5 integration
 
-Bu hujjat **ishni qayerdan davom ettirish** kerakligini aytadi.
+Implementation/validation snapshot: **2026-09-16**, `mobile` branch `master`.
+Astra reference: `360-astra-0.5`, branch `astra-0.5`, commit
+**`3de962b2de43580a249dfa17eb85dc493f62f9d6`**. The twelve core C++/header
+files and two Objective-C++ bridge files match that source. The source checkout
+was read-only during the migration.
 
-Oxirgi yangilanish: **2026-09-12**, branch `feat/bozor-ai-v2`.
+The remaining code migration is complete and the relevant automated suites pass.
+**Physical ultra-wide validation pending.** Authenticated live backend upload,
+listing creation and listing edit acceptance also remain pending.
 
-> ⚠️ **ARXITEKTURA ALMASHDI.** Ilgari panorama TELEFONDA, sof Dart bilan
-> tikilardi ([panorama-360-plan.md](panorama-360-plan.md) — o'sha 23 qadamli
-> reja). Endi telefon faqat **kadr yig'adi**, tikish esa **serverda**.
-> Reja hujjati TARIX sifatida qoladi; amaldagi holat SHU YERDA.
+## Production flow
 
----
-
-## 1. Bir qarashda
-
+```text
+Bozor AI → add listing → description/Step 6 → 360 foto qo'shish
+  → PanoCaptureChannel.startPreferred
+  → ultra-wide/CoreMotion when available, otherwise compatible ARKit
+  → persistent JPEG frames + meta.json in Application Support/pano/<uuid>
+  → PanoStitchCoordinator → UyStitcher.mm → Astra C++/OpenCV
+  → validated pano.jpg + preview.jpg
+  → existing Kadastr preview / accept or retake
+  → POST /api/v1/listings/media, role=panorama, one finished pano.jpg
+  → storage key + URL → existing room/draft/listing submission
 ```
-Bozor → e'lon qo'shish → 5-qadam (Tavsif) → «360 foto qo'shish»
-   → NATIV capture (iOS: ARKit / Android: ARCore) — 30 nishon, avto-zatvor
-   → har kadr + KAMERA POZASI serverga yuklanadi
-   → foydalanuvchi SHU EKRANDA kutadi (~30 s tikish)
-   → tayyor panorama S3 KALITI bilan qoralamaga tushadi
-   → bir nechta panorama yig'ilgach — hozirgidek TUR quriladi
-```
 
-| | |
+New captures are processed on the iPhone. Source frames and metadata are never
+uploaded by this flow. `PanoApi`, `PanoJobWatcher` and `PendingPano` remain for
+legacy `job:<id>` drafts; they are not the new-capture processing path. Android
+has no native Astra processing port and is outside this iOS migration.
+
+## Capabilities and compatibility
+
+| Capability | Check and behavior |
 |---|---|
-| Mobil taraf | iOS (ARKit) **tayyor**, Android (ARCore) **tayyor** — ikkalasi ham QURILMADA SINALMAGAN |
-| Server taraf | tayyor — `kadastr-backend` `4ae28b0` |
-| Regressiya bazasi | `analyze 27 (0 error, 4 warning)`, `tests 379 / fail 16` |
-| Push | branch hali **pushlanmagan** (upstream yo'q) |
+| Ultra-wide capture | iOS 15.4+, rear physical ultra-wide camera, device motion, camera authorization not denied/restricted. A first-use permission prompt is handled at start. |
+| Sensor processing | Independent `isSensorProcessingSupported` query; required before selecting ultra-wide. |
+| ARKit capture | Independent `isARKitCaptureSupported`; iOS 15+, world tracking and usable camera authorization. |
+| Native tour viewer | Independent `isViewerSupported`; iOS 16+, no capture hardware/permission dependency. The existing Dart tour remains the fallback. Native local result preview supports iOS 15+. |
 
-### Nega almashdi
+Step 6 exposes capture when a usable mode exists and keeps existing rooms
+accessible when capture is unavailable. Listing detail chooses its viewer using
+viewer capability. `startPreferred` rechecks capabilities for each capture.
 
-Sof Dart bilan telefonda tikish sifat va vaqt bo'yicha yetmasdi, va u
-kadr pozasini SENSORdan olardi (gyro/kompas) — xato to'planib panorama
-qiyshayardi. Nativ AR sessiyasi har kadr uchun kamera **transform** va
-**intrinsics** beradi, ya'ni geometriya taxmin emas, o'lchov bo'ladi.
-Server esa SIFT bilan burilishni aniqlashtiradi, chokni kesadi va ko'p
-bandli aralashtiradi — telefonda amaliy bo'lmagan narsalar.
+Legacy direct `start()` callers still default to ARKit. Production calls
+`startPreferred()` and explicitly selects ultra-wide first. A hardware/OS/motion
+capability failure before presentation can fall back to ARKit once; cancel,
+permission denial, interruption or a failed active capture never silently starts
+a second capture. No usable mode produces a controlled localized error.
 
-### Nima OLIB TASHLANDI
+## Capture contract
 
-* `lib/features/panorama/stitch/**`, `math/rotation.dart`,
-  `models/capture_*`, `data/camera_guard|capture_log|heading_source`,
-  sensorga tayangan `pano_capture_screen.dart` — **21 fayl**;
-* ularning **19 ta testi**;
-* `integration_test/**` va `tool/pano/bench_*.sh` (qurilmada tikishni
-  o'lchaydigan MIL-0/MIL-1 darvozalari), `integration_test` dev-bog'liqligi;
-* `PanoViewerScreen` — faqat LOKAL fayl o'qirdi; sfera renderi esa
-  `render/pano_sphere.dart` da QOLDI va turda ishlatiladi;
-* ML: `DeepLabV3` (suratga oluvchini o'chirish) va `LaMa` (qutb
-  bo'shliqlarini to'ldirish) serverga **umuman ko'chirilmadi** — qaror.
+`PanoUltraWideCapture.swift` uses AVFoundation still photos and CoreMotion at
+60 Hz with `xArbitraryZVertical`. It selects `.builtInUltraWideCamera` directly,
+not a virtual multi-camera device. Saved JPEGs use landscape sensor pixels;
+the portrait preview has its own orientation. Distortion correction is enabled
+when supported, stabilization is disabled for the calibration video, and focus,
+exposure and white balance are locked after the first accepted photo when supported.
 
-### Galereyadan yuklash — IZOHGA OLINGAN, o'chirilmagan
+`PanoTargetGrid.ultraWide17()` defines 17 unique required targets:
 
-`lib/features/bozor/widgets/pano_source_sheet.dart` butunlay izohda,
-tiklash yo'riqnomasi shu faylda. Sabab: server tikish uchun har kadrning
-kamera pozasini talab qiladi, galereyadagi tayyor equirect'da esa u yo'q.
+- Eight horizon targets at 45° yaw intervals.
+- Four upper targets at +52° pitch, yaws 45°, 135°, 225°, 315°.
+- Four lower targets at −52° with the same yaw offsets.
+- One required near-vertical zenith at +89°, matching Astra's convention.
 
----
+Acquisition order is independent of target IDs. A continuous 0.35-second dwell
+requires aim within 6°, angular speed below 8°/s and roll below 12°. Roll is
+unconstrained at the poles (`abs(forwardY) > 0.9`), where gravity cannot define it.
+Undo removes the last accepted frame. Normal completion uses all 17 targets;
+explicitly confirmed early finish is allowed with at least four accepted frames.
+Cancel/background/session interruption tears down capture safely; a new motion
+reference is never mixed into an existing capture.
 
-## 2. Buzilmasligi kerak bo'lgan qoidalar
+Photo timestamps are converted from the capture-session clock to the host clock.
+Pose history retains ten seconds of quaternion samples, interpolates with SLERP,
+and rejects missing/stale samples, gaps over 100 ms, excessive speed and invalid
+exposure-time aim/roll. Endpoint tolerance is 50 ms. Validation uses the photo's
+exposure timestamp, not shutter-request or delegate-delivery time.
 
-### 2.1 So'ralmagan joyga tegilmaydi
+Video calibration is converted to photo pixels with one scale and a vertical
+center-crop offset. Independent x/y stretching is not used. If video intrinsics
+are unavailable, the existing Astra FOV-based estimate is used; that fallback
+and lens calibration accuracy need device validation.
 
-360° ish **Bozor e'lon sehrgari** uchun. Undan tashqaridagi MAVJUD kodga
-tegilmaydi — bir marta tegilib qaytarishga to'g'ri kelgan (`e720c90`:
-AI Baholash kamerasi, Android CameraX, manifest).
+Each accepted frame records `poseSource: "sensors:coremotion"`, a column-major
+camera-to-world transform with zero initial translation, intrinsics `[fx,fy,cx,cy]`,
+actual JPEG width/height, target ID/angles and host-clock timestamp. JPEG and
+metadata reach disk before the frame is accepted. Optional `poseSource` and
+`exposureDuration` decode old ARKit metadata unchanged. Exposure duration is
+currently omitted by both capture paths, matching Astra; the timestamp is present.
 
-```bash
-git diff 966fe3d..HEAD --stat -- lib/features/services/   # BO'SH bo'lishi kerak
-```
+ARKit keeps its own grid: 28 required targets (12 horizon, 8 upper, 8 lower), plus
+one optional zenith. Its measured poses, capture UX and metadata remain compatible.
 
-### 2.2 Har qadamdan keyin baza o'lchanadi
+## Processing and output
 
-```bash
-bash tool/pano/baseline.sh
-```
+`PanoStitchCoordinator.ProcessingOptions` checks for the exact metadata marker
+`poseSource == "sensors:coremotion"`. One such entry selects sensor processing;
+frame count never selects it. Missing, `arkit` or unknown markers alone retain the
+legacy route.
 
-Android tomoni uchun alohida (sof JVM, emulyator kerak emas):
-
-```bash
-cd android && ./gradlew :app:testDebugUnitTest   # 14 test
-```
-
-`0 error`, `4 warning`, `fail 16` — yomonlashmasin. 16 yiqilgan test
-**bizdan oldin** ham yiqilardi, ro'yxati
-[tool/pano/README.md](../tool/pano/README.md) da.
-
-### 2.3 Mobil↔server shartnomasi
-
-Server panoramani **oddiy media kaliti** qilib qaytaradi
-(`listings/media/{user_id}/pano_*.jpg`), ya'ni e'lon uni yuklangan fotodan
-farqsiz qabul qiladi. Shuning uchun sehrgar uchtasini birga yozadi:
-
-```dart
-_d.panoramas.add(outcome.storageKey);          // LOKAL YO'L EMAS — KALIT
-_d.panoramaUrls[outcome.storageKey] = outcome.url;
-_d.uploadedMedia[outcome.storageKey] = outcome.storageKey;   // «yuklangan»
-```
-
-Oxirgi qator bo'lmasa `bozor_submit` kalitni fayl yo'li deb bilib
-`MultipartFile.fromPath` ga beradi va yuborish **yetti qadam to'ldirilgandan
-keyin** yiqiladi. Buni `test/features/bozor/pano_server_media_test.dart`
-qo'riqlaydi.
-
-### 2.4 Har tuzatish MUTATSIYA bilan tekshiriladi
-
-Qoidani buzib ko'r → test yiqilishi SHART. Yiqilmasa test hech narsani
-qo'riqlamayapti.
-
----
-
-## 3. Qolgan ish
-
-### 3.1 Qurilmada sinash — ASOSIY QOLGAN ISH
-
-Ikkala platforma ham **yozilgan va kompilyatsiya bo'ladi**, lekin HAQIQIY
-qurilmada hali sinalmagan. Simulyator/emulatorda ARKit ham, ARCore ham yo'q —
-`isSupported()` `false` qaytaradi va 360 qatori umuman ko'rinmaydi.
-
-Tekshiriladigan uchta narsa (har ikki platformada):
-
-1. 30 nishon aylanib chiqiladi, avtomatik zatvor ishlaydi;
-2. yuklash progressi kadrma-kadr o'sadi, keyin «tikilmoqda» ga o'tadi;
-3. tayyor panorama eskizi qatorida ko'rinadi (**tarmoqdan** yuklanadi) va
-   bosilganda sferada ochiladi.
-
-⚠️ **Android'da birinchi qaraladigan narsa — CHOK.** iOS birinchi kadrdan
-keyin ekspozitsiya va oq balansni QULFLAYDI; ARCore'da bunga to'g'ridan
-yo'l yo'q (Shared Camera / Camera2 qatlami kerak bo'lardi) va qulf
-QO'YILMAGAN. Server gain kompensatsiyasi + ko'p bandli aralashtirish buni
-tekislashi kerak. Tekislamasa —
-`android/.../pano/PanoCaptureActivity.kt` dagi izohga qarang.
-
-### 3.2 Platformalar orasidagi UCH farq (ataylab)
-
-| | iOS (ARKit) | Android (ARCore) |
+| Setting | Ultra-wide/CoreMotion | Legacy ARKit |
 |---|---|---|
-| Kamera oqimini chizish | `ARSCNView` o'zi chizadi | qo'lda, `PanoBackgroundRenderer` (GL) |
-| Yuqori aniqlikdagi kadr | `captureHighResolutionFrame` | yo'q — eng katta CPU kadri (≤1920) tanlanadi |
-| Ekspozitsiya qulfi | bor (`AVCaptureDevice`) | **yo'q** (yuqoriga qarang) |
+| `sensorPoses` | `true` | `false` |
+| Default output | 6144×3072 | 4096×2048 |
+| Processing | Sensor-aware bundle adjustment, high-quality MVS, current planar/structural processing | Existing `auto` / `mvs` / `fast` behavior |
+| Low-support fallback | Rotation-only when image evidence cannot support translation/depth | Existing behavior |
+| RAM selection | Sensor HQ default is preserved | `auto`: MVS at ≥5.5 GB RAM, otherwise rotation-only |
 
-Protokol esa AYNAN bir xil: `camera.transform`/`camera.pose.toMatrix()` —
-ikkalasi ham OpenGL konvensiyasi (−Z oldinga), column-major; kadr SENSOR
-orientatsiyasida, aylantirilmasdan yuboriladi.
+Explicit valid width overrides remain supported for tests/diagnostics. Production
+omits the width, so saved metadata controls the default. Weak sensor reconstruction
+still produces a panorama through the rotation fallback; the `mode` result reports
+the selected pipeline (`mvs`), not proof that depth reconstruction succeeded.
 
-### 3.3 Kichik qarzlar
+Astra estimates camera motion from image features with sensor orientation priors,
+then reconstructs depth using plane sweep when supported. Its planar/structural
+stages regularize supported geometry. Depth-aware or rotation-only composition
+projects into a 2:1 equirectangular image, blends seams and applies the existing
+Kadastr nadir logo. The preview is 1024×512.
 
-* `assets/i18n/bundle.json` da o'chirilgan quvurdan **31 ta yetim kalit**
-  qolgan (`bozor.pano.stitch.*`, `hint.*`, `resume.*`, `err.*`). Zarar
-  yo'q, lekin tozalash backend seed'i bilan birga qilinishi kerak —
-  bundle backenddan keladi, faqat mobil tarafdan o'chirish drift beradi.
-* `pano_source_sheet.dart` izohda turibdi (yuqoriga qarang).
-* ~~eski quvurning paketlari~~ — **tozalandi** (pastga qarang).
+Outputs are first written into a per-run `.stitch-<uuid>` directory. Both JPEGs
+must have valid JPEG markers, expected dimensions and a decodable thumbnail
+before publication. Each file is atomically written; `pano.jpg` is published last
+as the completion point. Normal failures remove the working directory and leave
+source frames for retry. A process crash may leave a working directory until the
+capture is later cleaned up.
 
-### 3.4 Tozalangan: eski quvurning platforma izi (2026-09-12)
+Flutter also validates a saved panorama before resume/preview/upload. Truncated
+outputs are restitched. Legacy valid pano-only drafts do not require a preview
+file. Failed preview must be accepted before retry can upload. Missing upload
+key/URL is an error and retains local data. Successful upload or explicit
+retake/delete removes local files; failed best-effort cleanup can leave files on disk.
 
-`7a2c301` («360° uchun paketlar») qo'shgan TO'RTTA paket `lib/` da umuman
-import qilinmay qolgan edi va olib tashlandi: **`image`**, **`camera`**,
-**`dchs_motion_sensors`**, **`vector_math`**.
+## Kadastr contracts preserved
 
-Ular bilan birga ketgani:
+The listing wizard, room titles/order, local and legacy drafts, upload endpoint,
+storage keys, delete/replace behavior, listing edits, tour links, hotspot
+conversion, existing renderers and nadir logo are retained. The draft keeps the
+uploaded panorama's storage key in `panoramas`, URL in `panoramaUrls`, and uploaded
+status in `uploadedMedia`; submission must not treat the key as a local filename.
+New error strings are supplied in Uzbek, Russian and English through the existing
+translation bundle and native strings map.
 
-| Qayerda | Nima |
+## Main implementation map
+
+| Path | Responsibility |
 |---|---|
-| `AndroidManifest.xml` | `RECORD_AUDIO` ni merge'dan chiqarib tashlaydigan blok (uni `camera_android_camerax` qo'shardi) |
-| `AndroidManifest.xml` | `camera.any` ni majburiy emas qiladigan `tools:replace` |
-| `AndroidManifest.xml` | giroskop/akselerometr `uses-feature` lari |
-| `ios/Runner/Info.plist` | `NSMotionUsageDescription` |
-| `pubspec.lock` | `camera_avfoundation`, `camera_android_camerax`, `camera_platform_interface`, `camera_web`, `stream_transform` |
+| `lib/features/panorama/data/pano_capture_channel.dart` | Separate capabilities, production mode selection, channel contract and localized errors |
+| `ios/Runner/AppDelegate.swift` | Native MethodChannel dispatch |
+| `ios/Runner/CaptureGeometry.swift` | Metadata, target grids, pose history, pole/roll handling, crop-aware intrinsics |
+| `ios/Runner/PanoUltraWideCapture.swift`, `PanoUltraWideCaptureView.swift` | AVFoundation/CoreMotion capture, file transaction and capture UI |
+| `ios/Runner/PanoCapture.swift` | ARKit compatibility capture |
+| `ios/Runner/PanoStitch.swift`, `PanoCore/*` | Metadata routing, Astra processing, validated output publication |
+| `ios/Runner/PanoTour.swift` | Existing local preview and native tour |
+| `lib/features/panorama/screens/pano_capture_flow.dart` | Capture → process → accept → upload, recovery and cleanup |
+| `lib/features/bozor/screens/bozor_description_step_screen.dart` | Step 6, rooms and draft integration |
+| `lib/features/bozor/feed/bozor_listing_detail_screen.dart` | Independent viewer selection |
 
-⚠️ **`NSMotionUsageDescription` nega xavfsiz olindi.** Uni faqat CoreMotion
-SENSOR API'si (`CMMotionManager` / `CMPedometer` / `CMAltimeter`) talab
-qiladi. Butun `Pods` va plagin manbalari tekshirildi: uni faqat
-`dchs_motion_sensors` va `camera_avfoundation` ishlatardi, ikkalasi ham
-ketdi. **ARKit bu kalitni talab qilmaydi** — unga
-`NSCameraUsageDescription` yetarli. (`PCScanKit` va `RoomPlanScanner`
-`CoreMotion` ni import qiladi, lekin faqat `CMAcceleration` STRUKTURASI
-uchun — u sensorga murojaat emas.)
+See [astra-0.5-migration-files.md](astra-0.5-migration-files.md) for the exact
+completion-stage file list and the already-present earlier-stage changes.
 
-`camera-*` va `guava` gradle bog'liqliklari QOLDI: ularni `:app` ning o'z
-`VideoCaptureActivity` si ishlatadi. Versiyalar ham o'zgarmadi — tushirishning
-foydasi yo'q.
+## Automated validation — measured 2026-09-16
 
----
+Each functional stage passed focused tests before continuing. Final combined runs:
 
-## 4. Xarita — qaysi fayl nima qiladi
+- `flutter test --no-pub test/features/panorama test/features/bozor --reporter expanded`:
+  **341 passed, 2 skipped, zero failures**. The two existing schema-parity tests
+  require absent `../kadastr-backend/tests/fixtures/mobile_param_schema.json`.
+- Simulator `xcodebuild test`, all `RunnerTests`: **71 passed, zero failures**:
+  CaptureGeometry 21, UltraWide 16, PanoStitch 11, PlanarGeometry 10,
+  Stitching 12, Runner 1. Swift/Objective-C++ compiled as part of this run.
+- Targeted Dart analysis: no issues in changed Dart files.
+- All six C++ implementations plus `UyStitcher.mm`: seven arm64 iOS-simulator
+  syntax checks passed. Existing OpenCV comma-initializer deprecation warnings remain.
+- Xcode also reports existing dependency deployment-target and privacy-resource
+  warnings; these are outside the panorama changes and did not fail the build.
+- Xcode project and Info.plist lint passed; `git diff --check` passed.
 
-### Mobil — capture va yuklash
+Native coverage includes metadata compatibility, exact grid angles, stale/missing
+pose rejection, crop intrinsics, roll/pole behavior, capture lifecycle, routing,
+planar geometry, measured-pose ARKit processing, sensor reconstruction/fallback,
+6144×3072 output, complete JPEG publication and Kadastr logo stamping.
+Flutter covers the capability matrix, production Step 6 path, resume/retry,
+preview acceptance, uploads, room ordering/names, delete/replace, drafts and
+listing payload/edit regressions.
 
-| Fayl | Nima |
-|---|---|
-| `ios/Runner/PanoCapture.swift` | ARKit sessiyasi, 30 nishon, avtomatik zatvor, JPEG 1280px + `meta.json` |
-| `ios/Runner/AppDelegate.swift` | `kadastr/pano_capture` kanali |
-| `android/.../pano/PanoCaptureActivity.kt` | ARCore sessiyasi, o'sha 30 nishon, o'sha zatvor, `meta.json` |
-| `android/.../pano/PanoBackgroundRenderer.kt` | kamera oqimini GL bilan chizish (ARCore'da tayyor ko'rinish yo'q) |
-| `android/.../pano/PanoOverlayView.kt` | nishon nuqtalari + reticle |
-| `android/.../pano/PanoYuv.kt` | YUV_420_888 → NV21 (sof JVM, testlangan) |
-| `android/.../pano/PanoTargets.kt` | nishon panjarasi + `meta` modeli (sof JVM, testlangan) |
-| `android/.../MainActivity.kt` | `kadastr/pano_capture` kanali |
-| `lib/features/panorama/data/pano_capture_channel.dart` | kanal klienti; matnlar SHU YERDA tarjima qilinadi va nativ tarafga uzatiladi |
-| `lib/features/panorama/data/pano_api.dart` | `createJob → uploadFrame × N → finish → status` |
-| `lib/features/panorama/screens/pano_capture_flow.dart` | kutish ekrani: capture → yuklash → tikish → natija; xatoda qayta urinish KADRLARNI QAYTA ISHLATADI |
+A deterministic 6144×3072 JPEG was sent through the real client multipart builder
+into a mock HTTP endpoint: its bytes stayed unchanged, only `pano.jpg` was sent,
+and key/URL handling passed. The live API's read-only OpenAPI schema confirms
+media upload plus listing create/update contracts. This is **not** an authenticated
+production upload or listing write. No production data was changed.
 
-### Mobil — ko'rsatish
-
-| Fayl | Nima |
-|---|---|
-| `lib/features/panorama/render/pano_sphere.dart` | sfera geometriyasi va bo'yoqchisi (`projectSphere`, `SphereMesh`, `ViewBasis`, `SpherePainter`) — ekran EMAS |
-| `lib/features/panorama/screens/pano_tour_screen.dart` | tur ekrani; tasvirni **fayldan ham, tarmoqdan ham** oladi (`TourPano.file` / `.url`) |
-
-### Mobil — Bozor tomoni
-
-| Fayl | Nima |
-|---|---|
-| `lib/features/bozor/screens/bozor_description_step_screen.dart` | `_pano360` bayrog'i (ARKit/ARCore bormi), `_add360`, `_open360` |
-| `lib/features/bozor/widgets/media_upload_row.dart` | eskiz; `urlOf` berilsa **tarmoqdan** yuklaydi |
-| `lib/features/bozor/models/bozor_draft.dart` | `panoramas` (KALITLAR) + `panoramaUrls` |
-
-### Server (`kadastr-backend`, commit `4ae28b0`)
-
-| Fayl | Nima |
-|---|---|
-| `app/services/pano_stitch.py` | tikish quvuri (SIFT → gain → DIS → graph-cut → multi-band → qutb) |
-| `app/services/pano_frames.py` | har kadr O'Z meta faylini yozadi; `frames.json` `finish` da yig'iladi (ko'p-worker poygasidan himoya) |
-| `app/tasks/bozor_pano_task.py` | `panorama.stitch` (alohida navbat, concurrency 1), `panorama.gc_frames` |
-| `app/models/bozor_pano_job.py` | `BozorPanoJob`, holatlar: capturing/queued/stitching/done/error |
-| `scripts/ensure_bozor_pano_jobs.py` | idempotent DDL (alembic EMAS — ikkita revision deploy'ni buzadi) |
-
-⚠️ **PRODDAGI TUZOQ (2026-09-12 da bir marta tushdik).** Prodning o'z
-`docker-compose.override.yml` i bor, u rsync'dan chetlab o'tiladi va
-`app`/`celery`/`celery-beat`/`photogrammetry-worker` uchun
-`volumes: !override` ishlatadi — bazadagi ro'yxatni TO'LDIRMAY,
-ALMASHTIRADI. Shu sababli `docker-compose.yml` ga qo'shilgan
-`/data/panoramas` mount'i `app` ga yetib bormadi: API kadrlarni o'z
-konteyneri ichiga yozdi, worker bo'sh katalog ko'rdi, har panorama
-yiqildi. Tuzatish — override'ga ham qator qo'shish, keyin
-`docker compose up -d app`. Tekshirish:
-`docker compose config | grep -c kadastr-panoramas` (2 bo'lishi kerak).
-
-**Kadrlar vaqtinchalik:** muvaffaqiyatda **darhol**, xatoda **24 soatdan
-keyin** o'chiriladi.
-
----
-
-## 5. Yangi sessiyada birinchi navbatda
+Re-run native tests with an installed simulator UUID:
 
 ```bash
-bash tool/pano/baseline.sh                               # 0 error / 4 warning / fail 16
-cd android && ./gradlew :app:testDebugUnitTest           # 14 test (pano)
-git -C ~/StudioProjects/kadastr-backend log --oneline -1 # 4ae28b0 bo'lsin
+xcodebuild -workspace ios/Runner.xcworkspace -scheme Runner \
+  -configuration Debug -destination 'platform=iOS Simulator,id=<UUID>' \
+  -only-testing:RunnerTests -parallel-testing-enabled NO \
+  CODE_SIGNING_ALLOWED=NO test
+plutil -lint ios/Runner.xcodeproj/project.pbxproj ios/Runner/Info.plist
+git diff --check
 ```
 
-Keyin — **3.1 (qurilmada sinash)**.
+## Before production release
+
+- **Physical ultra-wide validation pending.** No available ultra-wide iPhone was
+  connected; the listed iPhone XS was unavailable and has no ultra-wide camera.
+- On a supported phone verify automatic Step 6 selection, physical 0.5× lens,
+  all 17 targets/zenith, arbitrary order, aim/speed/roll/exposure-time rejection,
+  undo, early finish, cancel/background/interruption, JPEG orientation,
+  pixel intrinsics and saved metadata, sensor routing and final preview.
+- Test plain walls, reflective surfaces, close/moving objects, incomplete capture
+  and low light. Measure full 6144×3072 HQ processing time, peak memory,
+  thermal behavior and UI responsiveness. Simulator/synthetic timings are not
+  device benchmarks; no phone performance or memory claim is established.
+- Use an authenticated test account to upload 6144×3072 output, submit/edit a
+  listing, test multiple named/ordered rooms, delete/replace, draft recovery and
+  tour hotspots against the live backend. Restore the missing schema fixture
+  for the two skipped parity tests.
+- Exercise first-use/denied camera permission and ARKit fallback on real older
+  hardware/iOS. Minimum-iOS paths compiled but were not run on an iOS 15 device.
+
+No commit or push was made. The pre-existing `pubspec.yaml` edit is preserved.

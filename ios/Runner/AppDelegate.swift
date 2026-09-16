@@ -444,8 +444,8 @@ import RoomPlan
         }
       }
 
-      // 360° panorama — ARKit bilan yo'naltirilgan suratga olish + TELEFONDA
-      // tikish.
+      // 360° panorama — Astra ultra-wide/CoreMotion or ARKit capture, on-device
+      // stitching, and separate viewer/capture/processing capability queries.
       //
       // `start` → `{dir, frames}` (kadrlar + meta.json). Keyin Dart `stitch
       // {dir, width, mode}` ni chaqiradi (`PanoStitch.swift` → `PanoCore/`),
@@ -466,6 +466,27 @@ import RoomPlan
             result(false)
           }
 
+        case "ultraWideCapability":
+          result(PanoUltraWideCapability.current().channelValue)
+
+        case "isARKitCaptureSupported":
+          if #available(iOS 15, *) {
+            result(PanoCaptureCoordinator.shared.isAvailable)
+          } else { result(false) }
+
+        case "isViewerSupported":
+          // The tour UI uses iOS 16 sheets; it needs no capture hardware.
+          if #available(iOS 16, *) { result(true) } else { result(false) }
+
+        case "isSensorProcessingSupported":
+          // Processing saved frames needs the native core, not capture hardware
+          // or viewer support (and does not request camera permission).
+          if #available(iOS 15, *) {
+            result(true)
+          } else {
+            result(false)
+          }
+
         case "start":
           guard let controller = controller else {
             result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
@@ -479,7 +500,11 @@ import RoomPlan
           // takrorlanmasin.
           let args = call.arguments as? [String: Any]
           let strings = (args?["strings"] as? [String: String]) ?? [:]
-          PanoCaptureCoordinator.shared.start(from: controller, strings: strings, result: result)
+          guard let mode = PanoCaptureMode.resolve(args?["mode"]) else {
+            result(FlutterError(code: "INVALID_CAPTURE_MODE", message: "Noma'lum suratga olish rejimi", details: nil))
+            return
+          }
+          mode.start(from: controller, strings: strings, result: result)
 
         case "stitch":
           guard #available(iOS 15, *) else {
@@ -492,19 +517,22 @@ import RoomPlan
             result: result
           )
 
-        // Nativ tur (xonalarni bog'lash) va tikishdan keyingi natija ko'rish —
-        // `PanoTour.swift`. SwiftUI `presentationDetents` uchun iOS 16+.
+        // Preview supports iOS 15. Only the tour sheets require iOS 16.
         case "tour", "preview":
           guard let controller = controller else {
             result(FlutterError(code: "NO_CONTROLLER", message: "Flutter view controller yo'q", details: nil))
             return
           }
-          guard #available(iOS 16, *) else {
-            result(FlutterError(code: "UNSUPPORTED", message: "iOS 16+ kerak", details: nil))
+          guard #available(iOS 15, *) else {
+            result(FlutterError(code: "UNSUPPORTED", message: "iOS 15+ kerak", details: nil))
             return
           }
           let args = call.arguments as? [String: Any]
           if call.method == "tour" {
+            guard #available(iOS 16, *) else {
+              result(FlutterError(code: "UNSUPPORTED", message: "iOS 16+ kerak", details: nil))
+              return
+            }
             PanoTourCoordinator.shared.tour(args: args, from: controller, result: result)
           } else {
             PanoTourCoordinator.shared.preview(args: args, from: controller, result: result)

@@ -44,9 +44,9 @@ class MediaUploadRow extends StatelessWidget {
 
   /// Yozuvning holati — 360° panorama uchun.
   ///
-  /// Panorama serverda ~7–9 daqiqa tikiladi va foydalanuvchi buni kutmaydi:
-  /// qatorda o'sha vaqt davomida KUTILAYOTGAN yozuv turadi. Berilmasa
-  /// hamma yozuv tayyor deb qaraladi (foto va planirovka shunday).
+  /// Local captures awaiting processing/upload and legacy server-job drafts
+  /// expose their pending/error state here. Without a status callback all
+  /// entries are treated as ready (as with ordinary photos and floor plans).
   final MediaItemStatus Function(String path)? statusOf;
 
   /// Yozuv uchun TARMOQ manzili; `null` bo'lsa yozuv lokal fayl deb o'qiladi.

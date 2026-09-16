@@ -5,14 +5,14 @@
 // *and* positions jointly with a sparse set of triangulated SIFT tracks, using the ARKit
 // poses as a weak prior so scale and gravity stay anchored.
 //
-//   1. SIFT (5000 features, contrast 0.03) on every frame downscaled to `width` px
+//   1. SIFT (6000 features, contrast 0.02) on every frame downscaled to `width` px
 //   2. neighbouring pairs (optical axes within maxAngleDeg, k nearest): ratio-test matches,
-//      essential matrix with a 1.5 px Sampson inlier threshold (own implementation, no
-//      calib3d: ARKit-seeded and 8-point-RANSAC hypotheses, Cauchy-IRLS 8-point ladder and a
-//      5-DoF (R, t) Levenberg–Marquardt polish — matches cv::findEssentialMat's 5-point
-//      RANSAC inlier sets within a few %), and a gate that rejects pairs whose
-//      image-estimated relative rotation disagrees with ARKit by > 25°
-//   3. union-find tracks, linear (DLT) triangulation with the ARKit poses
+//      essential matrix with a 1.5 px Sampson inlier threshold: pose-seeded and 8-point
+//      RANSAC hypotheses with robust refinement, plus OpenCV's calibrated five-point
+//      hypothesis when its consensus is stronger and rotation is within 8° of the prior.
+//      Pairs whose estimated rotation disagrees with the prior by > 25° are rejected.
+//   3. image-derived baseline initialization for unknown sensor positions, union-find
+//      tracks, and linear (DLT) triangulation
 //   4. Levenberg–Marquardt with the Schur complement over cameras (axis-angle + position)
 //      and points, Cauchy loss (scale 2 px) on every residual, ARKit prior residuals
 //      (p − p0)/posSigma and dθ/rotSigma exactly as in the Python reference.
@@ -31,6 +31,7 @@
 namespace uy360 {
 
 struct BAOptions {
+    bool sensorTranslationInit = true; // initialize unknown positions from image baselines
     int width = 1008;          // feature extraction width (px)
     float posSigmaM = 0.03f;   // ARKit position prior σ (m)
     float rotSigmaDeg = 1.5f;  // ARKit rotation prior σ (deg)
@@ -55,6 +56,8 @@ struct BAOptions {
         o.rotSigmaDeg = 0.5f;
         o.yawSigmaDeg = 3.f;
         o.relRotSigmaDeg = 0.3f;
+        // The 0.5x rings overlap horizon views whose axes are ~64 degrees apart.
+        o.maxAngleDeg = 75.f;
         return o;
     }
 };
@@ -62,6 +65,9 @@ struct BAOptions {
 struct BAStats {
     float medianBeforePx = 0, medianAfterPx = 0;
     int points = 0, observations = 0;
+    float depth10 = 0, depth95 = 0, medianDepth = 0; // positive sparse depths, in the solved scale
+    int constrainedCameras = 0; // cameras with enough triangulated observations for 6-DoF
+    std::vector<int> cameraObservations; // same order as the input frames
     double seconds = 0;
 };
 

@@ -80,7 +80,10 @@ void main() {
         failures--;
         throw PlatformException(code: 'STITCH_FAILED', message: 'kam kadr');
       }
-      final pano = File('$dir/pano.jpg')..writeAsBytesSync([1, 2, 3]);
+      final pano = File('$dir/pano.jpg')
+        ..writeAsBytesSync(
+          File('test/fixtures/panorama/pano_32.jpg').readAsBytesSync(),
+        );
       onProgress?.call(1, 'done');
       return PanoStitchResult(panoPath: pano.path, previewPath: '');
     }
@@ -104,10 +107,13 @@ void main() {
   /// Ekranni ochib natijani qaytaradi.
   Future<PanoOutcome?> pump(
     WidgetTester tester, {
-    required PanoCaptureFn capture,
-    required PanoStitchFn stitch,
+    PanoCaptureFn? capture,
+    PanoStitchFn? stitch,
     required BozorApi api,
     PanoPreviewFn? preview,
+    String? resumeDir,
+    void Function(String dir)? onCaptured,
+    void Function(String dir)? onDiscarded,
   }) async {
     PanoOutcome? outcome;
     var popped = false;
@@ -120,6 +126,9 @@ void main() {
               outcome = await Navigator.of(ctx).push<PanoOutcome>(
                 MaterialPageRoute(
                   builder: (_) => PanoCaptureFlow(
+                    resumeDir: resumeDir,
+                    onCaptured: onCaptured,
+                    onDiscarded: onDiscarded,
                     api: api,
                     capture: capture,
                     stitch: stitch,
@@ -174,7 +183,7 @@ void main() {
       // Faqat BITTA so'rov, BITTA fayl, `role=panorama` — kadrlar ketmagan.
       // (MockClient multipart'ni oddiy `Request` ga yig'adi — tanani o'qiymiz.)
       expect(rec.uploads, hasLength(1));
-      final body = rec.uploads.single.body;
+      final body = latin1.decode(rec.uploads.single.bodyBytes);
       expect(body, contains('name="role"\r\n\r\npanorama'));
       expect('filename="pano.jpg"'.allMatches(body), hasLength(1));
       expect(body, isNot(contains('frame_0.jpg')));
@@ -198,6 +207,210 @@ void main() {
     expect(st.dirs, isEmpty);
     expect(rec.uploads, isEmpty);
   });
+
+  testWidgetsAsync(
+    'truncated saved JPEG is restitched before preview and upload',
+    (tester) async {
+      final dir = shotDir();
+      final jpeg = File('test/fixtures/panorama/pano_32.jpg').readAsBytesSync();
+      File(
+        '${dir.path}/pano.jpg',
+      ).writeAsBytesSync(jpeg.sublist(0, jpeg.length - 2));
+      final rec = recorder();
+      final st = stitcher();
+      var previews = 0;
+      final result = await pump(
+        tester,
+        resumeDir: dir.path,
+        api: rec.api,
+        stitch: st.fn,
+        capture: (_) async => throw StateError('Saved frames must be reused'),
+        preview: (_, _) async {
+          previews++;
+          return PanoPreviewAction.accept;
+        },
+      );
+      expect(result, isA<PanoUploaded>());
+      expect(st.dirs, [dir.path]);
+      expect(previews, 1);
+      expect(rec.uploads, hasLength(1));
+    },
+  );
+
+  testWidgetsAsync('incomplete stitch result is never previewed or uploaded', (
+    tester,
+  ) async {
+    final dir = shotDir();
+    addTearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+    final rec = recorder();
+    var previews = 0;
+    await pump(
+      tester,
+      api: rec.api,
+      capture: (_) async => PanoCaptureResult(dir: dir.path, frames: 17),
+      stitch: ({required dir, onProgress}) async {
+        File('$dir/pano.jpg').writeAsBytesSync([0xff, 0xd8, 0, 0]);
+        return PanoStitchResult(
+          panoPath: '$dir/pano.jpg',
+          previewPath: '$dir/preview.jpg',
+        );
+      },
+      preview: (_, _) async {
+        previews++;
+        return PanoPreviewAction.accept;
+      },
+    );
+    expect(previews, 0);
+    expect(rec.uploads, isEmpty);
+    expect(dir.existsSync(), isTrue);
+    expect(
+      find.text(tr(const Locale('en'), 'bozor.pano.flow.failed')),
+      findsWidgets,
+    );
+  });
+
+  testWidgetsAsync(
+    'retry after viewer failure requires acceptance before upload',
+    (tester) async {
+      final dir = shotDir();
+      final rec = recorder();
+      final st = stitcher();
+      var previews = 0;
+      await pump(
+        tester,
+        api: rec.api,
+        stitch: st.fn,
+        capture: (_) async => PanoCaptureResult(dir: dir.path, frames: 17),
+        preview: (_, _) async {
+          if (previews++ == 0) {
+            throw PlatformException(
+              code: 'VIEWER_FAILED',
+              message: 'Viewer failed',
+            );
+          }
+          return PanoPreviewAction.accept;
+        },
+      );
+      expect(rec.uploads, isEmpty);
+      await tester.tap(find.byType(FilledButton));
+      await pumpUntil(tester, () => !dir.existsSync());
+      expect(previews, 2);
+      expect(st.dirs, [dir.path]);
+      expect(rec.uploads, hasLength(1));
+    },
+  );
+
+  testWidgetsAsync('missing server key keeps the completed capture for retry', (
+    tester,
+  ) async {
+    final dir = shotDir();
+    addTearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+    final api = BozorApi(
+      client: MockClient(
+        (_) async => http.Response(
+          '{"files":[{"key":"","url":"https://storage.test/pano.jpg"}]}',
+          201,
+        ),
+      ),
+    );
+    addTearDown(api.dispose);
+    await pump(
+      tester,
+      api: api,
+      stitch: stitcher().fn,
+      capture: (_) async => PanoCaptureResult(dir: dir.path, frames: 17),
+    );
+    expect(dir.existsSync(), isTrue);
+    expect(File('${dir.path}/pano.jpg').existsSync(), isTrue);
+    expect(find.byType(FilledButton), findsOneWidget);
+  });
+
+  testWidgetsAsync(
+    'production capture selects ultra-wide then previews and uploads only pano',
+    (tester) async {
+      final dir = shotDir();
+      final rec = recorder();
+      const channel = MethodChannel('kadastr/pano_capture');
+      final methods = <String>[];
+      addTearDown(() {
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          null,
+        );
+        if (dir.existsSync()) dir.deleteSync(recursive: true);
+      });
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
+        call,
+      ) async {
+        methods.add(call.method);
+        final args = call.arguments as Map?;
+        switch (call.method) {
+          case 'ultraWideCapability':
+            return {'available': true, 'cameraAuthorization': 'authorized'};
+          case 'isSensorProcessingSupported':
+            return true;
+          case 'start':
+            expect(args!['mode'], 'ultrawide');
+            return {'dir': dir.path, 'frames': 17};
+          case 'stitch':
+            expect(args!['dir'], dir.path);
+            expect(args.containsKey('width'), isFalse);
+            expect(args['mode'], 'auto');
+            expect(args['logoAsset'], 'assets/branding/nadir_logo.png');
+            File('${dir.path}/pano.jpg').writeAsBytesSync(
+              File('test/fixtures/panorama/pano_32.jpg').readAsBytesSync(),
+            );
+            File('${dir.path}/preview.jpg').writeAsBytesSync(
+              File('test/fixtures/panorama/pano_32.jpg').readAsBytesSync(),
+            );
+            return {
+              'pano': '${dir.path}/pano.jpg',
+              'preview': '${dir.path}/preview.jpg',
+              'width': 6144,
+              'height': 3072,
+              'frames': 17,
+              'mode': 'mvs',
+            };
+          case 'preview':
+            expect(args!['path'], '${dir.path}/pano.jpg');
+            return {'action': 'accept'};
+          default:
+            fail('Unexpected channel method: ${call.method}');
+        }
+      });
+
+      final out = await pump(
+        tester,
+        preview: (ctx, path) => PanoCaptureChannel.preview(ctx, path: path),
+        api: rec.api,
+      );
+      expect(methods, [
+        'ultraWideCapability',
+        'isSensorProcessingSupported',
+        'ultraWideCapability',
+        'start',
+        'stitch',
+        'preview',
+      ]);
+      expect(out, isA<PanoUploaded>());
+      final uploaded = out! as PanoUploaded;
+      expect(uploaded.storageKey, key);
+      expect(uploaded.url, url);
+      expect(rec.uploads, hasLength(1));
+      final body = latin1.decode(rec.uploads.single.bodyBytes);
+      expect(body, contains('name="role"\r\n\r\npanorama'));
+      expect('filename="pano.jpg"'.allMatches(body), hasLength(1));
+      expect('filename="'.allMatches(body), hasLength(1));
+      expect(body, isNot(contains('preview.jpg')));
+      expect(body, isNot(contains('frame_0.jpg')));
+      expect(body, isNot(contains('meta.json')));
+      expect(dir.existsSync(), isFalse);
+    },
+  );
 
   testWidgetsAsync(
     'tikish yiqilsa: xato ekrani, qayta urinish CAPTURE\'ni takrorlamaydi',
@@ -252,7 +465,7 @@ void main() {
       await tester.tap(find.byType(FilledButton)); // «Qayta urinish»
       await pumpUntil(tester, () => outcome != null);
 
-      expect(captures, 1, reason: '30 nishon qayta aylanilmaydi');
+      expect(captures, 1, reason: 'Saved frames avoid repeating capture');
       expect(st.dirs, hasLength(2), reason: 'faqat tikish takrorlanadi');
       expect((outcome as PanoUploaded?)?.storageKey, key);
       expect(dir.existsSync(), isFalse);
@@ -321,11 +534,13 @@ void main() {
       final st = stitcher();
       var captures = 0;
       var previews = 0;
+      final events = <String>[];
 
       final out = await pump(
         tester,
         capture: (_) async {
           captures++;
+          events.add('capture:$captures');
           return PanoCaptureResult(
             dir: captures == 1 ? dir1.path : dir2.path,
             frames: 1,
@@ -333,6 +548,11 @@ void main() {
         },
         stitch: st.fn,
         api: rec.api,
+        onCaptured: (dir) => events.add('captured:$dir'),
+        onDiscarded: (dir) {
+          expect(Directory(dir).existsSync(), isFalse);
+          events.add('discarded:$dir');
+        },
         preview: (_, path) async {
           previews++;
           expect(
@@ -360,8 +580,62 @@ void main() {
       );
       expect((out as PanoUploaded?)?.storageKey, key);
       expect(dir2.existsSync(), isFalse);
+      expect(events, [
+        'capture:1',
+        'captured:${dir1.path}',
+        'discarded:${dir1.path}',
+        'capture:2',
+        'captured:${dir2.path}',
+      ]);
     },
   );
+
+  testWidgetsAsync('retake never resumes a discarded directory again', (
+    tester,
+  ) async {
+    final dir = shotDir();
+    File('${dir.path}/pano.jpg').writeAsBytesSync(
+      File('test/fixtures/panorama/pano_32.jpg').readAsBytesSync(),
+    );
+    addTearDown(() {
+      if (dir.existsSync()) dir.deleteSync(recursive: true);
+    });
+    final rec = recorder();
+    final st = stitcher();
+    var previews = 0;
+    var captures = 0;
+    final discarded = <String>[];
+
+    final out = await pump(
+      tester,
+      resumeDir: dir.path,
+      capture: (_) async {
+        captures++;
+        expect(discarded, [dir.path]);
+        return null;
+      },
+      stitch: st.fn,
+      api: rec.api,
+      preview: (_, _) async {
+        previews++;
+        return PanoPreviewAction.retake;
+      },
+      onDiscarded: (path) {
+        discarded.add(path);
+        // Cleanup is best effort. Simulate files remaining at the old path.
+        dir.createSync(recursive: true);
+        File('${dir.path}/pano.jpg').writeAsBytesSync(
+          File('test/fixtures/panorama/pano_32.jpg').readAsBytesSync(),
+        );
+      },
+    );
+
+    expect(out, isNull);
+    expect(previews, 1);
+    expect(captures, 1);
+    expect(st.dirs, isEmpty);
+    expect(rec.uploads, isEmpty);
+  });
 
   testWidgetsAsync('onCaptured — tikishdan OLDIN katalog beriladi', (
     tester,
@@ -493,7 +767,9 @@ void main() {
 
       // 2) pano.jpg tayyor → tikish ham YO'Q, to'g'ridan ko'rish → yuklash
       final dir2 = shotDir();
-      File('${dir2.path}/pano.jpg').writeAsBytesSync([1, 2, 3]);
+      File('${dir2.path}/pano.jpg').writeAsBytesSync(
+        File('test/fixtures/panorama/pano_32.jpg').readAsBytesSync(),
+      );
       PanoOutcome? out2;
       await tester.pumpWidget(
         MaterialApp(
