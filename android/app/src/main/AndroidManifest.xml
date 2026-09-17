@@ -5,8 +5,6 @@
          manifestga avtomatik qo'shadi — release APK'da internet bo'lmasligi
          uchun shu yerda ham e'lon qilamiz. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- Xaritada joriy joylashuvni aniqlash uchun (geolocator). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -95,7 +93,6 @@
              qurilmalarga ilova umuman tushmasdi. -->
         <meta-data android:name="com.google.ar.core" android:value="optional" />
 
-        <service android:name=".pano.PanoProcessingService" android:exported="false" android:foregroundServiceType="dataSync" />
         <activity android:name=".pano.UltraWideCaptureActivity" android:exported="false" tools:targetApi="28"
             android:screenOrientation="portrait" android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
             android:configChanges="keyboardHidden|keyboard|locale|layoutDirection|fontScale|uiMode" />

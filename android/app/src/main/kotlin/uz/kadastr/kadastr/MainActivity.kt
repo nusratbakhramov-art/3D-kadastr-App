@@ -164,7 +164,7 @@ class MainActivity : FlutterActivity() {
                         val width = call.argument<Int>("width")
                         val mode = call.argument<String>("mode") ?: "auto"
                         val logoAsset = call.argument<String>("logoAsset")
-                        val reserved = PanoProcessingService.reserve {
+                        val started = PanoProcessingRunner.start {
                             try {
                                 val logo = logoAsset?.let { asset ->
                                     File(dir,"nadir.png").also { out ->
@@ -182,9 +182,7 @@ class MainActivity : FlutterActivity() {
                                 mainHandler.post { result.error("STITCH_FAILED",e.message,null) }
                             }
                         }
-                        if (!reserved) result.error("BUSY","Processing is running",null)
-                        else try { ContextCompat.startForegroundService(this,Intent(this,PanoProcessingService::class.java)) }
-                        catch(e:Exception) { PanoProcessingService.release(); result.error("STITCH_FAILED",e.message,null) }
+                        if (!started) result.error("BUSY","Processing is running",null)
                     }
                 }
                 else -> result.notImplemented()

@@ -1,72 +1,36 @@
 package uz.kadastr.kadastr.pano
 
-import android.app.*
-import android.content.Intent
 import android.graphics.BitmapFactory
-import android.os.*
 import android.util.Log
-import androidx.core.app.NotificationCompat
 import java.io.File
 import java.util.concurrent.Executors
 
 /**
- * Keeps an accepted capture processing through Activity backgrounding; all inputs remain retryable.
+ * Runs one panorama processing job at a time off the platform channel thread.
  */
-class PanoProcessingService : Service() {
-    companion object {
-        private val executor = Executors.newSingleThreadExecutor()
-        @Volatile private var job: (() -> Unit)? = null
+object PanoProcessingRunner {
+    private val executor = Executors.newSingleThreadExecutor()
 
-        @Synchronized
-        fun reserve(work: () -> Unit): Boolean {
-            if (job != null) return false
-            job = work
-            return true
-        }
+    @Volatile
+    private var running = false
 
-        @Synchronized
-        fun release() {
-            job = null
-        }
-    }
-
-    private var started = false
-
-    override fun onBind(intent: Intent?) = null
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (Build.VERSION.SDK_INT >= 26) {
-            getSystemService(NotificationManager::class.java)
-                .createNotificationChannel(
-                    NotificationChannel(
-                        "panorama_processing",
-                        "360° panorama",
-                        NotificationManager.IMPORTANCE_LOW,
-                    )
-                )
-        }
-        startForeground(
-            360,
-            NotificationCompat.Builder(this, "panorama_processing")
-                .setSmallIcon(android.R.drawable.ic_menu_camera)
-                .setContentTitle("3D kadastr · 360°")
-                .setContentText("Panorama…")
-                .setOngoing(true)
-                .build(),
-        )
-        if (!started) {
-            started = true
-            executor.execute {
-                try {
-                    job?.invoke()
-                } finally {
-                    release()
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
-                }
+    @Synchronized
+    fun start(work: () -> Unit): Boolean {
+        if (running) return false
+        running = true
+        executor.execute {
+            try {
+                work()
+            } finally {
+                finish()
             }
         }
-        return START_NOT_STICKY
+        return true
+    }
+
+    @Synchronized
+    private fun finish() {
+        running = false
     }
 }
 
