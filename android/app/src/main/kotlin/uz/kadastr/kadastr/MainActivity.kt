@@ -22,7 +22,7 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
-import uz.kadastr.kadastr.pano.PanoCaptureActivity
+import uz.kadastr.kadastr.pano.*
 
 class MainActivity : FlutterActivity() {
 
@@ -129,24 +129,64 @@ class MainActivity : FlutterActivity() {
             }
         }
 
-        // 360° panorama capture — iOS'dagi `kadastr/pano_capture` kanalining
-        // egizagi (`ios/Runner/AppDelegate.swift`).
-        //
-        // ⚠️ ANDROID'DA YOPIQ (2026-09-13, mahsulot qarori). Tikish endi
-        // SERVERDA EMAS, TELEFONDA (iOS: `PanoStitch.swift` + C++ `PanoCore`).
-        // Android'ga yadro NDK orqali hali ko'chirilmagan, eski server yo'li
-        // esa o'chirilmoqda — shuning uchun `isSupported` HAR DOIM `false`:
-        // 360 qatori umuman ko'rinmaydi. ARCore capture kodi
-        // (`pano/PanoCaptureActivity.kt`, `resolveArCore`) SAQLANADI —
-        // yadro Android'ga kelganda `isSupported` ni `resolveArCore(result)`
-        // ga qaytarish yetadi.
-        MethodChannel(
-            flutterEngine.dartExecutor.binaryMessenger,
-            "kadastr/pano_capture"
-        ).setMethodCallHandler { call, result ->
+        val panoChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "kadastr/pano_capture")
+        panoChannel.setMethodCallHandler { call, result ->
             when (call.method) {
-                "isSupported" -> result.success(false)
-                "start" -> startPanoCapture(call.argument("strings"), result)
+                "isSupported", "isARCoreCaptureSupported" -> {
+                    if (NativeStitcher.ensureLoaded()) resolveArCore(result) else result.success(false)
+                }
+                "isARKitCaptureSupported", "isViewerSupported" -> result.success(false) // Android uses the existing Flutter tour viewer.
+                "isSensorProcessingSupported" -> result.success(NativeStitcher.ensureLoaded())
+                "ultraWideCapability" -> {
+                    val camera = try { UltraWideCamera.discover(this) } catch (e: Exception) { null }
+                    val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                    result.success(mapOf("available" to (camera != null && NativeStitcher.ensureLoaded()),
+                        "cameraAuthorization" to if (granted) "authorized" else "notDetermined",
+                        "reason" to if (camera == null) "NO_ULTRAWIDE_CAMERA" else null))
+                }
+                "start" -> if (call.argument<String>("mode") == "ultrawide") {
+                    if (Build.VERSION.SDK_INT < 28) result.error("UNSUPPORTED", "Ultra-wide requires Android 9", null)
+                    else if (pendingPanoResult != null) result.error("BUSY", "Capture is open", null)
+                    else {
+                        pendingPanoResult = result
+                        try {
+                            startActivityForResult(Intent(this, UltraWideCaptureActivity::class.java)
+                                .putExtra(PanoCaptureActivity.EXTRA_STRINGS, HashMap(call.argument<Map<String,String>>("strings") ?: emptyMap())), PANO_CAPTURE_REQUEST)
+                        } catch (e: Exception) { pendingPanoResult = null; result.error("LAUNCH_FAILED", e.message, null) }
+                    }
+                } else startPanoCapture(call.argument("strings"), result)
+                "stitch" -> {
+                    val path = call.argument<String>("dir")
+                    val dir = path?.let { File(it).canonicalFile }
+                    val roots = listOf(File(filesDir,"pano").canonicalFile,File(cacheDir,"pano").canonicalFile)
+                    if (dir == null || roots.none { dir.parentFile == it }) result.error("BAD_DIR", "Invalid capture directory", null)
+                    else {
+                        val width = call.argument<Int>("width")
+                        val mode = call.argument<String>("mode") ?: "auto"
+                        val logoAsset = call.argument<String>("logoAsset")
+                        val reserved = PanoProcessingService.reserve {
+                            try {
+                                val logo = logoAsset?.let { asset ->
+                                    File(dir,"nadir.png").also { out ->
+                                        assets.open(io.flutter.FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(asset)).use { input ->
+                                            out.outputStream().use { input.copyTo(it) }
+                                        }
+                                    }
+                                }
+                                val response = PanoProcessor.stitch(dir,width,mode,logo) { p,msg ->
+                                    mainHandler.post { panoChannel.invokeMethod("progress",mapOf("p" to p,"msg" to msg)) }
+                                }
+                                mainHandler.post { result.success(response) }
+                            } catch(e:Throwable) {
+                                Log.e("PanoProcessor","stitch failed",e)
+                                mainHandler.post { result.error("STITCH_FAILED",e.message,null) }
+                            }
+                        }
+                        if (!reserved) result.error("BUSY","Processing is running",null)
+                        else try { ContextCompat.startForegroundService(this,Intent(this,PanoProcessingService::class.java)) }
+                        catch(e:Exception) { PanoProcessingService.release(); result.error("STITCH_FAILED",e.message,null) }
+                    }
+                }
                 else -> result.notImplemented()
             }
         }
@@ -297,7 +337,7 @@ class MainActivity : FlutterActivity() {
             )
 
             PanoCaptureActivity.RESULT_FAILED -> pending.error(
-                "CAPTURE_FAILED",
+                data?.getStringExtra("code") ?: "CAPTURE_FAILED",
                 data?.getStringExtra(PanoCaptureActivity.EXTRA_ERROR) ?: "Suratga olinmadi",
                 null,
             )

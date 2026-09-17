@@ -26,6 +26,15 @@ data class PanoTarget(
 }
 
 object PanoTargetGrid {
+    fun ultraWide(): List<PanoTarget> {
+        val angles = (0 until 8).map { it * 45f to 0f } +
+            listOf(52f, -52f).flatMap { pitch -> (0 until 4).map { it * 90f + 45f to pitch } } +
+            listOf(0f to 89f)
+        return angles.mapIndexed { id, (yaw, pitch) ->
+            PanoTarget(id, Math.toRadians(yaw.toDouble()).toFloat(), Math.toRadians(pitch.toDouble()).toFloat(), false)
+        }
+    }
+
     /**
      * Gorizontda 12 (30°), +45° da 8, −45° da 8, zenit va nadir ixtiyoriy.
      * Portret asosiy linza ≈ 55°×69° FOV → hamma joyda ≥30% ustma-ustlik.
@@ -79,6 +88,9 @@ data class PanoFrameMeta(
     val timestamp: Double,
     val highRes: Boolean,
     val file: String,
+    val poseSource: String? = null,
+    val exposureDuration: Double? = null,
+    val diagnostics: JSONObject? = null,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("index", index)
@@ -94,6 +106,24 @@ data class PanoFrameMeta(
         put("timestamp", timestamp)
         put("highRes", highRes)
         put("file", file)
+        poseSource?.let { put("poseSource", it) }
+        exposureDuration?.let { put("exposureDuration", it) }
+        diagnostics?.keys()?.forEach { put(it, diagnostics.get(it)) }
+    }
+
+    companion object {
+        fun fromJson(o: JSONObject): PanoFrameMeta {
+            fun floats(key: String, n: Int): FloatArray {
+                val a = o.getJSONArray(key); require(a.length() == n)
+                return FloatArray(n) { a.getDouble(it).toFloat().also { v -> require(v.isFinite()) } }
+            }
+            return PanoFrameMeta(o.getInt("index"), o.getInt("targetId"), o.getDouble("targetYaw").toFloat(),
+                o.getDouble("targetPitch").toFloat(), floats("transform", 16), floats("intrinsics", 4),
+                o.getInt("imageWidth"), o.getInt("imageHeight"), o.getInt("pixelWidth"), o.getInt("pixelHeight"),
+                o.getDouble("timestamp"), o.optBoolean("highRes"), o.getString("file"),
+                if (o.isNull("poseSource")) null else o.getString("poseSource"),
+                if (o.isNull("exposureDuration")) null else o.getDouble("exposureDuration"))
+        }
     }
 
     // `FloatArray` maydonlari borligi uchun data-class'ning generatsiya

@@ -7,7 +7,7 @@
 /// Both paths save camera-to-world transforms, intrinsics and JPEGs locally.
 /// [stitch] invokes Astra's C++ core through `PanoStitch.swift`; Dart uploads
 /// only the finished `pano.jpg` through the existing listing media API.
-/// Android capture remains unavailable until its native processing port is ready.
+/// Android uses Camera2/sensors or ARCore and the same C++ core through JNI.
 library;
 
 import 'dart:io';
@@ -16,9 +16,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/i18n/app_translations.dart';
+import '../screens/pano_preview_screen.dart';
 
 /// Native capture paths. Production selects ultra-wide when available, then ARKit.
-enum PanoCaptureMode { arkit, ultrawide }
+enum PanoCaptureMode { arkit, arcore, ultrawide }
 
 /// Separate from panorama viewer support. Not-determined camera permission can
 /// be requested on start; denied/restricted permission makes capture unavailable.
@@ -218,6 +219,16 @@ abstract final class PanoCaptureChannel {
   static Future<bool> isARKitCaptureSupported() =>
       _supports('isARKitCaptureSupported');
 
+  /// Measured Android ARCore pose fallback, independent of the sensor path.
+  static Future<bool> isARCoreCaptureSupported() =>
+      _supports('isARCoreCaptureSupported');
+
+  static Future<PanoCaptureMode?> _legacyCaptureMode() async {
+    if (await isARKitCaptureSupported()) return PanoCaptureMode.arkit;
+    if (await isARCoreCaptureSupported()) return PanoCaptureMode.arcore;
+    return null;
+  }
+
   /// Native tour viewer availability; viewing never requires camera permission.
   static Future<bool> isViewerSupported() => _supports('isViewerSupported');
 
@@ -238,7 +249,7 @@ abstract final class PanoCaptureChannel {
     if (ultraWide.available && await isSensorProcessingSupported()) {
       return PanoCaptureMode.ultrawide;
     }
-    return await isARKitCaptureSupported() ? PanoCaptureMode.arkit : null;
+    return _legacyCaptureMode();
   }
 
   /// Production entry. Explicit [start] remains available for either capture path.
@@ -264,10 +275,10 @@ abstract final class PanoCaptureChannel {
         'NO_DEVICE_MOTION',
       };
       if (mode == PanoCaptureMode.ultrawide &&
-          unavailable.contains(error.code) &&
-          await isARKitCaptureSupported()) {
+          unavailable.contains(error.code)) {
+        final fallback = await _legacyCaptureMode();
         if (!context.mounted) return null;
-        return start(context, mode: PanoCaptureMode.arkit);
+        if (fallback != null) return start(context, mode: fallback);
       }
       rethrow;
     }
@@ -443,6 +454,14 @@ abstract final class PanoCaptureChannel {
     required String path,
   }) async {
     final l = Localizations.localeOf(context);
+    if (Platform.isAndroid) {
+      final action = await Navigator.of(context).push<PanoPreviewAction>(
+        MaterialPageRoute(builder: (_) => PanoPreviewScreen(path: path)),
+      );
+      // Back is cancellation, never acceptance of an unseen image.
+      if (action == null) throw PlatformException(code: 'PREVIEW_CANCELLED');
+      return action;
+    }
     final raw = await _channel.invokeMethod<Map<Object?, Object?>>('preview', {
       'path': path,
       'strings': _tourStrings(l),

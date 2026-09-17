@@ -64,6 +64,7 @@ class PanoTourScreen extends StatefulWidget {
     this.initialIndex = 0,
     this.editable = false,
     this.onChanged,
+    this.onImageReady,
   });
 
   final List<TourPano> panoramas;
@@ -78,6 +79,9 @@ class PanoTourScreen extends StatefulWidget {
   /// To'liq ro'yxat — chunki chaqiruvchi uni qoralamaga yozadi va
   /// qo'shimcha/o'chirishni alohida kuzatib turishi kerak emas.
   final ValueChanged<List<TourLink>>? onChanged;
+
+  /// Acceptance screens enable Continue only after the viewer decodes its texture.
+  final ValueChanged<bool>? onImageReady;
 
   @override
   State<PanoTourScreen> createState() => _PanoTourScreenState();
@@ -134,6 +138,7 @@ class _PanoTourScreenState extends State<PanoTourScreen> {
       return;
     }
     final int token = ++_loadToken;
+    widget.onImageReady?.call(false);
     final TourPano src = _current;
     setState(() {
       _loading = true;
@@ -171,6 +176,7 @@ class _PanoTourScreenState extends State<PanoTourScreen> {
         _image = frame.image;
         _loading = false;
       });
+      widget.onImageReady?.call(true);
     } on Object catch (e) {
       if (!mounted || token != _loadToken) return;
       setState(() {
@@ -245,7 +251,12 @@ class _PanoTourScreenState extends State<PanoTourScreen> {
       return;
     }
     // Ustma-ust tushgan tugmani bosib bo'lmaydi — oldindan aytamiz.
-    final TourLink? near = overlappingLink(_links, from, _yawDeg % 360, _pitchDeg);
+    final TourLink? near = overlappingLink(
+      _links,
+      from,
+      _yawDeg % 360,
+      _pitchDeg,
+    );
     if (near != null) {
       _toast(_t('bozor.pano.tour.too_close'));
       return;
@@ -327,10 +338,12 @@ class _PanoTourScreenState extends State<PanoTourScreen> {
     if (!mounted) return;
 
     if (action == 'remove') {
-      setState(() => _links = <TourLink>[
-        for (final TourLink l in _links)
-          if (l != link) l,
-      ]);
+      setState(
+        () => _links = <TourLink>[
+          for (final TourLink l in _links)
+            if (l != link) l,
+        ],
+      );
       _emit();
     } else if (action == 'go' && target >= 0) {
       _goTo(target, yaw: link.yawDeg);
@@ -386,7 +399,9 @@ class _PanoTourScreenState extends State<PanoTourScreen> {
           ),
 
           if (_loading)
-            const Center(child: CircularProgressIndicator(color: Colors.white70)),
+            const Center(
+              child: CircularProgressIndicator(color: Colors.white70),
+            ),
           if (_error != null)
             Center(
               child: Padding(
@@ -593,7 +608,9 @@ class _Hotspot extends StatelessWidget {
             ),
           ),
           child: Icon(
-            editing ? Icons.edit_location_alt_rounded : Icons.arrow_forward_rounded,
+            editing
+                ? Icons.edit_location_alt_rounded
+                : Icons.arrow_forward_rounded,
             color: Colors.white,
             size: 24,
           ),
@@ -757,9 +774,7 @@ class _TargetPickerState extends State<_TargetPicker> {
                 disabled: linked,
                 disabledText: _t('bozor.pano.tour.linked'),
                 selected: _selected == p.ref,
-                onTap: linked
-                    ? null
-                    : () => setState(() => _selected = p.ref),
+                onTap: linked ? null : () => setState(() => _selected = p.ref),
               );
             },
           ),

@@ -144,6 +144,41 @@ void main() {
     expect(await PanoCaptureChannel.isSensorProcessingSupported(), isTrue);
   });
 
+  testWidgets(
+    'Android prefers ultra-wide and retains measured ARCore fallback',
+    (tester) async {
+      var ultra = true;
+      mock(
+        (call) async => switch (call.method) {
+          'ultraWideCapability' => {
+            'available': ultra,
+            'cameraAuthorization': 'authorized',
+          },
+          'isSensorProcessingSupported' => true,
+          'isARKitCaptureSupported' => false,
+          'isARCoreCaptureSupported' => true,
+          'start' => {'dir': '/data/pano/android', 'frames': ultra ? 17 : 28},
+          _ => null,
+        },
+      );
+      expect(
+        await PanoCaptureChannel.preferredCaptureMode(),
+        PanoCaptureMode.ultrawide,
+      );
+      ultra = false;
+      expect(
+        await PanoCaptureChannel.preferredCaptureMode(),
+        PanoCaptureMode.arcore,
+      );
+      expect(
+        (await PanoCaptureChannel.startPreferred(
+          await contextOf(tester),
+        ))!.frames,
+        28,
+      );
+    },
+  );
+
   testWidgets('old native builds report sensor processing unavailable', (
     tester,
   ) async {
@@ -177,6 +212,7 @@ void main() {
                 },
                 'isSensorProcessingSupported' => processing,
                 'isARKitCaptureSupported' => arkit,
+                'isARCoreCaptureSupported' => false,
                 _ => fail('Capture selection must not query ${call.method}'),
               },
             );

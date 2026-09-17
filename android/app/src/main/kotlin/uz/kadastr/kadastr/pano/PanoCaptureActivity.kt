@@ -83,7 +83,7 @@ import kotlin.math.sqrt
  * Natija: `cacheDir/pano/<uuid>/` ichida `frame_N.jpg` + `meta.json`.
  * Dart shu katalogni o'qib serverga yuklaydi va yuklagach O'ZI o'chiradi.
  */
-class PanoCaptureActivity : Activity() {
+class PanoCaptureActivity : androidx.activity.ComponentActivity() {
 
     companion object {
         private const val TAG = "PanoCapture"
@@ -182,11 +182,15 @@ class PanoCaptureActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() { cancel() }
+        })
         strings = readStrings()
 
-        // `cacheDir` — kadrlar VAQTINCHALIK. Dart ularni yuklab o'chiradi;
+        // Persistent frames survive processing/upload failure; Dart owns cleanup.
+        //
         // o'chirmasa ham OS kerak bo'lganda keshni o'zi tozalaydi.
-        dir = File(File(cacheDir, "pano"), UUID.randomUUID().toString())
+        dir = File(File(filesDir, "pano"), UUID.randomUUID().toString())
         if (!dir.mkdirs()) {
             failWith("Katalog yaratilmadi: ${dir.absolutePath}")
             return
@@ -253,7 +257,7 @@ class PanoCaptureActivity : Activity() {
 
     override fun onRequestPermissionsResult(
         requestCode: Int,
-        permissions: Array<out String>,
+        permissions: Array<String>,
         grantResults: IntArray,
     ) {
         if (requestCode == CAMERA_PERMISSION_REQUEST) {
@@ -524,7 +528,7 @@ class PanoCaptureActivity : Activity() {
         io.execute {
             try {
                 val jpeg = encode(image)
-                File(dir, name).writeBytes(jpeg.bytes)
+                File(dir, name).outputStream().use { it.write(jpeg.bytes); it.fd.sync() }
                 metas.add(
                     PanoFrameMeta(
                         index = index,
@@ -546,8 +550,10 @@ class PanoCaptureActivity : Activity() {
                         timestamp = timestamp,
                         highRes = false,
                         file = name,
+                        poseSource = "arcore",
                     )
                 )
+                PanoStorage.writeMetadata(dir, metas)
                 runOnUiThread { onFrameSaved(jpeg.thumb) }
             } catch (e: Exception) {
                 Log.w(TAG, "kadr yozilmadi", e)
@@ -656,9 +662,7 @@ class PanoCaptureActivity : Activity() {
             Log.w(TAG, "meta yig'ilmadi", e)
             emptyList()
         }
-        val arr = org.json.JSONArray()
-        list.sortedBy { it.index }.forEach { arr.put(it.toJson()) }
-        File(dir, "meta.json").writeText(arr.toString())
+        PanoStorage.writeMetadata(dir, list.sortedBy { it.index })
         return list.size
     }
 
@@ -703,12 +707,6 @@ class PanoCaptureActivity : Activity() {
         finish()
     }
 
-    @Deprecated("API 33+ da OnBackInvokedCallback; minSdk 24 uchun shu kerak")
-    @Suppress("DEPRECATION")
-    override fun onBackPressed() {
-        cancel()
-    }
-
     /** Zenit va nadirni "olingan" deb belgilaydi — ularsiz yakunlash uchun. */
     private fun skipOptional() {
         glView.queueEvent {
@@ -746,7 +744,12 @@ class PanoCaptureActivity : Activity() {
             getSystemService(VIBRATOR_SERVICE) as? Vibrator
         } ?: return
         if (!v.hasVibrator()) return
-        v.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            v.vibrate(VibrationEffect.createOneShot(20, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            v.vibrate(20)
+        }
     }
 
     private fun dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()

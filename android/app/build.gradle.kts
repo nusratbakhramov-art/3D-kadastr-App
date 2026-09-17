@@ -13,7 +13,7 @@ plugins {
 // the Firebase file the build proceeds and push silently disables at runtime
 // (PushNotifications.init() guards Firebase init). Mirrors the conditional
 // release-signing below.
-if (file("google-services.json").exists()) {
+if (file("google-services.json").exists() && !providers.gradleProperty("panoDeviceTest").isPresent) {
     apply(plugin = "com.google.gms.google-services")
 }
 
@@ -28,7 +28,7 @@ if (keystorePropertiesFile.exists()) {
 android {
     namespace = "uz.kadastr.kadastr"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -49,7 +49,25 @@ android {
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         versionName = flutter.versionName
+        externalNativeBuild {
+            cmake {
+                arguments += listOf(
+                    "-DANDROID_STL=c++_shared",
+                    "-DOpenCV_DIR=${rootProject.projectDir}/third_party/OpenCV-android-sdk/sdk/native/jni",
+                    "-DCMAKE_BUILD_TYPE=Release",
+                    "-DUY360_DEVICE_TESTS=${providers.gradleProperty("panoDeviceTest").isPresent}",
+                )
+            }
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
     }
 
     signingConfigs {
@@ -65,6 +83,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Opt-in side-by-side device validation; never uninstall a differently signed store app.
+            if (providers.gradleProperty("panoDeviceTest").isPresent) applicationIdSuffix = ".astra"
+        }
         release {
             // Use the upload key when key.properties is present, else debug
             // (keeps `flutter run --release` working without secrets).
@@ -132,5 +154,8 @@ dependencies {
     // va nishon panjarasi. Ikkalasi ham indeks/burchak arifmetikasi, ya'ni
     // xatosi faqat qurilmada ko'rinadigan tur. Ishga tushirish:
     //     cd android && ./gradlew :app:testDebugUnitTest
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
