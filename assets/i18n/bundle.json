@@ -2068,7 +2068,17 @@
       "support.hours": "Working hours",
       "support.launch_failed": "Could not open",
       "support.title": "Support center",
-      "market.download.queued": "Queued"
+      "market.download.queued": "Queued",
+      "update.action_update": "Update",
+      "update.action_later": "Later",
+      "update.required_title": "Update required",
+      "update.required_body": "Install the new version to keep using the app.",
+      "update.optional_title": "A new version is available",
+      "update.optional_body": "A new version of the app is out. We recommend updating.",
+      "update.open_failed": "Could not open the store. Try again later.",
+      "update.version_label": "Version",
+      "update.version_yours": "Yours",
+      "update.version_new": "New"
     },
     "ru": {
       "about.app_name": "3D kadastr",
@@ -4138,7 +4148,17 @@
       "support.hours": "Часы работы",
       "support.launch_failed": "Не удалось открыть",
       "support.title": "Центр поддержки",
-      "market.download.queued": "В очереди"
+      "market.download.queued": "В очереди",
+      "update.action_update": "Обновить",
+      "update.action_later": "Позже",
+      "update.required_title": "Требуется обновление",
+      "update.required_body": "Чтобы продолжить пользоваться приложением, установите новую версию.",
+      "update.optional_title": "Доступна новая версия",
+      "update.optional_body": "Вышла новая версия приложения. Рекомендуем обновиться.",
+      "update.open_failed": "Не удалось открыть магазин. Попробуйте позже.",
+      "update.version_label": "Версия",
+      "update.version_yours": "У вас",
+      "update.version_new": "Новая"
     },
     "uz": {
       "about.app_name": "3D kadastr",
@@ -6208,7 +6228,17 @@
       "support.hours": "Ish vaqti",
       "support.launch_failed": "Ochib bo'lmadi",
       "support.title": "Yordam markazi",
-      "market.download.queued": "Navbatda"
+      "market.download.queued": "Navbatda",
+      "update.action_update": "Yangilash",
+      "update.action_later": "Keyinroq",
+      "update.required_title": "Yangilanish talab qilinadi",
+      "update.required_body": "Ilovadan foydalanishni davom ettirish uchun yangi versiyani o'rnating.",
+      "update.optional_title": "Yangi versiya mavjud",
+      "update.optional_body": "Ilovaning yangi versiyasi chiqdi. Yangilab qo'yishni tavsiya qilamiz.",
+      "update.open_failed": "Do'konni ochib bo'lmadi. Keyinroq urinib ko'ring.",
+      "update.version_label": "Versiya",
+      "update.version_yours": "Sizda",
+      "update.version_new": "Yangi"
     }
   },
   "version": 0

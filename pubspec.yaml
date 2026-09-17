@@ -84,6 +84,7 @@ flutter:
     - assets/images/home/
     - assets/images/payment/
     - assets/images/services/
+    - assets/images/store/
     - assets/images/howitworks/
 
   fonts:

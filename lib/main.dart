@@ -7,6 +7,8 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 
 import 'core/app_env.dart';
 import 'core/app_navigation.dart';
+import 'core/app_update/app_update_gate.dart';
+import 'core/app_update/app_update_store.dart';
 import 'core/i18n/app_translations.dart';
 import 'core/i18n/app_translations_store.dart';
 import 'core/payment_deep_links.dart';
@@ -97,10 +99,16 @@ class KadastrApp extends StatelessWidget {
                   darkTheme: AppTheme.dark(),
                   themeMode: themeMode,
                   builder: _systemUiBuilder,
-                  home: _AppRoot(
-                    onboardingStorage: onboardingStorage,
-                    authStorage: authStorage,
+                  // Yangilanish darvozasi ENG TASHQARIDA: majburiy
+                  // yangilanishда butun ilova (splash/onboarding/shell)
+                  // o'rniga bloklovchi ekran chiqadi.
+                  home: AppUpdateGate(
                     locale: locale,
+                    child: _AppRoot(
+                      onboardingStorage: onboardingStorage,
+                      authStorage: authStorage,
+                      locale: locale,
+                    ),
                   ),
                 );
               },
@@ -256,6 +264,13 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
       PaymentDeepLinks.onResumed();
       // Fonдан qaytganda bildirishnoma badge'ini yangilaymiz (push kelgan bo'lishi mumkin).
       unawaited(refreshNotifications());
+      // Yangilanishni ham qayta tekshiramiz. Store o'zi throttle qiladi
+      // (6 soat), shuning uchun har ekran yoqilganda so'rov ketmaydi.
+      unawaited(
+        AppUpdateStore.instance.onResumed(
+          lang: localeNotifier.value.languageCode,
+        ),
+      );
     }
   }
 
@@ -276,6 +291,15 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
     // Yordamchi bot "tez savol" chiplari — xuddi tarjimalar kabi keshdan o'qib,
     // fonda versiya bo'yicha yangilaymiz (chat ekrani ochilishini kutmaymiz).
     unawaited(ChatSuggestionsStore.instance.loadCachedThenRefresh());
+
+    // Ilova yangilanishi — sovuq startda bir marta. Keshdan darhol o'qiydi,
+    // so'ng backendni so'raydi (throttle: 6 soat). Tarmoq yo'q bo'lsa jim
+    // qoladi — bootstrap kutmaydi va ilova bloklanmaydi.
+    unawaited(
+      AppUpdateStore.instance.loadCachedThenRefresh(
+        lang: localeNotifier.value.languageCode,
+      ),
+    );
 
     // Avval saqlangan locale ni yuklab, app bo'ylab qo'llaymiz. Bu
     // localeNotifier'ni o'zgartiradi va MaterialApp rebuild bo'lib, butun
@@ -324,6 +348,7 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
     if (!mounted) return;
     setState(() {
       _stage = (_onboardingDone ?? false) ? _Stage.home : _Stage.onboarding;
+      if (_stage == _Stage.home) appShellReadyNotifier.value = true;
     });
   }
 
@@ -331,6 +356,7 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
     await widget.onboardingStorage.markCompleted();
     if (!mounted) return;
     setState(() => _stage = _Stage.home);
+    appShellReadyNotifier.value = true;
   }
 
   @override

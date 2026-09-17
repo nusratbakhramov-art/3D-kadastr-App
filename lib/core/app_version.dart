@@ -15,7 +15,12 @@ library;
 const String kAppVersion = '1.0.5';
 
 /// Build number — the part after the `+` in pubspec `version:`.
-const String kAppBuild = '47';
+///
+/// The update check sends this to `/releases/latest`, so a stale value here
+/// is no longer only a cosmetic drift on the About screen: it would make the
+/// backend offer a build the user already has. `app_version_test.dart` pins
+/// it to pubspec.
+const String kAppBuild = '54';
 
 /// "1.0.3 (25)" — what both About and Settings display.
 const String kAppVersionFull = '$kAppVersion ($kAppBuild)';

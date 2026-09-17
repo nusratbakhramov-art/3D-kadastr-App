@@ -14,6 +14,8 @@ import '../features/notifications/notifications_api.dart';
 import '../firebase_options.dart';
 import 'api_config.dart';
 import 'app_navigation.dart';
+import 'app_update/app_update_store.dart';
+import 'app_update/store_launcher.dart';
 
 /// Background isolate handler — app fonда yoki o'chgan holatda FCM xabari
 /// kelganda chaqiriladi. Bizning xabarlarda `notification` payload bor, shuning
@@ -233,7 +235,19 @@ class PushNotifications {
   }
 
   static void _handleTapData(Map<String, dynamic> data) {
-    // Hozircha barcha xabarnomalar "Arizalar" bo'limiga olib boradi.
+    // Ilova yangilanishi haqidagi push — do'konni ochamiz. `store_url` push
+    // payload'ida keladi (backend `publish_release` qo'shadi); bo'lmasa
+    // platforma zaxira havolasi ishlaydi.
+    if (data['type'] == 'app_update') {
+      final url = data['store_url'];
+      openStore(url is String ? url : null);
+      // Yangilanish holatini ham darhol yangilaymiz: push kelgan ekan, reliz
+      // e'lon qilingan — majburiy bo'lsa ilova ochilishida bloklovchi ekran
+      // chiqsin (throttle chetlab o'tiladi).
+      unawaited(AppUpdateStore.instance.refresh(force: true));
+      return;
+    }
+    // Qolgan barcha xabarnomalar "Arizalar" bo'limiga olib boradi.
     navigateToApplicationsTab();
   }
 
