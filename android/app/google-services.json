@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "512114544685",
+    "project_id": "d-kadastr-android-bc485",
+    "storage_bucket": "d-kadastr-android-bc485.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:512114544685:android:311958a45c127f368fa8a4",
+        "android_client_info": {
+          "package_name": "uz.kadastr.kadastr"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCjtOpQGcydcAFBMve9WEXdEldx2WZIWVs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
