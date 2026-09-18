@@ -66,15 +66,23 @@ class NotificationsApi {
         .timeout(_timeout);
   }
 
+  /// 2xx bo'lmasa OTADI — chaqiruvchi xatoni ko'rsatishi uchun.
+  ///
+  /// Avval javob kodi umuman tekshirilmasdi: server 500 qaytarsa ham
+  /// "bajarildi" deb hisoblanardi va foydalanuvchi o'qilmagan xabarlar
+  /// yo'qolgan deb o'ylardi.
   Future<void> markAllRead() async {
     final token = await _token();
     if (token == null) return;
-    await _client
+    final response = await _client
         .post(
           Uri.parse('${ApiConfig.baseUrl}/profile/notifications/read-all'),
           headers: _headers(token),
         )
         .timeout(_timeout);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('read-all: HTTP ${response.statusCode}');
+    }
   }
 }
 

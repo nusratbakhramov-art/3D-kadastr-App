@@ -1,16 +1,17 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/color_tokens.dart';
+import '../../widgets/app_banner.dart';
 import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
 import '../home/user_profile.dart';
 import '../settings/settings_state.dart';
 import 'notification_date.dart';
 import 'notification_detail_screen.dart';
+import 'notification_row.dart';
 import 'notification_model.dart';
 import 'notifications_api.dart';
 
@@ -24,6 +25,7 @@ class NotificationsScreen extends StatefulWidget {
 class _NotificationsScreenState extends State<NotificationsScreen> {
   final NotificationsApi _api = NotificationsApi();
   bool _loading = true;
+  bool _markingAll = false;
 
   @override
   void initState() {
@@ -36,10 +38,48 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
+  /// Bitta to'liq aylanish. Tugma FAQAT shu qadamlarda to'xtaydi, shuning
+  /// uchun tez javob ham, sekin javob ham butun aylanish bilan tugaydi.
+  static const Duration _spinTurn = Duration(milliseconds: 700);
+
   Future<void> _markAll() async {
+    if (_markingAll) return; // uchib ketayotgan so'rov ustiga ikkinchisi yo'q
+    setState(() => _markingAll = true);
+
+    // Optimistik: ro'yxat darhol o'qilgan ko'rinadi. Xato bo'lsa qaytaramiz —
+    // aks holda foydalanuvchi o'qilmaganlar yo'qolgan deb o'ylaydi.
+    final previous = notificationsNotifier.value;
+    final elapsed = Stopwatch()..start();
     markAllNotificationsRead();
     notificationUnreadNotifier.value = 0;
-    await _api.markAllRead();
+
+    var ok = true;
+    try {
+      await _api.markAllRead();
+    } catch (_) {
+      ok = false;
+      notificationsNotifier.value = previous;
+      notificationUnreadNotifier.value = unreadNotificationCount();
+    }
+
+    // Aylanishni o'rtasida kesmaymiz: qolgan qismini kutamiz.
+    final remainder =
+        elapsed.elapsedMilliseconds % _spinTurn.inMilliseconds;
+    await Future<void>.delayed(
+      Duration(milliseconds: _spinTurn.inMilliseconds - remainder),
+    );
+
+    if (!mounted) return;
+    setState(() => _markingAll = false);
+    final locale = localeNotifier.value;
+    showAppBanner(
+      context,
+      tr(
+        locale,
+        ok ? 'notifications.all_read_done' : 'notifications.all_read_failed',
+      ),
+      isError: !ok,
+    );
   }
 
   Future<void> _openItem(AppNotification item) async {
@@ -81,7 +121,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             title: _S.title(locale),
                             trailing: _MarkAllCircle(
                               active: hasUnread,
-                              onTap: hasUnread ? _markAll : null,
+                              pending: _markingAll,
+                              onTap: (hasUnread && !_markingAll)
+                                  ? _markAll
+                                  : null,
                             ),
                           ),
                         ),
@@ -130,125 +173,129 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         ],
       );
     }
-    return ListView.separated(
+    // Ro'yxat kunlar bo'yicha guruhlanadi, shuning uchun satrlar oldindan
+    // yoyiladi: sarlavha ham, satr ham bitta ListView elementi.
+    return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       itemCount: items.length,
-      separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, i) => _NotificationCard(
-        item: items[i],
-        locale: locale,
-        onTap: () => _openItem(items[i]),
-      ),
+      itemBuilder: (context, i) {
+        final item = items[i];
+        final newDay =
+            i == 0 || !sameNotificationDay(items[i - 1].at, item.at);
+        final row = NotificationRow(
+          item: item,
+          onTap: () => _openItem(item),
+        );
+        if (!newDay) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [_Hairline(), row],
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            NotificationDayHeader(at: item.at, locale: locale, first: i == 0),
+            row,
+          ],
+        );
+      },
     );
   }
 }
 
-class _NotificationCard extends StatelessWidget {
-  const _NotificationCard({
-    required this.item,
-    required this.locale,
+/// Satrlar orasidagi ingichka chiziq — belgidan keyin boshlanadi, shuning
+/// uchun ro'yxatda bitta tik o'q hosil bo'ladi.
+class _Hairline extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(left: 59),
+    child: Divider(
+      height: 1,
+      thickness: 1,
+      color: ColorTokens.divider(context),
+    ),
+  );
+}
+
+/// "Hammasini o'qilgan deb belgilash".
+///
+/// Backendga so'rov ketadi, shuning uchun bosilgach DARHOL aylanadi va qayta
+/// bosilmaydi. Tugma bir marta aylanib to'xtasa — hammasi tez bo'ldi; uzoq
+/// aylansa — server hali javob bermayapti. Aylanish o'rtasida to'xtamaydi:
+/// ekran uni butun qadamlarda tugatadi.
+class _MarkAllCircle extends StatefulWidget {
+  const _MarkAllCircle({
+    required this.active,
+    required this.pending,
     required this.onTap,
   });
 
-  final AppNotification item;
-  final Locale locale;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: ColorTokens.cardBg(context),
-      borderRadius: BorderRadius.circular(18),
-      child: InkWell(
-        onTap: hapticTap(onTap),
-        borderRadius: BorderRadius.circular(18),
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: item.unread
-                  ? AppColors.brandGreen
-                  : ColorTokens.divider(context),
-              width: item.unread ? 1.4 : 1,
-            ),
-          ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              NotificationDateChip(at: item.at, locale: locale),
-              const SizedBox(height: 12),
-              if (item.imageUrl != null) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: CachedNetworkImage(
-                    imageUrl: item.imageUrl!,
-                    width: double.infinity,
-                    height: 160,
-                    fit: BoxFit.cover,
-                    placeholder: (_, _) => Container(
-                      height: 160,
-                      color: ColorTokens.iconBg(context),
-                    ),
-                    errorWidget: (_, _, _) => const SizedBox.shrink(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-              Text(
-                item.title,
-                style: TextStyle(
-                  fontFamily: 'MTSCompact',
-                  fontWeight: FontWeight.w700,
-                  fontSize: 16.5,
-                  height: 1.25,
-                  color: ColorTokens.primaryText(context),
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                item.message,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontFamily: 'MTSText',
-                  fontWeight: FontWeight.w400,
-                  fontSize: 13.5,
-                  height: 1.35,
-                  color: ColorTokens.secondaryText(context),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MarkAllCircle extends StatelessWidget {
-  const _MarkAllCircle({required this.active, required this.onTap});
-
   final bool active;
+  final bool pending;
   final VoidCallback? onTap;
 
   @override
+  State<_MarkAllCircle> createState() => _MarkAllCircleState();
+}
+
+class _MarkAllCircleState extends State<_MarkAllCircle>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _spin = AnimationController(
+    vsync: this,
+    duration: _NotificationsScreenState._spinTurn,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.pending) _spin.repeat();
+  }
+
+  @override
+  void didUpdateWidget(_MarkAllCircle old) {
+    super.didUpdateWidget(old);
+    if (widget.pending && !_spin.isAnimating) {
+      _spin.repeat();
+    } else if (!widget.pending && _spin.isAnimating) {
+      _spin.stop();
+      _spin.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _spin.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // To'ldirilgan neon doira ro'yxatdagi hamma narsadan baland ovozli edi —
+    // u yordamchi amal, sarlavha emas.
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final accent = isDark ? AppColors.splashGreen : AppColors.brandGreen;
+    final lit = widget.active || widget.pending;
+    final icon = Icon(
+      widget.pending ? Icons.sync_rounded : Icons.done_all_rounded,
+      size: 20,
+      color: lit ? accent : ColorTokens.tertiaryText(context),
+    );
     return Material(
-      color: active ? AppColors.brandGreen : ColorTokens.cardBg(context),
+      color: lit
+          ? accent.withValues(alpha: 0.15)
+          : ColorTokens.cardBg(context),
       shape: const CircleBorder(),
       child: InkWell(
-        onTap: hapticTap(onTap),
+        onTap: hapticTap(widget.onTap),
         customBorder: const CircleBorder(),
         child: SizedBox(
           width: 40,
           height: 40,
-          child: Icon(
-            Icons.done_all_rounded,
-            size: 20,
-            color: active ? Colors.white : ColorTokens.tertiaryText(context),
-          ),
+          child: widget.pending
+              ? RotationTransition(turns: _spin, child: icon)
+              : icon,
         ),
       ),
     );

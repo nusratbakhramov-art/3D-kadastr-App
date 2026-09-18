@@ -8,8 +8,11 @@ library;
 
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../../widgets/app_banner.dart';
+import '../i18n/app_translations.dart';
 
 /// App Store ilova ID'si — `settings_screen.dart` dagi baho so'rash oqimi ham
 /// shu ilovani ko'rsatadi.
@@ -47,4 +50,20 @@ Future<bool> openStore([String? url]) async {
     }
     return false;
   }
+}
+
+/// Do'konni ochadi, ochilmasa snackbar ko'rsatadi.
+///
+/// Yangilanish ekrani ham, bildirishnomalar ro'yxatidagi `app_update` xabari
+/// ham SHU yo'ldan yuradi: push'ni bosganda do'kon ochilib, ro'yxatdagi o'sha
+/// xabar boshi berk ko'cha bo'lib qolgani — takrorlangan mantiq emas, YO'Q
+/// bo'lgan mantiq edi.
+Future<void> openStoreOrWarn(
+  BuildContext context,
+  String? url,
+  Locale locale,
+) async {
+  final ok = await openStore(url);
+  if (ok || !context.mounted) return;
+  showAppBanner(context, tr(locale, 'update.open_failed'), isError: true);
 }

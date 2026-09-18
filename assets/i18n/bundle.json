@@ -2078,7 +2078,9 @@
       "update.open_failed": "Could not open the store. Try again later.",
       "update.version_label": "Version",
       "update.version_yours": "Yours",
-      "update.version_new": "New"
+      "update.version_new": "New",
+      "notifications.all_read_done": "All notifications marked as read.",
+      "notifications.all_read_failed": "Couldn't mark them as read. Try again."
     },
     "ru": {
       "about.app_name": "3D kadastr",
@@ -4158,7 +4160,9 @@
       "update.open_failed": "Не удалось открыть магазин. Попробуйте позже.",
       "update.version_label": "Версия",
       "update.version_yours": "У вас",
-      "update.version_new": "Новая"
+      "update.version_new": "Новая",
+      "notifications.all_read_done": "Все уведомления отмечены прочитанными.",
+      "notifications.all_read_failed": "Не удалось отметить. Попробуйте ещё раз."
     },
     "uz": {
       "about.app_name": "3D kadastr",
@@ -6238,7 +6242,9 @@
       "update.open_failed": "Do'konni ochib bo'lmadi. Keyinroq urinib ko'ring.",
       "update.version_label": "Versiya",
       "update.version_yours": "Sizda",
-      "update.version_new": "Yangi"
+      "update.version_new": "Yangi",
+      "notifications.all_read_done": "Barcha bildirishnomalar o'qilgan deb belgilandi.",
+      "notifications.all_read_failed": "Belgilab bo'lmadi. Qayta urinib ko'ring."
     }
   },
   "version": 0

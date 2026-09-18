@@ -1,46 +1,29 @@
 import 'package:flutter/material.dart';
 
 import '../../core/i18n/app_translations.dart';
-import '../../theme/color_tokens.dart';
 
-/// "Bugun, 22:42" ko'rinishidagi sana yorlig'i (dizayndagi kulrang chip).
-class NotificationDateChip extends StatelessWidget {
-  const NotificationDateChip({super.key, required this.at, required this.locale});
-
-  final DateTime at;
-  final Locale locale;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: ColorTokens.iconBg(context),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.calendar_today_rounded,
-            size: 13,
-            color: ColorTokens.secondaryText(context),
-          ),
-          const SizedBox(width: 6),
-          Text(
-            formatNotificationDate(at, locale),
-            style: TextStyle(
-              fontFamily: 'MTSCompact',
-              fontWeight: FontWeight.w500,
-              fontSize: 12.5,
-              color: ColorTokens.secondaryText(context),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+/// Ro'yxatdagi kun sarlavhasi: "Bugun" / "Kecha" / "12.06.2026" — vaqtsiz.
+///
+/// Ro'yxatda sana har bir kartada takrorlanardi ("Kecha, 12:35" to'rt marta
+/// ketma-ket). Kun — guruh, vaqt — satr; shuning uchun ikkiga ajratilgan.
+String notificationDayLabel(DateTime at, Locale locale) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final d = DateTime(at.year, at.month, at.day);
+  if (d == today) return _today(locale);
+  if (d == today.subtract(const Duration(days: 1))) return _yesterday(locale);
+  return '${at.day.toString().padLeft(2, '0')}.'
+      '${at.month.toString().padLeft(2, '0')}.${at.year}';
 }
+
+/// Bir kunning ichida satrlarni ajratadigan yagona narsa — "16:20".
+String notificationTime(DateTime at) =>
+    '${at.hour.toString().padLeft(2, '0')}:'
+    '${at.minute.toString().padLeft(2, '0')}';
+
+/// Bir kunga tegishli ekanini aniqlaydi (guruhlash uchun).
+bool sameNotificationDay(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
 
 /// "Bugun, 22:42" / "Kecha, 22:42" / "12.06.2026, 22:42" (lokalizatsiya bilan).
 String formatNotificationDate(DateTime at, Locale locale) {

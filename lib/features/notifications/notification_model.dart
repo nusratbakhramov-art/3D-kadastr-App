@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../core/api_config.dart';
+import '../../theme/app_colors.dart';
 
-enum NotificationType { system, payment, scan, valuation, listing }
+/// `appUpdate` ALOHIDA tur: faqat shu turdagi bildirishnoma do'konga olib
+/// boradi, qolganlari «Arizalar»ga. Push'ni bosganda do'kon ochilar edi, lekin
+/// ro'yxatdagi O'SHA xabar boshi berk ko'cha edi — ikkala yo'l bir xil
+/// bo'lishi uchun tur saqlanadi.
+enum NotificationType { system, payment, scan, valuation, listing, appUpdate }
 
 @immutable
 class AppNotification {
@@ -61,6 +66,8 @@ NotificationType _typeFromString(String? t) => switch (t) {
   'scan_completed' || 'scan' => NotificationType.scan,
   'valuation_done' || 'valuation_failed' || 'valuation' => NotificationType.valuation,
   'listing' || 'moderation_result' => NotificationType.listing,
+  // Backend `app_release_service.NOTIFICATION_TYPE`.
+  'app_update' => NotificationType.appUpdate,
   _ => NotificationType.system,
 };
 
@@ -99,4 +106,11 @@ int unreadNotificationCount() =>
     const Color(0xFF8B5CF6),
   ),
   NotificationType.listing => (Icons.list_alt_rounded, const Color(0xFFF59E0B)),
+  // Brend neon yashili — yangilanish ekranlaridagi CTA bilan bir xil rang,
+  // shuning uchun "yangilanish" butun ilovada bitta rangda gapiradi. Skanning
+  // zumrad yashilidan (#10B981) sezilarli farq qiladi.
+  NotificationType.appUpdate => (
+    Icons.system_update_alt_rounded,
+    AppColors.splashGreen,
+  ),
 };

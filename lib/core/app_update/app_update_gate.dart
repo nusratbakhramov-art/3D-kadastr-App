@@ -128,7 +128,6 @@ class _S {
   static String requiredBody(Locale l) => tr(l, 'update.required_body');
   static String optionalTitle(Locale l) => tr(l, 'update.optional_title');
   static String optionalBody(Locale l) => tr(l, 'update.optional_body');
-  static String openFailed(Locale l) => tr(l, 'update.open_failed');
   static String versionYours(Locale l) => tr(l, 'update.version_yours');
   static String versionNew(Locale l) => tr(l, 'update.version_new');
 }
@@ -137,13 +136,7 @@ Future<void> _openStoreOrWarn(
   BuildContext context,
   AppRelease release,
   Locale locale,
-) async {
-  final ok = await openStore(release.storeUrl);
-  if (ok || !context.mounted) return;
-  ScaffoldMessenger.maybeOf(
-    context,
-  )?.showSnackBar(SnackBar(content: Text(_S.openFailed(locale))));
-}
+) => openStoreOrWarn(context, release.storeUrl, locale);
 
 /// Chiqib bo'lmaydigan ekran — majburiy yangilanish.
 ///
