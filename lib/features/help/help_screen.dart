@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
@@ -8,6 +9,7 @@ import '../../widgets/app_header_back.dart';
 import '../../widgets/app_menu_card.dart';
 import '../../widgets/app_reveal.dart';
 import '../settings/settings_state.dart';
+import '../support/support_service.dart';
 
 class HelpScreen extends StatefulWidget {
   const HelpScreen({super.key});
@@ -21,15 +23,70 @@ class _HelpScreenState extends State<HelpScreen>
   @override
   int get currentToken => 1;
 
+  /// Aloqa ma'lumotlari adminkadan keladi (Sozlamalar -> support_info), xuddi
+  /// asosiy ekran va AI holati ekranidagidek. Oldin bu yerda uchta qator
+  /// KODGA YOZILGAN edi va uchalasi ham NOTO'G'RI ko'rsatilardi:
+  /// "@kadastr_bot", "support@example.uz" (RFC 2606 namuna domeni) va
+  /// "+998 71 200 00 00". Admin ularni o'zgartira olmasdi — yangi reliz kerak
+  /// edi. Endi manba bitta: `SupportService`.
+  final SupportService _support = SupportService();
+  SupportInfo _info = const SupportInfo(phone: SupportService.fallbackPhone);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSupportInfo();
+  }
+
+  Future<void> _loadSupportInfo() async {
+    // Xato bo'lsa jim qaytadi va zaxira raqam qoladi — yordam sahifasi
+    // tarmoqsiz ham ochilishi kerak.
+    final info = await _support.fetchInfo();
+    if (mounted) setState(() => _info = info);
+  }
+
+  /// Adminka "@nick" ham, to'liq havola ham kiritishi mumkin.
+  Uri _telegramUri(String raw) {
+    final v = raw.trim();
+    if (v.startsWith('http://') || v.startsWith('https://')) return Uri.parse(v);
+    return Uri.parse('https://t.me/${v.replaceFirst('@', '')}');
+  }
+
+  Future<void> _open(Uri uri) async {
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // Qurilmada mos ilova yo'q — jim o'tamiz, sahifa buzilmaydi.
+    }
+  }
+
+  /// Savollar soni KODDA emas, tarjimalar to'plamida hal bo'ladi.
+  ///
+  /// Oldin `for (var i = 1; i <= 5; i++)` turardi: admin Tarjimalar sahifasida
+  /// matnni o'zgartira olardi, lekin oltinchi savolni QO'SHA olmasdi va
+  /// beshtadan kamini ham qila olmasdi — buning uchun yangi reliz kerak edi.
+  /// `tr` topilmagan kalitni kalitning o'zi qilib qaytargani uchun mavjudligini
+  /// shundan bilamiz.
+  static const int _faqLimit = 30; // cheksiz aylanmaslik uchun xavfsizlik chegarasi
+  List<({String q, String a})> _faqs(Locale locale) {
+    final out = <({String q, String a})>[];
+    for (var i = 1; i <= _faqLimit; i++) {
+      final qKey = 'help.faq.q$i';
+      final aKey = 'help.faq.a$i';
+      final q = tr(locale, qKey);
+      final a = tr(locale, aKey);
+      if (q == qKey) break; // savol tugadi
+      out.add((q: q, a: a == aKey ? '' : a));
+    }
+    return out;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<Locale>(
       valueListenable: localeNotifier,
       builder: (context, locale, _) {
-        final faqs = <({String q, String a})>[
-          for (var i = 1; i <= 5; i++)
-            (q: tr(locale, 'help.faq.q$i'), a: tr(locale, 'help.faq.a$i')),
-        ];
+        final faqs = _faqs(locale);
         return Scaffold(
           backgroundColor: ColorTokens.scaffoldBg(context),
           body: Stack(
@@ -92,30 +149,35 @@ class _HelpScreenState extends State<HelpScreen>
                           curve: Curves.easeOutCubic,
                         ),
                         child: AppMenuCard(
+                          // Bo'sh maydon ko'rsatilmaydi: adminka telegramni
+                          // tozalasa, qator yo'qoladi — "—" yoki eski qiymat
+                          // qolib ketmaydi.
                           rows: [
-                            AppMenuRow(
-                              icon: Icons.send_rounded,
-                              label: tr(locale, 'help.telegram'),
-                              trailing: const _ContactValue(
-                                text: '@kadastr_bot',
+                            if ((_info.telegram ?? '').isNotEmpty)
+                              AppMenuRow(
+                                icon: Icons.send_rounded,
+                                label: tr(locale, 'help.telegram'),
+                                trailing: _ContactValue(text: _info.telegram!),
+                                onTap: hapticTap(
+                                  () => _open(_telegramUri(_info.telegram!)),
+                                ),
                               ),
-                              onTap: () {},
-                            ),
-                            AppMenuRow(
-                              icon: Icons.mail_outline_rounded,
-                              label: tr(locale, 'help.email'),
-                              trailing: const _ContactValue(
-                                text: 'support@example.uz',
+                            if ((_info.email ?? '').isNotEmpty)
+                              AppMenuRow(
+                                icon: Icons.mail_outline_rounded,
+                                label: tr(locale, 'help.email'),
+                                trailing: _ContactValue(text: _info.email!),
+                                onTap: hapticTap(
+                                  () => _open(Uri(scheme: 'mailto', path: _info.email!)),
+                                ),
                               ),
-                              onTap: () {},
-                            ),
                             AppMenuRow(
                               icon: Icons.call_outlined,
                               label: tr(locale, 'help.phone'),
-                              trailing: const _ContactValue(
-                                text: '+998 71 200 00 00',
+                              trailing: _ContactValue(text: _info.callNumber),
+                              onTap: hapticTap(
+                                () => _open(Uri(scheme: 'tel', path: _info.callNumber)),
                               ),
-                              onTap: () {},
                             ),
                           ],
                         ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/api_config.dart';
 
@@ -38,6 +39,16 @@ class SupportInfo {
     workingHours: (json['working_hours'] as String?)?.trim(),
     callCenter: (json['call_center'] as String?)?.trim(),
   );
+
+  /// Diskka saqlash uchun — backend javobi bilan bir xil kalitlar, shuning
+  /// uchun o'qishda ham [fromJson] ishlaydi.
+  Map<String, dynamic> toJson() => {
+    'phone': phone,
+    'email': email,
+    'telegram': telegram,
+    'working_hours': workingHours,
+    'call_center': callCenter,
+  };
 }
 
 /// `GET /api/v1/support/info` orqali qo'llab-quvvatlash ma'lumotlarini oladi.
@@ -60,6 +71,15 @@ class SupportService {
 
   static SupportInfo? _cache;
 
+  /// Oxirgi muvaffaqiyatli javob diskda — `AppTranslationsStore` bilan bir xil
+  /// yondashuv.
+  ///
+  /// Xotiradagi kesh jarayon bilan birga o'ladi: ilova YOPILIB, internetsiz
+  /// qaytadan ochilsa, aloqa ma'lumotlari yo'qolardi va Yordam sahifasida
+  /// faqat zaxira raqam qolardi. Telegram va pochta aynan aloqa yo'q paytda
+  /// kerak bo'ladi.
+  static const String _prefsKey = 'support_info_v1';
+
   Future<SupportInfo> fetchInfo({bool forceRefresh = false}) async {
     if (!forceRefresh && _cache != null) return _cache!;
     try {
@@ -73,11 +93,44 @@ class SupportService {
         final body = jsonDecode(res.body) as Map<String, dynamic>;
         final info = SupportInfo.fromJson(body);
         _cache = info;
+        // Kutamiz: yozuv mikrosoniyalik ish, lekin "olindi" deyilgach u
+        // DISKDA bo'lishi kerak — aks holda ilova shu zahoti yopilsa,
+        // keyingi internetsiz ochilishda hech narsa qolmaydi.
+        await _persist(info);
         return info;
       }
     } catch (_) {
-      // Tarmoq/parsing xatosi — pastdagi zaxira raqamga tushamiz.
+      // Tarmoq/parsing xatosi — quyida oxirgi ma'lum qiymatga tushamiz.
     }
-    return _cache ?? const SupportInfo(phone: fallbackPhone);
+    if (_cache != null) return _cache!;
+    final stored = await _restore();
+    if (stored != null) {
+      _cache = stored;
+      return stored;
+    }
+    return const SupportInfo(phone: fallbackPhone);
   }
+
+  Future<void> _persist(SupportInfo info) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_prefsKey, jsonEncode(info.toJson()));
+    } catch (_) {
+      // Saqlanmasa ham ilova ishlayveradi — bu faqat qulaylik.
+    }
+  }
+
+  Future<SupportInfo?> _restore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_prefsKey);
+      if (raw == null || raw.isEmpty) return null;
+      return SupportInfo.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Testlar uchun: jarayon keshi statik bo'lgani uchun tozalash kerak.
+  static void resetCacheForTest() => _cache = null;
 }

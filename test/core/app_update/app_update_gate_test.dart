@@ -9,6 +9,9 @@ import 'package:kadastr/core/app_update/app_update_store.dart';
 import 'package:kadastr/core/app_version.dart';
 import 'package:kadastr/core/i18n/app_translations.dart';
 
+/// Hech qachon `kAppVersion` ga teng bo'lmaydigan versiya.
+const String _futureVersion = '99.0.0';
+
 const _child = Scaffold(body: Center(child: Text('ILOVA MAZMUNI')));
 
 Widget _app() => MaterialApp(
@@ -93,10 +96,15 @@ void main() {
   testWidgets('required update replaces the whole app with a blocking screen',
       (tester) async {
     await tester.pumpWidget(_app());
+    // Ataylab ilovaning O'Z versiyasidan uzoq: bu test "SIZDA x -> YANGI y"
+    // qatorining IKKALA tomonini ham tekshiradi, shuning uchun ular bir xil
+    // matn bo'lib qolmasligi kerak. Avval bu yerda '1.0.6' turardi va
+    // `kAppVersion` 1.0.5 dan 1.0.6 ga ko'tarilgan kuni test sindi:
+    // `find.text('1.0.6')` ikkita widget topdi.
     appReleaseNotifier.value = const AppRelease(
       hasUpdate: true,
       required: true,
-      version: '1.0.6',
+      version: _futureVersion,
       title: 'Yangilanish shart',
       subtitle: 'Eski versiya qo\'llab-quvvatlanmaydi',
     );
@@ -109,7 +117,7 @@ void main() {
     // "Keyinroq" YO'Q — chiqib ketish yo'li yo'q.
     expect(find.text('Keyinroq'), findsNothing);
     // Versiya endi chip sifatida ko'rsatiladi: joriy → yangi.
-    expect(find.text('1.0.6'), findsOneWidget);
+    expect(find.text(_futureVersion), findsOneWidget);
     expect(find.text(kAppVersion), findsOneWidget);
   });
 
