@@ -189,7 +189,15 @@ class _BozorDealStepScreenState extends State<BozorDealStepScreen> {
                         subtitle:
                             '${draft.stepNumber(WizardStep.deal)}'
                             '/${draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.deal) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.deal) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),

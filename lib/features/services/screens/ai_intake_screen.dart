@@ -7,8 +7,8 @@
 ///   • Rooms (optional)                        → dynamic breakdown
 ///
 /// Files are uploaded to S3 the moment they're picked; the returned keys are
-/// stored on the bundle. Photos (at least 4 per room and no fewer than 12 in
-/// total), kadastr documents, and the floor numbers are required to enable
+/// stored on the bundle. Photos (at least 4 in total — see [_minPhotos]),
+/// kadastr documents, and the floor numbers are required to enable
 /// "Hisoblash"; passport and rooms are optional. Tapping the still-disabled
 /// button surfaces what's missing (no permanent banner).
 library;
@@ -124,9 +124,14 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   // user gets a friendly hint instead of a raw 422 from the server.
   static const int _maxFloors = 200;
 
-  // Photo minimum: a flat 12 photos total (owner spec — this is the required
-  // minimum and does NOT scale per room; never more than 12 required).
-  static const int _minPhotos = 12;
+  // Photo minimum: a flat 4 photos total (owner spec, lowered from 12 on
+  // 2026-09-21 — this is the required minimum and does NOT scale per room).
+  //
+  // ⚠️ The wording next to the field is NOT here: it comes from the backend
+  // translation bundle (`services.ai.intake.object_photos_hint` /
+  // `…_bullet1`), which admins edit. Changing this constant alone leaves the
+  // hint saying "12" — the bundle rows have to be updated too.
+  static const int _minPhotos = 4;
   static const int _maxPhotos = 60;
 
   // How many photos we require before "Hisoblash" unlocks.

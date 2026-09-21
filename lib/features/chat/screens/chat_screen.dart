@@ -554,17 +554,9 @@ class _Bubble extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: SvgPicture.asset(
-                'assets/icons/tab-home.svg',
-                width: 15,
-                height: 15,
-                colorFilter: const ColorFilter.mode(
-                  AppColors.splashGreen,
-                  BlendMode.srcIn,
-                ),
-              ),
+            const Padding(
+              padding: EdgeInsets.only(top: 1),
+              child: _BotMark(size: 20),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -615,6 +607,29 @@ class _Bubble extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Bot javobining yonidagi belgi — ILOVANING LOGOSI.
+///
+/// ⚠️ Ilgari bu yerda `assets/icons/tab-home.svg` yashil rangga bo'yalib
+/// turardi: u pastki menyudagi "Bosh sahifa" ikonkasi, ya'ni suhbatda u
+/// yordamchini emas, boshqa tugmani bildirardi. Endi mavjud brend assetidan
+/// (`splash-logo.svg` — splash va «Ilova haqi» dagi bilan bir xil)
+/// foydalanamiz; YANGI asset qo'shilmadi.
+///
+/// Logo KO'P RANGLI — `colorFilter` ATAYLAB YO'Q, aks holda gradient bir
+/// tekis dog'ga aylanardi.
+class _BotMark extends StatelessWidget {
+  const _BotMark({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => SvgPicture.asset(
+    'assets/branding/splash-logo.svg',
+    width: size,
+    height: size,
+  );
 }
 
 /// Xato qatori — ataylab bot javobiga o'xshamaydi: brend belgisi yo'q, fon
@@ -769,15 +784,7 @@ class _ThinkingRowState extends State<_ThinkingRow>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SvgPicture.asset(
-            'assets/icons/tab-home.svg',
-            width: 16,
-            height: 16,
-            colorFilter: const ColorFilter.mode(
-              AppColors.splashGreen,
-              BlendMode.srcIn,
-            ),
-          ),
+          const _BotMark(size: 20),
           const SizedBox(width: 9),
           AnimatedBuilder(
             animation: _shimmer,

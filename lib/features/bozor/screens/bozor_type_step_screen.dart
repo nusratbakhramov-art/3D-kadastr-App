@@ -196,6 +196,28 @@ class _BozorTypeStepScreenState extends State<BozorTypeStepScreen> {
     final bg = isDark ? AppColors.greenBlack : AppColors.lightBackground;
     final kind = _draft.kind;
 
+    // Birinchi qadamda «orqaga» — OQIMDAN CHIQISH. Tizim tugmasi va iOS'dagi
+    // chetdan surish ham shu yo'ldan o'tishi kerak, aks holda tugma tasdiq
+    // so'rar, surish esa jimgina e'lonni tashlab chiqib ketardi.
+    //
+    // Qolgan qadamlarda PopScope YO'Q: u yerda pop — oddiy «bitta qadam
+    // orqaga», tasdiqlashning keragi yo'q.
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        confirmCloseBozorWizard(context);
+      },
+      child: _scaffold(context, l, bg, kind),
+    );
+  }
+
+  Widget _scaffold(
+    BuildContext context,
+    Locale l,
+    Color bg,
+    PropertyKind? kind,
+  ) {
     return Scaffold(
       backgroundColor: bg,
       body: SafeArea(
@@ -215,7 +237,15 @@ class _BozorTypeStepScreenState extends State<BozorTypeStepScreen> {
                         // noturar joy" da 6 ta qadam bo'ladi, qolganida 7 ta.
                         subtitle: '${_draft.stepNumber(WizardStep.type)}'
                             '/${_draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: _draft.stepIndex(WizardStep.type) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: _draft.stepIndex(WizardStep.type) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),

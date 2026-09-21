@@ -2080,7 +2080,11 @@
       "update.version_yours": "Yours",
       "update.version_new": "New",
       "notifications.all_read_done": "All notifications marked as read.",
-      "notifications.all_read_failed": "Couldn't mark them as read. Try again."
+      "notifications.all_read_failed": "Couldn't mark them as read. Try again.",
+      "bozor.exit.title": "Cancel the listing?",
+      "bozor.exit.body": "What you entered stays in the draft — you can continue from “My listings”.",
+      "bozor.exit.stay": "Keep editing",
+      "bozor.exit.leave": "Leave"
     },
     "ru": {
       "about.app_name": "3D kadastr",
@@ -4162,7 +4166,11 @@
       "update.version_yours": "У вас",
       "update.version_new": "Новая",
       "notifications.all_read_done": "Все уведомления отмечены прочитанными.",
-      "notifications.all_read_failed": "Не удалось отметить. Попробуйте ещё раз."
+      "notifications.all_read_failed": "Не удалось отметить. Попробуйте ещё раз.",
+      "bozor.exit.title": "Отменить объявление?",
+      "bozor.exit.body": "Введённые данные сохранятся в черновике — продолжить можно из «Моих объявлений».",
+      "bozor.exit.stay": "Продолжить",
+      "bozor.exit.leave": "Выйти"
     },
     "uz": {
       "about.app_name": "3D kadastr",
@@ -6244,7 +6252,11 @@
       "update.version_yours": "Sizda",
       "update.version_new": "Yangi",
       "notifications.all_read_done": "Barcha bildirishnomalar o'qilgan deb belgilandi.",
-      "notifications.all_read_failed": "Belgilab bo'lmadi. Qayta urinib ko'ring."
+      "notifications.all_read_failed": "Belgilab bo'lmadi. Qayta urinib ko'ring.",
+      "bozor.exit.title": "E'lonni bekor qilmoqchimisiz?",
+      "bozor.exit.body": "Kiritilgan ma'lumotlar qoralamada saqlanadi — «Mening e'lonlarim» dan davom ettirishingiz mumkin.",
+      "bozor.exit.stay": "Davom etish",
+      "bozor.exit.leave": "Chiqish"
     }
   },
   "version": 0

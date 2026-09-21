@@ -589,7 +589,15 @@ class _BozorDescriptionStepScreenState
                         subtitle:
                             '${draft.stepNumber(WizardStep.description)}'
                             '/${draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.description) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.description) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -647,6 +655,9 @@ class _BozorDescriptionStepScreenState
                           MediaUploadRow(
                             label: _S.add360(l),
                             iconAsset: 'assets/icons/upload-360.svg',
+                            // Yotiq ikonka — `MediaUploadRow.iconSize` izohiga
+                            // qarang (PANO-04).
+                            iconSize: 22,
                             paths: _d.panoramas,
                             // Eskiz serverdan keladi — kadrlar o'chirilgan,
                             // lokal nusxa yo'q.

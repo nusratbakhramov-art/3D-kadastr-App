@@ -56,7 +56,7 @@ Future<void> saveAiDraftStep(AiBaholashBundle bundle, String nextStep) async {
   try {
     await service.updateDraft(
       id,
-      payload: bundle.toJson(),
+      payload: bundle.toJson(forDraft: true),
       currentStep: nextStep,
       token: token,
     );

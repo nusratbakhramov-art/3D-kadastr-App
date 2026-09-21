@@ -31,10 +31,24 @@ class MediaUploadRow extends StatelessWidget {
     this.urlOf,
     this.fileOf,
     this.statusOf,
+    this.iconSize = _defaultIconSize,
   });
+
+  /// Qatordagi ikonka o'lchami. Sukut hamma qatorda bir xil.
+  static const double _defaultIconSize = 26;
 
   final String label;
   final String iconAsset;
+
+  /// Ikonka kvadratining tomoni.
+  ///
+  /// ⚠️ NEGA SOZLANADIGAN. `upload-360.svg` boshqa ikonkalardan farqli
+  /// o'laroq YOTIQ (21 × 14.9): bitta 26 pt li kvadratga sig'dirilganda u
+  /// to'liq kenglikni egallaydi va foto/planirovka qatorlaridagi ikonkalardan
+  /// yirikroq ko'rinadi. Umumiy sukutni kichraytirish qolgan ikki qatorni ham
+  /// mayda qilib yuborardi, shuning uchun o'lchamni faqat 360° qatori
+  /// pasaytiradi.
+  final double iconSize;
 
   /// Tanlangan yozuvlar. Odatda LOKAL YO'L, 360° qatorida esa S3 KALITI
   /// ([urlOf] ga qarang).
@@ -99,8 +113,8 @@ class MediaUploadRow extends StatelessWidget {
                 children: [
                   SvgPicture.asset(
                     iconAsset,
-                    width: 26,
-                    height: 26,
+                    width: iconSize,
+                    height: iconSize,
                     colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
                   ),
                   const SizedBox(width: 12),

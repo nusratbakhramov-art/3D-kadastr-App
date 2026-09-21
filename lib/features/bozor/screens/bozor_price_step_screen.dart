@@ -145,7 +145,15 @@ class _BozorPriceStepScreenState extends State<BozorPriceStepScreen> {
                         title: tr(l, 'bozor.price.title'),
                         subtitle:
                             '${draft.stepNumber(WizardStep.price)}/${draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.price) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.price) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),

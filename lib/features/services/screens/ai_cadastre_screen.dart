@@ -356,6 +356,23 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
       );
       _bundle = bundle;
     }
+    // Xaritada tanlangan UCHASTKANING markazi joylashuv qadamiga olib
+    // o'tiladi. Busiz o'sha qadam pinni kadastr MANZILI matnini geokodlab
+    // qo'yardi va manzil topilmasa Toshkent markazida qolardi — foydalanuvchi
+    // obyektni allaqachon xaritada ko'rsatgan bo'lsa ham.
+    //
+    // Raqam qo'lda o'zgartirilgan bo'lsa (`_parcel` shunda tozalanadi) markaz
+    // ham yozilmaydi — eski uyning nuqtasi yangi raqam ostida qolib ketmasin.
+    final parcelCenter = _parcel?.cadastreNumber == info.cadastreNumber
+        ? _parcel?.center
+        : null;
+    if (parcelCenter != null) {
+      bundle.parcelCenter = AiParcelPoint(
+        lat: parcelCenter.latitude,
+        lng: parcelCenter.longitude,
+        cadastreNumber: info.cadastreNumber,
+      );
+    }
     // Fon rejimida saqlash — sekin backend "Davom etish"'ni muzlatmasin.
     saveAiDraftStepInBackground(bundle, 'client');
     Navigator.of(context).push(

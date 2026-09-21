@@ -8,6 +8,7 @@ import '../../widgets/app_glow_background.dart';
 import '../../widgets/app_header_back.dart';
 import '../../widgets/app_menu_card.dart';
 import '../../widgets/app_reveal.dart';
+import '../../widgets/app_toast.dart';
 import '../settings/settings_state.dart';
 import '../support/support_service.dart';
 
@@ -46,18 +47,40 @@ class _HelpScreenState extends State<HelpScreen>
   }
 
   /// Adminka "@nick" ham, to'liq havola ham kiritishi mumkin.
-  Uri _telegramUri(String raw) {
+  ///
+  /// Buzuq qiymat (bo'sh, probel, `Uri.parse` hazm qilmaydigan matn) `null`
+  /// qaytaradi — qator umuman bosilmaydigan bo'ladi, `Uri.parse` esa
+  /// `FormatException` bilan yiqilmaydi.
+  Uri? _telegramUri(String raw) {
     final v = raw.trim();
-    if (v.startsWith('http://') || v.startsWith('https://')) return Uri.parse(v);
-    return Uri.parse('https://t.me/${v.replaceFirst('@', '')}');
+    if (v.isEmpty) return null;
+    if (v.startsWith('http://') || v.startsWith('https://')) {
+      return Uri.tryParse(v);
+    }
+    final handle = v.replaceFirst(RegExp(r'^@'), '').trim();
+    if (handle.isEmpty) return null;
+    return Uri.tryParse('https://t.me/$handle');
   }
 
-  Future<void> _open(Uri uri) async {
-    try {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      // Qurilmada mos ilova yo'q — jim o'tamiz, sahifa buzilmaydi.
+  /// Havolani ochadi va OCHILMASA aytadi.
+  ///
+  /// ⚠️ Ilgari natija ham, istisno ham JIM YUTILARDI: qurilmada Telegram
+  /// bo'lmasa yoki adminka buzuq qiymat kiritsa, qator bosilardi-yu hech
+  /// narsa bo'lmasdi va foydalanuvchi ilovani "qotib qolgan" deb o'ylardi.
+  /// `launchUrl` ko'p holda xato TASHLAMAYDI — `false` qaytaradi, shuning
+  /// uchun natijani ham tekshirish shart.
+  Future<void> _open(Uri? uri) async {
+    final locale = localeNotifier.value;
+    var ok = false;
+    if (uri != null) {
+      try {
+        ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {
+        ok = false;
+      }
     }
+    if (ok || !mounted) return;
+    AppToast.error(context, tr(locale, 'support.launch_failed'));
   }
 
   /// Savollar soni KODDA emas, tarjimalar to'plamida hal bo'ladi.

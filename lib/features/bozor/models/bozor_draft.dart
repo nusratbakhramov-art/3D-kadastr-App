@@ -174,11 +174,17 @@ extension PropertyTypeAddressX on PropertyType {
   /// `Номер квартиры` faqat kvartirada bo'ladi; umumiysi `Этажей в доме`.
   /// Qolgan to'rt turda qo'shimcha qator umuman yo'q.
   List<AddressRow> get addressRows {
+    // ⚠️ `AddressRow.landmark` («Mo'ljal») ATAYLAB YO'Q — mijoz talabi bilan
+    // 2026-09-21 da formadan olib tashlandi. Enum qiymati, model maydoni,
+    // kodek va `landmark` API maydoni JOYIDA QOLDI: backendda u `nullable`
+    // (`app/schemas/bozor_listing.py` — `landmark: str | None`), eski
+    // qoralamalar va tahrirlanayotgan e'lonlar esa qiymatni saqlab qolishi
+    // kerak. Ya'ni maydon faqat KO'RSATILMAYDI; hech qayerga bo'sh yoki
+    // o'ylab topilgan qiymat yuborilmaydi.
     const common = [
       AddressRow.region,
       AddressRow.district,
       AddressRow.address,
-      AddressRow.landmark,
     ];
     return switch (this) {
       PropertyType.apartment || PropertyType.newBuildingApartment => const [
