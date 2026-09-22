@@ -6,13 +6,15 @@ import 'package:kadastr/features/bozor/screens/bozor_description_step_screen.dar
 import 'package:kadastr/features/bozor/screens/bozor_price_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_type_step_screen.dart';
 import 'package:kadastr/features/services/widgets/service_app_bar.dart';
+import 'package:kadastr/widgets/sheet_button.dart';
 
 /// Sehrgar sarlavhasidagi ikki tugma (FLOW-01…07).
 ///
 /// Mijoz sharhi: 6/8 «Tavsif» dagi ← foydalanuvchini bosh sahifaga otib
 /// yuborardi — u yagona tugma bo'lib, butun oqimni yopardi. Endi:
 ///   * ← — bitta qadam orqaga, hech qanday tasdiq oynasisiz;
-///   * × — oqimni tark etish, BITTA marta so'raladigan tasdiq bilan;
+///   * × — oqimni tark etish, BITTA marta so'raladigan tasdiq bilan
+///     (pastki DRAWER, `SheetButton` lar bilan — Material `AlertDialog` emas);
 ///   * 1-qadamda × yo'q (orqaga qaytadigan joy yo'q, ← ning o'zi chiqish).
 void main() {
   BozorDraft draft() => BozorDraft(
@@ -55,6 +57,21 @@ void main() {
         ),
       );
 
+  /// Tasdiq — pastki drawer, ya'ni uni `SheetButton` lari bo'yicha topamiz.
+  /// Birinchisi — «Davom etish» (yashil, oqimda qoladi), ikkinchisi —
+  /// «Chiqish» (qizil tonal).
+  Finder exitSheet() => find.byType(SheetButton);
+  Finder stayButton() => exitSheet().first;
+  Finder leaveButton() => exitSheet().last;
+
+  void expectNoDialogWidgets(WidgetTester tester) {
+    expect(
+      find.byType(AlertDialog),
+      findsNothing,
+      reason: 'ilovada so\'rov oynalari DRAWER — Material dialog ishlatilmaydi',
+    );
+  }
+
   testWidgets('6/8: ← oldingi qadamga qaytaradi, tasdiq so\'ramaydi', (
     tester,
   ) async {
@@ -65,34 +82,35 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     expect(find.byType(BozorPriceStepScreen), findsOneWidget);
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(exitSheet(), findsNothing);
+    expectNoDialogWidgets(tester);
     expect(find.text('RO\'YXAT'), findsNothing);
     await flushTimers(tester);
   });
 
-  testWidgets('6/8: × tasdiq so\'raydi; «davom» bosilsa oqimda qolamiz', (
+  testWidgets('6/8: × drawer ochadi; «Davom etish» bosilsa oqimda qolamiz', (
     tester,
   ) async {
     await openDescription(tester);
 
     appBar(tester, BozorDescriptionStepScreen).onClose!();
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(exitSheet(), findsNWidgets(2));
+    expectNoDialogWidgets(tester);
 
-    // Birinchi amal (chapdagi «davom etish») — oynani yopadi, oqim joyida.
-    await tester.tap(find.byType(TextButton));
+    await tester.tap(stayButton());
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(exitSheet(), findsNothing);
     expect(find.byType(BozorDescriptionStepScreen), findsOneWidget);
     await flushTimers(tester);
   });
 
-  testWidgets('6/8: × tasdiqlansa butun oqim yopiladi', (tester) async {
+  testWidgets('6/8: «Chiqish» bosilsa butun oqim yopiladi', (tester) async {
     await openDescription(tester);
 
     appBar(tester, BozorDescriptionStepScreen).onClose!();
     await tester.pumpAndSettle();
-    await tester.tap(find.byType(FilledButton));
+    await tester.tap(leaveButton());
     await tester.pumpAndSettle();
 
     expect(find.text('RO\'YXAT'), findsOneWidget);
@@ -111,15 +129,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byType(AlertDialog),
-      findsOneWidget,
-      reason: 'ikkita ustma-ust oyna bo\'lsa, birinchisini yopish '
+      exitSheet(),
+      findsNWidgets(2),
+      reason: 'ikkita ustma-ust drawer bo\'lsa, birinchisini yopish '
           'ikkinchisini ochiq qoldirardi — foydalanuvchi bir xil savolga '
-          'ikki marta javob berardi (FLOW-07)',
+          'ikki marta javob berardi (FLOW-07). Bitta drawer = 2 ta tugma.',
     );
-    await tester.tap(find.byType(TextButton));
+    await tester.tap(stayButton());
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(exitSheet(), findsNothing);
     await flushTimers(tester);
   });
 
@@ -170,9 +188,9 @@ void main() {
     // Android tizim tugmasi / dasturiy pop — `onPopInvokedWithResult` yo'li.
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byType(AlertDialog), findsOneWidget);
+    expect(exitSheet(), findsNWidgets(2));
 
-    await tester.tap(find.byType(TextButton)); // «Davom etish»
+    await tester.tap(stayButton());
     await tester.pumpAndSettle();
     expect(find.byType(BozorTypeStepScreen), findsOneWidget);
     expect(find.text('RO\'YXAT'), findsNothing);
@@ -196,7 +214,7 @@ void main() {
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.byType(BozorPriceStepScreen), findsOneWidget);
-    expect(find.byType(AlertDialog), findsNothing);
+    expect(exitSheet(), findsNothing);
     await flushTimers(tester);
   });
 
