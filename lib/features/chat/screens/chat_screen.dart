@@ -330,7 +330,15 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             IconButton(
               onPressed: hapticTap(_newChat),
               tooltip: tr(widget.locale, 'chat.new_chat'),
-              icon: const Icon(Icons.edit_square, size: 20),
+              // The house pen-square (same mark as profile edit), not
+              // Icons.edit_square — the Material glyph is a heavy filled box
+              // that clashes with this header's thin strokes.
+              icon: SvgPicture.asset(
+                'assets/icons/pen-square.svg',
+                width: 21,
+                height: 21,
+                colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+              ),
             ),
         ],
       ),
@@ -556,7 +564,7 @@ class _Bubble extends StatelessWidget {
           children: [
             const Padding(
               padding: EdgeInsets.only(top: 1),
-              child: _BotMark(size: 20),
+              child: _BotMark(size: 22),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -609,26 +617,35 @@ class _Bubble extends StatelessWidget {
   }
 }
 
-/// Bot javobining yonidagi belgi — ILOVANING LOGOSI.
+/// Bot javobining yonidagi avatar — `assets/branding/chatbot.png`.
 ///
-/// ⚠️ Ilgari bu yerda `assets/icons/tab-home.svg` yashil rangga bo'yalib
-/// turardi: u pastki menyudagi "Bosh sahifa" ikonkasi, ya'ni suhbatda u
-/// yordamchini emas, boshqa tugmani bildirardi. Endi mavjud brend assetidan
-/// (`splash-logo.svg` — splash va «Ilova haqi» dagi bilan bir xil)
-/// foydalanamiz; YANGI asset qo'shilmadi.
+/// ⚠️ IKKI MARTA NOTO'G'RI BO'LGAN JOY. Avval bu yerda
+/// `assets/icons/tab-home.svg` yashil rangga bo'yalib turardi — u pastki
+/// menyudagi «Bosh sahifa» ikonkasi, ya'ni suhbatda butunlay boshqa narsani
+/// bildirardi. Keyin `splash-logo.svg` qo'yildi — u ham noto'g'ri edi: splash
+/// logosi ilovaning o'zining belgisi, yordamchining emas. To'g'ri asset —
+/// egasi bergan `chatbot.png`.
 ///
-/// Logo KO'P RANGLI — `colorFilter` ATAYLAB YO'Q, aks holda gradient bir
-/// tekis dog'ga aylanardi.
+/// RANG FILTRI YO'Q: PNG ko'p rangli va tayyor holda ishlatiladi.
+/// Kvadrat (797 × 797) — `BoxFit.contain` cho'zilishdan va kesilishdan
+/// saqlaydi, `FilterQuality.medium` esa retina ekranda maydalashtirilganda
+/// qirralarni silliq qoldiradi.
 class _BotMark extends StatelessWidget {
   const _BotMark({required this.size});
 
   final double size;
 
   @override
-  Widget build(BuildContext context) => SvgPicture.asset(
-    'assets/branding/splash-logo.svg',
+  Widget build(BuildContext context) => SizedBox(
     width: size,
     height: size,
+    child: Image.asset(
+      'assets/branding/chatbot.png',
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      // Asset yo'qolsa suhbat BUZILMASIN: bo'sh joy qoladi, qator chiziladi.
+      errorBuilder: (_, _, _) => const SizedBox.shrink(),
+    ),
   );
 }
 
@@ -784,7 +801,7 @@ class _ThinkingRowState extends State<_ThinkingRow>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const _BotMark(size: 20),
+          const _BotMark(size: 22),
           const SizedBox(width: 9),
           AnimatedBuilder(
             animation: _shimmer,
@@ -1062,9 +1079,16 @@ class _InputBarState extends State<_InputBar> {
   }
 }
 
-/// Typographic empty state: no avatar, no illustration. The greeting is the
-/// hero and the suggestions are plain rows — nothing to render, nothing to
-/// load, and it stays legible whatever the theme.
+/// Mascot + typographic empty state. The greeting is the hero, the mascot
+/// waves from the top right, and the suggestions stay plain rows so the screen
+/// keeps working whatever the theme.
+
+/// Drawn size of the mascot, and how much room the greeting leaves for it.
+/// The gutter is smaller than the artwork because the PNG carries transparent
+/// margin on its left — the waving arm is the only thing that reaches out.
+const double _kMascotSize = 148;
+const double _kMascotTextGutter = 104;
+
 class _EmptyState extends StatelessWidget {
   const _EmptyState({
     required this.lang,
@@ -1100,37 +1124,72 @@ class _EmptyState extends StatelessWidget {
         return ListView(
           padding: EdgeInsets.fromLTRB(20, topInset + 20, 20, bottomInset + 16),
           children: [
-            Text(
-              tr(Locale(lang), 'chat.kicker'),
-              style: const TextStyle(
-                fontFamily: 'MTSCompact',
-                fontSize: 10.5,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
-                color: AppColors.splashGreen,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text.rich(
-              TextSpan(
-                children: [
-                  TextSpan(
-                    text: '${_greetLead(lang, name)}\n',
-                    style: TextStyle(color: strong),
+            // The mascot sits on the right of the greeting, as in the design.
+            // The text is padded clear of it rather than drawn under it: the
+            // greeting carries the user's name and can run to three lines, so
+            // a literal overlap would hide real words.
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(right: _kMascotTextGutter),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        tr(Locale(lang), 'chat.kicker'),
+                        style: const TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                          color: AppColors.splashGreen,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: '${_greetLead(lang, name)}\n',
+                              style: TextStyle(color: strong),
+                            ),
+                            TextSpan(
+                              text: tr(Locale(lang), 'chat.greet_ask'),
+                              style: TextStyle(color: muted),
+                            ),
+                          ],
+                        ),
+                        style: const TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                          height: 1.12,
+                          letterSpacing: -1,
+                        ),
+                      ),
+                    ],
                   ),
-                  TextSpan(
-                    text: tr(Locale(lang), 'chat.greet_ask'),
-                    style: TextStyle(color: muted),
+                ),
+                // Bleeds a little past the 20pt page margin, like the mock.
+                Positioned(
+                  top: -14,
+                  right: -14,
+                  child: IgnorePointer(
+                    child: SizedBox(
+                      width: _kMascotSize,
+                      height: _kMascotSize,
+                      child: Image.asset(
+                        'assets/branding/chatbot.png',
+                        fit: BoxFit.contain,
+                        filterQuality: FilterQuality.medium,
+                        excludeFromSemantics: true,
+                        errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                      ),
+                    ),
                   ),
-                ],
-              ),
-              style: const TextStyle(
-                fontFamily: 'MTSCompact',
-                fontSize: 30,
-                fontWeight: FontWeight.w900,
-                height: 1.12,
-                letterSpacing: -1,
-              ),
+                ),
+              ],
             ),
             // Align, not a bare Container: ListView hands children tight
             // horizontal constraints, so width: 34 alone stretches full-bleed.
