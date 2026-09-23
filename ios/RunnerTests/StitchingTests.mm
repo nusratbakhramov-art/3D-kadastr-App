@@ -422,4 +422,21 @@ static NSArray *frameDictionaries(const std::vector<uy360::FrameInput>& frames) 
     XCTAssertGreaterThan(cv::countNonZero(delta.reshape(1)), 0);
     [[NSFileManager defaultManager] removeItemAtPath:dir error:nil];
 }
+// Regression for stuff: 13/17 cameras pass the legacy policy, but four
+// invented translations must not enter Android sensor MVS. End-to-end fixture
+// and saved-JPEG replay coverage live in Android's PanoDeviceTest.
+- (void)testSensorTranslationSupportRequiresEveryCameraWhenOptedIn {
+    XCTAssertFalse(uy360::PipelineOptions().requireAllSensorCameras);
+    XCTAssertTrue(uy360::sensorTranslationSupported(13, 17, false));
+    XCTAssertFalse(uy360::sensorTranslationSupported(12, 17, false));
+    XCTAssertFalse(uy360::sensorTranslationSupported(13, 17, true));
+    XCTAssertFalse(uy360::sensorTranslationSupported(16, 17, true));
+    XCTAssertTrue(uy360::sensorTranslationSupported(17, 17, true));
+    XCTAssertTrue(uy360::sensorTranslationSupported(4, 4, true));
+    XCTAssertFalse(uy360::sensorTranslationSupported(0, 17, true));
+    XCTAssertFalse(uy360::sensorTranslationSupported(0, 0, true));
+    XCTAssertFalse(uy360::sensorTranslationSupported(2, 2, true));
+    XCTAssertFalse(uy360::sensorTranslationSupported(18, 17, true));
+}
+
 @end

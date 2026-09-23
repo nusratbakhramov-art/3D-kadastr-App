@@ -765,6 +765,10 @@ void main() {
       expect(st.dirs, [dir1.path]);
       expect((out1 as PanoUploaded?)?.storageKey, key);
 
+      // The route result resolves before its reverse transition finishes.
+      // Finish that transition before replacing the app for the second case.
+      await tester.pumpAndSettle();
+
       // 2) pano.jpg tayyor → tikish ham YO'Q, to'g'ridan ko'rish → yuklash
       final dir2 = shotDir();
       File('${dir2.path}/pano.jpg').writeAsBytesSync(

@@ -2,6 +2,7 @@ package uz.kadastr.kadastr.pano
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.ImageFormat
 import android.hardware.camera2.*
@@ -104,6 +105,122 @@ class PanoDeviceTest {
     }
 
     @Test
+    fun unobservedZenithRejectsSensorDepth() {
+        val dir =
+            File(instrumentation.targetContext.cacheDir, "astra-weak-zenith").apply { mkdirs() }
+        try {
+            NativeFixture.create(dir.path, .15f, false)
+            val frame = PanoStorage.readMetadata(dir).last()
+            val blank =
+                Bitmap.createBitmap(frame.imageWidth, frame.imageHeight, Bitmap.Config.ARGB_8888)
+            blank.eraseColor(Color.GRAY)
+            File(dir, frame.file).outputStream().use {
+                blank.compress(Bitmap.CompressFormat.JPEG, 95, it)
+            }
+            blank.recycle()
+            PanoProcessor.stitch(dir, 1024, "auto", null) { _, _ -> }
+            val result = NativeStitcher.Result.fromJson(File(dir, "processing.json").readText())
+            assertTrue(result.diagnostics.getInt("baConstrainedCameras") >= 13)
+            assertEquals(0, result.diagnostics.getJSONArray("baCameraObservations").getInt(16))
+            assertEquals(0, result.depthFrames)
+            assertEquals(0.0, result.mvsSeconds, 0.0)
+            assertTrue(result.align.startsWith("rotation-fallback"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun nativePhotometryFlagChangesPixelsWithoutChangingCoverage() {
+        val dir =
+            File(instrumentation.targetContext.cacheDir, "photometry-fixture").apply { mkdirs() }
+        try {
+            val frames =
+                (0..1).map { i ->
+                    val file = File(dir, "frame_$i.jpg")
+                    val image = Bitmap.createBitmap(320, 240, Bitmap.Config.ARGB_8888)
+                    image.eraseColor(
+                        if (i == 0) Color.rgb(80, 80, 80) else Color.rgb(160, 160, 160)
+                    )
+                    file.outputStream().use { image.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+                    image.recycle()
+                    PanoFrameMeta(
+                        index = i,
+                        targetId = i,
+                        targetYaw = 0f,
+                        targetPitch = 0f,
+                        transform =
+                            PoseMath.toColumnMajor16(
+                                PoseMath.rotationY(Math.toRadians(i * 45.0).toFloat())
+                            ),
+                        intrinsics = floatArrayOf(150f, 150f, 159.5f, 119.5f),
+                        imageWidth = 320,
+                        imageHeight = 240,
+                        pixelWidth = 320,
+                        pixelHeight = 240,
+                        timestamp = i.toDouble(),
+                        highRes = true,
+                        file = file.name,
+                        poseSource = "sensors:android",
+                        exposureDuration = .01,
+                        exposureDurationNs = 10_000_000,
+                        diagnostics =
+                            org.json
+                                .JSONObject()
+                                .put("cameraId", "2")
+                                .put("sensorSensitivity", 100)
+                                .put("aeLocked", true)
+                                .put("awbLocked", true),
+                    )
+                }
+            val locked =
+                NativeStitcher.stitch(
+                    dir,
+                    frames,
+                    1024,
+                    false,
+                    true,
+                    File(dir, "locked.jpg"),
+                    File(dir, "locked-preview.jpg"),
+                    null,
+                ) { _, _ ->
+                }
+            val legacy =
+                NativeStitcher.stitch(
+                    dir,
+                    frames.map { it.copy(diagnostics = null) },
+                    1024,
+                    false,
+                    true,
+                    File(dir, "legacy.jpg"),
+                    File(dir, "legacy-preview.jpg"),
+                    null,
+                ) { _, _ ->
+                }
+            assertTrue(locked.ok)
+            assertTrue(legacy.ok)
+            assertEquals("locked-capture", locked.diagnostics.getString("gainCompensation"))
+            assertEquals("overlap", legacy.diagnostics.getString("gainCompensation"))
+            assertEquals(locked.coverage, legacy.coverage, 0.0)
+            fun peak(file: String): Int {
+                val bitmap = BitmapFactory.decodeFile(File(dir, file).path)
+                var peak = 0
+                for (y in 0 until bitmap.height step 8) for (x in
+                    0 until bitmap.width step 8) peak =
+                    maxOf(peak, Color.red(bitmap.getPixel(x, y)))
+                bitmap.recycle()
+                return peak
+            }
+            assertTrue(
+                "Locked input must retain its brighter source",
+                peak("locked.jpg") > peak("legacy.jpg") + 30,
+            )
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun captureActivityPreviewAndCancel() {
         val context = instrumentation.targetContext
         val intent =
@@ -138,6 +255,33 @@ class PanoDeviceTest {
             }
             assertFalse("Capture failed during startup", activity.isFinishing)
             assertTrue("No preview texture", pixels)
+            // Exercise the activity's first-target lock handshake against the real HAL.
+            fun field(name: String): java.lang.reflect.Field =
+                activity.javaClass.getDeclaredField(name).apply { isAccessible = true }
+            val worker = field("worker").get(activity) as Handler
+            val shoot =
+                activity.javaClass
+                    .getDeclaredMethod("shoot", PanoTarget::class.java)
+                    .apply { isAccessible = true }
+            var locked = false
+            val lockDeadline = SystemClock.elapsedRealtime() + 8000
+            while (!locked && SystemClock.elapsedRealtime() < lockDeadline) {
+                val sample = CountDownLatch(1)
+                worker.post {
+                    if (!field("photometryLocked").getBoolean(activity))
+                        shoot.invoke(
+                            activity,
+                            PanoTargetGrid.ultraWide().first(),
+                        )
+                    locked =
+                        field("photometryLocked").getBoolean(activity) &&
+                            field("frameReady").getBoolean(activity)
+                    sample.countDown()
+                }
+                assertTrue(sample.await(1, TimeUnit.SECONDS))
+                if (!locked) Thread.sleep(100)
+            }
+            assertTrue("HAL never confirmed the activity's exposure/white-balance lock", locked)
             instrumentation.runOnMainSync { activity.onBackPressedDispatcher.onBackPressed() }
             Thread.sleep(500)
             assertTrue("Cancel did not finish capture", activity.isFinishing)

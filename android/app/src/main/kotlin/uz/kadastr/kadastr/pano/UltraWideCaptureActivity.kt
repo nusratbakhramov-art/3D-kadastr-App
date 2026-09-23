@@ -50,6 +50,8 @@ class UltraWideCaptureActivity :
     private var finishingCapture = false
     private var opened = false
     private var frameReady = false
+    private var photometryLocked = false
+    private var photometrySettled = false
     private var lastPoseNs = 0L
     private var nextFrameNs = 0L
     private var correction = CaptureRequest.DISTORTION_CORRECTION_MODE_OFF
@@ -308,24 +310,7 @@ class UltraWideCaptureActivity :
                         }
                         session = s
                         try {
-                            val request =
-                                c.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
-                                    addTarget(surface!!)
-                                    configure(this)
-                                }
-                            s.setRepeatingRequest(
-                                request.build(),
-                                object : CameraCaptureSession.CaptureCallback() {
-                                    override fun onCaptureCompleted(
-                                        session: CameraCaptureSession,
-                                        request: CaptureRequest,
-                                        result: TotalCaptureResult,
-                                    ) {
-                                        frameReady = true
-                                    }
-                                },
-                                worker,
-                            )
+                            repeatPreview()
                         } catch (e: Exception) {
                             fail("CAMERA_FAILED")
                         }
@@ -339,8 +324,57 @@ class UltraWideCaptureActivity :
         )
     }
 
+    private fun repeatPreview() {
+        val device = camera ?: return
+        val activeSession = session ?: return
+        val request =
+            device
+                .createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                .apply {
+                    addTarget(surface!!)
+                    configure(this)
+                }
+                .build()
+        activeSession.setRepeatingRequest(
+            request,
+            object : CameraCaptureSession.CaptureCallback() {
+                override fun onCaptureCompleted(
+                    session: CameraCaptureSession,
+                    request: CaptureRequest,
+                    result: TotalCaptureResult,
+                ) {
+                    val physical = selection!!.lens.physicalId
+                    val metadata =
+                        if (physical == null) result
+                        else result.physicalCameraResults[physical] ?: return
+                    val ae = metadata[CaptureResult.CONTROL_AE_STATE]
+                    val awb = metadata[CaptureResult.CONTROL_AWB_STATE]
+                    photometrySettled =
+                        (ae == null ||
+                            ae == CaptureResult.CONTROL_AE_STATE_CONVERGED ||
+                            ae == CaptureResult.CONTROL_AE_STATE_FLASH_REQUIRED ||
+                            ae == CaptureResult.CONTROL_AE_STATE_LOCKED) &&
+                            (awb == null ||
+                                awb == CaptureResult.CONTROL_AWB_STATE_CONVERGED ||
+                                awb == CaptureResult.CONTROL_AWB_STATE_LOCKED)
+                    frameReady =
+                        !photometryLocked ||
+                            ((selection!!.chars[C.CONTROL_AE_LOCK_AVAILABLE] != true ||
+                                metadata[CaptureResult.CONTROL_AE_LOCK] == true) &&
+                                (selection!!.chars[C.CONTROL_AWB_LOCK_AVAILABLE] != true ||
+                                    metadata[CaptureResult.CONTROL_AWB_LOCK] == true))
+                }
+            },
+            worker,
+        )
+    }
+
     private fun configure(b: CaptureRequest.Builder) {
         b.set(CaptureRequest.CONTROL_MODE, CaptureRequest.CONTROL_MODE_AUTO)
+        if (selection!!.chars[C.CONTROL_AE_LOCK_AVAILABLE] == true)
+            b.set(CaptureRequest.CONTROL_AE_LOCK, photometryLocked)
+        if (selection!!.chars[C.CONTROL_AWB_LOCK_AVAILABLE] == true)
+            b.set(CaptureRequest.CONTROL_AWB_LOCK, photometryLocked)
         b.set(
             CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
             CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF,
@@ -438,6 +472,23 @@ class UltraWideCaptureActivity :
     private fun shoot(target: PanoTarget) {
         val c = camera ?: return
         val s = session ?: return
+        if (!photometryLocked) {
+            gate.reset()
+            if (!photometrySettled) return
+            photometryLocked = true
+            frameReady = false
+            try {
+                repeatPreview()
+                // Never silently take an unlocked sequence if an advertised lock fails.
+                worker.postDelayed(
+                    { if (!finishingCapture && !frameReady) fail("CAMERA_FAILED") },
+                    3000,
+                )
+            } catch (e: Exception) {
+                fail("CAMERA_FAILED")
+            }
+            return
+        }
         pending = target
         gate.reset()
         jpeg = null
@@ -624,41 +675,68 @@ class UltraWideCaptureActivity :
             raw.delete()
             val meta =
                 PanoFrameMeta(
-                    index,
-                    target.id,
-                    target.yaw,
-                    target.pitch,
-                    PoseMath.toColumnMajor16(rotation),
-                    saved.array(),
-                    saved.width,
-                    saved.height,
-                    saved.width,
-                    saved.height,
-                    instant * 1e-9,
-                    true,
-                    name,
-                    "sensors:android",
-                    exposure * 1e-9,
-                    JSONObject()
-                        .put("cameraId", chosen.lens.openId)
-                        .put("physicalCameraId", chosen.lens.physicalId)
-                        .put("rollingShutterSkewNs", skew)
-                        .put("sensorTimestampNs", start)
-                        .put("poseInstantNs", instant)
-                        .put("poseTimestampSource", "realtime:frameExposureMidpoint")
-                        .put("intrinsicsSource", saved.source)
-                        .put("sensorOrientation", sensorOrientation)
-                        .put("pixelRotation", pixelRotation)
-                        .put(
-                            "distortionCorrection",
-                            result[CaptureResult.DISTORTION_CORRECTION_MODE],
-                        )
-                        .put("softwareUndistortion", distortion.isNotEmpty())
-                        .put(
-                            "cropRegion",
-                            JSONArray(listOf(crop.left, crop.top, crop.right, crop.bottom)),
-                        )
-                        .put("activeArray", active.toShortString()),
+                    index = index,
+                    targetId = target.id,
+                    targetYaw = target.yaw,
+                    targetPitch = target.pitch,
+                    transform = PoseMath.toColumnMajor16(rotation),
+                    intrinsics = saved.array(),
+                    imageWidth = saved.width,
+                    imageHeight = saved.height,
+                    pixelWidth = saved.width,
+                    pixelHeight = saved.height,
+                    timestamp = instant * 1e-9,
+                    highRes = true,
+                    file = name,
+                    poseSource = "sensors:android",
+                    exposureDuration = exposure * 1e-9,
+                    poseInstantNs = instant,
+                    exposureDurationNs = exposure,
+                    imageTimestampNs = start,
+                    poseTimestampSource = "realtime:frameExposureMidpoint",
+                    intrinsicsSource = saved.source,
+                    diagnostics =
+                        JSONObject()
+                            .put("cameraId", chosen.lens.openId)
+                            .put("focalLengthMm", result[CaptureResult.LENS_FOCAL_LENGTH])
+                            .put(
+                                "lensIntrinsics",
+                                calibration?.let { JSONArray(it.toList()) } ?: JSONObject.NULL,
+                            )
+                            .put(
+                                "lensDistortion",
+                                (result[CaptureResult.LENS_DISTORTION] ?: chars[C.LENS_DISTORTION])
+                                    ?.let { JSONArray(it.toList()) } ?: JSONObject.NULL,
+                            )
+                            .put(
+                                "preCorrectionActiveArray",
+                                chars[C.SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE]
+                                    ?.toShortString(),
+                            )
+                            .put("jpegOrientation", result[CaptureResult.JPEG_ORIENTATION])
+                            .put("sensorSensitivity", result[CaptureResult.SENSOR_SENSITIVITY])
+                            .put("aeLocked", result[CaptureResult.CONTROL_AE_LOCK])
+                            .put("awbLocked", result[CaptureResult.CONTROL_AWB_LOCK])
+                            .put("aeLockAvailable", chars[C.CONTROL_AE_LOCK_AVAILABLE])
+                            .put("awbLockAvailable", chars[C.CONTROL_AWB_LOCK_AVAILABLE])
+                            .put("physicalCameraId", chosen.lens.physicalId)
+                            .put("rollingShutterSkewNs", skew)
+                            .put("sensorTimestampNs", start)
+                            .put("poseInstantNs", instant)
+                            .put("poseTimestampSource", "realtime:frameExposureMidpoint")
+                            .put("intrinsicsSource", saved.source)
+                            .put("sensorOrientation", sensorOrientation)
+                            .put("pixelRotation", pixelRotation)
+                            .put(
+                                "distortionCorrection",
+                                result[CaptureResult.DISTORTION_CORRECTION_MODE] ?: JSONObject.NULL,
+                            )
+                            .put("softwareUndistortion", distortion.isNotEmpty())
+                            .put(
+                                "cropRegion",
+                                JSONArray(listOf(crop.left, crop.top, crop.right, crop.bottom)),
+                            )
+                            .put("activeArray", active.toShortString()),
                 )
             PanoStorage.writeMetadata(dir, metas + meta)
             metas.add(meta)

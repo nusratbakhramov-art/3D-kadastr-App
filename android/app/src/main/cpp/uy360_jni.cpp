@@ -71,7 +71,8 @@ std::string jsonEscape(const std::string& s) {
     return o;
 }
 
-std::string resultJson(const uy360::Result& r, const uy360::PipelineStats* st, const std::string& errorOverride) {
+std::string resultJson(const uy360::Result& r, const uy360::PipelineStats* st, const std::string& errorOverride,
+                       bool preservePhotometry) {
     std::string err = errorOverride.empty() ? r.error : errorOverride;
     char buf[1024];
     std::snprintf(buf, sizeof(buf),
@@ -84,6 +85,17 @@ std::string resultJson(const uy360::Result& r, const uy360::PipelineStats* st, c
                   st ? st->baSeconds : 0.0, st ? st->mvsSeconds : 0.0, st ? st->stitchSeconds : 0.0,
                   st ? st->ba.medianBeforePx : 0.f, st ? st->ba.medianAfterPx : 0.f);
     std::string out = buf;
+    out += std::string("\"gainCompensation\":\"") + (preservePhotometry ? "locked-capture" : "overlap") + "\",";
+    if (st) {
+        out += "\"baConstrainedCameras\":" + std::to_string(st->ba.constrainedCameras) + ",";
+        out += "\"baPoints\":" + std::to_string(st->ba.points) + ",";
+        out += "\"baCameraObservations\":[";
+        for (size_t i = 0; i < st->ba.cameraObservations.size(); ++i) {
+            if (i) out += ",";
+            out += std::to_string(st->ba.cameraObservations[i]);
+        }
+        out += "],\"fallbackReason\":\"" + jsonEscape(st->fallbackReason) + "\",";
+    }
     out += "\"blend\":\"" + jsonEscape(r.blend) + "\",";
     out += "\"align\":\"" + jsonEscape(r.align) + "\",";
     out += "\"error\":\"" + jsonEscape(err) + "\"}";
@@ -161,7 +173,7 @@ Java_uz_kadastr_kadastr_pano_NativeStitcher_version(JNIEnv* env, jobject) {
     return env->NewStringUTF(v.c_str());
 }
 
-/// stitch(paths, transforms[16n], intrinsics[4n], sizes[2n], targetPitch[n], width, mvs, sensorPoses, pano, preview,
+/// stitch(paths, transforms[16n], intrinsics[4n], sizes[2n], targetPitch[n], width, mvs, sensorPoses, photometryLocked, pano, preview,
 ///        logoPath, cb)
 /// logoPath: PNG stamped as a disc over the bottom cap of the panorama (`Options.nadirLogoPath`, the
 /// brand disc that hides feet / the mirror fill — same as iOS); null or "" = no logo. Applies to both
@@ -169,11 +181,12 @@ Java_uz_kadastr_kadastr_pano_NativeStitcher_version(JNIEnv* env, jobject) {
 extern "C" JNIEXPORT jstring JNICALL
 Java_uz_kadastr_kadastr_pano_NativeStitcher_stitch(JNIEnv* env, jobject, jobjectArray jpaths, jfloatArray jtransforms,
                                                    jfloatArray jintrinsics, jintArray jsizes, jfloatArray jpitch,
-                                                   jint width, jboolean mvs, jboolean sensorPoses, jstring jpano,
+                                                   jint width, jboolean mvs, jboolean sensorPoses, jboolean photometryLocked, jstring jpano,
                                                    jstring jpreview, jstring jlogoPath, jobject jcb) {
     uy360::Result r;
     std::string error;
     uy360::PipelineStats st;
+    const bool preservePhotometry = sensorPoses == JNI_TRUE && photometryLocked == JNI_TRUE;
     try {
         const jsize n = jpaths ? env->GetArrayLength(jpaths) : 0;
         if (n <= 0) throw std::runtime_error("no frames");
@@ -219,7 +232,10 @@ Java_uz_kadastr_kadastr_pano_NativeStitcher_stitch(JNIEnv* env, jobject, jobject
 
         uy360::Options opt = uy360::optionsForFrameCount((int)frames.size());
         opt.width = width > 0 ? width : 4096;
-        // nadir patch (Options.nadirLogoDeg = 28° cap): stamped by stitchImpl in both modes, "" = off
+        // A parallax-contaminated overlap mean can invent exposure differences
+        // even with verified AE/AWB locks (S23 stuff-2). Preserve those pixels.
+        opt.gainComp = !preservePhotometry;
+        // nadir patch (Options.nadirLogoDeg = 20° cap): stamped by stitchImpl in both modes, "" = off
         if (!logoPath.empty()) opt.nadirLogoPath = logoPath;
         LOGI("stitch: %zu frames, width %d, mvs=%d, sensorPoses=%d, logo=%s, threads=%d", frames.size(), opt.width,
              (int)mvs, (int)sensorPoses, logoPath.empty() ? "-" : logoPath.c_str(), cv::getNumThreads());
@@ -235,6 +251,9 @@ Java_uz_kadastr_kadastr_pano_NativeStitcher_stitch(JNIEnv* env, jobject, jobject
             // shots, rotation-known essential estimation, pivot fill for track-less frames.
             // ARCore captures (6-DoF, metric) use the same accurate-pose priors as iOS.
             popt.sensorPoses = sensorPoses == JNI_TRUE;
+            popt.requireAllSensorCameras = popt.sensorPoses;
+            // Match the existing missing/feet cap; do not overwrite another 16° of photographed floor.
+            if (popt.sensorPoses) opt.nadirLogoDeg = opt.nadirCutDeg;
             r = uy360::stitchMVS(frames, opt, popt, pano, preview, prog, &st);
         } else {
             r = uy360::stitch(frames, opt, pano, preview, prog);
@@ -248,7 +267,7 @@ Java_uz_kadastr_kadastr_pano_NativeStitcher_stitch(JNIEnv* env, jobject, jobject
     } catch (...) {
         error = "unknown native error";
     }
-    std::string json = resultJson(r, &st, error);
+    std::string json = resultJson(r, &st, error, preservePhotometry);
     return env->NewStringUTF(json.c_str());
 }
 

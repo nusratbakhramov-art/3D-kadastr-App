@@ -20,6 +20,12 @@ inline Pose poseFromTransform(const std::array<float, 16>& t) {
 }
 }  // namespace
 
+bool sensorTranslationSupported(int constrainedCameras, int frameCount, bool requireAll) {
+    if (frameCount < 3 || constrainedCameras > frameCount) return false;
+    const int required = requireAll ? frameCount : std::max(3, (frameCount * 3 + 3) / 4);
+    return constrainedCameras >= required;
+}
+
 Result stitchMVS(const std::vector<FrameInput>& frames, const Options& opt, const PipelineOptions& popt,
                  const std::string& panoPath, const std::string& previewPath, const Progress& progress,
                  PipelineStats* stats, std::vector<Pose>* posesOut, std::vector<DepthMap>* depthsOut) {
@@ -51,7 +57,7 @@ Result stitchMVS(const std::vector<FrameInput>& frames, const Options& opt, cons
                    std::isfinite(st.ba.medianAfterPx);
         } catch (const std::exception& e) {
             poses.clear();
-            res.align = std::string("ba-failed: ") + e.what();
+            st.fallbackReason = std::string("ba-failed: ") + e.what();
         }
     }
     // Sensor translations begin as an arbitrary pivot, unlike ARKit's measured positions.
@@ -59,16 +65,25 @@ Result stitchMVS(const std::vector<FrameInput>& frames, const Options& opt, cons
     // textureless rooms can leave most cameras constrained only by that invented pivot;
     // feeding it to MVS bends otherwise aligned walls. Require observation support across
     // the capture, otherwise retain the sensor rotations and use the rotation stitcher.
-    const bool sensorFallback = popt.sensorPoses &&
-        (!baOK || st.ba.constrainedCameras < std::max(3, (int(frames.size()) * 3 + 3) / 4));
-    if (sensorFallback) {
+    const bool weakSensorRotations = popt.sensorPoses &&
+        (!baOK || !sensorTranslationSupported(st.ba.constrainedCameras, int(frames.size()), false));
+    const bool unsupportedSensorDepth = popt.sensorPoses && popt.requireAllSensorCameras &&
+        (!baOK || !sensorTranslationSupported(st.ba.constrainedCameras, int(frames.size()), true));
+    const bool sensorFallback = weakSensorRotations || unsupportedSensorDepth;
+    if (weakSensorRotations) {
         poses.clear();
         baOK = false;
-        if (progress) progress(0.12f, "Chuqurlik uchun moslik kam: rotatsiya bilan tikish");
     }
     if (poses.size() != frames.size()) {
         poses.resize(frames.size());
         for (size_t i = 0; i < frames.size(); ++i) poses[i] = poseFromTransform(frames[i].transform);
+    }
+    if (sensorFallback) {
+        if (progress) progress(0.12f, "Chuqurlik uchun moslik kam: rotatsiya bilan tikish");
+        if (st.fallbackReason.empty()) st.fallbackReason = weakSensorRotations ? "insufficient triangulated observations" :
+            "unconstrained sensor cameras " + std::to_string(st.ba.constrainedCameras) + "/" + std::to_string(frames.size());
+        // Retain well-supported BA rotations, never its guessed translations.
+        for (auto& pose : poses) pose.p = cv::Vec3f(0, 0, 0);
     }
     st.baSeconds = secondsSince(t0);
 
@@ -98,7 +113,7 @@ Result stitchMVS(const std::vector<FrameInput>& frames, const Options& opt, cons
                      });
         st.stitchSeconds = secondsSince(ts);
         res.seconds = secondsSince(t0);
-        if (sensorFallback) res.align = "rotation-fallback: insufficient triangulated observations";
+        if (sensorFallback) res.align = "rotation-fallback: " + st.fallbackReason;
         if (stats) *stats = st;
         if (posesOut) *posesOut = std::move(poses);
         if (depthsOut) depthsOut->assign(frames.size(), DepthMap());

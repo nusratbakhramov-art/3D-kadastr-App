@@ -28,6 +28,10 @@ struct PipelineOptions {
     /// Sensor captures also fall back to rotation-only when too few cameras have
     /// triangulated observations to constrain their translations.
     bool runMVS = true;
+    /// Android sensor safety: every participating camera must have triangulated
+    /// support. A globally good median does not constrain an unobserved ceiling.
+    /// Opt-in so existing measured-pose and iOS processing remain unchanged.
+    bool requireAllSensorCameras = false;
     bool regularizePlanes = true; // shared upright rectangle constraints for sensor captures
 };
 
@@ -37,7 +41,13 @@ struct PipelineStats {
     PlanarStats planar;
     double baSeconds = 0, mvsSeconds = 0, stitchSeconds = 0;
     int depthFrames = 0;
+    std::string fallbackReason;
 };
+
+/// Translation support policy, separate from BA so its safety boundary can be
+/// tested without depending on randomized feature matching. Measured-pose paths
+/// do not use this sensor-only gate.
+bool sensorTranslationSupported(int constrainedCameras, int frameCount, bool requireAll);
 
 /// Progress: BA 0–0.12, MVS 0.12–0.72, stitch 0.72–1.0.
 /// posesOut / depthsOut (optional) receive the intermediate results (CLI parity tests, caching).

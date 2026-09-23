@@ -39,6 +39,7 @@ object NativeStitcher {
         val blend: String,
         val align: String,
         val error: String,
+        val diagnostics: JSONObject,
     ) {
         companion object {
             fun fromJson(s: String): Result {
@@ -60,6 +61,7 @@ object NativeStitcher {
                     blend = o.optString("blend"),
                     align = o.optString("align"),
                     error = o.optString("error"),
+                    diagnostics = o,
                 )
             }
         }
@@ -91,7 +93,7 @@ object NativeStitcher {
     private external fun version(): String
 
     /**
-     * Signature mirrored by `Java_uz_uy360_capture_stitch_NativeStitcher_stitch` in
+     * Signature mirrored by `Java_uz_kadastr_kadastr_pano_NativeStitcher_stitch` in
      * cpp/uy360_jni.cpp.
      */
     private external fun stitch(
@@ -103,6 +105,7 @@ object NativeStitcher {
         width: Int,
         mvs: Boolean,
         sensorPoses: Boolean,
+        photometryLocked: Boolean,
         panoPath: String,
         previewPath: String,
         logoPath: String,
@@ -166,6 +169,7 @@ object NativeStitcher {
                 width,
                 mvs,
                 sensorPoses,
+                PanoStorage.hasLockedPhotometry(frames),
                 panoFile.absolutePath,
                 previewFile.absolutePath,
                 logoFile?.absolutePath ?: "",
