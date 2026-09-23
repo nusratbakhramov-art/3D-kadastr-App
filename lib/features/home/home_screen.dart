@@ -381,6 +381,26 @@ class _SupportCtaButton extends StatelessWidget {
   static const double _padLeft = 12;
   static const double _padRight = 8;
   static const double _labelIconGap = 2;
+  static const double _borderWidth = 1.2;
+
+  /// The label's style, at [size]. ONE definition, used both to measure the
+  /// label in [fittedFontSize] and to paint it.
+  ///
+  /// ⚠️ `letterSpacing` is pinned, and that is the whole point of this helper.
+  /// A `Text` merges its style onto the ambient `DefaultTextStyle`, which here
+  /// resolves to Material 3's `bodyMedium` — and that carries
+  /// `letterSpacing: 0.25`. The measuring TextPainter used a bare TextStyle, so
+  /// it never saw those 0.25pt per character: "Savol bering" measured 85.9pt
+  /// against an 87.3pt slot and was then PAINTED 3pt wider (12 characters),
+  /// which is what ellipsised it to "Savol beri…" on a 360dp Galaxy.
+  static TextStyle _labelStyle(double size, [Color? color]) => TextStyle(
+    fontFamily: 'MTSCompact',
+    fontWeight: FontWeight.w700,
+    fontSize: size,
+    height: 1.15,
+    letterSpacing: 0,
+    color: color,
+  );
 
   /// The largest size at or below [base] at which [label] fits one line inside
   /// a button of [buttonWidth]. Measured, not guessed: the Uzbek and Russian
@@ -400,19 +420,11 @@ class _SupportCtaButton extends StatelessWidget {
         _padRight -
         _labelIconGap -
         iconWidth -
-        2; // the 1.2pt border on both sides, rounded up
+        _borderWidth * 2; // the border insets the Container's child on both sides
     if (available <= 0) return base;
 
     final painter = TextPainter(
-      text: TextSpan(
-        text: label,
-        style: TextStyle(
-          fontFamily: 'MTSCompact',
-          fontWeight: FontWeight.w700,
-          fontSize: base,
-          height: 1.15,
-        ),
-      ),
+      text: TextSpan(text: label, style: _labelStyle(base)),
       maxLines: 1,
       textDirection: TextDirection.ltr,
       // Measure at the reader's own text scale. Without it the label was
@@ -456,7 +468,7 @@ class _SupportCtaButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(height / 2),
               border: Border.all(
                 color: accent.withValues(alpha: isDark ? 0.55 : 0.4),
-                width: 1.2,
+                width: _borderWidth,
               ),
             ),
             child: Row(
@@ -470,13 +482,7 @@ class _SupportCtaButton extends StatelessWidget {
                     label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontFamily: 'MTSCompact',
-                      fontWeight: FontWeight.w700,
-                      fontSize: fontSize,
-                      height: 1.15,
-                      color: labelColor,
-                    ),
+                    style: _labelStyle(fontSize, labelColor),
                   ),
                 ),
                 const SizedBox(width: _labelIconGap),

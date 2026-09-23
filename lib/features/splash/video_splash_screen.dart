@@ -4,67 +4,43 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
-/// Splash — oldindan render qilingan intro roligi (ovoz bilan).
+/// Splash — oldindan render qilingan intro roligi (ovozsiz).
 ///
-/// `assets/branding/splash/intro.mp4` — 720×1680 (9:21), 5.1s, h264 + AAC.
-/// Sahna [BlueprintSplashScreen] dagi bilan bir xil g'oya (lockup paydo
-/// bo'ladi → neon uy o'zini chizadi), faqat bu safar tayyor video sifatida.
+/// `assets/branding/splash/intro-black.mp4` — 1280×720 (16:9), 3.1s, 30fps,
+/// h264, audio YO'Q. Sahna: qop-qora fonda ilova belgisi o'zini chizadi.
 ///
-/// Eski splash ekranlari ([BlueprintSplashScreen], [AnimatedSplashScreen])
-/// O'CHIRILMAGAN — main.dart dagi bitta konstanta bilan qaytariladi.
+/// Manba mijozdan 2560×1440 60fps 5s (3.4 MB) holida keldi. Ikki narsa
+/// o'zgartirildi: (1) o'lcham yarmiga tushirildi — ekranda eni bo'yicha
+/// ~1200px dan oshmaydi; (2) OXIRI KESILDI — animatsiya 3.05s da tugab,
+/// qolgan 1.95s da qimirlamas belgi turardi, ya'ni splash shuncha vaqt
+/// "o'lik" qotib qolardi. Natija: 55 KB.
 ///
-/// ## Yashil chaqnash yo'q
+/// Eski splash ekranlari ([BlueprintSplashScreen], [AnimatedSplashScreen]) va
+/// eski rolik (`intro.mp4`) O'CHIRILMAGAN — main.dart dagi bitta konstanta
+/// bilan qaytariladi.
+///
+/// ## Chaqnash yo'q
 /// Rolik ilova ochilishi bilan DARHOL boshlanishi kerak. Shuning uchun OS
 /// launch screen'i ham [launchColor] ga bo'yalgan (iOS: LaunchScreen.storyboard,
-/// Android: drawable/launch_background.xml va values-v31/styles.xml) — eski
-/// yashil (#00E135) naqshli ekran olib tashlandi. Flutter tomonda ham xuddi
-/// shu rang fon bo'lib turadi, shuning uchun native → Flutter → video
-/// o'tishlarining hech biri ko'zga tashlanmaydi.
+/// Android: drawable/launch_background.xml va values-v31/styles.xml). Yangi
+/// rolikning foni sof qora (#000000) — launch screen, Flutter foni va videoning
+/// o'zi bitta rang, ya'ni o'tishlar ko'rinmaydi.
 ///
-/// ## Nega ekranda "letterbox" chizig'i yo'q
-/// Manba rolik 9:16 edi, telefonlar esa 9:19.5 gacha uzun. Ikkala oddiy yo'l
-/// ham yomon chiqardi:
-///   * "cover" — har chetdan ~11% qirqilib, o'ngdagi uy va daraxtlar kesilardi;
-///   * "contain" + fon rangi — tepa/pastda tasma qolardi, va u tasma videoga
-///     MOS TUSHMASDI: iOS videoni va Flutter ning solid rangini bir xil rang
-///     profilidan o'tkazmaydi, shuning uchun rangni qo'lda tanlash bilan chok
-///     baribir ko'rinib turardi.
-///
-/// Yechim asset darajasida: rolikning O'ZI 9:21 gacha kengaytirilgan —
-/// tepa va pastga 200px dan qo'shilgan va u joy kadrning O'Z piksellari
-/// bilan to'ldirilgan: chekka qatorlar AKS ETTIRILADI (`mirror`), so'ng
-/// chetga borgan sari qoraytiriladi (vinyetka). Retsept:
-///
-/// ```
-/// G="if(lt(Y,200),0.1+0.9*Y/200,\
-///     if(gt(Y,1479),0.1+0.9*(1680-Y)/200,1))"
-/// ffmpeg -i src.mp4 -vf "pad=720:1680:0:200,\
-///   fillborders=top=200:bottom=200:mode=mirror,format=rgb24,\
-///   geq=r='r(X,Y)*($G)':g='g(X,Y)*($G)':b='b(X,Y)*($G)',format=yuv420p" \
-///   -c:v libx264 -profile:v high -level 4.0 -crf 21 -preset slow \
-///   -movflags +faststart -c:a aac -b:a 128k intro.mp4
-/// ```
-///
-/// `mirror` (ilgari `smear` edi) shu rolik uchun SHART: pastki chekka —
-/// qoyatoshlar, va bitta qatorni cho'zish vertikal chiziqlar qoldirardi.
-/// Aks ettirish chokda piksel-bapiksel mos tushadi, qoraytirish esa
-/// chetdagi takrorlangan naqshni ko'rinmas qiladi.
-///
-/// Muhimi o'zgarmadi: bo'sh joy ham VIDEO ning o'zi, ya'ni bitta rang
-/// quvuridan o'tadi va chok fizik jihatdan mumkin emas. Shuning uchun bu
-/// yerda [BoxFit.cover] ishlatiladi:
-///   * 16:9 ekranda — aynan kengaytirilgan qismi qirqiladi, kompozitsiya butun;
-///   * 19.5:9 (iPhone) — kengaytirilganning bir qismi qirqiladi, butun;
-///   * 21:9 — tep-tekis tushadi.
+/// ## Nega [BoxFit.contain]
+/// Rolik ENI bo'yicha uzun (16:9), telefon esa bo'yiga. `cover` bilan u
+/// balandlikka cho'zilib, enining ~70% i qirqilardi va belgi ekranni to'ldirib
+/// yuborardi. `contain` da rolik ekran ENIGA tushadi, belgi esa kadrdagi
+/// ulushini (eni bo'yicha ~30%) saqlaydi. Tepa-pastdagi bo'sh joy ko'rinmaydi:
+/// u ham, rolikning foni ham bir xil qora.
 class VideoSplashScreen extends StatefulWidget {
   const VideoSplashScreen({super.key, required this.onComplete});
 
-  /// Rolikning eng qorong'i cheti. Video ostidagi fon, shuningdek OS launch
-  /// screen'ining rangi (iOS: LaunchScreen.storyboard, Android:
-  /// drawable/launch_background.xml + values-v31/styles.xml) — hammasi bir xil
-  /// bo'lgani uchun ilova ochilganda hech qanday chaqnash ko'rinmaydi.
-  /// main.dart splash konteynerini ham shu rangga bo'yaydi.
-  static const Color launchColor = Color(0xFF040E07);
+  /// Rolik foni — SOF QORA, va shundayligicha qolishi kerak. Video ostidagi
+  /// fon, OS launch screen'ining rangi (iOS: LaunchScreen.storyboard, Android:
+  /// drawable/launch_background.xml + values-v31/styles.xml) va main.dart
+  /// dagi splash konteyneri — hammasi shu rang. Boshqa qiymat qo'yilsa,
+  /// rolikning cheti ko'rinib qoladi.
+  static const Color launchColor = Color(0xFF000000);
 
   final VoidCallback onComplete;
 
@@ -74,7 +50,7 @@ class VideoSplashScreen extends StatefulWidget {
 
 class _VideoSplashScreenState extends State<VideoSplashScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  static const String _asset = 'assets/branding/splash/intro.mp4';
+  static const String _asset = 'assets/branding/splash/intro-black.mp4';
 
   /// Birinchi video kadri fon rangi ustida bilinmay ochilsin — launch screen
   /// bilan rang bir xil bo'lgani uchun bu deyarli sezilmaydi, lekin kadrning
@@ -84,12 +60,31 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
   /// Rolik yuklanmasa (asset buzuq, kodek yo'q) splash qotib qolmasin.
   static const Duration _bootTimeout = Duration(seconds: 4);
 
-  /// Rolik tugagach oxirgi kadr shuncha turadi — uy to'liq chizilgan holda
+  /// Rolik tugagach oxirgi kadr shuncha turadi — belgi to'liq chizilgani
   /// ko'zga tashlanib ulgursin, keyin ilovaga o'tiladi.
-  static const Duration _holdLastFrame = Duration(seconds: 1);
+  ///
+  /// ⚠️ Ikki tomonga ham xato qilish oson — bu qiymat ikkalasi orasidagi
+  /// o'rta nuqta:
+  ///  • Manba rolikda animatsiya 3.05s da tugab, keyin 1.95s davomida
+  ///    qimirlamas belgi turardi — u qism assetdan KESIB tashlandi (rolik endi
+  ///    3.1s). Ustiga bu yerda 1 soniya kutilardi: oxirida ~3s "o'lik" ekran.
+  ///  • Keyin 120ms qilib qo'yildi — bu esa teskari nuqson berdi: belgi
+  ///    joyiga tushishi bilanoq main.dart dagi `AnimatedSwitcher` (350ms)
+  ///    o'tishni boshlab yuborar, ya'ni splash "tugamay turib yopilardi".
+  /// 450ms — tugagan belgi bir zum ko'rinib turishiga yetadi, lekin kutish
+  /// sezilmaydi. Ekranga bosish bu kutishni baribir kesib o'tadi.
+  static const Duration _holdLastFrame = Duration(milliseconds: 450);
 
   /// Ijro qandaydir sababga ko'ra to'xtab qolsa ham ilova ochiladi.
   static const Duration _playSlack = Duration(seconds: 2);
+
+  /// Rolik ekran eniga sig'dirilgandan keyin yana shuncha kattalashtiriladi.
+  /// Kadrdagi belgi eni bo'yicha ~30% joyni egallaydi, ya'ni 1.0 da u 402pt
+  /// li ekranda ~123pt bo'lardi — kichkina ko'rinadi. 1.6 da ~195pt.
+  ///
+  /// Xavfsiz: rolikning foni va chetlari qop-qora, shuning uchun
+  /// kattalashtirishda faqat qora joy qirqiladi.
+  static const double _videoScale = 1.6;
 
   VideoPlayerController? _controller;
   late final AnimationController _fadeCtrl;
@@ -132,7 +127,9 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
 
     controller.addListener(_handleTick);
     await controller.setLooping(false);
-    await controller.setVolume(1);
+    // Yangi rolikda audio dorozhka YO'Q; 0 — qurilma ovozini beixtiyor
+    // o'zgartirmaslik uchun.
+    await controller.setVolume(0);
     if (!mounted || _finished) return;
 
     _bootWatchdog?.cancel();
@@ -226,16 +223,23 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
             child: SizedBox.expand(
               child: ready
                   ? SizedBox.expand(
-                      // Rolik 9:21 — ekrandan uzunroq, shuning uchun "cover"
-                      // faqat kengaytirilgan chetlarini yeydi. Cho'zilish yo'q
-                      // (nisbat saqlanadi) va bo'sh tasma ham yo'q.
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        clipBehavior: Clip.hardEdge,
-                        child: SizedBox(
-                          width: controller.value.size.width,
-                          height: controller.value.size.height,
-                          child: VideoPlayer(controller),
+                      // `contain`, NOT `cover`: rolik eniga cho'zilgan (16:9),
+                      // telefon esa bo'yiga. `cover` uni balandlikka cho'zib,
+                      // enining ~70% ini qirqib tashlardi.
+                      //
+                      // Kattalashtirish esa [_videoScale] bilan: rolikning
+                      // chetlari ham qop-qora bo'lgani uchun kattalashganda
+                      // faqat qora joy qirqiladi, belgi esa butun qoladi.
+                      child: Transform.scale(
+                        scale: _videoScale,
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          clipBehavior: Clip.hardEdge,
+                          child: SizedBox(
+                            width: controller.value.size.width,
+                            height: controller.value.size.height,
+                            child: VideoPlayer(controller),
+                          ),
                         ),
                       ),
                     )
