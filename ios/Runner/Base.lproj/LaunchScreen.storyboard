@@ -30,8 +30,10 @@
                                  Assets.xcassets ichida turibdi, qaytarish
                                  uchun faqat shu blokni tiklash kifoya. -->
                         </subviews>
-                        <!-- #040E07 — intro roligining eng qorong'i cheti. -->
-                        <color key="backgroundColor" red="0.015686275" green="0.054901961" blue="0.027450980" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+                        <!-- #000000 — intro roligining fon rangi. Rolik fonи
+                             ham aynan shu rang, shuning uchun launch screen →
+                             Flutter → video o'tishida chok ko'rinmaydi. -->
+                        <color key="backgroundColor" red="0.0" green="0.0" blue="0.0" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
                     </view>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>

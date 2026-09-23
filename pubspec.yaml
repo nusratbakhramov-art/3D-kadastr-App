@@ -117,13 +117,13 @@ flutter_launcher_icons:
   adaptive_icon_foreground: "assets/branding/appicon.png"
 
 # DIQQAT: iOS LaunchScreen.storyboard va Android launch_background.xml QO'LDA
-# tahrirlangan (VideoSplashScreen darhol ochilishi uchun tekis #040E07 fon,
+# tahrirlangan (VideoSplashScreen darhol ochilishi uchun tekis #000000 fon,
 # naqsh/logo yo'q). `dart run flutter_native_splash:create` ularni qayta
 # yozadi — quyidagi sozlama shu sababli intro roligining rangiga moslangan.
 flutter_native_splash:
-  color: "#040E07"
+  color: "#000000"
   android_12:
-    color: "#040E07"
+    color: "#000000"
   android: true
   ios: true
   web: false

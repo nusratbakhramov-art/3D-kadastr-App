@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Launch screen — faqat bitta tekis qorong'i rang (#040E07).
+<!-- Launch screen — faqat bitta tekis qorong'i rang (#000000).
 
      Ilova ochilishi bilan DARHOL intro roligi (VideoSplashScreen) ko'rinishi
      kerak. Rolikning birinchi kadri qorong'i, shuning uchun launch screen ham
@@ -9,6 +9,6 @@
      fayllar o'chirilmagan, qaytarish uchun eski layer-list'ni tiklash kifoya. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
-        <color android:color="#FF040E07"/>
+        <color android:color="#FF000000"/>
     </item>
 </layer-list>
