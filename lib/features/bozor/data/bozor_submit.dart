@@ -82,9 +82,9 @@ class BozorSubmitter {
           'key': key,
           'role': entry.key,
           'sort_order': i,
-          // Muqova — birinchi foto. Backend ham shu qoidaga tushadi, lekin
-          // aniq aytib qo'ygan yaxshi.
-          'is_cover': entry.key == 'photo' && i == 0,
+          // Muqova — foydalanuvchi TANLAGAN rasm (tanlamagan bo'lsa
+          // birinchisi, `DescriptionDraft.coverPhotoIndex` ga qarang).
+          'is_cover': entry.key == 'photo' && i == d.coverPhotoIndex,
           // Xona nomi — faqat 360° da bor.
           if (entry.key == 'panorama')
             'title': ?d.roomName(entry.value[i]) ?? d.roomName(key),

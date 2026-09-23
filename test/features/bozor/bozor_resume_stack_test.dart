@@ -6,6 +6,7 @@ import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/screens/bozor_description_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_price_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_type_step_screen.dart';
+import 'param_schema_fixture.dart';
 
 /// Qoralama SAQLANGAN qadamdan davom ettirilganda oldingi qadamlar ham
 /// navigatorda bo'lishi kerak: «Ortga» → oldingi qadam, header ← → ro'yxat.
@@ -13,6 +14,9 @@ import 'package:kadastr/features/bozor/screens/bozor_type_step_screen.dart';
 /// Prod 2026-09-13: 6-qadamda saqlangan qoralamada «Ortga» bosilganda
 /// foydalanuvchi to'g'ridan «Mening e'lonlarim» ga tushib qolardi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   BozorDraft draft() => BozorDraft(
     deal: DealType.rent,
     kind: PropertyKind.residential,

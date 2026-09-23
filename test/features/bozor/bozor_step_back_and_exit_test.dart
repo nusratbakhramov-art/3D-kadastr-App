@@ -7,6 +7,7 @@ import 'package:kadastr/features/bozor/screens/bozor_price_step_screen.dart';
 import 'package:kadastr/features/bozor/screens/bozor_type_step_screen.dart';
 import 'package:kadastr/features/services/widgets/service_app_bar.dart';
 import 'package:kadastr/widgets/sheet_button.dart';
+import 'param_schema_fixture.dart';
 
 /// Sehrgar sarlavhasidagi ikki tugma (FLOW-01…07).
 ///
@@ -17,6 +18,9 @@ import 'package:kadastr/widgets/sheet_button.dart';
 ///     (pastki DRAWER, `SheetButton` lar bilan — Material `AlertDialog` emas);
 ///   * 1-qadamda × yo'q (orqaga qaytadigan joy yo'q, ← ning o'zi chiqish).
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   BozorDraft draft() => BozorDraft(
     deal: DealType.rent,
     kind: PropertyKind.residential,

@@ -463,7 +463,7 @@ class _AiStartScreenState extends State<AiStartScreen> {
                     subtitle: _S.subtitle(l),
                     // Bu tugma butun oqimni yopadi — bitta qadam
                     // orqaga EMAS. Qadamma-qadam qaytish pastda.
-                    onBack: () => closeAiWizard(context),
+                    onBack: () => confirmCloseAiWizard(context),
                   ),
                 ),
                 const SizedBox(height: 8),

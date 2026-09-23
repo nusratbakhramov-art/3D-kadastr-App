@@ -77,6 +77,13 @@ class BozorApi {
     };
   }
 
+  /// 3-qadam SXEMASI — qaysi turda qanday maydonlar bor.
+  ///
+  /// Til berilmaydi: javobda yorliq yo'q, faqat kalitlar. Matnlar
+  /// `app_translations` dan `bozor.param.<key>` bo'yicha olinadi.
+  Future<Map<String, dynamic>> paramSchema() =>
+      _getJson(_uri('/listings/schema', const {}));
+
   /// Viloyat → tuman daraxti. `marketplace` moduliniki — e'lonlar uchun ham
   /// SHU ro'yxat ishlatiladi, ikkinchisini yaratmaymiz.
   Future<List<RegionNode>> regionsTree() async {

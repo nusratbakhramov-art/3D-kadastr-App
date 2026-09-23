@@ -32,6 +32,17 @@ enum PropertyType {
   land,
   commercial,
   garage,
+  /// «Podval» — yerto'la/tsokol qavatdagi noturar joy.
+  ///
+  /// AYRIM tur, `commercial` ning ichida emas: mijoz uni ro'yxatda alohida
+  /// nom bilan ko'rishni so'radi, va «tijorat» deb belgilangan e'lon
+  /// qidiruvda yerto'la ekanini yashirardi.
+  ///
+  /// Parametrlari hozircha AYNAN tijorat joyiniki — o'z jadvali dizaynda
+  /// ochilmagan. Bu shu fayldagi mavjud usul: `newBuildingApartment` ham
+  /// shu sababdan oddiy kvartira maydonlarini ishlatadi
+  /// (`param_schema.dart` ga qarang).
+  basement,
   otherNonResidential,
 }
 
@@ -60,12 +71,27 @@ extension PropertyKindX on PropertyKind {
     PropertyKind.nonResidential => const [
       PropertyType.commercial,
       PropertyType.garage,
+      PropertyType.basement,
       PropertyType.otherNonResidential,
     ],
   };
 }
 
 extension PropertyTypeX on PropertyType {
+  /// Backend bilan SHARTNOMA: `bozor_listings.property_type` va
+  /// `listing_options.PROPERTY_TYPES` dagi kod. Sxema ham shu kod bo'yicha
+  /// keladi (`param_schema.dart`).
+  String get code => switch (this) {
+    PropertyType.apartment => 'apartment',
+    PropertyType.newBuildingApartment => 'new_building_apartment',
+    PropertyType.house => 'house',
+    PropertyType.land => 'land',
+    PropertyType.commercial => 'commercial',
+    PropertyType.garage => 'garage',
+    PropertyType.basement => 'basement',
+    PropertyType.otherNonResidential => 'other_non_residential',
+  };
+
   String label(Locale l) => switch (this) {
     PropertyType.apartment => tr(l, 'bozor.type.apartment'),
     PropertyType.newBuildingApartment => tr(l, 'bozor.type.new_building'),
@@ -73,6 +99,7 @@ extension PropertyTypeX on PropertyType {
     PropertyType.land => tr(l, 'bozor.type.land'),
     PropertyType.commercial => tr(l, 'bozor.type.commercial'),
     PropertyType.garage => tr(l, 'bozor.type.garage'),
+    PropertyType.basement => tr(l, 'bozor.type.basement'),
     PropertyType.otherNonResidential => tr(l, 'bozor.type.other_non_res'),
   };
 
@@ -84,6 +111,7 @@ extension PropertyTypeX on PropertyType {
     PropertyType.land => PropertyKind.residential,
     PropertyType.commercial ||
     PropertyType.garage ||
+    PropertyType.basement ||
     PropertyType.otherNonResidential => PropertyKind.nonResidential,
   };
 
@@ -202,6 +230,7 @@ extension PropertyTypeAddressX on PropertyType {
       PropertyType.land ||
       PropertyType.commercial ||
       PropertyType.garage ||
+      PropertyType.basement ||
       PropertyType.otherNonResidential => common,
     };
   }
@@ -220,6 +249,7 @@ extension PropertyTypeAddressX on PropertyType {
     PropertyType.land => tr(l, 'bozor.desc.about.land'),
     PropertyType.commercial => tr(l, 'bozor.desc.about.commercial'),
     PropertyType.garage => tr(l, 'bozor.desc.about.garage'),
+    PropertyType.basement => tr(l, 'bozor.desc.about.basement'),
     PropertyType.otherNonResidential => tr(l, 'bozor.desc.about.other'),
   };
 
@@ -240,6 +270,7 @@ extension PropertyTypeAddressX on PropertyType {
       PropertyType.land => tr(l, 'bozor.price.sale.land'),
       PropertyType.commercial => tr(l, 'bozor.price.sale.commercial'),
       PropertyType.garage => tr(l, 'bozor.price.sale.garage'),
+      PropertyType.basement => tr(l, 'bozor.price.sale.basement'),
       PropertyType.otherNonResidential => tr(l, 'bozor.price.sale.other'),
     };
   }
@@ -526,6 +557,25 @@ class DescriptionDraft {
   /// Telefonda saqlangan, hali yuklanmagan tushirishlar: `local:<uuid>`
   /// havola → holat. [LocalPano] izohiga qarang.
   final Map<String, LocalPano> localPanoramas = {};
+
+  /// MUQOVA rasmi — [photos] dagi havola. `null` bo'lsa birinchisi.
+  ///
+  /// ⚠️ INDEKS EMAS, HAVOLA saqlanadi. Indeks saqlansa, undan oldingi rasm
+  /// o'chirilganda muqova jimgina BOSHQA rasmga surilib ketardi.
+  ///
+  /// `null` sukuti ataylab: ilgari muqova har doim birinchi rasm edi
+  /// (`bozor_submit.dart`), shuning uchun eski qoralamalar va tanlov
+  /// qilmagan foydalanuvchilar o'sha xulqni oladi.
+  String? coverPhoto;
+
+  /// Muqovaning [photos] dagi o'rni. Tanlangan rasm o'chirilgan bo'lsa (yoki
+  /// hech qachon tanlanmagan bo'lsa) — `0`.
+  int get coverPhotoIndex {
+    final ref = coverPhoto;
+    if (ref == null) return 0;
+    final i = photos.indexOf(ref);
+    return i < 0 ? 0 : i;
+  }
 
   /// Havola → XONA NOMI («Zal», «Oshxona»). Har skan xonaga bog'lanadi:
   /// nom capture'dan OLDIN so'raladi, `local:` havola kalitga almashganda

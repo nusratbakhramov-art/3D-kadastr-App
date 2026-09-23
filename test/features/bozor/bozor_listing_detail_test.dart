@@ -13,6 +13,7 @@ import 'package:kadastr/features/market/widgets/listing_gallery_pager.dart';
 import 'package:kadastr/features/market/widgets/listing_meta_pills.dart';
 import 'package:kadastr/widgets/remote_image.dart';
 import 'package:photo_view/photo_view_gallery.dart';
+import 'param_schema_fixture.dart';
 
 /// E'lon detali ekrani.
 ///
@@ -24,6 +25,9 @@ import 'package:photo_view/photo_view_gallery.dart';
 /// Yorliqlar bu yerda kalitning O'ZI bo'lib chiqadi (`bozor.detail.call`):
 /// `tr()` bundle yuklanmagan holatda kalitni qaytaradi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   const jsonHeaders = {'content-type': 'application/json; charset=utf-8'};
 
   http.Response ok(Object body) =>

@@ -6,6 +6,7 @@ import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/screens/bozor_contacts_step_screen.dart';
 import 'package:kadastr/features/bozor/widgets/bozor_phone_field.dart';
 import 'package:kadastr/features/services/widgets/wizard_nav_bar.dart';
+import 'param_schema_fixture.dart';
 
 /// 6-qadamda SMS TASDIQLASH YO'Q — mahsulot qarori (2026-09-11).
 ///
@@ -16,6 +17,9 @@ import 'package:kadastr/features/services/widgets/wizard_nav_bar.dart';
 /// Yorliqlar bu yerda kalitning O'ZI bo'lib chiqadi (`bozor.contacts.name`):
 /// `tr()` bundle yuklanmagan holatda kalitni qaytaradi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   BozorDraft draftAt(PropertyType type) =>
       BozorDraft(deal: DealType.rent, kind: type.kind, type: type);
 

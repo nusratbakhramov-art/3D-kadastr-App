@@ -643,6 +643,13 @@ class _BozorDescriptionStepScreenState
                           MediaUploadRow(
                             label: _S.addPhoto(l),
                             iconAsset: 'assets/icons/upload-photo.svg',
+                            // Muqovani FOYDALANUVCHI tanlaydi; tanlamasa
+                            // birinchi rasm (`DescriptionDraft.coverPhoto`).
+                            coverLabel: _S.coverBadge(l),
+                            makeCoverLabel: _S.makeCover(l),
+                            coverIndex: _d.coverPhotoIndex,
+                            onSetCover: (i) =>
+                                setState(() => _d.coverPhoto = _d.photos[i]),
                             paths: _d.photos,
                             onAdd: () => _pick(_d.photos, multiple: true),
                             onRemove: (i) =>
@@ -655,9 +662,6 @@ class _BozorDescriptionStepScreenState
                           MediaUploadRow(
                             label: _S.add360(l),
                             iconAsset: 'assets/icons/upload-360.svg',
-                            // Yotiq ikonka — `MediaUploadRow.iconSize` izohiga
-                            // qarang (PANO-04).
-                            iconSize: 22,
                             paths: _d.panoramas,
                             // Eskiz serverdan keladi — kadrlar o'chirilgan,
                             // lokal nusxa yo'q.
@@ -758,6 +762,10 @@ class _S {
   static String textHint(Locale l) => tr(l, 'bozor.desc.hint');
   static String addPlan(Locale l) => tr(l, 'bozor.desc.add_plan');
   static String addPhoto(Locale l) => tr(l, 'bozor.desc.add_photo');
+
+  static String coverBadge(Locale l) => tr(l, 'bozor.media.cover_badge');
+
+  static String makeCover(Locale l) => tr(l, 'bozor.media.make_cover');
   static String add360(Locale l) => tr(l, 'bozor.desc.add_360');
   static String youtube(Locale l) => tr(l, 'bozor.desc.youtube');
   static String youtubeHint(Locale l) => tr(l, 'bozor.desc.youtube_hint');

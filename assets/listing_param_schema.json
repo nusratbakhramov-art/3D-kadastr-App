@@ -1,0 +1,1397 @@
+{
+  "version": 1,
+  "types": {
+    "apartment": [
+      {
+        "key": "rooms_count",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "rooms_count",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "total_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "living_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "kitchen_area",
+        "control": "number",
+        "optional": true,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "ceiling_height",
+        "control": "number",
+        "optional": true,
+        "unit": "m",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "bathroom",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "bathroom",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "balcony",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "balcony",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "renovation",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "renovation",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "window_view",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "window_view",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "build_year",
+        "control": "integer",
+        "optional": true,
+        "unit": "y",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "elevator",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "elevator",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "freight_elevator",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "gas",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "parking",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "parking",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "garage_ceiling_height",
+        "control": "number",
+        "optional": true,
+        "unit": "m",
+        "options": null,
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_material",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "garage_material",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_status",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "garage_status",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "gsk_name",
+        "control": "text",
+        "optional": true,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_security",
+        "control": "multi_select",
+        "optional": false,
+        "unit": null,
+        "options": "garage_security",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_amenities",
+        "control": "multi_select",
+        "optional": false,
+        "unit": null,
+        "options": "garage_amenities",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "security",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "security",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "amenities",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "amenities",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "yard_improvements",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "yard_improvements",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "infrastructure",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "infrastructure",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      }
+    ],
+    "new_building_apartment": [
+      {
+        "key": "rooms_count",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "rooms_count",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "total_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "living_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "kitchen_area",
+        "control": "number",
+        "optional": true,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "ceiling_height",
+        "control": "number",
+        "optional": true,
+        "unit": "m",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "bathroom",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "bathroom",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "balcony",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "balcony",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "renovation",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "renovation",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "window_view",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "window_view",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "build_year",
+        "control": "integer",
+        "optional": true,
+        "unit": "y",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "elevator",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "elevator",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "freight_elevator",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "gas",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "parking",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "parking",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "garage_ceiling_height",
+        "control": "number",
+        "optional": true,
+        "unit": "m",
+        "options": null,
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_material",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "garage_material",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_status",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "garage_status",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "gsk_name",
+        "control": "text",
+        "optional": true,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_security",
+        "control": "multi_select",
+        "optional": false,
+        "unit": null,
+        "options": "garage_security",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "garage_amenities",
+        "control": "multi_select",
+        "optional": false,
+        "unit": null,
+        "options": "garage_amenities",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": {
+          "key": "parking",
+          "value": "garage"
+        }
+      },
+      {
+        "key": "security",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "security",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "amenities",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "amenities",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "yard_improvements",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "yard_improvements",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "infrastructure",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "infrastructure",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      }
+    ],
+    "house": [
+      {
+        "key": "land_area",
+        "control": "number",
+        "optional": false,
+        "unit": "sot.",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "land_type",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "land_type",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "electricity",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "water_supply",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "gas",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "sewerage",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "house_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "rooms_count",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "rooms_count",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "house_type",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "house_type",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "irrigated_area",
+        "control": "number",
+        "optional": true,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "built_up_area",
+        "control": "number",
+        "optional": true,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "living_area",
+        "control": "number",
+        "optional": true,
+        "unit": "m²",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "ceiling_height",
+        "control": "number",
+        "optional": true,
+        "unit": "m",
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "bathroom_location",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "bathroom_location",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "bathroom_type",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "bathroom",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "renovation",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "renovation",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "security",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "security",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "amenities",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "amenities",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "yard_improvements",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "yard_improvements",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "infrastructure",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "infrastructure",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      }
+    ],
+    "land": [
+      {
+        "key": "land_area",
+        "control": "number",
+        "optional": false,
+        "unit": "sot.",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "land_type",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "land_type",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "has_annex",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "annex_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": {
+          "key": "has_annex",
+          "value": true
+        }
+      },
+      {
+        "key": "rooms_count",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "rooms_count",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "electricity",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "water_supply",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "gas",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "sewerage",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "amenities",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "amenities",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "infrastructure",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "infrastructure",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      }
+    ],
+    "commercial": [
+      {
+        "key": "purpose",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "purpose",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "building_type",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "building_type",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "premises_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "with_land",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "land_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": {
+          "key": "with_land",
+          "value": true
+        }
+      },
+      {
+        "key": "business_center_name",
+        "control": "text",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": {
+          "key": "building_type",
+          "value": "business_center"
+        }
+      },
+      {
+        "key": "building_floors",
+        "control": "integer",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "whole_building",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "floor",
+        "control": "integer",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "possible_purpose",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "purpose",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "rooms_count",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "rooms_count",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "entrance_kind",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "entrance_kind",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "renovation",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "renovation",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "electricity",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "water_supply",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "gas",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "sewerage",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "bathrooms_count",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "rooms_count",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "security",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "security",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "amenities",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "amenities",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "infrastructure",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "infrastructure",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      }
+    ],
+    "garage": [
+      {
+        "key": "garage_kind",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "garage_kind",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "parking_type",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "parking_type",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "garage_ceiling_height",
+        "control": "number",
+        "optional": false,
+        "unit": "m",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "garage_material",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "garage_material",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "garage_status",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "garage_status",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "gsk_name",
+        "control": "text",
+        "optional": true,
+        "unit": null,
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "garage_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "garage_security",
+        "control": "multi_select",
+        "optional": false,
+        "unit": null,
+        "options": "garage_security",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "garage_amenities",
+        "control": "multi_select",
+        "optional": false,
+        "unit": null,
+        "options": "garage_amenities",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      }
+    ],
+    "basement": [
+      {
+        "key": "purpose",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "purpose",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "building_type",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "building_type",
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "premises_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "with_land",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "land_area",
+        "control": "number",
+        "optional": false,
+        "unit": "m²",
+        "options": null,
+        "in_step": true,
+        "section": "main",
+        "visible_when": {
+          "key": "with_land",
+          "value": true
+        }
+      },
+      {
+        "key": "business_center_name",
+        "control": "text",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": {
+          "key": "building_type",
+          "value": "business_center"
+        }
+      },
+      {
+        "key": "building_floors",
+        "control": "integer",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "whole_building",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "floor",
+        "control": "integer",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "possible_purpose",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "purpose",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "rooms_count",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "rooms_count",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "entrance_kind",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "entrance_kind",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "renovation",
+        "control": "select",
+        "optional": false,
+        "unit": null,
+        "options": "renovation",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "electricity",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "water_supply",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "gas",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "sewerage",
+        "control": "toggle",
+        "optional": false,
+        "unit": null,
+        "options": null,
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "bathrooms_count",
+        "control": "select",
+        "optional": true,
+        "unit": null,
+        "options": "rooms_count",
+        "in_step": false,
+        "section": "main",
+        "visible_when": null
+      },
+      {
+        "key": "security",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "security",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "amenities",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "amenities",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      },
+      {
+        "key": "infrastructure",
+        "control": "multi_select",
+        "optional": true,
+        "unit": null,
+        "options": "infrastructure",
+        "in_step": false,
+        "section": "extra",
+        "visible_when": null
+      }
+    ],
+    "other_non_residential": []
+  }
+}

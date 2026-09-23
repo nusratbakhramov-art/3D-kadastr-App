@@ -11,7 +11,9 @@ import '../ai_draft_saver.dart';
 import '../api_cadastre_service.dart';
 import '../data/ngis_parcel_client.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../models/ai_wizard_steps.dart';
 import '../models/ai_scan_result.dart';
+import '../../../widgets/sheet_button.dart';
 import '../widgets/parcel_map.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -76,7 +78,6 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     r'^\d{2}:\d{2}:\d{2}:\d{2}:\d{2}:\d{4}(:\d{1,4})*$',
   );
   final TextEditingController _cadastreController = TextEditingController();
-  Timer? _loadTimer;
   _LoadStatus _status = _LoadStatus.idle;
   CadastreLookupResult? _info;
   String? _errorMsg;
@@ -88,6 +89,25 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   /// davreest.uz scrape, which can get the user rate-limited or blocked.
   String? _inFlightNumber;
   List<String> _recent = const [];
+
+  /// Shu RAQAM uchun nechta reyestr urinishi natijasiz tugadi.
+  ///
+  /// ⚠️ NIMA SANALADI. Faqat haqiqatan yuborilgan va natijasiz qaytgan
+  /// so'rov: format xatosi (so'rov umuman ketmagan) ham, foydalanuvchi
+  /// ekrandan chiqib ketgani ham sanalmaydi. Tarmoq uzilishi SANALADI —
+  /// foydalanuvchi uchun natija bir xil (ma'lumot yo'q), lekin xabar
+  /// boshqacha bo'lib qoladi ([_performLookup] dagi uch tarmoq).
+  int _failedAttempts = 0;
+
+  /// Sanoq qaysi raqamga tegishli — raqam o'zgarsa nolga tushadi.
+  String? _failedNumber;
+
+  /// Zaxira varag'i hozir ochiqmi. Ikki marta bosish ikkita varaq
+  /// ochmasligi uchun (`bozor_routes.dart` dagi bilan bir xil qulf).
+  bool _fallbackSheetOpen = false;
+
+  /// Foydalanuvchi «hujjat bilan davom etish» ni tanladimi.
+  bool _documentMode = false;
 
   /// Xaritadan tanlangan uchastka — ichki xaritada ajratib ko'rsatiladi va
   /// tanlagich qayta ochilganda o'sha joydan boshlanadi.
@@ -157,11 +177,13 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
 
   /// Raqamni maydonga qo'yadi va qidiruvni MAJBURAN qaytadan boshlaydi.
   ///
-  /// Holatni oldindan `idle` ga qaytarish shart: [_onCadastreChanged] qidiruvni
-  /// faqat `idle`/`error` da boshlaydi, aks holda avvalgi uyning manzili va
+  /// Holatni oldin `idle` ga qaytaramiz, aks holda avvalgi uyning manzili va
   /// maydoni yangi raqam ostida turib qolardi.
+  ///
+  /// Qidiruv bu yerda ATAYLAB o'zi boshlanadi — maydonni qo'lda terishdan
+  /// farqli o'laroq, xaritadan uy tanlash yoki oxirgi raqamni bosish allaqachon
+  /// ONGLI tanlov; odamni yana tugma bosishga majburlash ortiqcha.
   void _applyNumber(String number) {
-    _loadTimer?.cancel();
     setState(() {
       _status = _LoadStatus.idle;
       _info = null;
@@ -172,20 +194,15 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
       text: number,
       selection: TextSelection.collapsed(offset: number.length),
     );
+    if (_cadastreRe.hasMatch(number)) unawaited(_runLookup());
   }
 
-  void _useRecent(String number) {
-    _cadastreController.value = TextEditingValue(
-      text: number,
-      selection: TextSelection.collapsed(offset: number.length),
-    );
-    // Filling the field to full length triggers _onCadastreChanged → lookup,
-    // which now hits the backend cache first (instant for recents).
-  }
+  /// Oxirgi qidirilgan raqamni bosish — tayyor javobni qayta olish, shuning
+  /// uchun qidiruv shu yerda boshlanadi ([_applyNumber] ga qarang).
+  void _useRecent(String number) => _applyNumber(number);
 
   @override
   void dispose() {
-    _loadTimer?.cancel();
     _cadastreController.removeListener(_onCadastreChanged);
     _cadastreController.dispose();
     super.dispose();
@@ -199,31 +216,42 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     if (_parcel != null && _parcel!.cadastreNumber != text) {
       _parcel = null;
     }
-    final filled = _cadastreRe.hasMatch(text);
-    if (filled) {
-      if (_status == _LoadStatus.idle || _status == _LoadStatus.error) {
-        _loadTimer?.cancel();
-        _loadTimer = Timer(const Duration(milliseconds: 250), _runLookup);
-        setState(() => _status = _LoadStatus.loading);
-      }
-    } else {
-      _loadTimer?.cancel();
-      if (_status != _LoadStatus.idle) {
-        setState(() {
-          _status = _LoadStatus.idle;
-          _info = null;
-          _errorMsg = null;
-        });
-        widget.onResolved?.call(null);
-      }
+    // Boshqa raqam — boshqa hikoya: muvaffaqiyatsiz urinishlar sanog'i
+    // nolga tushadi, aks holda birinchi raqamda ikki marta xato qilgan
+    // odam ikkinchi raqamni bir marta terishi bilanoq zaxira varag'ini
+    // ko'rardi.
+    if (_failedNumber != null && _failedNumber != text) {
+      _failedAttempts = 0;
+      _failedNumber = null;
     }
+    // ⚠️ BU YERDA QIDIRUV BOSHLANMAYDI. Ilgari raqam to'lishi bilan 250 ms
+    // dan keyin so'rov o'zi ketardi — raqamning dumini tahrir qilgan odam
+    // har tuzatishida davreestr'ni qaytadan qirqib olardi. Endi qidiruvni
+    // faqat foydalanuvchi boshlaydi: maydon ichidagi tugma yoki klaviatura
+    // «done» tugmasi. Tugma raqam to'liq bo'lgach o'zi yonadi va bir-ikki
+    // marta "puls" beradi — bosish mumkinligi shundan bilinadi.
+    if (!_cadastreRe.hasMatch(text) && _status != _LoadStatus.idle) {
+      setState(() {
+        _status = _LoadStatus.idle;
+        _info = null;
+        _errorMsg = null;
+      });
+      widget.onResolved?.call(null);
+    }
+  }
+
+  /// Maydon ichidagi qidiruv tugmasi / klaviatura «done» tugmasi.
+  void _onSearchPressed() {
+    if (!_cadastreRe.hasMatch(_cadastreController.text)) return;
+    FocusScope.of(context).unfocus();
+    HapticFeedback.lightImpact();
+    unawaited(_runLookup());
   }
 
   Future<void> _runLookup() async {
     final number = _cadastreController.text;
     // Already scraping this exact number — ignore the tap (see [_inFlightNumber]).
     if (_inFlightNumber == number) return;
-    _loadTimer?.cancel();
     _inFlightNumber = number;
     final reqId = ++_lookupRequestId;
     // Manual refresh / retry enters here with the status still `loaded` or
@@ -269,19 +297,28 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
       final hasData =
           (result.address?.trim().isNotEmpty ?? false) ||
           result.totalArea != null ||
+          result.landArea != null ||
           result.livingArea != null ||
           result.cadastreValue != null ||
           (result.objectTypeHint?.trim().isNotEmpty ?? false);
       if (!hasData) {
+        // 2-holat: so'rov o'tdi, javob keldi, lekin reyestrda foydali
+        // ma'lumot yo'q. `hasUsableData` bilan bir xil mezon —
+        // `davreestr_client.dart` dagi izohga qarang; bitta maydonga
+        // (masalan kadastr qiymatiga) qarab qaror qilinmaydi.
         setState(() {
           _status = _LoadStatus.error;
           _info = null;
-          _errorMsg = _CadastreStrings.notFound(
+          _errorMsg = _CadastreStrings.notFoundRetry(
             Localizations.localeOf(context),
           );
         });
+        await _registerFailure(number);
         return;
       }
+      // Muvaffaqiyat — sanoq tozalanadi.
+      _failedAttempts = 0;
+      _failedNumber = null;
       setState(() {
         _info = result;
         _status = _LoadStatus.loaded;
@@ -294,11 +331,14 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
       // Remember it upstream so back→forward re-prefills instead of clearing.
       widget.onResolved?.call(result);
     } on CadastreLookupException catch (e) {
+      // 1-holat: reyestrning o'zi rad etdi (raqam topilmadi, limit, captcha).
+      // Xabar SERVERNIKI — uni "topilmadi" bilan almashtirmaymiz.
       if (!mounted || reqId != _lookupRequestId) return;
       setState(() {
         _status = _LoadStatus.error;
         _errorMsg = e.message;
       });
+      await _registerFailure(number);
     } catch (e) {
       if (!mounted || reqId != _lookupRequestId) return;
       setState(() {
@@ -312,8 +352,84 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
       // "retry" calls back into _runLookup, which would otherwise be dropped as
       // a duplicate of this (already finished) request.
       _inFlightNumber = null;
+      // 3-holat: tarmoq/server uzilishi. Foydalanuvchiga «topilmadi»
+      // DEYILMAYDI — uning raqami to'g'ri bo'lishi mumkin. Lekin urinish
+      // baribir natijasiz, shuning uchun sanoqqa kiradi: ikki marta
+      // uzilgandan keyin ham zaxira yo'lini ko'rsatish kerak.
       await NetworkErrorHandler.maybeShow(context, e, onRetry: _runLookup);
+      await _registerFailure(number);
     }
+  }
+
+  /// Natijasiz urinishni qayd qiladi va ikkinchisidan keyin zaxira varag'ini
+  /// ochadi.
+  ///
+  /// Ikki marta — ataylab: birinchi xatodan keyin odam raqamni tekshirib
+  /// qayta urinadi, uchinchisiga yetguncha esa u allaqachon «ilova ishlamas
+  /// ekan» degan xulosaga keladi. Zaxira yo'li BOR ekan, u haqda ikkinchi
+  /// xatodayoq aytish kerak.
+  Future<void> _registerFailure(String number) async {
+    if (!mounted) return;
+    _failedNumber = number;
+    _failedAttempts++;
+    if (_failedAttempts >= 2) await _showFallbackSheet();
+  }
+
+  /// «Topa olmadingizmi?» zaxira varag'i.
+  ///
+  /// Ikki natijasiz urinishdan keyin O'ZI ochiladi, undan oldin esa maydon
+  /// yonidagi «Topa olmayapsizmi?» tugmasi bilan qo'lda ham ochiladi —
+  /// foydalanuvchi zaxira yo'li borligini bilish uchun ikki marta
+  /// muvaffaqiyatsizlikka uchrashi SHART emas.
+  ///
+  /// Ilovaning qolgan so'rov oynalari kabi pastki drawer
+  /// (`login_required_sheet`, `bozor_routes._ExitWizardSheet`), tugmalari
+  /// `SheetButton` dan.
+  Future<void> _showFallbackSheet() async {
+    if (_fallbackSheetOpen || !mounted) return;
+    _fallbackSheetOpen = true;
+    try {
+      final choice = await showModalBottomSheet<_FallbackChoice>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (_) => const _CadastreFallbackSheet(),
+      );
+      if (!mounted) return;
+      switch (choice) {
+        case _FallbackChoice.retry:
+          _runLookup();
+        case _FallbackChoice.document:
+          _continueWithDocument();
+        case null:
+          break;
+      }
+    } finally {
+      _fallbackSheetOpen = false;
+    }
+  }
+
+  /// «Hujjat bilan davom etish» — reyestr tekshiruvi HAL BO'LMAGANI
+  /// yozib qo'yiladi va oqim davom etadi.
+  ///
+  /// Holat bundle'da (`AiCadastreResolution.documentRequired`) va qoralama
+  /// payload'ida saqlanadi, ya'ni orqaga/oldinga yurishda ham, qoralamadan
+  /// tiklashda ham yo'qolmaydi. Joylashuv esa noma'lumligicha qoladi —
+  /// shuning uchun qo'lda xarita qadami KO'RSATILADI.
+  void _continueWithDocument() {
+    final info = _info;
+    setState(() {
+      _status = _LoadStatus.loaded;
+      _errorMsg = null;
+      _documentMode = true;
+      // Reyestr hech narsa bermagan bo'lsa ham oqim davom etishi uchun
+      // minimal yozuv kerak: raqamning o'zi.
+      _info = info ??
+          CadastreLookupResult(
+            cadastreNumber: _cadastreController.text.trim(),
+          );
+    });
+    widget.onResolved?.call(_info);
   }
 
   /// DRAFT arizani (bir marta) yaratadi. Skan qilingan yo'lda draft allaqachon
@@ -350,9 +466,10 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
         kadastr: info,
         scan: widget.scan,
         draftId: draftId,
-        // Area now comes straight from the cadastre (total_area) — the manual
-        // area step was removed. widget.areaM2 is only a resume fallback.
-        areaM2: info.totalArea ?? widget.areaM2,
+        // Area now comes straight from the cadastre — the manual area step
+        // was removed. Yer uchastkasida maydon `land_area` da keladi, shuning
+        // uchun `effectiveArea`. widget.areaM2 is only a resume fallback.
+        areaM2: info.effectiveArea ?? widget.areaM2,
       );
       _bundle = bundle;
     }
@@ -366,12 +483,40 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     final parcelCenter = _parcel?.cadastreNumber == info.cadastreNumber
         ? _parcel?.center
         : null;
+    // Reyestr hal bo'lmagan bo'lsa buni YOZIB qo'yamiz: keyingi qadamlar
+    // (hujjat talabi, qo'lda xarita) shu holatga qarab ishlaydi va u
+    // qoralamada ham saqlanadi.
+    bundle.cadastreResolution = _documentMode
+        ? AiCadastreResolution.documentRequired
+        : AiCadastreResolution.resolved;
     if (parcelCenter != null) {
       bundle.parcelCenter = AiParcelPoint(
         lat: parcelCenter.latitude,
         lng: parcelCenter.longitude,
         cadastreNumber: info.cadastreNumber,
       );
+      // Uchastka markazi obyektning ISHONCHLI nuqtasi — joylashuvni shu
+      // yerda YAKUNLAYMIZ va qo'lda xarita qadami oqimdan tushib qoladi
+      // (`AiBaholashBundle.needsManualLocation`). Nuqta ham, uning manbai
+      // ham yoziladi: keyingi qadamlar koordinataga emas, MANBAGA qarab
+      // qaror qiladi.
+      bundle.location = AiLocationInfo(
+        lat: parcelCenter.latitude,
+        lng: parcelCenter.longitude,
+        addressText: info.address,
+      );
+      bundle.locationSource = AiLocationSource.parcel;
+    } else {
+      // Raqam QO'LDA kiritilgan. Reyestr javobi koordinata bermaydi
+      // (`CadastreLookupResult` da lat/lng yo'q), ya'ni obyektning joyi hali
+      // noma'lum — qo'lda xarita qadami KERAK bo'ladi. Eski qiymatni
+      // tozalaymiz: foydalanuvchi avval uchastka tanlab, keyin boshqa raqam
+      // yozgan bo'lsa, eski uyning nuqtasi qolib ketmasin.
+      if (bundle.locationSource == AiLocationSource.parcel) {
+        bundle.parcelCenter = null;
+        bundle.location = null;
+        bundle.locationSource = AiLocationSource.none;
+      }
     }
     // Fon rejimida saqlash — sekin backend "Davom etish"'ni muzlatmasin.
     saveAiDraftStepInBackground(bundle, 'client');
@@ -384,12 +529,24 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   }
 
   /// Kadastr endi MAJBURIY: davom etish uchun davreestr topilishi VA obyekt
-  /// maydoni (total_area) bo'lishi shart — maydon shu yerdan olinadi (alohida
-  /// maydon qadami olib tashlangan).
+  /// maydoni bo'lishi shart — maydon shu yerdan olinadi (alohida maydon qadami
+  /// olib tashlangan).
+  ///
+  /// Maydon `total_area` YOKI `land_area` dan olinadi
+  /// ([CadastreLookupResult.effectiveArea]): yer uchastkasi yozuvida birinchisi
+  /// hech qachon bo'lmaydi, shu sababli avval har bir yer uchastkasi
+  /// «maydon yo'q» deb bloklanardi.
   bool get _areaReady =>
-      _info?.totalArea != null && (_info?.totalArea ?? 0) > 0;
+      _info?.effectiveArea != null && (_info?.effectiveArea ?? 0) > 0;
 
-  bool get _canContinue => _status == _LoadStatus.loaded && _areaReady;
+  /// «Davom etish» bosiladimi.
+  ///
+  /// HUJJAT REJIMIDA maydon SHART EMAS: reyestr hech narsa bermagani uchun
+  /// bu rejim umuman paydo bo'lgan, maydonni talab qilish esa foydalanuvchini
+  /// o'sha boshi berk ko'chaga qaytarardi. Maydon keyinroq — kadastr
+  /// hujjatidan olinadi.
+  bool get _canContinue =>
+      _status == _LoadStatus.loaded && (_areaReady || _documentMode);
 
   Future<void> _continue() async {
     if (!_canContinue || _info == null) return;
@@ -424,13 +581,22 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                         subtitle: _CadastreStrings.subtitle(l),
                         // Bu tugma butun oqimni yopadi — bitta qadam
                         // orqaga EMAS. Qadamma-qadam qaytish pastda.
-                        onBack: () => closeAiWizard(context),
+                        onBack: () => confirmCloseAiWizard(context),
                       ),
                     ),
                     const SizedBox(height: 8),
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: const StepProgressBar(count: 7, activeIndex: 0),
+                      // Bo'laklar soni «Joylashuv» qadami kerak bo'ladimi-yo'qmi
+                      // ga bog'liq. Bu qadamda buni uchastka tanlanganidan
+                      // bilamiz: tanlangan bo'lsa nuqta bor, ya'ni qo'lda
+                      // xarita qadami tushib qoladi va chiziq 6 bo'lak bo'ladi.
+                      child: StepProgressBar(
+                        count: aiStepsFor(
+                          needsManualLocation: _parcel == null,
+                        ).length,
+                        activeIndex: 0,
+                      ),
                     ),
                     if (widget.scanJobId != null) ...[
                       const SizedBox(height: 12),
@@ -470,6 +636,8 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                           _CadastreInput(
                             isDark: isDark,
                             controller: _cadastreController,
+                            onSearch: _onSearchPressed,
+                            isBusy: _status == _LoadStatus.loading,
                           ),
                           if (_status == _LoadStatus.idle &&
                               _recent.isNotEmpty &&
@@ -519,7 +687,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                                         _PropertyInfoCardSkeleton(
                                           isDark: isDark,
                                         )
-                                      else if (_status == _LoadStatus.error)
+                                      else if (_status == _LoadStatus.error) ...[
                                         _LookupErrorCard(
                                           message:
                                               _errorMsg ??
@@ -527,8 +695,55 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                                           onRetry: _runLookup,
                                           isDark: isDark,
                                           locale: l,
-                                        )
+                                        ),
+                                        // «Topa olmayapsizmi?» — zaxira
+                                        // yo'lini IKKI marta xato qilmasdan
+                                        // ham ochish mumkin. Ataylab past
+                                        // ovozli matn-tugma: ekranda
+                                        // allaqachon xato kartasi turibdi,
+                                        // yana bitta yorqin tugma qo'ysak
+                                        // asosiy amal («qayta urinish»)
+                                        // ko'rinmay qolardi.
+                                        const SizedBox(height: 10),
+                                        Center(
+                                          child: TextButton.icon(
+                                            onPressed: _showFallbackSheet,
+                                            icon: const Icon(
+                                              Icons.help_outline_rounded,
+                                              size: 18,
+                                            ),
+                                            label: Text(
+                                              _CadastreStrings.helpCta(l),
+                                            ),
+                                            style: TextButton.styleFrom(
+                                              foregroundColor:
+                                                  AppColors.splashGreen,
+                                              textStyle: const TextStyle(
+                                                fontFamily: 'MTSCompact',
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ]
                                       else if (_info != null) ...[
+                                        // Hujjat rejimida reyestr kartasi
+                                        // deyarli bo'sh bo'ladi — nima
+                                        // bo'layotganini aytib qo'yamiz,
+                                        // aks holda foydalanuvchi «ma'lumot
+                                        // chiqmadi» deb o'ylaydi.
+                                        if (_documentMode) ...[
+                                          _AreaMissingCard(
+                                            isDark: isDark,
+                                            locale: l,
+                                            message:
+                                                _CadastreStrings.documentMode(
+                                                  l,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 10),
+                                        ],
                                         _PropertyInfoCard(
                                           isDark: isDark,
                                           info: _info!,
@@ -838,10 +1053,21 @@ class _RecentChips extends StatelessWidget {
 }
 
 class _CadastreInput extends StatelessWidget {
-  const _CadastreInput({required this.isDark, required this.controller});
+  const _CadastreInput({
+    required this.isDark,
+    required this.controller,
+    required this.onSearch,
+    required this.isBusy,
+  });
 
   final bool isDark;
   final TextEditingController controller;
+
+  /// Qidiruvni boshlash — tugma yoki klaviaturaning «done» tugmasi.
+  final VoidCallback onSearch;
+
+  /// Qidiruv ketyapti: tugma spinnerga aylanadi va bosilmaydi.
+  final bool isBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -863,6 +1089,13 @@ class _CadastreInput extends StatelessWidget {
       // phone keyboard accepts arbitrary characters on paste; the mask
       // formatter below then strips/re-inserts the colons.
       keyboardType: TextInputType.phone,
+      // Klaviaturada «done» — qidiruvning ikkinchi yo'li. Odam raqamni terib
+      // bo'lib klaviaturani yopmoqchi bo'lganda tugmani qidirishi shart emas.
+      textInputAction: TextInputAction.search,
+      onSubmitted: (_) => onSearch(),
+      // Aks holda `InputDecorator` matnni ham, suffiksdagi tugmani ham
+      // asosga (baseline) tekislaydi va tugma maydon ichida pastroqda turadi.
+      textAlignVertical: TextAlignVertical.center,
       inputFormatters: [_CadastreMaskFormatter()],
       style: TextStyle(
         fontFamily: 'MTSText',
@@ -872,9 +1105,43 @@ class _CadastreInput extends StatelessWidget {
       ),
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 16,
-          vertical: 18,
+        contentPadding: const EdgeInsets.fromLTRB(16, 18, 6, 18),
+        // Tugma o'z eniga yoyilsin. Balandlik chegarasi YO'Q: `maxHeight`
+        // qo'yilsa, `InputDecorator` suffiksni matn qatoriga emas, o'sha
+        // quticha ichiga tekislaydi va tugma bir necha punkt pastda qoladi.
+        suffixIconConstraints: const BoxConstraints(),
+        // TUGMA UMUMAN YO'Q, TO RAQAM TO'LIQ BO'LMAGUNCHA.
+        //
+        // O'chiq tugma foydasiz: u joy egallaydi, «bosib bo'lmaydi» deb
+        // turadi va nima yetishmayotganini aytmaydi. Paydo bo'lishning o'zi
+        // — «raqam to'g'ri, endi qidirsa bo'ladi» degan ishora.
+        //
+        // Mezon «Davom etish» nikiga TENG: bitta [_cadastreRe]. Ikki joyda
+        // ikki xil qoida bo'lsa, tugma chiqib, qidiruv esa ishlamasligi
+        // mumkin edi.
+        suffixIcon: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) {
+            final ready = _AiCadastreScreenState._cadastreRe.hasMatch(
+              value.text,
+            );
+            return AnimatedSwitcher(
+              duration: const Duration(milliseconds: 190),
+              switchInCurve: Curves.easeOutBack,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(scale: animation, child: child),
+              ),
+              child: ready
+                  ? _CadastreSearchButton(
+                      key: const ValueKey('search'),
+                      isBusy: isBusy,
+                      onPressed: onSearch,
+                    )
+                  : const SizedBox.shrink(key: ValueKey('empty')),
+            );
+          },
         ),
         hintText: 'XX:XX:XX:XX:XX:XXXX',
         hintStyle: TextStyle(
@@ -892,6 +1159,202 @@ class _CadastreInput extends StatelessWidget {
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: AppColors.splashGreen, width: 1.4),
+        ),
+      ),
+    );
+  }
+}
+
+/// Maydon ichidagi «Qidirish» tugmasi.
+///
+/// Bu vidjet FAQAT raqam to'liq bo'lganda quriladi — o'chiq holati yo'q
+/// (chaqirilishiga qarang). Shuning uchun paydo bo'lishning o'zi asosiy
+/// ishora, ustiga esa bir marta yorug'lik yo'li o'tkazamiz.
+///
+/// KENGAYUVCHI HALQA ATAYLAB YO'Q: u tugmadan TASHQARIGA chiqadi, qo'shni
+/// elementlarni turtadi va Android'ning eski «ripple» ini eslatadi. Yorug'lik
+/// yo'li tugma chegarasidan chiqmaydi.
+class _CadastreSearchButton extends StatefulWidget {
+  const _CadastreSearchButton({
+    super.key,
+    required this.isBusy,
+    required this.onPressed,
+  });
+
+  final bool isBusy;
+  final VoidCallback onPressed;
+
+  @override
+  State<_CadastreSearchButton> createState() => _CadastreSearchButtonState();
+}
+
+class _CadastreSearchButtonState extends State<_CadastreSearchButton>
+    with SingleTickerProviderStateMixin {
+  /// Yorug'lik yo'li necha marta o'tadi. Ikkitadan ko'pi «diqqat!» deb
+  /// qichqirishga aylanadi.
+  static const _sweepCount = 2;
+
+  late final AnimationController _intro = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1150),
+  )..addStatusListener(_onIntroDone);
+
+  /// Yorug'lik yo'li — sikl boshidagi yarmi harakat, qolgani JIMLIK. Ikki
+  /// yo'l ketma-ket o'tsa, ular bir-biriga ulanib ketgan bo'lardi.
+  late final Animation<double> _sweep = CurvedAnimation(
+    parent: _intro,
+    curve: const Interval(0, 0.48, curve: Curves.easeInOut),
+  );
+
+  int _sweepsLeft = 0;
+
+  void _onIntroDone(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    if (_sweepsLeft > 0) {
+      _sweepsLeft--;
+      _intro.forward(from: 0);
+    } else {
+      _intro.reset();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Vidjet paydo bo'lishining o'zi «raqam tayyor» degani, shuning uchun
+    // ishora shu yerda, boshqa shartsiz boshlanadi.
+    _sweepsLeft = _sweepCount - 1;
+    _intro.forward(from: 0);
+  }
+
+  /// So'zning o'lchangan eni — spinner chiqqanda tugma torayib ketmasligi
+  /// uchun. O'lchov matn uslubi bilan bir xil bo'lishi shart.
+  double _labelWidth(BuildContext context, String label) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: const TextStyle(
+          fontFamily: 'MTSCompact',
+          fontSize: 13,
+          height: 1.15,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    return painter.width;
+  }
+
+  @override
+  void dispose() {
+    _intro.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Tugma ko'rinib turgan bo'lsa, u doim yashil — shuning uchun bu yerda
+    // qorong'i rejimga qarash kerak emas: yashil fonda oq matn ikkalasida
+    // ham bir xil.
+    //
+    // Yagona farq — qidiruv ketayotganda bosib bo'lmaydi.
+    final active = !widget.isBusy;
+
+    final label = tr(Localizations.localeOf(context), 'common.search');
+    const radius = BorderRadius.all(Radius.circular(10));
+
+    final content = widget.isBusy
+        // Spinner SO'ZNING o'rnini egallaydi — tugmaning eni o'zgarmasligi
+        // uchun kengligi so'zga tenglashtiriladi.
+        ? SizedBox(
+            height: 15,
+            width: _labelWidth(context, label),
+            child: const Center(
+              child: SizedBox(
+                width: 13,
+                height: 13,
+                child: CircularProgressIndicator(
+                  strokeWidth: 1.8,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+          )
+        : Text(
+            label,
+            style: const TextStyle(
+              fontFamily: 'MTSCompact',
+              fontSize: 13,
+              height: 1.15,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
+          );
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: Semantics(
+        button: true,
+        enabled: active,
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            color: AppColors.splashGreen,
+            borderRadius: radius,
+          ),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: active ? widget.onPressed : null,
+                child: Stack(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 9,
+                      ),
+                      child: content,
+                    ),
+                    // Yorug'lik yo'li. Tugmadan TASHQARIGA chiqmaydi:
+                    // yuqoridagi `clipBehavior` uni chegarada qirqadi.
+                    if (active)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: AnimatedBuilder(
+                            animation: _sweep,
+                            builder: (context, _) {
+                              final t = _sweep.value;
+                              if (t == 0 || t == 1) {
+                                return const SizedBox.shrink();
+                              }
+                              return FractionallySizedBox(
+                                widthFactor: 0.42,
+                                // -1.7 dan 1.7 gacha: yo'l tugmaning bir
+                                // chetidan kirib, ikkinchisidan chiqadi.
+                                alignment: Alignment(-1.7 + t * 3.4, 0),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.white.withValues(alpha: 0),
+                                        Colors.white.withValues(alpha: 0.3),
+                                        Colors.white.withValues(alpha: 0),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -1076,7 +1539,7 @@ class _PropertyInfoCard extends StatelessWidget {
       (_CadastreStrings.address(l), info.address ?? '—'),
       if (info.objectTypeHint != null)
         (_CadastreStrings.type(l), info.objectTypeHint!),
-      (_CadastreStrings.area(l), fmtNum(info.totalArea, 'm²')),
+      (_CadastreStrings.area(l), fmtNum(info.effectiveArea, 'm²')),
       if (info.livingArea != null)
         (_CadastreStrings.livingArea(l), fmtNum(info.livingArea, 'm²')),
       (_CadastreStrings.cadastreValue(l), fmtUzs(info.cadastreValue)),
@@ -1235,11 +1698,20 @@ class _LookupErrorCard extends StatelessWidget {
 /// Shown when the lookup succeeded but no usable object area (total_area) came
 /// back — the area is now REQUIRED (it feeds the valuation), so the user can't
 /// continue. Nudges a fresh re-lookup.
+/// Sariq ogohlantirish kartasi.
+///
+/// Sukut bo'yicha «maydon yo'q» matni, [message] berilsa — o'sha (hujjat
+/// rejimi izohi). Ko'rinish bir xil, shuning uchun yangi karta yasalmadi.
 class _AreaMissingCard extends StatelessWidget {
-  const _AreaMissingCard({required this.isDark, required this.locale});
+  const _AreaMissingCard({
+    required this.isDark,
+    required this.locale,
+    this.message,
+  });
 
   final bool isDark;
   final Locale locale;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
@@ -1262,7 +1734,7 @@ class _AreaMissingCard extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              _CadastreStrings.areaMissing(locale),
+              message ?? _CadastreStrings.areaMissing(locale),
               style: TextStyle(
                 fontFamily: 'MTSText',
                 fontSize: 13,
@@ -1306,8 +1778,131 @@ class _RefreshRow extends StatelessWidget {
   }
 }
 
+/// Zaxira varag'idagi tanlov.
+enum _FallbackChoice { retry, document }
+
+/// «Kadastr ma'lumotlari topilmadimi?» drawer'i — [_showFallbackSheet].
+class _CadastreFallbackSheet extends StatelessWidget {
+  const _CadastreFallbackSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? AppColors.darkSurface : Colors.white;
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+
+    // Rangli konteyner TASHQARIDA — fon pastki xavfsiz zonani ham to'ldiradi
+    // (`login_required_sheet` dagi bilan bir xil sabab).
+    return Container(
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? const Color(0xFF2C3133)
+                      : const Color(0xFFE3E5E8),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.splashGreen.withValues(alpha: 0.14),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.description_outlined,
+                  size: 26,
+                  color: AppColors.splashGreen,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                _CadastreStrings.fallbackTitle(l),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: textColor,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _CadastreStrings.fallbackBody(l),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontSize: 14,
+                  height: 1.4,
+                  color: muted,
+                ),
+              ),
+              const SizedBox(height: 24),
+              // Asosiy amal — QAYTA URINISH: ko'pchilikda raqam shunchaki
+              // xato terilgan bo'ladi va reyestr yo'li aniqroq natija beradi.
+              SheetButton(
+                label: _CadastreStrings.fallbackRetry(l),
+                filled: true,
+                isDark: isDark,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  Navigator.of(context).pop(_FallbackChoice.retry);
+                },
+              ),
+              const SizedBox(height: 10),
+              SheetButton(
+                label: _CadastreStrings.fallbackDocument(l),
+                isDark: isDark,
+                icon: Icons.upload_file_rounded,
+                onTap: () =>
+                    Navigator.of(context).pop(_FallbackChoice.document),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CadastreStrings {
   const _CadastreStrings._();
+
+  static String notFoundRetry(Locale l) =>
+      tr(l, 'services.ai.cadastre.not_found_retry');
+
+  static String helpCta(Locale l) => tr(l, 'services.ai.cadastre.help_cta');
+
+  static String fallbackTitle(Locale l) =>
+      tr(l, 'services.ai.cadastre.fallback_title');
+
+  static String fallbackBody(Locale l) =>
+      tr(l, 'services.ai.cadastre.fallback_body');
+
+  static String fallbackRetry(Locale l) =>
+      tr(l, 'services.ai.cadastre.fallback_retry');
+
+  static String fallbackDocument(Locale l) =>
+      tr(l, 'services.ai.cadastre.fallback_document');
+
+  static String documentMode(Locale l) =>
+      tr(l, 'services.ai.cadastre.document_mode');
 
   static String areaMissing(Locale l) =>
       tr(l, 'services.ai.cadastre.area_missing');
@@ -1334,7 +1929,10 @@ class _CadastreStrings {
   static String signInFirst(Locale l) =>
       tr(l, 'services.ai.common.sign_in_first');
 
-  static String notFound(Locale l) => tr(l, 'services.ai.cadastre.not_found');
+  // `services.ai.cadastre.not_found` OLIB TASHLANDI: uning o'rnini
+  // `not_found_retry` egalladi — bir xil ma'no, lekin nima qilish kerakligini
+  // ham aytadi («raqamni tekshirib, qayta urinib ko'ring»). Kalitning o'zi
+  // adminkada qoldi, chunki seed hech qachon qator o'chirmaydi.
 
   static String networkError(Locale l, String err) =>
       '${tr(l, 'services.ai.cadastre.network_error')}: $err';

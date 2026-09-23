@@ -29,6 +29,7 @@ import '../../settings/settings_state.dart';
 import '../ai_draft_saver.dart';
 import '../api_ai_upload_service.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../models/ai_wizard_steps.dart';
 import '../widgets/file_preview_gallery.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -468,13 +469,16 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                     subtitle: _Strings.appBarSubtitle(l),
                     // Bu tugma butun oqimni yopadi — bitta qadam
                     // orqaga EMAS. Qadamma-qadam qaytish pastda.
-                    onBack: () => closeAiWizard(context),
+                    onBack: () => confirmCloseAiWizard(context),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 7, activeIndex: 4),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: StepProgressBar(
+                    count: widget.bundle.aiStepCount,
+                    activeIndex: widget.bundle.aiStepIndex(AiStep.intake),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Expanded(

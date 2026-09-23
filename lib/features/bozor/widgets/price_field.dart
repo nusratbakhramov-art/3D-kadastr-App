@@ -13,6 +13,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
+import 'amount_input_formatter.dart';
 
 class PriceField extends StatelessWidget {
   const PriceField({
@@ -90,6 +91,10 @@ class PriceField extends StatelessWidget {
                   controller: controller,
                   onTapOutside: (_) => FocusScope.of(context).unfocus(),
                   keyboardType: const TextInputType.numberWithOptions(),
+                  // Guruhlash KIRITISH paytida: `5002323` → `5 002 323`.
+                  // Kursor o'z joyida qoladi, ya'ni raqamni o'rtasidan ham
+                  // tuzatish mumkin — [AmountInputFormatter] ga qarang.
+                  inputFormatters: const [AmountInputFormatter()],
                   style: TextStyle(
                     fontFamily: 'MTSText',
                     fontSize: 14.5,

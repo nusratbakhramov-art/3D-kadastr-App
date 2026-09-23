@@ -44,7 +44,21 @@ struct Options {
     /// Nadir patch: a logo (PNG/JPEG, square, optional alpha) stamped over the bottom cap of the
     /// panorama — hides the tripod/feet/mirror-fill area like professional tours do. Empty = off.
     std::string nadirLogoPath;
-    float nadirLogoDeg = 28.f;  // angular radius of the disc (degrees from the nadir); feet/tripod reach ~25°
+    /// Angular radius of the disc, in degrees from the nadir.
+    ///
+    /// This is the "3D kadastr" mark a viewer sees UNDERFOOT when it looks
+    /// straight down in the finished 360 — the only branding in the viewing
+    /// experience (the Dart/native tour chrome carries no logo of its own).
+    ///
+    /// 28° → 20° on 2026-09-22 at the client's request: the disc read as
+    /// oversized, swallowing most of the floor. 20° still covers the 12°
+    /// `nadirCutDeg` hole and its mirror-filled ring with margin.
+    ///
+    /// ⚠️ FLOOR ~12°. Below `nadirCutDeg` the cut hole itself would show.
+    /// Between 20° and 25° a tripod or the photographer's feet may peek out
+    /// past the rim on a low capture — that is the trade the client asked
+    /// for, and it is why this did not go lower.
+    float nadirLogoDeg = 20.f;
     int seamWidth = 1024;      // seam finder resolution (1536 → 1024: −60 % graph-cut time, no visible change)
     int refineSmallWidth = 1000;
     int alignMaxSide = 1024;

@@ -19,6 +19,7 @@ import '../../services/widgets/wizard_nav_bar.dart';
 import '../bozor_routes.dart';
 import '../data/bozor_draft_store.dart';
 import '../models/bozor_draft.dart';
+import '../widgets/amount_input_formatter.dart';
 import '../widgets/option_picker_sheet.dart';
 import '../widgets/price_field.dart';
 import 'bozor_description_step_screen.dart';
@@ -46,10 +47,15 @@ class BozorPriceStepScreen extends StatefulWidget {
 }
 
 class _BozorPriceStepScreenState extends State<BozorPriceStepScreen> {
-  late final TextEditingController _amount =
-      TextEditingController(text: widget.draft.price.amount);
-  late final TextEditingController _daily =
-      TextEditingController(text: widget.draft.price.dailyAmount);
+  // Maydonda GURUHLANGAN matn (`5 002 323`), qoralamada esa XOM raqamlar
+  // (`5002323`). Qoralamadan qaytganda guruhlab ko'rsatamiz, aks holda
+  // saqlangan narx ajratgichsiz ochilardi.
+  late final TextEditingController _amount = TextEditingController(
+    text: groupDigits(digitsOnly(widget.draft.price.amount)),
+  );
+  late final TextEditingController _daily = TextEditingController(
+    text: groupDigits(digitsOnly(widget.draft.price.dailyAmount)),
+  );
 
   PriceDraft get _p => widget.draft.price;
 
@@ -80,8 +86,11 @@ class _BozorPriceStepScreenState extends State<BozorPriceStepScreen> {
     super.dispose();
   }
 
-  void _onAmount() => setState(() => _p.amount = _amount.text.trim());
-  void _onDaily() => setState(() => _p.dailyAmount = _daily.text.trim());
+  // ⚠️ Qoralamaga AJRATGICHSIZ yoziladi: `bozor_draft_codec.dart` narxni
+  // `num.tryParse` bilan o'qiydi va `'5 002 323'` uchun `null` qaytarardi,
+  // ya'ni e'lon `0` narx bilan ketardi.
+  void _onAmount() => setState(() => _p.amount = digitsOnly(_amount.text));
+  void _onDaily() => setState(() => _p.dailyAmount = digitsOnly(_daily.text));
 
   Future<void> _pickUnit({required bool daily}) async {
     final l = Localizations.localeOf(context);

@@ -8,6 +8,7 @@ import 'package:kadastr/features/bozor/data/bozor_api.dart';
 import 'package:kadastr/features/bozor/feed/bozor_draft_card.dart';
 import 'package:kadastr/features/bozor/feed/bozor_home_screen.dart';
 import 'package:kadastr/features/bozor/feed/bozor_listing_card.dart';
+import 'param_schema_fixture.dart';
 
 /// «Bozor» ekrani — ikki tab.
 ///
@@ -84,6 +85,9 @@ Future<void> _pump(WidgetTester tester, BozorApi api) async {
 }
 
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   testWidgets('ikkita tab chiziladi va «E‘lon qo‘shish» tugmasi bor', (
     tester,
   ) async {

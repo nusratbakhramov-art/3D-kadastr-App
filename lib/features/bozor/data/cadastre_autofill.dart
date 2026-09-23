@@ -65,7 +65,7 @@ String? primaryAreaKey(PropertyType type) => switch (type) {
   PropertyType.apartment || PropertyType.newBuildingApartment => 'total_area',
   PropertyType.house => 'house_area',
   PropertyType.land => 'land_area',
-  PropertyType.commercial => 'premises_area',
+  PropertyType.commercial || PropertyType.basement => 'premises_area',
   PropertyType.garage => 'garage_area',
   // Bu turda «Параметры» qadami umuman yo'q.
   PropertyType.otherNonResidential => null,
@@ -112,6 +112,7 @@ CadastreAutofill buildCadastreAutofill({
     case PropertyType.land:
       put('land_area', info.landArea, toSotix: true);
     case PropertyType.commercial:
+    case PropertyType.basement:
       put('premises_area', info.totalArea);
     case PropertyType.garage:
       put('garage_area', info.totalArea);

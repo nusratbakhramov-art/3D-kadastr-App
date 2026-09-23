@@ -6,6 +6,7 @@ import 'package:http/testing.dart';
 import 'package:kadastr/features/bozor/data/bozor_api.dart';
 import 'package:kadastr/features/bozor/data/bozor_submit.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
+import 'param_schema_fixture.dart';
 
 /// Mavjud e'lonni tahrirlashni YAKUNLASH.
 ///
@@ -15,6 +16,9 @@ import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 /// undan davom ettirish asl e'lonni yana tahrirlashga olib borardi —
 /// foydalanuvchi esa buni e'lon ikkilanib qolgan deb ko'radi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   BozorDraft draft({int? editingId, int? draftId}) {
     final d = BozorDraft(
       deal: DealType.rent,

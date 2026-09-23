@@ -110,6 +110,9 @@ class _HelpScreenState extends State<HelpScreen>
       valueListenable: localeNotifier,
       builder: (context, locale, _) {
         final faqs = _faqs(locale);
+        final telegram = _info.telegramOrNull;
+        final email = _info.emailOrNull;
+        final phone = _info.callNumberOrNull;
         return Scaffold(
           backgroundColor: ColorTokens.scaffoldBg(context),
           body: Stack(
@@ -172,36 +175,46 @@ class _HelpScreenState extends State<HelpScreen>
                           curve: Curves.easeOutCubic,
                         ),
                         child: AppMenuCard(
-                          // Bo'sh maydon ko'rsatilmaydi: adminka telegramni
-                          // tozalasa, qator yo'qoladi — "—" yoki eski qiymat
-                          // qolib ketmaydi.
+                          // HAR BIR QATOR — ADMINKANING QARORI.
+                          //
+                          // Qiymat bo'sh (yoki faqat probel) bo'lsa qator
+                          // UMUMAN chizilmaydi: "—", eski qiymat yoki hech
+                          // qayerga olib bormaydigan qator qolmaydi.
+                          // Shart `SupportInfo` da — «Yordam» sahifasi va
+                          // qo'llab-quvvatlash varag'i bir xil qoidani
+                          // ishlatishi uchun.
+                          //
+                          // ⚠️ Mijoz «email kerak emas» desa yechim SHU
+                          // YERDA emas: adminkada email maydonini bo'shatish
+                          // kifoya, ilovani qayta chiqarish shart emas.
                           rows: [
-                            if ((_info.telegram ?? '').isNotEmpty)
+                            if (telegram != null)
                               AppMenuRow(
                                 icon: Icons.send_rounded,
                                 label: tr(locale, 'help.telegram'),
-                                trailing: _ContactValue(text: _info.telegram!),
+                                trailing: _ContactValue(text: telegram),
                                 onTap: hapticTap(
-                                  () => _open(_telegramUri(_info.telegram!)),
+                                  () => _open(_telegramUri(telegram)),
                                 ),
                               ),
-                            if ((_info.email ?? '').isNotEmpty)
+                            if (email != null)
                               AppMenuRow(
                                 icon: Icons.mail_outline_rounded,
                                 label: tr(locale, 'help.email'),
-                                trailing: _ContactValue(text: _info.email!),
+                                trailing: _ContactValue(text: email),
                                 onTap: hapticTap(
-                                  () => _open(Uri(scheme: 'mailto', path: _info.email!)),
+                                  () => _open(Uri(scheme: 'mailto', path: email)),
                                 ),
                               ),
-                            AppMenuRow(
-                              icon: Icons.call_outlined,
-                              label: tr(locale, 'help.phone'),
-                              trailing: _ContactValue(text: _info.callNumber),
-                              onTap: hapticTap(
-                                () => _open(Uri(scheme: 'tel', path: _info.callNumber)),
+                            if (phone != null)
+                              AppMenuRow(
+                                icon: Icons.call_outlined,
+                                label: tr(locale, 'help.phone'),
+                                trailing: _ContactValue(text: phone),
+                                onTap: hapticTap(
+                                  () => _open(Uri(scheme: 'tel', path: phone)),
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),

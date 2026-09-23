@@ -5,10 +5,14 @@ import 'package:kadastr/features/bozor/data/bozor_draft_codec.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/screens/bozor_terms_step_screen.dart';
 import 'package:kadastr/features/bozor/widgets/tier_card.dart';
+import 'param_schema_fixture.dart';
 
 /// Oxirgi qadam: tariflar YO'Q, backend «E'lon shartlari» matni va uning
 /// ostida rozilik katakchasi; belgilangach `terms_version` serverga ketadi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   BozorDraft draft() => BozorDraft(
     deal: DealType.rent,
     kind: PropertyKind.residential,

@@ -31,24 +31,28 @@ class MediaUploadRow extends StatelessWidget {
     this.urlOf,
     this.fileOf,
     this.statusOf,
-    this.iconSize = _defaultIconSize,
+    this.coverLabel,
+    this.makeCoverLabel,
+    this.coverIndex,
+    this.onSetCover,
   });
 
-  /// Qatordagi ikonka o'lchami. Sukut hamma qatorda bir xil.
-  static const double _defaultIconSize = 26;
+  /// Muqova eskizidagi nishon matni («Asosiy rasm»). `null` — muqova
+  /// tushunchasi bu qatorda umuman yo'q (planirovka, 360°).
+  final String? coverLabel;
+
+  /// Qolgan eskizlardagi tugma matni («Asosiy qilish»).
+  final String? makeCoverLabel;
+
+  /// Hozirgi muqovaning o'rni. `null` — belgilanmagan.
+  final int? coverIndex;
+
+  /// Muqovani almashtirish. `null` bo'lsa nishon FAQAT ko'rsatiladi,
+  /// bosilmaydi.
+  final ValueChanged<int>? onSetCover;
 
   final String label;
   final String iconAsset;
-
-  /// Ikonka kvadratining tomoni.
-  ///
-  /// ⚠️ NEGA SOZLANADIGAN. `upload-360.svg` boshqa ikonkalardan farqli
-  /// o'laroq YOTIQ (21 × 14.9): bitta 26 pt li kvadratga sig'dirilganda u
-  /// to'liq kenglikni egallaydi va foto/planirovka qatorlaridagi ikonkalardan
-  /// yirikroq ko'rinadi. Umumiy sukutni kichraytirish qolgan ikki qatorni ham
-  /// mayda qilib yuborardi, shuning uchun o'lchamni faqat 360° qatori
-  /// pasaytiradi.
-  final double iconSize;
 
   /// Tanlangan yozuvlar. Odatda LOKAL YO'L, 360° qatorida esa S3 KALITI
   /// ([urlOf] ga qarang).
@@ -113,8 +117,8 @@ class MediaUploadRow extends StatelessWidget {
                 children: [
                   SvgPicture.asset(
                     iconAsset,
-                    width: iconSize,
-                    height: iconSize,
+                    width: 26,
+                    height: 26,
                     colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
                   ),
                   const SizedBox(width: 12),
@@ -156,6 +160,12 @@ class MediaUploadRow extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, i) => _Thumb(
                 path: paths[i],
+                // Bitta rasm bo'lsa tanlovning ma'nosi yo'q — nishon ham,
+                // tugma ham chizilmaydi.
+                coverLabel: paths.length > 1 ? coverLabel : null,
+                makeCoverLabel: makeCoverLabel,
+                isCover: i == coverIndex,
+                onSetCover: onSetCover == null ? null : () => onSetCover!(i),
                 url: urlOf?.call(paths[i]),
                 file: fileOf?.call(paths[i]),
                 status: statusOf?.call(paths[i]) ?? MediaItemStatus.ready,
@@ -207,7 +217,17 @@ class _Thumb extends StatelessWidget {
     required this.status,
     this.url,
     this.file,
+    this.coverLabel,
+    this.makeCoverLabel,
+    this.isCover = false,
+    this.onSetCover,
   });
+
+  /// Bo'sh bo'lmasa — eskiz ostida muqova yo'lagi chiziladi.
+  final String? coverLabel;
+  final String? makeCoverLabel;
+  final bool isCover;
+  final VoidCallback? onSetCover;
 
   final MediaItemStatus status;
 
@@ -322,6 +342,26 @@ class _Thumb extends StatelessWidget {
               ),
             ),
           ),
+          // Muqova yo'lagi eskizning PASTIDA: yuqori o'ng burchakni
+          // «o'chirish» tugmasi egallagan, ikkisi bir joyda bo'lsa bosishga
+          // xalaqit berardi.
+          //
+          // Muqovada — to'q yashil nishon (bosilmaydi, u allaqachon muqova).
+          // Qolganlarida — yarim shaffof «Asosiy qilish» tugmasi. Ya'ni
+          // tanlov KO'RINIB turadi: ilgari muqova jimgina birinchi rasm
+          // bo'lardi va foydalanuvchi uni o'zgartira olmasdi.
+          if (coverLabel != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: _CoverStrip(
+                label: isCover ? coverLabel! : (makeCoverLabel ?? coverLabel!),
+                isCover: isCover,
+                radius: radius.bottomLeft.x,
+                onTap: isCover ? null : onSetCover,
+              ),
+            ),
           Positioned(
             right: 2,
             top: 2,
@@ -354,6 +394,57 @@ Widget _fallbackIcon(bool isDark) => Icon(
 );
 
 /// Eskiz o'rnidagi belgi — hali rasm yo'q (tayyorlanmoqda yoki yiqilgan).
+/// Eskiz ostidagi muqova yo'lagi — nishon ham, tugma ham shu.
+class _CoverStrip extends StatelessWidget {
+  const _CoverStrip({
+    required this.label,
+    required this.isCover,
+    required this.radius,
+    this.onTap,
+  });
+
+  final String label;
+  final bool isCover;
+  final double radius;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final strip = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+      color: isCover
+          ? AppColors.splashGreen
+          : Colors.black.withValues(alpha: 0.55),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontFamily: 'MTSCompact',
+          fontWeight: FontWeight.w700,
+          fontSize: 9,
+          height: 1.1,
+          color: Colors.white,
+        ),
+      ),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.vertical(bottom: Radius.circular(radius)),
+      // Muqovaning o'zida bosish yo'q — bosilsa hech narsa o'zgarmasdi,
+      // lekin tugmadek ko'rinib turardi.
+      child: onTap == null
+          ? IgnorePointer(child: strip)
+          : Material(
+              color: Colors.transparent,
+              child: InkWell(onTap: hapticSelect(onTap!), child: strip),
+            ),
+    );
+  }
+}
+
 class _Placeholder extends StatelessWidget {
   const _Placeholder({
     required this.isDark,

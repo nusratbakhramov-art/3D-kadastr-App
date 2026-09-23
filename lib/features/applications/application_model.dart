@@ -150,16 +150,21 @@ class ApplicationItem {
   final List<ApplicationTimelineStep> timeline;
 }
 
+/// Arizalar ro'yxatidagi filtr chipi — faqat IDENTIFIKATOR.
+///
+/// Yorlig'i ataylab yo'q: ekran uni `applications.chip.<id>` kalitidan
+/// oladi (`applications_screen.dart` ga qarang). Ilgari bu yerda o'zbekcha
+/// `label` ham turardi, lekin uni hech kim o'qimasdi — tarjimadan chetda
+/// qolgan, til almashtirilganda o'zgarmaydigan nusxa edi.
 class ApplicationServiceChip {
-  const ApplicationServiceChip({required this.id, required this.label});
+  const ApplicationServiceChip({required this.id});
 
   final String id;
-  final String label;
 }
 
 const List<ApplicationServiceChip> applicationServiceChips = [
-  ApplicationServiceChip(id: 'all', label: 'Barchasi'),
-  ApplicationServiceChip(id: 'kad_3d', label: '3D kadastr'),
-  ApplicationServiceChip(id: 'ai_eval', label: 'AI Baholash'),
-  ApplicationServiceChip(id: 'calc', label: 'Kalkulyator'),
+  ApplicationServiceChip(id: 'all'),
+  ApplicationServiceChip(id: 'kad_3d'),
+  ApplicationServiceChip(id: 'ai_eval'),
+  ApplicationServiceChip(id: 'calc'),
 ];

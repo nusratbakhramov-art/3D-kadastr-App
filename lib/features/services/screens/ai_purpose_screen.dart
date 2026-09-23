@@ -13,6 +13,7 @@ import '../../../theme/app_colors.dart';
 import '../ai_draft_saver.dart';
 import '../api_ai_valuation_job_service.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../models/ai_wizard_steps.dart';
 import '../widgets/choice_tile.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -229,13 +230,16 @@ class _AiPurposeScreenState extends State<AiPurposeScreen> {
                     subtitle: _PurposeStrings.subtitle(l),
                     // Bu tugma butun oqimni yopadi — bitta qadam
                     // orqaga EMAS. Qadamma-qadam qaytish pastda.
-                    onBack: () => closeAiWizard(context),
+                    onBack: () => confirmCloseAiWizard(context),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 7, activeIndex: 3),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: StepProgressBar(
+                    count: widget.bundle.aiStepCount,
+                    activeIndex: widget.bundle.aiStepIndex(AiStep.purpose),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Expanded(

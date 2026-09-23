@@ -7,6 +7,7 @@ import 'package:http/testing.dart';
 import 'package:kadastr/features/bozor/data/bozor_api.dart';
 import 'package:kadastr/features/bozor/data/bozor_submit.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
+import 'param_schema_fixture.dart';
 
 /// Yuborish oqimi — fayllar bittalab, qisman muvaffaqiyat saqlanadi.
 ///
@@ -92,6 +93,9 @@ class _Recorder {
 }
 
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   setUpAll(() => _tmp = Directory.systemTemp.createTempSync('bozor_submit'));
   tearDownAll(() => _tmp.deleteSync(recursive: true));
 

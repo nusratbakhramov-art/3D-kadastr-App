@@ -108,9 +108,11 @@ class MarketCategory {
 
 const String kMarketCategoryAll = 'all';
 
-const List<MarketCategory> marketCategories = [
-  MarketCategory(id: kMarketCategoryAll, label: 'Barchasi'),
-  MarketCategory(id: 'residential', label: 'Turar joy'),
-  MarketCategory(id: 'nonresidential', label: 'Noturar'),
-  MarketCategory(id: 'projects', label: 'Loyihalar'),
-];
+// ⚠️ BU YERDA TAYYOR RO'YXAT YO'Q — ATAYLAB.
+//
+// Ilgari shu joyda o'zbekcha yorliqli `const marketCategories` turardi. U
+// hech qayerda ishlatilmasdi: ro'yxatni `MarketController` quradi —
+// «Barchasi» `tr('market.controller.*')` dan, qolganlari esa backenddagi
+// kategoriyalar nomidan. Ya'ni bu ro'yxat tarjima qilinmaydigan matnni
+// saqlab turgan, lekin ekranga chiqmaydigan nusxa edi: kimdir uni ishlatib
+// qo'ysa, ilova til almashtirganda ham o'zbekcha qolardi.

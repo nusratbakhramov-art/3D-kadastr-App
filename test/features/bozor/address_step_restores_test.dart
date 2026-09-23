@@ -5,6 +5,7 @@ import 'package:kadastr/features/bozor/data/regions_repository.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/screens/bozor_address_step_screen.dart';
 import 'package:kadastr/features/services/widgets/wizard_nav_bar.dart';
+import 'param_schema_fixture.dart';
 
 /// 2-qadam qoralamadan/e'londan TIKLANISHI kerak.
 ///
@@ -21,6 +22,9 @@ import 'package:kadastr/features/services/widgets/wizard_nav_bar.dart';
 /// tugmani bosish esa navigatsiya va fon saqlashni ishga tushirib testni
 /// mo'rt qilardi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   BozorDraft filledDraft() {
     final d = BozorDraft(
       deal: DealType.rent,

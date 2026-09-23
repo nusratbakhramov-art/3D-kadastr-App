@@ -5,6 +5,7 @@ import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/models/bozor_validation.dart';
 import 'package:kadastr/features/bozor/models/param_schema.dart';
 import 'package:kadastr/features/bozor/screens/bozor_terms_step_screen.dart';
+import 'param_schema_fixture.dart';
 
 /// 3-qadam validatsiyasi qamrovi.
 ///
@@ -40,6 +41,9 @@ List<ParamField> missingRequired(PropertyType type, ParamValues values) {
 }
 
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   test('majburiy maydonlarning HAMMASI qadamda ko‘rinmaydi', () {
     // Bu test o'zi tuzatishni tekshirmaydi — u MUAMMONING BORLIGINI
     // qotiradi: agar kelajakda hamma majburiy maydon `inStep` bo'lib qolsa,
@@ -58,23 +62,31 @@ void main() {
       isNotEmpty,
       reason: 'shu maydonlar uchun kengaytirilgan tekshiruv kerak',
     );
-    // Prod'da uchragan aynan shu holat.
-    expect(offScreen, contains('house.bathroom_type'));
+    // Prod'da uchragan holat `house.bathroom_type` edi; 2026-09-23 da u
+    // mijozning talabi bilan IXTIYORIY qilindi, shuning uchun namuna
+    // sifatida hozir ham majburiy va qadamda KO'RINMAYDIGAN maydon
+    // olinadi. Da'vo o'zgargani yo'q — tekshiruv qamrovi haqida.
+    expect(offScreen, contains('apartment.living_area'));
   });
 
   _gateTests();
   _screenGateTest();
 
   group('missingRequired', () {
-    test('uy: bo‘sh qoralamada bathroom_type YETISHMAYDI deb topiladi', () {
+    test('uy: bathroom_type endi MAJBURIY EMAS', () {
+      // 2026-09-23: mijoz «sanuzel turi» ni majburiy emas deb belgiladi.
+      // Yonidagi `bathroom_location` allaqachon ixtiyoriy edi — ikkisi
+      // bir-biriga zid turardi. Backendda ham aynan shunday
+      // (`listing_param_schema.py`), parity testi buni qo'riqlaydi.
       final missing = missingRequired(PropertyType.house, {});
-      expect(missing.map((f) => f.key), contains('bathroom_type'));
+      expect(missing.map((f) => f.key), isNot(contains('bathroom_type')));
     });
 
-    test('uy: bathroom_type to‘ldirilgach ro‘yxatdan chiqadi', () {
-      final values = <String, Object?>{'bathroom_type': 'separate'};
-      final missing = missingRequired(PropertyType.house, values);
-      expect(missing.map((f) => f.key), isNot(contains('bathroom_type')));
+    test('uy: bo‘sh qoralamada BOSHQA majburiylar baribir topiladi', () {
+      // Yuqoridagi o'zgarish tekshiruvni butunlay o'chirib qo'ymaganini
+      // qotiradi.
+      final missing = missingRequired(PropertyType.house, {});
+      expect(missing.map((f) => f.key), contains('house_area'));
     });
 
     test('kvartira: living_area va parking ham tekshiriladi', () {
@@ -176,13 +188,22 @@ void _gateTests() {
       expect(draftBlockers(_complete()), isEmpty);
     });
 
-    test('AYNAN prod holati: bathroom_type bo‘sh → 3-qadam to‘sadi', () {
+    test('qadamda KO‘RINMAYDIGAN majburiy maydon bo‘sh → 3-qadam to‘sadi', () {
+      // Prod'da bu `house.bathroom_type` edi (2026-09-10). U endi
+      // ixtiyoriy, lekin da'vo o'sha-o'sha: ekranda ko'rinmaydigan majburiy
+      // maydon ham darvozadan o'tkazmasligi kerak.
       final d = _complete();
-      d.params.remove('bathroom_type');
+      d.params.remove('house_area');
       final blockers = draftBlockers(d);
       expect(blockers, hasLength(1));
       expect(blockers.first.step, WizardStep.params);
-      expect(blockers.first.fieldLabelKeys, contains('bozor.param.bathroom_type'));
+      expect(blockers.first.fieldLabelKeys, contains('bozor.param.house_area'));
+    });
+
+    test('bathroom_type bo‘sh bo‘lsa TO‘SILMAYDI', () {
+      final d = _complete();
+      d.params.remove('bathroom_type');
+      expect(draftBlockers(d), isEmpty);
     });
 
     test('bo‘sh qoralamada 1-qadam to‘sadi va QOLGANI sanalmaydi', () {
@@ -255,7 +276,9 @@ void _screenGateTest() {
   testWidgets('7-qadam: to‘liqsiz qoralama YUBORILMAYDI', (tester) async {
     var submitted = false;
     final draft = _complete();
-    draft.params.remove('bathroom_type'); // aynan prod holati
+    // Qadamda ko'rinmaydigan majburiy maydon (prod holati `bathroom_type`
+    // edi; u 2026-09-23 da ixtiyoriy bo'ldi).
+    draft.params.remove('house_area');
     draft.terms.accepted = true;
 
     await tester.pumpWidget(
@@ -274,7 +297,7 @@ void _screenGateTest() {
     expect(submitted, isFalse, reason: 'server 400 bergandan ko‘ra oldin to‘smoq');
     // Xabar QAYERGA qaytishni aytadi: qadam raqami + nomi + maydon.
     expect(find.textContaining('bozor.params.title'), findsOneWidget);
-    expect(find.textContaining('bozor.param.bathroom_type'), findsOneWidget);
+    expect(find.textContaining('bozor.param.house_area'), findsOneWidget);
 
     // Toast 3 sekund turadi va o'z timer'i bor — uni tugatmasak
     // `flutter_test` "A Timer is still pending" deb yiqiladi.

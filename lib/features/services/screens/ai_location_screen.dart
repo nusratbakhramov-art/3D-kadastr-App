@@ -23,6 +23,7 @@ import '../../../widgets/app_toast.dart';
 import '../ai_draft_saver.dart';
 import '../data/geocoder_client.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../models/ai_wizard_steps.dart';
 import '../widgets/map_zoom_controls.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -391,12 +392,23 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
   }
 
   /// Joriy tanlangan joyni bundle'ga yozadi (oldinga ham, Orqaga ham).
+  ///
+  /// Nuqta bilan birga uning MANBAI ham yoziladi. Bu ekranga kelingan ekan,
+  /// foydalanuvchi pinni o'zi tasdiqlaydi — shu sababli manba
+  /// [AiLocationSource.manualMap]. Yagona istisno: pin uchastka markazidan
+  /// kelgan va foydalanuvchi unga TEGMAGAN bo'lsa, manba `parcel` bo'lib
+  /// qoladi (aniqroq va ishonchliroq belgi).
   void _captureToBundle() {
     widget.bundle.location = AiLocationInfo(
       lat: _center.latitude,
       lng: _center.longitude,
       addressText: _addressText,
     );
+    widget.bundle.locationSource = switch (_pinSource) {
+      _PinSource.none => AiLocationSource.none,
+      _PinSource.parcel => AiLocationSource.parcel,
+      _ => AiLocationSource.manualMap,
+    };
   }
 
   /// Haqiqiy joy aniqlanganmi — Toshkent default'ini draftga yozmaslik uchun.
@@ -422,13 +434,16 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
                 subtitle: _AiLocationStrings.appBarSubtitle(l),
                 // Bu tugma butun oqimni yopadi — bitta qadam
                 // orqaga EMAS. Qadamma-qadam qaytish pastda.
-                onBack: () => closeAiWizard(context),
+                onBack: () => confirmCloseAiWizard(context),
               ),
             ),
             const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: StepProgressBar(count: 7, activeIndex: 2),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: StepProgressBar(
+                count: widget.bundle.aiStepCount,
+                activeIndex: widget.bundle.aiStepIndex(AiStep.location),
+              ),
             ),
             const SizedBox(height: 12),
             Padding(
