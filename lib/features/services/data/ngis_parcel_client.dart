@@ -46,6 +46,8 @@ import 'package:flutter_map/flutter_map.dart' show LatLngBounds;
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
+import '../cadastre_number.dart';
+
 class NgisException implements Exception {
   const NgisException(this.code, this.message);
   final String code;
@@ -185,6 +187,7 @@ const List<NgisLayer> kNgisParcelLayers = [
 final List<NgisLayer> kNgisIdentifyOrder =
     kNgisParcelLayers.reversed.toList(growable: false);
 
+
 /// Xaritadan topilgan bitta kadastr obyekti.
 class NgisParcel {
   const NgisParcel({
@@ -318,7 +321,72 @@ class NgisParcelClient {
       'f': 'geojson',
     };
 
-    final decoded = await _post(layer.boundsQueryUrl, body);
+    return _geoJsonParcels(layer, await _post(layer.boundsQueryUrl, body));
+  }
+
+  /// Kadastr RAQAMI bo'yicha uchastkani topadi — foydalanuvchi raqamni QO'LDA
+  /// kiritganda.
+  ///
+  /// Nega kerak: reyestr javobida koordinata YO'Q (`CadastreLookupResult` da
+  /// lat/lng maydoni yo'q), shuning uchun raqamni qo'lda kiritgan odamdan
+  /// keyingi qadamda uyni yana xaritada belgilash so'ralardi — garchi uchastka
+  /// geoportalda turgan bo'lsa ham. Bu yerda o'sha nuqtani raqamning o'zidan
+  /// olamiz.
+  ///
+  /// Qatlamlar PARALLEL so'raladi, javob esa [kNgisIdentifyOrder] ustuvorligi
+  /// bo'yicha tanlanadi (turar-joy qishloq xo'jaligidan aniqroq). Bittasining
+  /// yiqilishi qolganini to'xtatmaydi.
+  ///
+  /// Topilmasa `null` — bu XATO EMAS: qatlamda yo'q uchastkalar bor va u holda
+  /// oqim avvalgidek qo'lda xarita qadamiga tushadi.
+  Future<NgisParcel?> findByNumber(String cadastreNumber) async {
+    final full = cadastreNumber.trim();
+    if (full.isEmpty) return null;
+    final base = cadastreBaseNumber(full);
+    // Avval raqamning o'zi: qatlamda aynan shu yozuv bo'lsa, uni olamiz.
+    // Dumsiz asos faqat farq qilganda ikkinchi urinish bo'ladi.
+    final candidates = <String>[full, if (base != full) base];
+
+    for (final number in candidates) {
+      final results = await Future.wait(
+        kNgisIdentifyOrder.map(
+          (layer) => _queryByNumber(layer, number).catchError(
+            (_) => const <NgisParcel>[],
+          ),
+        ),
+      );
+      for (final list in results) {
+        if (list.isNotEmpty) return list.first;
+      }
+    }
+    return null;
+  }
+
+  Future<List<NgisParcel>> _queryByNumber(
+    NgisLayer layer,
+    String number,
+  ) async {
+    final decoded = await _post(layer.boundsQueryUrl, {
+      // Apostrof SQL ni buzmasligi uchun ikkilantiriladi. Raqamda uchramaydi,
+      // lekin bu yerga maydon matni ham tushishi mumkin.
+      'where': "${layer.numberField} = '${number.replaceAll("'", "''")}'",
+      'outFields': layer.outFields,
+      'outSR': '4326',
+      'returnGeometry': 'true',
+      'geometryPrecision': '6',
+      'maxAllowableOffset': _simplifyOffset,
+      // Bo'lingan uchastka bir necha yozuv bo'lishi mumkin — birinchisi
+      // yetadi, lekin javobni cheklab qo'yamiz.
+      'resultRecordCount': '4',
+      'f': 'geojson',
+    });
+    return _geoJsonParcels(layer, decoded);
+  }
+
+  List<NgisParcel> _geoJsonParcels(
+    NgisLayer layer,
+    Map<dynamic, dynamic>? decoded,
+  ) {
     if (decoded == null) return const [];
 
     final features = decoded['features'];
