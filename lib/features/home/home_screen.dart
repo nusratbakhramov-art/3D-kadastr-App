@@ -261,7 +261,10 @@ class _SupportCtaRow extends StatelessWidget {
   final VoidCallback? onAskTap;
   final VoidCallback? onCallTap;
 
-  static const double _gap = 12;
+  /// Gap between the two buttons. Tight on purpose — every point here is a
+  /// point of label width, and the label is what runs out of room first (the
+  /// pair shares ONE size, so the longest string sets it for both).
+  static const double _gap = 8;
 
   /// Largest label size the design asks for. Both buttons come down together
   /// from here when the longer label does not fit.
@@ -281,18 +284,21 @@ class _SupportCtaRow extends StatelessWidget {
     // its own label to fit (a FittedBox), so on a 360dp Galaxy the longer
     // "Savol bering" came out visibly smaller than "Bog'lanish" beside it.
     // Whichever label is tighter now sets the size for both.
+    final scaler = MediaQuery.textScalerOf(context);
     final fontSize = math.min(
       _SupportCtaButton.fittedFontSize(
         ask,
         'assets/icons/cta-ask.png',
         buttonWidth,
         _baseFontSize,
+        scaler,
       ),
       _SupportCtaButton.fittedFontSize(
         contact,
         'assets/icons/cta-call.png',
         buttonWidth,
         _baseFontSize,
+        scaler,
       ),
     );
 
@@ -359,7 +365,7 @@ class _SupportCtaButton extends StatelessWidget {
   /// ⚠️ Not a square box. These PNGs are wide (the headset is 125×88), so a
   /// square `contain` box scaled them to fit their WIDTH and the glyph came out
   /// a third shorter than the box it was given.
-  static const double _iconHeight = 38;
+  static const double _iconHeight = 34;
 
   /// Rendered width of each glyph at [_iconHeight], from the PNG's own aspect.
   /// Hard-coded because it is needed BEFORE the image is laid out, to work out
@@ -369,9 +375,12 @@ class _SupportCtaButton extends StatelessWidget {
     'assets/icons/cta-call.png': 103 / 88,
   };
 
-  static const double _padLeft = 18;
-  static const double _padRight = 10;
-  static const double _labelIconGap = 4;
+  // Trimmed to buy label width. Russian is the binding case: "Задать вопрос"
+  // is 23% wider than the Uzbek string, and because the pair shares one size it
+  // dragged BOTH labels down to ~9.6pt on a 360dp phone.
+  static const double _padLeft = 12;
+  static const double _padRight = 8;
+  static const double _labelIconGap = 2;
 
   /// The largest size at or below [base] at which [label] fits one line inside
   /// a button of [buttonWidth]. Measured, not guessed: the Uzbek and Russian
@@ -382,6 +391,7 @@ class _SupportCtaButton extends StatelessWidget {
     String asset,
     double buttonWidth,
     double base,
+    TextScaler scaler,
   ) {
     final iconWidth = _iconHeight * (_iconAspect[asset] ?? 1);
     final available =
@@ -405,10 +415,17 @@ class _SupportCtaButton extends StatelessWidget {
       ),
       maxLines: 1,
       textDirection: TextDirection.ltr,
+      // Measure at the reader's own text scale. Without it the label was
+      // measured at 1.0 and painted larger, which is what ellipsised the longer
+      // Russian string even though the maths said it fitted.
+      textScaler: scaler,
     )..layout();
 
     if (painter.width <= available) return base;
-    return base * available / painter.width;
+    // 0.98 of the exact ratio: the painter measures the string, the Text widget
+    // then lays it out with its own rounding, and an exact fit lost the last
+    // glyph to an ellipsis.
+    return base * available / painter.width * 0.98;
   }
 
   @override
@@ -561,6 +578,20 @@ class _CardsGrid extends StatelessWidget {
   /// however much room the grid is given.
   static const double wideRatio = 0.62;
 
+  /// Row 1's share of the two square rows (the pair sums to 2). Under 1 makes
+  /// the first row shorter and the second correspondingly taller.
+  ///
+  /// Only NARROW phones get the shift. On a 360dp Galaxy the row-2 titles
+  /// ("Taqiqni tekshirish", "Baholash Ai") wrap to two lines and the copy needs
+  /// the extra height; on a 402pt iPhone the same strings fit and the rows look
+  /// better equal. Interpolated, so nothing jumps at one magic width.
+  static double _topRowWeight(double gridWidth) {
+    const narrow = 330.0; // ~360dp phone
+    const wide = 370.0; // ~402pt phone
+    final t = ((gridWidth - narrow) / (wide - narrow)).clamp(0.0, 1.0);
+    return 0.9 + 0.1 * t;
+  }
+
   /// Smallest the grid can be before its own copy stops fitting.
   ///
   /// Measured, at the reader's text size: the longest title and subtitle of the
@@ -704,13 +735,21 @@ class _CardsGrid extends StatelessWidget {
             ? constraints.maxHeight
             : squareWidth / 0.86 * (2 + wideRatio) + gap * 2;
         final squareHeight = (total - gap * 2) / (2 + wideRatio);
+        // The two rows are NOT equal. Row 1's copy is short (one-line titles,
+        // two-line subtitles) and its cards looked airy, while row 2 carries
+        // the long names — "Taqiqni tekshirish", "Baholash Ai" — over three
+        // lines of text. The weights move height from the first row to the
+        // second; they sum to 2, so the grid's total is unchanged.
+        final topWeight = _topRowWeight(constraints.maxWidth);
+        final topRowHeight = squareHeight * topWeight;
+        final bottomRowHeight = squareHeight * (2 - topWeight);
         final wideHeight = squareHeight * wideRatio;
 
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              height: squareHeight,
+              height: topRowHeight,
               child: Row(
                 children: [
                   Expanded(
@@ -731,7 +770,7 @@ class _CardsGrid extends StatelessWidget {
             ),
             const SizedBox(height: gap),
             SizedBox(
-              height: squareHeight,
+              height: bottomRowHeight,
               child: Row(
                 children: [
                   Expanded(

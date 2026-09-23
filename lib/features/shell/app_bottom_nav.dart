@@ -77,9 +77,12 @@ class AppBottomNav extends StatelessWidget {
   /// much is covered. Adding the constants on top double-counted it: the
   /// support buttons ended up 67pt above the slab with dead background between.
   static double contentInset(BuildContext context) =>
-      MediaQuery.of(context).padding.bottom + _breathingGap;
+      MediaQuery.of(context).padding.bottom - _fadeOverlap;
 
-  static const double _breathingGap = 6;
+  /// How far a page's last row may reach INTO the fade band. The top of that
+  /// band is fully transparent, so this much overlap costs nothing visually and
+  /// it is what closes the last of the gap above the slab.
+  static const double _fadeOverlap = 10;
 
   /// Everything this widget occupies, fade included.
   static double totalHeight(BuildContext context) =>
