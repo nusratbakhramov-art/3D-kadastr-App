@@ -28,11 +28,18 @@ const TextStyle kServiceCardTitleStyle = TextStyle(
   shadows: _textShadows,
 );
 
+/// ⚠️ `letterSpacing` is pinned, like the title's above, and for the same
+/// reason: Home MEASURES this style with a bare TextPainter to size the grid,
+/// but a `Text` paints it merged onto the ambient `DefaultTextStyle` — Material
+/// 3's `bodyMedium`, which carries `letterSpacing: 0.25`. Left null, every line
+/// painted wider than it measured, so the measured height was short by however
+/// many lines that pushed over.
 const TextStyle kServiceCardSubtitleStyle = TextStyle(
   fontFamily: 'MTSText',
   fontWeight: FontWeight.w400,
   fontSize: 11.5,
   height: 1.35,
+  letterSpacing: 0,
   color: Color(0xFFB7BDC2),
   shadows: _textShadows,
 );
