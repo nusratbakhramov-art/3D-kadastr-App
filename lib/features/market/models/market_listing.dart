@@ -43,6 +43,7 @@ class MarketListing {
     this.isOwned = false,
     this.scenes = const [],
     this.files = const [],
+    this.contentLocale = 'uz',
   });
 
   final String id;
@@ -81,6 +82,14 @@ class MarketListing {
 
   /// Downloadable file variants (GLB, USDZ, OBJ, etc.).
   final List<MarketListingFile> files;
+
+  /// [title] va [description] AMALDA qaysi tilda kelgani (`uz` / `ru` / `en`).
+  ///
+  /// Ilova tilidan farq qilishi mumkin: to'liq tarjima bo'lmasa server
+  /// o'zbekchaga qaytaradi. ⚠️ Bu maydon FAQAT ma'lumot uchun — zaxira
+  /// qoidasi serverda, bitta joyda hal qilinadi, ilovada TAKRORLANMAYDI.
+  /// Shu sababli ekranlar hamon oddiy `title` / `description` ni chizadi.
+  final String contentLocale;
 
   /// Images to show in the detail gallery. Order: cover image first,
   /// then scene preview URLs. Empty entries are dropped.
