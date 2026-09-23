@@ -104,17 +104,7 @@ object PanoProcessor {
             "completed seconds=${result.seconds} align=${result.align} depthFrames=${result.depthFrames}",
         )
         File(dir, "processing.json")
-            .writeText(
-                org.json
-                    .JSONObject()
-                    .put("width", outputWidth)
-                    .put("height", outputWidth / 2)
-                    .put("sensorPoses", sensors)
-                    .put("seconds", result.seconds)
-                    .put("align", result.align)
-                    .put("depthFrames", result.depthFrames)
-                    .toString()
-            )
+            .writeText(result.diagnostics.put("sensorPoses", sensors).toString())
         return mapOf(
             "pano" to File(dir, "pano.jpg").path,
             "preview" to File(dir, "preview.jpg").path,

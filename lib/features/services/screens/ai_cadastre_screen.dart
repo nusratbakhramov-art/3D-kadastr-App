@@ -9,6 +9,7 @@ import '../../../theme/app_colors.dart';
 import '../../auth/auth_storage.dart';
 import '../ai_draft_saver.dart';
 import '../api_cadastre_service.dart';
+import '../cadastre_number.dart';
 import '../data/ngis_parcel_client.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../models/ai_wizard_steps.dart';
@@ -72,11 +73,9 @@ class AiCadastreScreen extends StatefulWidget {
 
 class _AiCadastreScreenState extends State<AiCadastreScreen> {
   static const _fullMaskLength = 19;
-  // Base NN:NN:NN:NN:NN:NNNN, optionally followed by sub-parcel / building /
-  // unit blocks, e.g. 10:09:01:01:02:5942:0001:039.
-  static final _cadastreRe = RegExp(
-    r'^\d{2}:\d{2}:\d{2}:\d{2}:\d{2}:\d{4}(:\d{1,4})*$',
-  );
+  // Raqam shakli `cadastre_number.dart` da — geoportal qidiruvi ham, bu ekran
+  // ham bitta qoidadan yuradi.
+  static final _cadastreRe = kCadastreNumberRe;
   final TextEditingController _cadastreController = TextEditingController();
   _LoadStatus _status = _LoadStatus.idle;
   CadastreLookupResult? _info;
@@ -109,9 +108,14 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
   /// Foydalanuvchi «hujjat bilan davom etish» ni tanladimi.
   bool _documentMode = false;
 
-  /// Xaritadan tanlangan uchastka — ichki xaritada ajratib ko'rsatiladi va
-  /// tanlagich qayta ochilganda o'sha joydan boshlanadi.
+  /// Xaritadan tanlangan YOKI raqam bo'yicha topilgan uchastka — ichki
+  /// xaritada ajratib ko'rsatiladi va tanlagich qayta ochilganda o'sha joydan
+  /// boshlanadi.
   NgisParcel? _parcel;
+
+  /// Raqam bo'yicha xaritadan qidirish hozir ketyaptimi — xarita kartasida
+  /// shu paytda «qidirilyapti» holati ko'rsatiladi.
+  bool _locatingParcel = false;
 
   /// The bundle this screen created, kept so that returning here (Back from a
   /// later step) and pressing Davom etish again REUSES it instead of building a
@@ -213,7 +217,13 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     // Qo'lda boshqa raqam yozilsa, xaritadagi yashil ajratma endi shu raqamga
     // tegishli emas — uni olib tashlaymiz, aks holda xarita bir uyni, maydon
     // esa boshqasini ko'rsatib turardi.
-    if (_parcel != null && _parcel!.cadastreNumber != text) {
+    //
+    // Taqqoslash DUMSIZ asos bo'yicha: `.../5414/01` xonadonining uchastkasi
+    // xaritada `...:5414` bo'lib turadi, ya'ni to'g'ridan-to'g'ri tenglik
+    // to'g'ri topilgan uchastkani darhol o'chirib yuborardi.
+    if (_parcel != null &&
+        cadastreBaseNumber(_parcel!.cadastreNumber) !=
+            cadastreBaseNumber(text)) {
       _parcel = null;
     }
     // Boshqa raqam — boshqa hikoya: muvaffaqiyatsiz urinishlar sanog'i
@@ -237,6 +247,39 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
         _errorMsg = null;
       });
       widget.onResolved?.call(null);
+    }
+  }
+
+  /// Kadastr raqami bo'yicha uchastkani geoportaldan topadi.
+  ///
+  /// Xaritadan tanlangan uy uchun chaqirilmaydi — u yerda uchastka allaqachon
+  /// qo'lda ([_parcel]).
+  ///
+  /// Topilmaslik — XATO EMAS: geoportal qatlamlarida yo'q uchastkalar bor.
+  /// U holda hech narsa o'zgarmaydi va oqim avvalgidek qo'lda xarita
+  /// qadamini so'raydi.
+  Future<void> _locateParcel(String number, int reqId) async {
+    final base = cadastreBaseNumber(number);
+    if (_parcel != null && cadastreBaseNumber(_parcel!.cadastreNumber) == base) {
+      return;
+    }
+    setState(() => _locatingParcel = true);
+    final client = NgisParcelClient();
+    try {
+      final found = await client.findByNumber(number);
+      // Ekran yopilgan, raqam almashgan yoki yangi qidiruv ketgan bo'lsa —
+      // javob endi kerak emas.
+      if (!mounted ||
+          reqId != _lookupRequestId ||
+          cadastreBaseNumber(_cadastreController.text) != base) {
+        return;
+      }
+      if (found != null) setState(() => _parcel = found);
+    } on NgisException {
+      // Geoportal yiqildi — jim o'tamiz, joylashuv qadami qo'lda so'raladi.
+    } finally {
+      client.dispose();
+      if (mounted) setState(() => _locatingParcel = false);
     }
   }
 
@@ -324,6 +367,12 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
         _status = _LoadStatus.loaded;
         _errorMsg = null;
       });
+      // Reyestr manzil beradi, KOORDINATA bermaydi. Uchastkani raqam bo'yicha
+      // geoportaldan topamiz — shunda xaritada uy ajratiladi va joylashuv
+      // qadami oqimdan tushadi ([_goNext] ga qarang). Qidiruv FONDA: natija
+      // kartasi darhol ko'rinadi, geoportal esa kechiksa ham hech narsani
+      // ushlab turmaydi.
+      unawaited(_locateParcel(number, reqId));
       // Draft ERTA boshlanadi — foydalanuvchi natijani o'qib turganda. Ataylab
       // aynan shu yerda: kadastr topilgan payt oqimning birinchi jiddiy
       // qadami, bo'sh raqam terib chiqib ketgan odam ortida ariza qoldirmaydi.
@@ -480,8 +529,15 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
     //
     // Raqam qo'lda o'zgartirilgan bo'lsa (`_parcel` shunda tozalanadi) markaz
     // ham yozilmaydi — eski uyning nuqtasi yangi raqam ostida qolib ketmasin.
-    final parcelCenter = _parcel?.cadastreNumber == info.cadastreNumber
-        ? _parcel?.center
+    //
+    // Taqqoslash DUMSIZ asos bo'yicha: xonadon raqami `.../01` bilan, uning
+    // uchastkasi esa xaritada dumsiz turadi.
+    final parcel = _parcel;
+    final parcelCenter =
+        parcel != null &&
+            cadastreBaseNumber(parcel.cadastreNumber) ==
+                cadastreBaseNumber(info.cadastreNumber)
+        ? parcel.center
         : null;
     // Reyestr hal bo'lmagan bo'lsa buni YOZIB qo'yamiz: keyingi qadamlar
     // (hujjat talabi, qo'lda xarita) shu holatga qarab ishlaydi va u
@@ -626,6 +682,7 @@ class _AiCadastreScreenState extends State<AiCadastreScreen> {
                             isDark: isDark,
                             locale: l,
                             onTap: _pickFromMap,
+                            busy: _locatingParcel,
                           ),
                           const SizedBox(height: 20),
                           _SectionLabel(
@@ -854,12 +911,18 @@ class _MapCard extends StatelessWidget {
     required this.isDark,
     required this.locale,
     required this.onTap,
+    this.busy = false,
   });
 
   final NgisParcel? parcel;
   final bool isDark;
   final Locale locale;
   final VoidCallback onTap;
+
+  /// Uchastka raqam bo'yicha qidirilyapti — o'ng tomondagi so'z o'rniga
+  /// aylanma chiqadi. Yangi matn ATAYLAB kiritilmadi: kutish bir-ikki soniya,
+  /// tarjima esa uchta tilda yangi kalit talab qilardi.
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -895,7 +958,12 @@ class _MapCard extends StatelessWidget {
               left: 10,
               right: 10,
               bottom: 10,
-              child: _MapCardBadge(parcel: p, isDark: isDark, locale: locale),
+              child: _MapCardBadge(
+                parcel: p,
+                isDark: isDark,
+                locale: locale,
+                busy: busy,
+              ),
             ),
           ],
         ),
@@ -909,11 +977,13 @@ class _MapCardBadge extends StatelessWidget {
     required this.parcel,
     required this.isDark,
     required this.locale,
+    this.busy = false,
   });
 
   final NgisParcel? parcel;
   final bool isDark;
   final Locale locale;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -950,20 +1020,30 @@ class _MapCardBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 6),
-          Text(
-            tr(
-              locale,
-              p == null
-                  ? 'services.ai.cadastre.map_open'
-                  : 'services.ai.cadastre.map_change',
+          if (busy)
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.splashGreen,
+              ),
+            )
+          else
+            Text(
+              tr(
+                locale,
+                p == null
+                    ? 'services.ai.cadastre.map_open'
+                    : 'services.ai.cadastre.map_change',
+              ),
+              style: const TextStyle(
+                fontFamily: 'MTSText',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.splashGreen,
+              ),
             ),
-            style: const TextStyle(
-              fontFamily: 'MTSText',
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.splashGreen,
-            ),
-          ),
         ],
       ),
     );
@@ -1372,6 +1452,39 @@ class _CadastreMaskFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
+    // Bino / xonadon dumi `/` bilan yoziladi (`...:5414/01`) va xaritadan
+    // shu ko'rinishda keladi. Maskaga tegmasa, matnni tahrirlash paytida `/`
+    // raqamlar qatoriga qo'shilib ketardi va `.../5414/01` jimgina
+    // `...:5414:01` ga aylanardi — boshqa obyekt.
+    final slash = newValue.text.indexOf('/');
+    if (slash >= 0) {
+      final head = formatEditUpdate(
+        oldValue,
+        TextEditingValue(
+          text: newValue.text.substring(0, slash),
+          selection: TextSelection.collapsed(
+            offset: newValue.selection.end.clamp(0, slash),
+          ),
+        ),
+      );
+      final tail = newValue.text
+          .substring(slash + 1)
+          .replaceAll(RegExp(r'\D'), '');
+      final text = '${head.text}/$tail';
+      // Karet dumda bo'lsa — dumdagi o'z joyida qoladi, aks holda boshdagi
+      // hisoblangan joyda.
+      final inTail = newValue.selection.end > slash;
+      final offset = inTail
+          ? text.length - (newValue.text.length - newValue.selection.end)
+          : head.selection.end;
+      return TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(
+          offset: offset.clamp(0, text.length),
+        ),
+      );
+    }
+
     final allDigits = newValue.text.replaceAll(RegExp(r'\D'), '');
     final digits = allDigits.substring(
       0,

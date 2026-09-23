@@ -5,6 +5,29 @@ import org.json.JSONArray
 
 /** Acquisition order is index; targetId identifies grid coverage, never an array offset. */
 object PanoStorage {
+    /**
+     * Do not estimate exposure from misaligned pixels when the camera already locked it.
+     * Missing/legacy diagnostics deliberately keep the existing compensation path.
+     */
+    fun hasLockedPhotometry(frames: List<PanoFrameMeta>): Boolean {
+        if (frames.size < 2) return false
+        val first = frames.first()
+        val exposure = first.exposureDurationNs ?: return false
+        val iso = first.diagnostics?.optInt("sensorSensitivity", 0) ?: return false
+        val camera = first.diagnostics?.optString("cameraId", "").orEmpty()
+        if (exposure <= 0 || iso <= 0 || camera.isBlank()) return false
+        return frames.all { frame ->
+            val d = frame.diagnostics
+            frame.poseSource == "sensors:android" &&
+                frame.exposureDurationNs == exposure &&
+                d?.opt("aeLocked") == true &&
+                d.opt("awbLocked") == true &&
+                d.optInt("sensorSensitivity", 0) == iso &&
+                d.optString("cameraId", "") == camera
+        }
+    }
+
+
     fun writeMetadata(dir: File, frames: List<PanoFrameMeta>) {
         val tmp = File(dir, "meta.json.tmp")
         val bytes =

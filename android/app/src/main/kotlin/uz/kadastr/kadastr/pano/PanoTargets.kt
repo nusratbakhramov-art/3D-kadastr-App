@@ -91,6 +91,11 @@ data class PanoFrameMeta(
     val poseSource: String? = null,
     val exposureDuration: Double? = null,
     val diagnostics: JSONObject? = null,
+    val exposureDurationNs: Long? = null,
+    val poseInstantNs: Long? = null,
+    val imageTimestampNs: Long? = null,
+    val poseTimestampSource: String? = null,
+    val intrinsicsSource: String? = null,
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
         put("index", index)
@@ -109,6 +114,11 @@ data class PanoFrameMeta(
         poseSource?.let { put("poseSource", it) }
         exposureDuration?.let { put("exposureDuration", it) }
         diagnostics?.keys()?.forEach { put(it, diagnostics.get(it)) }
+        exposureDurationNs?.let { put("exposureDurationNs", it) }
+        poseInstantNs?.let { put("poseInstantNs", it) }
+        imageTimestampNs?.let { put("imageTimestampNs", it) }
+        poseTimestampSource?.let { put("poseTimestampSource", it) }
+        intrinsicsSource?.let { put("intrinsicsSource", it) }
     }
 
     companion object {
@@ -122,7 +132,21 @@ data class PanoFrameMeta(
                 o.getInt("imageWidth"), o.getInt("imageHeight"), o.getInt("pixelWidth"), o.getInt("pixelHeight"),
                 o.getDouble("timestamp"), o.optBoolean("highRes"), o.getString("file"),
                 if (o.isNull("poseSource")) null else o.getString("poseSource"),
-                if (o.isNull("exposureDuration")) null else o.getDouble("exposureDuration"))
+                if (o.isNull("exposureDuration")) null else o.getDouble("exposureDuration"),
+                diagnostics = JSONObject().apply {
+                    // Preserve optional diagnostics without letting them override canonical fields.
+                    val canonical = setOf("index", "targetId", "targetYaw", "targetPitch",
+                        "transform", "intrinsics", "imageWidth", "imageHeight", "pixelWidth",
+                        "pixelHeight", "timestamp", "highRes", "file", "poseSource", "exposureDuration",
+                        "exposureDurationNs", "poseInstantNs", "imageTimestampNs",
+                        "poseTimestampSource", "intrinsicsSource")
+                    o.keys().forEach { key -> if (key !in canonical) put(key, o.get(key)) }
+                },
+                exposureDurationNs = if (o.isNull("exposureDurationNs")) null else o.getLong("exposureDurationNs"),
+                poseInstantNs = if (o.isNull("poseInstantNs")) null else o.getLong("poseInstantNs"),
+                imageTimestampNs = if (o.isNull("imageTimestampNs")) null else o.getLong("imageTimestampNs"),
+                poseTimestampSource = if (o.isNull("poseTimestampSource")) null else o.getString("poseTimestampSource"),
+                intrinsicsSource = if (o.isNull("intrinsicsSource")) null else o.getString("intrinsicsSource"))
         }
     }
 
