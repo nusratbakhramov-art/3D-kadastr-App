@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show File;
 
 import 'package:flutter/material.dart';
 
@@ -129,9 +130,7 @@ class _MainShellState extends State<MainShell> {
   Future<void> _openSettings() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SettingsScreen(
-          onLogoutConfirmed: _handleLogout,
-        ),
+        builder: (_) => SettingsScreen(onLogoutConfirmed: _handleLogout),
       ),
     );
   }
@@ -194,10 +193,8 @@ class _MainShellState extends State<MainShell> {
     final title = tr(widget.locale, 'shell.menu.scans');
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => ApplicationsScreen(
-          lockedServiceId: 'calc',
-          titleOverride: title,
-        ),
+        builder: (_) =>
+            ApplicationsScreen(lockedServiceId: 'calc', titleOverride: title),
       ),
     );
   }
@@ -220,10 +217,7 @@ class _MainShellState extends State<MainShell> {
   Future<void> _openAiValuation() async {
     // AI Baholash needs an account — gate with a login drawer before the
     // wizard opens (kadastr → client → location → purpose → intake → result).
-    if (!await ensureLoggedIn(
-      context,
-      storage: widget.authStorage,
-    )) {
+    if (!await ensureLoggedIn(context, storage: widget.authStorage)) {
       return;
     }
     if (!mounted) return;
@@ -240,9 +234,9 @@ class _MainShellState extends State<MainShell> {
   void _openCombinedCalc() {
     // Birlashgan kalkulyator = maydon → ko'p tanlovli xizmatlar → umumiy hisob
     // → "Ariza topshirish" (to'g'ridan buyurtma). "Kalkulyator" karta + banner.
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const KadastrAreaScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const KadastrAreaScreen()));
   }
 
   void _openServiceList() {
@@ -268,9 +262,9 @@ class _MainShellState extends State<MainShell> {
   Future<void> _openBozorAi() async {
     if (!await ensureLoggedIn(context, storage: widget.authStorage)) return;
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const BozorHomeScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const BozorHomeScreen()));
   }
 
   /// «Taqiqni tekshirish» — shaxsiy kadastr ma'lumoti bo'yicha so'rov, shuning
@@ -280,12 +274,10 @@ class _MainShellState extends State<MainShell> {
   Future<void> _openTaqiqCheck() async {
     if (!await ensureLoggedIn(context, storage: widget.authStorage)) return;
     if (!mounted) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const TaqiqCheckScreen()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => const TaqiqCheckScreen()));
   }
-
-  void _openMarketTab() => _onTabChanged(1);
 
   @override
   Widget build(BuildContext context) {
@@ -293,6 +285,9 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      // Pages paint UNDER the tab bar; the bar's own gradient is what makes
+      // content disappear as it scrolls behind it.
+      extendBody: true,
       body: PageView(
         controller: _pageController,
         physics: const NeverScrollableScrollPhysics(),
@@ -308,7 +303,6 @@ class _MainShellState extends State<MainShell> {
             onOpenAiValuation: _openAiValuation,
             onOpenBozorAi: _openBozorAi,
             onOpenTaqiqCheck: _openTaqiqCheck,
-            onOpenMarket: _openMarketTab,
             // "Kalkulyator" karta → birlashgan (maydon → xizmatlar) kalkulyator.
             onOpenKalkulyator: _openCombinedCalc,
             // Banner "Online kalkulyator" → birlashgan kalkulyator.
@@ -356,42 +350,43 @@ class _ShellStrings {
   const _ShellStrings._();
 
   // Each tab keeps one fixed colour — nothing here reacts to which tab is
-  // selected.
+  // selected. The 3D glyphs carry their own palette (green house, blue bag,
+  // orange document), so the label below each one simply repeats that hue;
+  // recolouring on selection would erase the cue the design navigates by.
   //
-  // Market va Arizalar ilgari TINTSIZ edi: ular korzinka.uz va my.gov.uz
-  // belgilari va o'z brend ranglarini SVG ichida olib yuradi (qizil va
-  // ko'k). Panel esa shu sababli uch xil rangli bo'lib ko'rinardi. Endi
-  // ikkalasi ham Asosiy bilan bir xil yashilga bo'yaladi.
-  //
-  // ⚠️ `BlendMode.srcIn` ikonkani BITTA rangga tekislaydi. Bu ikkalasida
-  // ham tekshirilgan: Market bir rangli edi, Arizalar esa uch rangli, lekin
-  // uning plitkalari oq ORALIQ bilan ajralgan va "bajarildi" belgisi
-  // KESIK (teshik) — shuning uchun tekislangach ham tuzilishi o'qiladi.
-  // Yangi ko'p rangli ikonka qo'shilsa — avval shunday tekshirib ko'ring.
+  // ⚠️ These are PNGs, not the old flat SVGs, and nothing tints them. Swapping
+  // in a new glyph means picking its label colour here too, or the pair drifts
+  // apart — `analyze` will not notice.
   static List<AppBottomNavItem> items(Locale locale) => [
     AppBottomNavItem(
       label: _home(locale),
-      iconAsset: 'assets/icons/tab-home.svg',
-      tintLight: AppColors.brandGreen,
-      tintDark: AppColors.splashGreen,
+      iconAsset: 'assets/icons/tab-home.png',
+      // Designer's green, not the darker brand green: this label is the only
+      // thing marking the active tab, so it is a specified colour.
+      labelColorLight: const Color(0xFF00BF47),
+      labelColorDark: const Color(0xFF00BF47),
     ),
     AppBottomNavItem(
       label: _market(locale),
-      iconAsset: 'assets/icons/tab-market.svg',
-      tintLight: AppColors.brandGreen,
-      tintDark: AppColors.splashGreen,
+      iconAsset: 'assets/icons/tab-market.png',
+      labelColorLight: const Color(0xFF1B8FEA),
+      labelColorDark: const Color(0xFF5CC0FF),
     ),
     AppBottomNavItem(
       label: _applications(locale),
-      iconAsset: 'assets/icons/tab-applications.svg',
-      tintLight: AppColors.brandGreen,
-      tintDark: AppColors.splashGreen,
+      iconAsset: 'assets/icons/tab-applications.png',
+      labelColorLight: const Color(0xFFF26522),
+      labelColorDark: const Color(0xFFFF8A4C),
     ),
     AppBottomNavItem(
       label: _profile(locale),
       iconAsset: 'assets/icons/tab-profile.svg',
-      tintLight: AppColors.textBlack,
-      tintDark: Colors.white,
+      labelColorLight: AppColors.textBlack,
+      labelColorDark: Colors.white,
+      // Profil is the one tab whose glyph is the person themselves: their
+      // avatar if they have one, their initial if signed in without one, and a
+      // neutral disc while a guest.
+      iconBuilder: (context) => const _NavAvatar(),
     ),
   ];
 
@@ -404,4 +399,73 @@ class _ShellStrings {
   static String _applications(Locale l) => tr(l, 'nav.applications');
 
   static String _profile(Locale l) => tr(l, 'nav.profile');
+}
+
+/// The Profil tab's glyph: the signed-in user's avatar, drawn as a disc the
+/// same size as the other tabs' 3D icons.
+///
+/// It listens to [userProfileNotifier] itself so a profile edit repaints 30pt
+/// of tab bar rather than rebuilding the shell (and with it every page the
+/// [PageView] is holding alive).
+class _NavAvatar extends StatelessWidget {
+  const _NavAvatar();
+
+  /// Squircle, not a circle: the other three glyphs are rounded squares, and a
+  /// round avatar beside them read as a different kind of thing.
+  static final BorderRadius _shape = BorderRadius.circular(8);
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return RepaintBoundary(
+      child: ValueListenableBuilder<UserProfile?>(
+        valueListenable: userProfileNotifier,
+        builder: (context, profile, _) {
+          final path = profile?.avatarPath;
+          if (path != null) {
+            return ClipRRect(
+              borderRadius: _shape,
+              child: path.startsWith('assets/')
+                  ? Image.asset(path, fit: BoxFit.cover)
+                  : Image.file(File(path), fit: BoxFit.cover),
+            );
+          }
+          if (profile == null) {
+            return DecoratedBox(
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.darkIconBg : const Color(0xFFE3E6E8),
+                borderRadius: _shape,
+              ),
+              child: Icon(
+                Icons.person_outline_rounded,
+                size: 18,
+                color: isDark ? Colors.white70 : const Color(0xFF6B7073),
+              ),
+            );
+          }
+          final initial = profile.name.isNotEmpty
+              ? profile.name.characters.first.toUpperCase()
+              : '?';
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: AppColors.brandGreen,
+              borderRadius: _shape,
+            ),
+            child: Center(
+              child: Text(
+                initial,
+                style: const TextStyle(
+                  fontFamily: 'MTSCompact',
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 }
