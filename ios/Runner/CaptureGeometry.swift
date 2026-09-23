@@ -21,7 +21,7 @@ struct PanoTarget: Identifiable, Hashable {
 enum PanoTargetGrid {
     /// Gorizontda 12 (30°), +45° da 8, −45° da 8, zenit ixtiyoriy. NADIR YO'Q:
     /// eng pastki qism (oyoq osti) suratga olinmaydi — tikishda o'sha joyga
-    /// «3D kadastr» disk-logosi bosiladi (`PanoStitch.swift` → `nadirLogoPath`,
+    /// ilova ikonkasi bosiladi (`PanoStitch.swift` → `nadirLogoPath`,
     /// yadro 28° qopqoqni logo bilan yopadi, −45° qatori esa 45°+34° gacha
     /// yetadi, ya'ni bo'shliq qolmaydi).
     /// Portret asosiy linza ≈ 55°×69° FOV → hamma joyda ≥30% ustma-ustlik.

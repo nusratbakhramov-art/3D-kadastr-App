@@ -153,8 +153,17 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
     String path,
   ) => PanoCaptureChannel.preview(context, path: path);
 
-  /// Nadir (oyoq osti) suratga OLINMAYDI — o'rniga shu disk-logo bosiladi
+  /// Nadir (oyoq osti) suratga OLINMAYDI — o'rniga shu logo bosiladi
   /// (`PanoCapture.swift` nishon to'ri, yadro `nadirLogoPath`).
+  ///
+  /// Rasmning O'ZI — ilovaning rasmiy ikonkasi (`assets/branding/appicon.png`
+  /// dan yasalgan), atrofi shaffof. 2026-09-23 gacha bu yerda «3D kadastr»
+  /// yozuvi bor katta yashil disk turardi — mijoz uni xunuk deb topdi.
+  ///
+  /// ⚠️ Faylni almashtirganda: yadro rasmning ICHKI AYLANASINI oladi (burchaklar
+  /// umuman o'qilmaydi) va `nadirCutDeg` (12°) teshigini yopish uchun
+  /// `nadirCutDeg / nadirLogoDeg = 0.6` radiusgacha shaffof bo'lmagan joy
+  /// kerak. Hozirgi ikonka o'qlar bo'ylab 0.705 gacha to'la qoplaydi.
   static const String kNadirLogoAsset = 'assets/branding/nadir_logo.png';
 
   static Future<PanoStitchResult> _defaultStitch({
