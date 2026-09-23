@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../core/api_config.dart';
 import '../auth/auth_http_client.dart';
+import '../settings/settings_state.dart';
 import 'models/market_listing.dart';
 import 'models/market_region_node.dart';
 
@@ -47,16 +48,24 @@ class MarketplaceApiService {
   MarketplaceApiService({http.Client? client, String? baseUrl, String? locale})
     : _client = client ?? AuthHttpClient(),
       _baseUrl = baseUrl ?? ApiConfig.baseUrl,
-      _locale = locale;
+      _localeOverride = locale;
 
   final http.Client _client;
   final String _baseUrl;
-  final String? _locale;
+  final String? _localeOverride;
   static const Duration _timeout = Duration(seconds: 15);
+
+  /// Konstruktorda `locale` berilsa — o'sha (testlar va DI uchun), aks holda
+  /// ilovaning JORIY tili.
+  ///
+  /// Ataylab saqlanmaydi, har so'rovda o'qiladi: servis obyekti uzoq yashaydi
+  /// (ekran state'ida), til esa sozlamalardan istalgan payt o'zgaradi. Qiymat
+  /// bir marta ko'chirib olinsa, e'lon tafsiloti eski tilda qolib ketardi.
+  String get _locale => _localeOverride ?? localeNotifier.value.languageCode;
 
   Map<String, String> _headers([Map<String, String>? extra]) {
     final h = <String, String>{};
-    if (_locale != null && _locale.isNotEmpty) h['Accept-Language'] = _locale;
+    if (_locale.isNotEmpty) h['Accept-Language'] = _locale;
     if (extra != null) h.addAll(extra);
     return h;
   }
@@ -69,7 +78,9 @@ class MarketplaceApiService {
     final res = await _client.get(uri, headers: _headers()).timeout(_timeout);
     if (res.statusCode != 200) _throw(res);
     final body = jsonDecode(res.body);
-    final list = body is Map ? (body['items'] as List? ?? const []) : body as List;
+    final list = body is Map
+        ? (body['items'] as List? ?? const [])
+        : body as List;
     final out = <String>[];
     for (final raw in list) {
       if (raw is String) {
@@ -89,7 +100,9 @@ class MarketplaceApiService {
     final res = await _client.get(uri, headers: _headers()).timeout(_timeout);
     if (res.statusCode != 200) _throw(res);
     final body = jsonDecode(res.body);
-    final list = body is Map ? (body['items'] as List? ?? const []) : body as List;
+    final list = body is Map
+        ? (body['items'] as List? ?? const [])
+        : body as List;
     return list
         .whereType<Map>()
         .map((m) => MarketRegionNode.fromJson(m.cast<String, dynamic>()))
@@ -206,7 +219,9 @@ class MarketplaceApiService {
     String msg = 'HTTP ${res.statusCode}';
     try {
       final body = jsonDecode(res.body);
-      if (body is Map && body['detail'] != null) msg = body['detail'].toString();
+      if (body is Map && body['detail'] != null) {
+        msg = body['detail'].toString();
+      }
     } catch (_) {}
     throw MarketplaceApiException(msg);
   }
@@ -271,6 +286,9 @@ class MarketplaceApiService {
       isOwned: json['is_owned'] as bool? ?? false,
       scenes: scenes,
       files: files,
+      // Eski backend bu maydonni yubormaydi — o'shanda matn o'zbekcha edi,
+      // shuning uchun zaxira qiymat 'uz'.
+      contentLocale: (json['content_locale'] as String?) ?? 'uz',
     );
   }
 }

@@ -37,10 +37,14 @@ class MarketScreen extends StatefulWidget {
 class _MarketScreenState extends State<MarketScreen> {
   static const double _scrollToTopThreshold = 600;
 
-  late final MarketController _controller;
+  late MarketController _controller;
+
+  /// `_controller` qaysi til uchun qurilgani — til o'zgarganini shu bilan
+  /// aniqlaymiz.
+  late String _controllerLocale;
   late final ScrollController _scroll;
   late final TextEditingController _searchText;
-  late final _StickyHeaderDelegate _headerDelegate;
+  late _StickyHeaderDelegate _headerDelegate;
 
   final ValueNotifier<bool> _showScrollTop = ValueNotifier<bool>(false);
   final ValueNotifier<bool> _headerScrolled = ValueNotifier<bool>(false);
@@ -48,9 +52,9 @@ class _MarketScreenState extends State<MarketScreen> {
   @override
   void initState() {
     super.initState();
+    _controllerLocale = localeNotifier.value.languageCode;
     _controller =
-        widget.controller ??
-        sharedMarketController(locale: localeNotifier.value.languageCode);
+        widget.controller ?? sharedMarketController(locale: _controllerLocale);
     _scroll = ScrollController()..addListener(_onScroll);
     _searchText = TextEditingController(text: _controller.searchInput);
     _controller.addListener(_syncSearchText);
@@ -62,6 +66,35 @@ class _MarketScreenState extends State<MarketScreen> {
     );
     // Idempotent — only fetches on the very first open.
     unawaited(_controller.initialize());
+    // Til o'zgarsa ro'yxatni QAYTA olish kerak: bu ekran `PageView` ichida
+    // yashaydi, ya'ni sozlamalardan til almashtirilganda `initState` qayta
+    // ishlamaydi va keshdagi e'lonlar eski tilda qolib ketardi. Sarlavha va
+    // tavsifni backend hal qiladi, shuning uchun yechim — yangi til bilan
+    // qayta so'rash.
+    localeNotifier.addListener(_onLocaleChanged);
+  }
+
+  void _onLocaleChanged() {
+    if (!mounted || widget.controller != null) return;
+    final code = localeNotifier.value.languageCode;
+    if (code == _controllerLocale) return;
+    // Obunani ESKI kontrollerdan avval yechamiz: `sharedMarketController`
+    // yangisini qurishdan oldin eskisini `dispose` qiladi.
+    _controller
+      ..removeListener(_syncSearchText)
+      ..removeListener(_handleControllerError);
+    _controllerLocale = code;
+    final next = sharedMarketController(locale: code);
+    _controller = next
+      ..addListener(_syncSearchText)
+      ..addListener(_handleControllerError);
+    _headerDelegate = _StickyHeaderDelegate(
+      height: 60,
+      scrolled: _headerScrolled,
+      child: _StickyHeader(onFilterTap: _onFilterTap, controller: next),
+    );
+    unawaited(_controller.initialize());
+    setState(() {});
   }
 
   Object? _lastSeenError;
@@ -168,6 +201,7 @@ class _MarketScreenState extends State<MarketScreen> {
 
   @override
   void dispose() {
+    localeNotifier.removeListener(_onLocaleChanged);
     // Do NOT dispose the shared controller — it lives for the app lifetime
     // so data persists across tab switches.
     _controller.removeListener(_syncSearchText);
