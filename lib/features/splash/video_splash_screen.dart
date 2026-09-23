@@ -86,6 +86,31 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
   /// kattalashtirishda faqat qora joy qirqiladi.
   static const double _videoScale = 1.6;
 
+  /// Rolikdagi zarba nuqtalari — ijro boshlangan lahzadan hisoblanadi.
+  ///
+  /// Kadrma-kadr o'lchab topilgan (30fps, har kadrning oldingisidan farqi):
+  ///   0.00s  belgi markazda paydo bo'la boshlaydi — `_boot` da beriladi
+  ///   0.50–1.65s  deyarli qimirlamaydi (farq ~0.02) — zarba YO'Q
+  ///   1.67s  ikonka tanasi o'sa boshlaydi (farq 0.02 dan 0.50 ga sakraydi)
+  ///   2.25s  yumaloq kvadrat joyiga tushadi va BURCHAK QAVSLARI chiqadi —
+  ///          rolikdagi eng kuchli urg'u (farq cho'qqisi 2.48)
+  ///   2.73s  uy chizilib bo'ldi, harakat tugaydi (farq 0.4 ga tushadi)
+  ///
+  /// ⚠️ To'rtta — va shundayligicha qolgani ma'qul. 3 soniyada bundan
+  /// ko'pi tinish belgisi bo'lishdan to'xtab, bir tekis titroqqa aylanadi.
+  ///
+  /// ⚠️ Nega Timer, nega `_handleTick` EMAS: `video_player` pozitsiyani ~500ms
+  /// da bir yangilaydi, ya'ni listener orqali berilgan zarba nuqtadan 250ms
+  /// gacha chetga ketardi. Timer'lar `play()` bilan birga ishga tushadi.
+  ///
+  /// ⚠️ Qiymatlar AYNAN shu rolikka bog'liq. Asset almashtirilsa, ular ham
+  /// qayta o'lchanishi kerak.
+  static const List<(Duration, void Function())> _beats = [
+    (Duration(milliseconds: 1670), HapticFeedback.selectionClick),
+    (Duration(milliseconds: 2250), HapticFeedback.mediumImpact),
+    (Duration(milliseconds: 2730), HapticFeedback.lightImpact),
+  ];
+
   VideoPlayerController? _controller;
   late final AnimationController _fadeCtrl;
   late final Animation<double> _fadeT;
@@ -93,6 +118,7 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
   Timer? _bootWatchdog;
   Timer? _playWatchdog;
   Timer? _holdTimer;
+  final List<Timer> _beatTimers = [];
   bool _ready = false;
   bool _finished = false;
 
@@ -140,8 +166,19 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
     setState(() => _ready = true);
     unawaited(controller.play());
     _fadeCtrl.forward();
-    // Ikki zarbdan birinchisi — rolik boshlandi.
+    // To'rt zarbdan birinchisi — rolik boshlandi. Qolgani [_beats] da,
+    // shu lahzadan sanaladi.
     HapticFeedback.lightImpact();
+    for (final (offset, feedback) in _beats) {
+      _beatTimers.add(Timer(offset, feedback));
+    }
+  }
+
+  void _cancelBeats() {
+    for (final timer in _beatTimers) {
+      timer.cancel();
+    }
+    _beatTimers.clear();
   }
 
   /// Rolik oxiriga yetdi (yoki xato berdi) — ilovaga o'tamiz.
@@ -156,17 +193,25 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
     // (Ekranga bosish bu kutishni ham kesib o'tadi.) `_holdTimer` bir martalik
     // qo'riqchi: `isCompleted` har bir tick'da rost bo'lib turadi.
     if (controller.value.isCompleted && _holdTimer == null) {
-      // Ikkinchi zarb — uy chizilib bo'ldi.
-      HapticFeedback.mediumImpact();
+      // Zarba bu yerda YO'Q: "uy chizilib bo'ldi" zarbasi [_beats] da 2.73s
+      // ga qo'yilgan. `isCompleted` rolik OXIRIDA (3.1s) yonadi, ya'ni
+      // harakat to'xtaganidan ~0.37s keyin — zarba jonsiz kadrga tushardi.
       _holdTimer = Timer(_holdLastFrame, _finish);
     }
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Fonga chiqqanda plugin ijroni to'xtatadi — qaytganda davom ettiramiz,
-    // aks holda splash faqat watchdog bilan yopilardi.
-    if (state != AppLifecycleState.resumed || _finished || !_ready) return;
+    // Fonga chiqqanda plugin ijroni to'xtatadi — lekin zarba timer'lari
+    // to'xtamaydi. Ular rolik qotib turgan paytda yonib, keyin qaytganda
+    // ijro bilan mos kelmay qolardi; shuning uchun bekor qilinadi. Qolgan
+    // zarbalar shu startda qaytarilmaydi — bittasini yo'qotish, notog'ri
+    // joyda urishdan yaxshiroq.
+    if (state != AppLifecycleState.resumed) {
+      _cancelBeats();
+      return;
+    }
+    if (_finished || !_ready) return;
     final controller = _controller;
     if (controller == null || controller.value.isCompleted) return;
     unawaited(controller.play());
@@ -178,6 +223,9 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
     _bootWatchdog?.cancel();
     _playWatchdog?.cancel();
     _holdTimer?.cancel();
+    // Ekranga bosib o'tkazib yuborilganda qolgan zarbalar ilovaning ichida
+    // "qo'shimcha" bo'lib chiqib ketmasin.
+    _cancelBeats();
     // Ovoz keyingi ekranga "sudralib" o'tmasin.
     unawaited(_controller?.pause() ?? Future<void>.value());
     if (mounted) widget.onComplete();
@@ -189,6 +237,7 @@ class _VideoSplashScreenState extends State<VideoSplashScreen>
     _bootWatchdog?.cancel();
     _playWatchdog?.cancel();
     _holdTimer?.cancel();
+    _cancelBeats();
     _controller?.removeListener(_handleTick);
     unawaited(_controller?.dispose() ?? Future<void>.value());
     _fadeCtrl.dispose();
