@@ -1,23 +1,18 @@
 import 'dart:async';
+import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/haptics.dart';
 import '../../core/i18n/app_translations.dart';
 import '../../theme/app_colors.dart';
 import '../support/support_service.dart';
-import '../market/market_controller.dart';
-import '../market/models/market_listing.dart';
-import '../market/listing_detail_screen.dart';
-import '../market/widgets/featured_carousel.dart';
 import '../chat/screens/chat_screen.dart';
-import 'widgets/fab_pulse.dart';
 import '../onboarding/onboarding_page_data.dart';
 import '../services/models/service_item.dart';
 import '../services/widgets/service_card.dart';
+import '../shell/app_bottom_nav.dart';
 import 'user_profile.dart';
 import 'widgets/home_header.dart';
 
@@ -31,7 +26,6 @@ class HomeScreen extends StatefulWidget {
     this.onOpenAiValuation,
     this.onOpenBozorAi,
     this.onOpenTaqiqCheck,
-    this.onOpenMarket,
     this.onOpenKalkulyator,
     this.onOpenOrder,
     this.onOpenProfile,
@@ -45,7 +39,6 @@ class HomeScreen extends StatefulWidget {
   final VoidCallback? onOpenAiValuation;
   final VoidCallback? onOpenBozorAi;
   final VoidCallback? onOpenTaqiqCheck;
-  final VoidCallback? onOpenMarket;
   final VoidCallback? onOpenKalkulyator;
   final VoidCallback? onOpenOrder;
   final VoidCallback? onOpenProfile;
@@ -56,18 +49,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  late final MarketController _marketController;
-  final ScrollController _scroll = ScrollController();
   final SupportService _supportService = SupportService();
 
-  // The FABs auto-hide while the user scrolls down (reading through the feed)
-  // and come back on any upward move, when the scroll settles, or at the top.
-  //
-  // A notifier, NOT setState: the visibility flips repeatedly mid-fling (drag →
-  // idle → drag), and a setState here rebuilt the whole feed — header, three
-  // service cards, the carousel — on every flip, right when the raster thread
-  // was already busy scrolling. Only the two FABs listen now.
-  final ValueNotifier<bool> _fabsVisible = ValueNotifier<bool>(true);
   SupportInfo _supportInfo = const SupportInfo(
     phone: SupportService.fallbackPhone,
   );
@@ -75,37 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _marketController = sharedMarketController(
-      locale: widget.locale.languageCode,
-    );
-    unawaited(_marketController.initialize());
     unawaited(_loadSupportInfo());
-    _scroll.addListener(_onScroll);
-  }
-
-  @override
-  void dispose() {
-    _scroll.dispose();
-    _fabsVisible.dispose();
-    super.dispose();
-  }
-
-  // The Call markaz block owns the very bottom of the feed, so the FABs step
-  // aside for that short stretch (not the whole tail) to avoid sitting on it.
-  static const double _bottomHideZone = 130;
-
-  void _onScroll() {
-    if (!_scroll.hasClients) return;
-    final pos = _scroll.position;
-    final nearBottom = pos.pixels >= pos.maxScrollExtent - _bottomHideZone;
-    // Reverse == dragging content up (reading downward) → hide. Otherwise show,
-    // except across the bottom stretch where the call block takes over. The
-    // pixels<=0 guard stops a top overscroll bounce from sticking them hidden.
-    final show =
-        pos.pixels <= 0 ||
-        (!nearBottom && pos.userScrollDirection != ScrollDirection.reverse);
-    // ValueNotifier already no-ops when the value is unchanged.
-    _fabsVisible.value = show;
   }
 
   Future<void> _loadSupportInfo() async {
@@ -122,52 +75,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onListingTap(MarketListing listing) {
-    final isIos = Theme.of(context).platform == TargetPlatform.iOS;
+  /// Height [HomeHeader] takes at the reader's text size: the avatar is fixed
+  /// at 44, the greeting + date grow with the scale, and the taller of the two
+  /// wins. Kept here as a calculation rather than a measured widget because the
+  /// grid below has to be sized in the SAME layout pass.
+  static double _headerHeight(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context);
+    // Line heights rounded UP, plus a couple of points of slack. The header is
+    // pinned to this number, so an under-estimate is not a cosmetic error — it
+    // overflows the Row (a 2.8px overflow stripe, seen on the sim).
+    final text = scaler.scale(20) * 1.3 + 4 + scaler.scale(14) * 1.4;
+    return math.max(48, text);
+  }
+
+  void _openAssistant() {
     Navigator.of(context).push(
-      isIos
-          ? PageRouteBuilder<void>(
-              pageBuilder: (_, __, ___) =>
-                  ListingDetailScreen(listing: listing),
-              transitionsBuilder: (_, animation, __, child) {
-                return SlideTransition(
-                  position:
-                      Tween<Offset>(
-                        begin: const Offset(1, 0),
-                        end: Offset.zero,
-                      ).animate(
-                        CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOutCubic,
-                        ),
-                      ),
-                  child: child,
-                );
-              },
-            )
-          : PageRouteBuilder<void>(
-              transitionDuration: const Duration(milliseconds: 360),
-              reverseTransitionDuration: const Duration(milliseconds: 280),
-              pageBuilder: (_, __, ___) =>
-                  ListingDetailScreen(listing: listing),
-              transitionsBuilder: (_, animation, __, child) {
-                final curved = CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutCubic,
-                  reverseCurve: Curves.easeInCubic,
-                );
-                return FadeTransition(
-                  opacity: curved,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.06),
-                      end: Offset.zero,
-                    ).animate(curved),
-                    child: child,
-                  ),
-                );
-              },
-            ),
+      MaterialPageRoute<void>(
+        builder: (_) => ChatScreen(locale: widget.locale),
+      ),
     );
   }
 
@@ -181,20 +106,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: backgroundColor,
-      // Pastki-o'ng: qo'ng'iroq — kiruvchi qo'ng'iroqdagi "javob berish" kabi
-      // yashil (chap tomondagi qizil chat bilan juftlikda).
-      floatingActionButton: _FabReveal(
-        visible: _fabsVisible,
-        child: FabPulse(
-          visible: _fabsVisible,
-          color: AppColors.callGreen,
-          child: _ImageFab(
-            asset: 'assets/icons/ai-phone-icon.png',
-            onTap: hapticTap(_callSupport),
-            tooltip: tr(widget.locale, 'home.fab.call'),
-          ),
-        ),
-      ),
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -204,279 +115,366 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           SafeArea(
             bottom: false,
-            child: SingleChildScrollView(
-              controller: _scroll,
-              clipBehavior: Clip.none,
-              // Modest tail — the FABs step aside across the bottom stretch, so
-              // the block doesn't need a big gap to clear them.
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-              // Every block below is wrapped in a RepaintBoundary. A
-              // SingleChildScrollView — unlike a sliver list — adds none of its
-              // own, so without them one scroll frame re-rasterised the whole
-              // column: three cards' radial glow + elevation shadow + six
-              // strings each carrying three blurred text shadows, the carousel,
-              // and the pattern. With them, scrolling just translates layers
-              // the raster cache already holds.
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  RepaintBoundary(
-                    child: ValueListenableBuilder<UserProfile?>(
-                      valueListenable: userProfileNotifier,
-                      builder: (context, profile, _) {
-                        return ValueListenableBuilder<int>(
-                          valueListenable: notificationUnreadNotifier,
-                          builder: (context, unread, _) {
-                            return HomeHeader(
-                              profile: profile,
-                              unreadCount: unread,
-                              locale: widget.locale,
-                              today: date,
-                              onLoginTap: widget.onLoginTap,
-                              onAvatarTap: widget.onOpenProfile,
-                              onBellTap: widget.onOpenNotifications,
+            child: LayoutBuilder(
+              builder: (context, viewport) {
+                // The grid ABSORBS whatever height the rest of the page does
+                // not use, down to a floor measured from the copy at the
+                // reader's own text size. That is what makes this work on a
+                // short phone, a tall one, and at 200% text alike: no fixed
+                // aspect ratio, no magic clamps.
+                //
+                // Everything below the grid is measured, not guessed —
+                // measured at the CURRENT text scale, so a reader who enlarges
+                // type gets taller cards (or a page that scrolls) instead of
+                // clipped words.
+                // The bar is drawn OVER the page now, so the feed reserves the
+                // slab and its gaps — but NOT the whole fade band. The top of
+                // that band is fully transparent, so the support buttons can
+                // sit in it without greying out, and reserving it whole is what
+                // left ~64pt of dead background under them on a tall phone.
+                final navHeight = AppBottomNav.contentInset(context);
+                final verticalPadding = 12.0 + navHeight;
+                const gapAboveGrid = 20.0;
+                const gapAboveCta = 16.0;
+                final gridWidth = viewport.maxWidth - 32;
+                final gridMin = _CardsGrid.minHeight(
+                  context,
+                  widget.locale,
+                  gridWidth,
+                );
+                // The header and the button row are PINNED to the heights
+                // computed here — each is wrapped in a SizedBox below — so this
+                // arithmetic is exact rather than an estimate. That is what
+                // lets the grid take every remaining pixel: nothing left over
+                // at the bottom, nothing sliding under the bar.
+                final headerHeight = _headerHeight(context);
+                final ctaHeight = _SupportCtaButton.heightFor(context);
+                final leftover =
+                    viewport.maxHeight -
+                    verticalPadding -
+                    gapAboveGrid -
+                    gapAboveCta -
+                    headerHeight -
+                    ctaHeight;
+                // Only a genuinely small screen scrolls: the floor is what the
+                // cards' own copy needs at the reader's text size.
+                final fits = leftover >= gridMin;
+                final gridHeight = math.max(leftover, gridMin);
+
+                final padding = EdgeInsets.fromLTRB(16, 12, 16, navHeight);
+                final grid = RepaintBoundary(
+                  child: _CardsGrid(
+                    locale: widget.locale,
+                    onOpenKadastr3d: widget.onOpenKadastr3d,
+                    onOpenAiValuation: widget.onOpenAiValuation,
+                    onOpenBozorAi: widget.onOpenBozorAi,
+                    onOpenTaqiqCheck: widget.onOpenTaqiqCheck,
+                    onOpenKalkulyator: widget.onOpenKalkulyator,
+                  ),
+                );
+
+                // Every block below is wrapped in a RepaintBoundary. A
+                // SingleChildScrollView — unlike a sliver list — adds none of
+                // its own, so without them one scroll frame re-rasterised the
+                // whole column: five cards' glow + elevation shadow + strings
+                // each carrying three blurred text shadows, and the pattern.
+                final column = Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      height: headerHeight,
+                      child: RepaintBoundary(
+                        child: ValueListenableBuilder<UserProfile?>(
+                          valueListenable: userProfileNotifier,
+                          builder: (context, profile, _) {
+                            return ValueListenableBuilder<int>(
+                              valueListenable: notificationUnreadNotifier,
+                              builder: (context, unread, _) {
+                                return HomeHeader(
+                                  profile: profile,
+                                  unreadCount: unread,
+                                  locale: widget.locale,
+                                  today: date,
+                                  onLoginTap: widget.onLoginTap,
+                                  onAvatarTap: widget.onOpenProfile,
+                                  onBellTap: widget.onOpenNotifications,
+                                );
+                              },
                             );
                           },
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  RepaintBoundary(
-                    child: _CardsGrid(
-                      locale: widget.locale,
-                      onOpenKadastr3d: widget.onOpenKadastr3d,
-                      onOpenAiValuation: widget.onOpenAiValuation,
-                      onOpenBozorAi: widget.onOpenBozorAi,
-                      onOpenTaqiqCheck: widget.onOpenTaqiqCheck,
-                      onOpenKalkulyator: widget.onOpenKalkulyator,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _SectionHeader(
-                    title: _sectionTitle(widget.locale),
-                    locale: widget.locale,
-                    onSeeAll: widget.onOpenMarket,
-                  ),
-                  const SizedBox(height: 12),
-                  RepaintBoundary(
-                    child: FeaturedCarousel(
-                      controller: _marketController,
-                      onTap: _onListingTap,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Support number — always in the feed. Rendering it only at
-                  // the bottom made the scroll extent jump as it popped in/out
-                  // (it grew the list, which flipped the at-bottom check off,
-                  // which removed it — an oscillation that read as a glitch).
-                  // The floating FABs step aside via _atBottom instead, so they
-                  // don't cover it down here.
-                  RepaintBoundary(
-                    child: _CallCenterBlock(
-                      phone: _supportInfo.phone,
-                      locale: widget.locale,
-                      onTap: hapticTap(_callSupport),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Pastki-chap: chat — kiruvchi qo'ng'iroqdagi "rad etish" kabi qizil.
-          Positioned(
-            left: 16,
-            bottom: 16,
-            child: _FabReveal(
-              visible: _fabsVisible,
-              child: FabPulse(
-                visible: _fabsVisible,
-                color: AppColors.declineRed,
-                child: _ImageFab(
-                  asset: 'assets/icons/ai-chat-icon.png',
-                  onTap: hapticTap(
-                    () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => ChatScreen(locale: widget.locale),
+                        ),
                       ),
                     ),
-                  ),
-                  tooltip: tr(widget.locale, 'home.fab.assistant'),
-                ),
-              ),
+                    const SizedBox(height: gapAboveGrid),
+                    // Exactly the leftover height when the page fits, the
+                    // measured floor when it does not (and then it scrolls).
+                    SizedBox(height: gridHeight, child: grid),
+                    const SizedBox(height: gapAboveCta),
+                    // Chat + call, in the feed. They used to be two floating
+                    // FABs that hid themselves while the user scrolled; as a
+                    // pair of ordinary buttons they are always reachable,
+                    // never cover a card, and cost nothing to keep on screen.
+                    SizedBox(
+                      height: ctaHeight,
+                      child: RepaintBoundary(
+                        child: _SupportCtaRow(
+                          locale: widget.locale,
+                          onAskTap: hapticTap(_openAssistant),
+                          onCallTap: hapticTap(_callSupport),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+
+                if (fits) {
+                  // Everything is on screen; no scroll view at all.
+                  return Padding(padding: padding, child: column);
+                }
+                return SingleChildScrollView(
+                  clipBehavior: Clip.none,
+                  padding: padding,
+                  child: column,
+                );
+              },
             ),
           ),
         ],
       ),
     );
   }
-
-  // Keyed so the panel can reword it; "home.see_all" beside it already is.
-  static String _sectionTitle(Locale l) => tr(l, 'home.section.top_models');
 }
 
-/// A floating action button whose whole face is a supplied PNG (the icon
-/// already carries its own colour/disc), with a soft drop shadow so it lifts
-/// off the content and a tap target matched to the 64pt gradient FABs it sits
-/// beside.
+/// The pair of pill buttons that close the Home feed: «Savol bering» opens the
+/// in-app assistant, «Bog'lanish» dials the support number.
 ///
-/// The shadow used to be a blurred silhouette of the PNG itself
-/// (`ImageFiltered` + `ImageFilter.blur`). That is a live GPU blur of a
-/// saveLayer, re-run on every frame the FAB paints — and because it sits inside
-/// the reveal's `AnimatedScale`, the raster cache could never hold it. Two of
-/// them, over a scrolling feed, was the single most expensive thing on Home.
-/// Both icons are full-bleed circular discs (their alpha is a circle inscribed
-/// in the 400×400 box), so an ordinary circular `BoxShadow` draws the same
-/// shape for free.
-class _ImageFab extends StatelessWidget {
-  const _ImageFab({
-    required this.asset,
-    required this.onTap,
-    required this.tooltip,
+/// Each is outlined in its own hue with a matching tinted fill — light enough
+/// that the 3D glyph on the right stays the loudest thing in the button.
+class _SupportCtaRow extends StatelessWidget {
+  const _SupportCtaRow({
+    required this.locale,
+    required this.onAskTap,
+    required this.onCallTap,
   });
 
-  final String asset;
-  final VoidCallback? onTap;
-  final String tooltip;
+  final Locale locale;
+  final VoidCallback? onAskTap;
+  final VoidCallback? onCallTap;
 
-  static const double size = fabSize;
+  static const double _gap = 12;
+
+  /// Largest label size the design asks for. Both buttons come down together
+  /// from here when the longer label does not fit.
+  static const double _baseFontSize = 16;
 
   @override
   Widget build(BuildContext context) {
-    // The PNGs are 400×400 — decoding them at that size to draw at 56pt burns
-    // ~640 KB and a downscale per paint. Decode straight to the device size.
-    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final ask = tr(locale, 'home.support.ask');
+    final contact = tr(locale, 'home.support.contact');
 
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.45),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Image.asset(
-            asset,
-            width: size,
-            height: size,
-            fit: BoxFit.contain,
-            cacheWidth: (size * dpr).round(),
-            filterQuality: FilterQuality.medium,
+    // Width from the MEDIA QUERY, not a LayoutBuilder: this row is measured by
+    // Home before it is built (to size the grid), and a builder that only knows
+    // its width at paint time cannot answer that.
+    final rowWidth = MediaQuery.sizeOf(context).width - 32;
+    final buttonWidth = (rowWidth - _gap) / 2;
+    // ONE size for the pair, not one per button. Each button used to shrink
+    // its own label to fit (a FittedBox), so on a 360dp Galaxy the longer
+    // "Savol bering" came out visibly smaller than "Bog'lanish" beside it.
+    // Whichever label is tighter now sets the size for both.
+    final fontSize = math.min(
+      _SupportCtaButton.fittedFontSize(
+        ask,
+        'assets/icons/cta-ask.png',
+        buttonWidth,
+        _baseFontSize,
+      ),
+      _SupportCtaButton.fittedFontSize(
+        contact,
+        'assets/icons/cta-call.png',
+        buttonWidth,
+        _baseFontSize,
+      ),
+    );
+
+    return Row(
+      children: [
+        Expanded(
+          child: _SupportCtaButton(
+            label: ask,
+            asset: 'assets/icons/cta-ask.png',
+            // Brand pair, given by the designer: blue ask / green contact.
+            accent: const Color(0xFF0069E1),
+            fontSize: fontSize,
+            onTap: onAskTap,
           ),
         ),
-      ),
+        const SizedBox(width: _gap),
+        Expanded(
+          child: _SupportCtaButton(
+            label: contact,
+            asset: 'assets/icons/cta-call.png',
+            accent: const Color(0xFF00BF47),
+            fontSize: fontSize,
+            onTap: onCallTap,
+          ),
+        ),
+      ],
     );
   }
 }
 
-/// Scales + fades a FAB away while the feed scrolls under it.
-///
-/// Subscribes to the visibility itself so a scroll never rebuilds anything
-/// above it, and sits behind a [RepaintBoundary] so the reveal animation
-/// repaints 56pt of FAB rather than the whole Home stack under it.
-class _FabReveal extends StatelessWidget {
-  const _FabReveal({required this.visible, required this.child});
-
-  final ValueListenable<bool> visible;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: ValueListenableBuilder<bool>(
-        valueListenable: visible,
-        child: child,
-        builder: (context, show, child) {
-          return AnimatedScale(
-            scale: show ? 1 : 0,
-            duration: const Duration(milliseconds: 170),
-            curve: Curves.easeOutCubic,
-            child: AnimatedOpacity(
-              opacity: show ? 1 : 0,
-              duration: const Duration(milliseconds: 170),
-              child: child,
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    required this.locale,
-    this.subtitle,
-    this.onSeeAll,
+class _SupportCtaButton extends StatelessWidget {
+  const _SupportCtaButton({
+    required this.label,
+    required this.asset,
+    required this.accent,
+    required this.fontSize,
+    required this.onTap,
   });
-  final String title;
-  final String? subtitle;
-  final Locale locale;
-  final VoidCallback? onSeeAll;
+
+  final String label;
+  final String asset;
+  final Color accent;
+
+  /// Handed down by [_SupportCtaRow] so both buttons share one type size.
+  final double fontSize;
+
+  final VoidCallback? onTap;
+
+  /// The design's pill height, and the floor. It grows when the reader's text
+  /// does — a fixed 44 clipped the label at the larger accessibility sizes.
+  static const double _baseHeight = 44;
+
+  static double heightFor(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context);
+    return math.max(
+      _baseHeight,
+      math.max(_iconHeight + 6, scaler.scale(16) * 1.15 + 14),
+    );
+  }
+
+  /// Sized by HEIGHT, and almost the full height of the pill — the design has
+  /// the glyph nearly bursting out of it.
+  ///
+  /// ⚠️ Not a square box. These PNGs are wide (the headset is 125×88), so a
+  /// square `contain` box scaled them to fit their WIDTH and the glyph came out
+  /// a third shorter than the box it was given.
+  static const double _iconHeight = 38;
+
+  /// Rendered width of each glyph at [_iconHeight], from the PNG's own aspect.
+  /// Hard-coded because it is needed BEFORE the image is laid out, to work out
+  /// how much room the label has left.
+  static const Map<String, double> _iconAspect = {
+    'assets/icons/cta-ask.png': 125 / 88,
+    'assets/icons/cta-call.png': 103 / 88,
+  };
+
+  static const double _padLeft = 18;
+  static const double _padRight = 10;
+  static const double _labelIconGap = 4;
+
+  /// The largest size at or below [base] at which [label] fits one line inside
+  /// a button of [buttonWidth]. Measured, not guessed: the Uzbek and Russian
+  /// strings differ enough in width that a fixed size either clips one or
+  /// leaves the other looking undersized.
+  static double fittedFontSize(
+    String label,
+    String asset,
+    double buttonWidth,
+    double base,
+  ) {
+    final iconWidth = _iconHeight * (_iconAspect[asset] ?? 1);
+    final available =
+        buttonWidth -
+        _padLeft -
+        _padRight -
+        _labelIconGap -
+        iconWidth -
+        2; // the 1.2pt border on both sides, rounded up
+    if (available <= 0) return base;
+
+    final painter = TextPainter(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(
+          fontFamily: 'MTSCompact',
+          fontWeight: FontWeight.w700,
+          fontSize: base,
+          height: 1.15,
+        ),
+      ),
+      maxLines: 1,
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    if (painter.width <= available) return base;
+    return base * available / painter.width;
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final titleColor = isDark ? Colors.white : AppColors.textBlack;
-    final subtitleColor = isDark
-        ? Colors.white70
-        : AppColors.textBlack.withValues(alpha: 0.55);
-    final linkColor = AppColors.splashGreen;
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final fill = isDark
+        ? accent.withValues(alpha: 0.12)
+        : Colors.white.withValues(alpha: 0.92);
+    final labelColor = isDark
+        ? Color.alphaBlend(accent.withValues(alpha: 0.75), Colors.white)
+        : accent;
+    final height = heightFor(context);
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: titleColor,
-                ),
-              ),
-              if (subtitle != null && subtitle!.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtitle!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                    color: subtitleColor,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        if (onSeeAll != null)
-          GestureDetector(
-            onTap: hapticTap(onSeeAll),
-            child: Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text(
-                _HomeScreenStrings.seeAll(locale),
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: linkColor,
-                ),
+    return Semantics(
+      button: true,
+      label: label,
+      child: Material(
+        color: fill,
+        borderRadius: BorderRadius.circular(height / 2),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            height: height,
+            padding: const EdgeInsets.fromLTRB(_padLeft, 3, _padRight, 3),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(height / 2),
+              border: Border.all(
+                color: accent.withValues(alpha: isDark ? 0.55 : 0.4),
+                width: 1.2,
               ),
             ),
+            child: Row(
+              children: [
+                // One line, always. The label is set at 16 and allowed to scale
+                // DOWN to fit: the two buttons share a phone width, so a long
+                // translation ("Задать вопрос" on a 360dp Galaxy) would
+                // otherwise wrap to two lines and unbalance the pair.
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'MTSCompact',
+                      fontWeight: FontWeight.w700,
+                      fontSize: fontSize,
+                      height: 1.15,
+                      color: labelColor,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: _labelIconGap),
+                Image.asset(
+                  asset,
+                  height: _iconHeight,
+                  fit: BoxFit.fitHeight,
+                  cacheHeight: (_iconHeight * dpr).round(),
+                  filterQuality: FilterQuality.medium,
+                ),
+              ],
+            ),
           ),
-      ],
+        ),
+      ),
     );
   }
 }
@@ -531,10 +529,15 @@ class _HomePatternBackground extends StatelessWidget {
 }
 
 /// The Home service grid — the rich dark cards brought over from the (removed)
-/// Services page: two rows of square cards (AI Baholash + 3D kadastr, then
-/// Bozor AI + Taqiqni tekshirish) and one wide card (Kalkulyator), each with an
-/// accent glow and a 3D image. Market lives in the bottom tab + "Top modellar",
-/// so it's not a card here.
+/// Services page: two rows of square cards (3D kadastr + Bozor AI, then Taqiqni
+/// tekshirish + AI baholash) and one wide card (Kalkulyator), each with an
+/// accent glow and a 3D image. Market lives in the bottom tab, so it's not a
+/// card here.
+///
+/// ⚠️ THE ORDER IS THE DESIGN'S, not a natural one — it reads 3D kadastr,
+/// Bozor AI, Taqiq, AI baholash, Kalkulyator (the mockup calls them Xizmatlar,
+/// Mulk bazaar, Ta'qiq tekshirish, Mulk baholash, Qurilish calculator). Adding
+/// a card means placing it where the mockup puts it, not appending it.
 class _CardsGrid extends StatelessWidget {
   const _CardsGrid({
     required this.locale,
@@ -552,6 +555,70 @@ class _CardsGrid extends StatelessWidget {
   final VoidCallback? onOpenTaqiqCheck;
   final VoidCallback? onOpenKalkulyator;
 
+  static const double gap = 12;
+
+  /// The wide card's height as a share of a square one. Keeps the two in step
+  /// however much room the grid is given.
+  static const double wideRatio = 0.62;
+
+  /// Smallest the grid can be before its own copy stops fitting.
+  ///
+  /// Measured, at the reader's text size: the longest title and subtitle of the
+  /// five cards are laid out for real, and the tallest result sets the floor.
+  /// Below it the page scrolls rather than clipping a word — which is exactly
+  /// what happens at the large accessibility text sizes.
+  static double minHeight(BuildContext context, Locale locale, double width) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final columnWidth = (width - gap) / 2;
+    // The title dodges the chevron (18 + 36 + 18); the subtitle below it gets
+    // the full column. Measured exactly as the card lays them out.
+    final titleWidth = columnWidth - 18 - 30 - 18;
+    final subtitleWidth = columnWidth - 36;
+
+    double block(String title, String subtitle) {
+      double lay(String text, TextStyle style, int maxLines, double width) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: style),
+          maxLines: maxLines,
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+        )..layout(maxWidth: width > 0 ? width : 1);
+        return painter.height;
+      }
+
+      return lay(
+            title,
+            kServiceCardTitleStyle.copyWith(
+              fontSize: serviceCardTitleSize(columnWidth),
+            ),
+            2,
+            titleWidth,
+          ) +
+          6 +
+          lay(
+            subtitle,
+            kServiceCardSubtitleStyle.copyWith(
+              fontSize: serviceCardSubtitleSize(columnWidth),
+            ),
+            4,
+            subtitleWidth,
+          );
+    }
+
+    final l = locale;
+    final tallest = [
+      block(_CardStrings.kadastr3d(l), _CardStrings.kadastr3dSub(l)),
+      block(_CardStrings.bozorAi(l), _CardStrings.bozorAiSub(l)),
+      block(_CardStrings.taqiqCheck(l), _CardStrings.taqiqCheckSub(l)),
+      block(_CardStrings.aiValuation(l), _CardStrings.aiValuationSub(l)),
+    ].reduce(math.max);
+
+    // Copy + its 18pt padding top and bottom + room for the artwork to read as
+    // more than a sliver.
+    final square = tallest + 36 + 56;
+    return square * 2 + square * wideRatio + gap * 2;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l = locale;
@@ -562,12 +629,21 @@ class _CardsGrid extends StatelessWidget {
       asset: 'assets/images/home/cta-icon.png',
       accent: const Color(0xFF00E135),
       layout: ServiceLayout.square,
+      // This object is a compact badge rather than a house that fills the
+      // corner, so its light is tighter and sits a little further left.
+      glow: const ServiceGlow(x: 0.50, y: 1.04, width: 1.70, height: 1.35),
+      // The badge is drawn small inside its own frame — at the shared scale it
+      // came out visibly smaller than the four houses beside it.
+      artScale: 1.3,
     );
     final ai = ServiceItem(
       id: ServiceId.aiValuation,
       title: _CardStrings.aiValuation(l),
       subtitle: _CardStrings.aiValuationSub(l),
-      asset: 'assets/images/services/ai.png',
+      // Mockup art, kept under the name it was exported with so the next
+      // export drops straight in. The old `ai.png` chip still serves the
+      // Services page, which is why this is a new file and not an overwrite.
+      asset: 'assets/images/services/mulk-baholash.png',
       accent: const Color(0xFF7C3AED),
       layout: ServiceLayout.square,
     );
@@ -578,16 +654,19 @@ class _CardsGrid extends StatelessWidget {
       id: ServiceId.bozorAi,
       title: _CardStrings.bozorAi(l),
       subtitle: _CardStrings.bozorAiSub(l),
-      asset: 'assets/images/services/bozor-ai.png',
-      accent: const Color(0xFFF59E0B),
+      asset: 'assets/images/services/mulk-bazaar.png',
+      accent: const Color(0xFFF5B301),
       layout: ServiceLayout.square,
     );
     final taqiq = ServiceItem(
       id: ServiceId.taqiqCheck,
       title: _CardStrings.taqiqCheck(l),
       subtitle: _CardStrings.taqiqCheckSub(l),
-      asset: 'assets/images/services/taqiq.png',
-      accent: const Color(0xFFF43F5E),
+      asset: 'assets/images/services/taqiq-tekshrish.png',
+      // Orange, not the old rose: the new art is an orange house, and the glow
+      // under a 3D object has to be that object's own colour or it reads as a
+      // second light source.
+      accent: const Color(0xFFF26522),
       layout: ServiceLayout.square,
     );
     final calculator = ServiceItem(
@@ -597,26 +676,35 @@ class _CardsGrid extends StatelessWidget {
       asset: 'assets/images/services/calculator.png',
       accent: const Color(0xFF22D3EE),
       layout: ServiceLayout.wide,
+      // Pushed right, hard: on a card this wide a centred glow lights the copy
+      // instead of the calculator, and the whole card goes cyan.
+      // Wider and a touch hotter than the square cards': the calculator is a
+      // dark object that hides most of the core, so what is left to see is the
+      // spill around it.
+      glow: const ServiceGlow(
+        x: 0.50,
+        y: 1.06,
+        width: 1.25,
+        height: 2.20,
+        opacity: 1.05,
+      ),
     );
 
-    const gap = 12.0;
     return LayoutBuilder(
       builder: (context, constraints) {
+        // Heights come from the SPACE THE GRID IS GIVEN, split two-square-rows
+        // to one wide row. No aspect ratio and no pt clamps: those were tuned
+        // on one phone at one text size and were wrong on every other.
+        //
+        // The caller sizes the grid (viewport minus the rest of the page,
+        // floored by [minHeight]); an unbounded height only happens in tests,
+        // where the width-derived fallback keeps the cards sane.
         final squareWidth = (constraints.maxWidth - gap) / 2;
-        const squareAspect = 0.78;
-        // The cards are sized by aspect ratio, so on a Pro Max-class phone the
-        // extra width used to stretch them ~30pt taller than the artwork and
-        // copy need — a dead gap under the subtitle, and "Top modellar" pushed
-        // off-screen. Cap the height so surplus width widens the cards instead
-        // of stretching them; narrow phones keep the original proportions.
-        // The floor is deliberately tall: the 3D logo is bottom-anchored, so a
-        // taller card pushes it down and away from the top-left copy, which is
-        // what keeps the subtitle off the logo on small phones (e.g. S23).
-        final squareHeight = (squareWidth / squareAspect).clamp(172.0, 230.0);
-        // Keep the wide (Calculator) card at its ORIGINAL height — it must not
-        // grow just because the square cards got taller, so it's derived from
-        // the old square proportion, not the new taller one.
-        final wideHeight = (squareWidth / 0.84).clamp(150.0, 208.0) * 0.72;
+        final total = constraints.hasBoundedHeight
+            ? constraints.maxHeight
+            : squareWidth / 0.86 * (2 + wideRatio) + gap * 2;
+        final squareHeight = (total - gap * 2) / (2 + wideRatio);
+        final wideHeight = squareHeight * wideRatio;
 
         return Column(
           mainAxisSize: MainAxisSize.min,
@@ -627,15 +715,15 @@ class _CardsGrid extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ServiceCard(
-                      item: ai,
-                      onTap: onOpenAiValuation ?? () {},
+                      item: kadastr,
+                      onTap: onOpenKadastr3d ?? () {},
                     ),
                   ),
                   const SizedBox(width: gap),
                   Expanded(
                     child: ServiceCard(
-                      item: kadastr,
-                      onTap: onOpenKadastr3d ?? () {},
+                      item: bozorAi,
+                      onTap: onOpenBozorAi ?? () {},
                     ),
                   ),
                 ],
@@ -648,15 +736,15 @@ class _CardsGrid extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ServiceCard(
-                      item: bozorAi,
-                      onTap: onOpenBozorAi ?? () {},
+                      item: taqiq,
+                      onTap: onOpenTaqiqCheck ?? () {},
                     ),
                   ),
                   const SizedBox(width: gap),
                   Expanded(
                     child: ServiceCard(
-                      item: taqiq,
-                      onTap: onOpenTaqiqCheck ?? () {},
+                      item: ai,
+                      onTap: onOpenAiValuation ?? () {},
                     ),
                   ),
                 ],
@@ -700,81 +788,4 @@ class _CardStrings {
   static String taqiqCheck(Locale l) => tr(l, 'home.card.taqiq_check');
 
   static String taqiqCheckSub(Locale l) => tr(l, 'home.card.taqiq_check_sub');
-}
-
-class _HomeScreenStrings {
-  const _HomeScreenStrings._();
-
-  static String seeAll(Locale l) => tr(l, 'home.see_all');
-}
-
-/// Bottom-of-feed "Call center" block. Revealed only when scrolled to the very
-/// bottom, reusing the same phone glyph as the bottom-right call FAB.
-class _CallCenterBlock extends StatelessWidget {
-  const _CallCenterBlock({
-    required this.phone,
-    required this.locale,
-    required this.onTap,
-  });
-
-  final String phone;
-  final Locale locale;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : AppColors.textBlack;
-    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
-
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        // No card bg/border — the green orb + phone number / 24/7 sit centred
-        // directly on the feed background. The number (fetched from backend) is
-        // the hero line; the hours read as a quiet subline beneath it.
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Image.asset(
-              'assets/icons/ai-phone-icon.png',
-              width: 46,
-              height: 46,
-              fit: BoxFit.contain,
-            ),
-            const SizedBox(width: 12),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  phone,
-                  style: TextStyle(
-                    fontSize: 21,
-                    fontWeight: FontWeight.w800,
-                    height: 1.05,
-                    letterSpacing: 0.2,
-                    color: textColor,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  tr(locale, 'home.contact_center.hours'),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    height: 1.15,
-                    color: muted,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

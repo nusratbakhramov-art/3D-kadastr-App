@@ -64,6 +64,12 @@ class HomeHeader extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 dateText,
+                // One line, like the greeting above it. At the large
+                // accessibility text sizes "23 sentabr, 2026" wrapped to two
+                // lines and overflowed the header, which Home pins to a
+                // computed height.
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontFamily: 'MTSCompact',
                   fontWeight: FontWeight.w400,
