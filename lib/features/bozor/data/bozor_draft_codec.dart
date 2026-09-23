@@ -39,17 +39,8 @@ extension PropertyKindCode on PropertyKind {
   };
 }
 
-extension PropertyTypeCode on PropertyType {
-  String get code => switch (this) {
-    PropertyType.apartment => 'apartment',
-    PropertyType.newBuildingApartment => 'new_building_apartment',
-    PropertyType.house => 'house',
-    PropertyType.land => 'land',
-    PropertyType.commercial => 'commercial',
-    PropertyType.garage => 'garage',
-    PropertyType.otherNonResidential => 'other_non_residential',
-  };
-}
+// `PropertyType.code` — endi `bozor_draft.dart` da (sxema yuklovchisi ham
+// o'sha kodni ishlatadi, kodek esa uni import qila olmaydi).
 
 extension PlacementTierCode on PlacementTier {
   String get code => switch (this) {
@@ -79,6 +70,7 @@ PropertyType? propertyTypeFromCode(Object? code) => switch (code) {
   'land' => PropertyType.land,
   'commercial' => PropertyType.commercial,
   'garage' => PropertyType.garage,
+  'basement' => PropertyType.basement,
   'other_non_residential' => PropertyType.otherNonResidential,
   _ => null,
 };
@@ -163,6 +155,8 @@ Map<String, dynamic> draftToDraftPayload(BozorDraft draft) {
     // qoralamaga qaytgan foydalanuvchi tanlagan rasmlarini yo'qotardi.
     kLocalMediaKey: {
       'photos': List<String>.from(d.photos),
+      // Tanlangan muqova — HAVOLA bo'yicha, indeks bo'yicha emas.
+      'cover_photo': ?d.coverPhoto,
       'plan': List<String>.from(d.planFiles),
       'panorama': List<String>.from(d.panoramas),
       // Panorama kalitlarining ko'rsatish URL'lari — viewer/tur uchun.
@@ -378,6 +372,13 @@ BozorDraft draftFromPayload(Map<String, dynamic> json, {int? draftId}) {
   draft.description.photos
     ..clear()
     ..addAll(_strList(local['photos']));
+  // Ro'yxatda qolmagan havola tiklanmaydi — `coverPhotoIndex` baribir
+  // birinchisiga tushardi, lekin qoralamada o'lik qiymat saqlanmasin.
+  final cover = local['cover_photo'];
+  draft.description.coverPhoto =
+      (cover is String && draft.description.photos.contains(cover))
+      ? cover
+      : null;
   draft.description.planFiles
     ..clear()
     ..addAll(_strList(local['plan']));

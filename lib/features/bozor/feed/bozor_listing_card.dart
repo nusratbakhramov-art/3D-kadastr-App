@@ -118,17 +118,22 @@ class BozorListingCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 4),
-                    Text(
-                      listing.regionLine,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontFamily: 'MTSText',
-                        fontSize: 13,
-                        color: meta,
+                    // Shart: `region_id` yuborilmagan e'londa `regionLine`
+                    // BO'SH satr bo'ladi va shartsiz chizilganda kartada
+                    // sababsiz bo'sh qator (+4pt) qolardi.
+                    if (listing.regionLine.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        listing.regionLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontFamily: 'MTSText',
+                          fontSize: 13,
+                          color: meta,
+                        ),
                       ),
-                    ),
+                    ],
                     // Rad etilgan e'londa SABAB kartada ko'rinadi: egasi
                     // detalga kirmasdan nima tuzatishni bilishi kerak.
                     // Backend kafolatlaydi: `rejected` da sabab bo'sh emas.

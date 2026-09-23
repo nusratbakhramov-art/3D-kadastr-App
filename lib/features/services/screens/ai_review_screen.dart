@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../models/ai_wizard_steps.dart';
 import '../widgets/file_preview_gallery.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -78,13 +79,16 @@ class _AiReviewScreenState extends State<AiReviewScreen> {
                     subtitle: _S.subtitle(l),
                     // Bu tugma butun oqimni yopadi — bitta qadam
                     // orqaga EMAS. Qadamma-qadam qaytish pastda.
-                    onBack: () => closeAiWizard(context),
+                    onBack: () => confirmCloseAiWizard(context),
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: StepProgressBar(count: 7, activeIndex: 5),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: StepProgressBar(
+                    count: bundle.aiStepCount,
+                    activeIndex: bundle.aiStepIndex(AiStep.review),
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Expanded(

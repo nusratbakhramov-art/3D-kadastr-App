@@ -55,7 +55,55 @@ class AiBaholashBundle {
   int? draftId;
 
   AiClientInfo? client;
+
+  /// Xaritada foydalanuvchi TASDIQLAGAN nuqta (3-qadam). Yuboriladigan
+  /// `location` shu.
   AiLocationInfo? location;
+
+  /// Geoportalda tanlangan UCHASTKANING markazi (1-qadam, `ai/parcel-map`).
+  ///
+  /// ⚠️ [location] DAN ALOHIDA TURADI va u bilan ALMASHTIRILMAYDI — ular ikki
+  /// boshqa narsa:
+  ///   * bu — reyestr uchastkasining geometrik markazi, ya'ni OBYEKTNING
+  ///     o'zi qayerdaligi;
+  ///   * [location] — foydalanuvchi 3-qadamda tasdiqlagan nuqta, payload'ga
+  ///     shu ketadi.
+  /// Qurilmaning GPS joylashuvi esa ikkalasi ham EMAS: u faqat xaritani
+  /// suradi va hech qachon bu maydonlarga yozilmaydi.
+  ///
+  /// Nega saqlanadi: 3-qadam pinni kadastr MANZILI matnini geokodlab
+  /// qo'yardi. Manzil topilmasa pin Toshkent markazida qolardi va baholash
+  /// butunlay boshqa hududning o'xshashlarini olardi — foydalanuvchi obyektni
+  /// xaritada ALLAQACHON ko'rsatgan bo'lsa ham. Uchastka markazi bor ekan, u
+  /// geokoddan ANIQROQ, shuning uchun boshlang'ich pin sifatida ishlatiladi.
+  AiParcelPoint? parcelCenter;
+
+  /// Tasdiqlangan joylashuv QAYERDAN kelgani.
+  ///
+  /// ⚠️ `location != null` YETARLI EMAS. Toshkent sukuti ham koordinata,
+  /// qurilma GPS'i ham koordinata — ikkalasi ham obyektning joyi EMAS. Shu
+  /// sababli qo'lda xarita qadami kerak-kerakmasligini koordinatadan emas,
+  /// MANBADAN hal qilamiz. `ai_location_screen` ichidagi `_PinSource` shu
+  /// ekranning ichki holati; bu esa oqim bo'ylab yuradigan, qoralamada
+  /// saqlanadigan yakuniy manba.
+  AiLocationSource locationSource = AiLocationSource.none;
+
+  /// Reyestr tekshiruvi qanday yakunlandi.
+  AiCadastreResolution cadastreResolution = AiCadastreResolution.resolved;
+
+  /// Reyestrdan ma'lumot olinmagan va foydalanuvchi «hujjat bilan davom
+  /// etish» ni tanlagan — obyekt ma'lumotlari KEYIN yuklanadigan kadastr
+  /// hujjatidan tekshiriladi.
+  bool get needsCadastreDocument =>
+      cadastreResolution == AiCadastreResolution.documentRequired;
+
+  /// Qo'lda xarita qadami KERAKMI.
+  ///
+  /// Uchastka yoki reyestr ishonchli nuqta bergan bo'lsa — yo'q, va
+  /// foydalanuvchidan bir xil obyektni IKKI marta belgilash so'ralmaydi.
+  /// Qolgan hamma holatda (qo'lda raqam kiritilgan va reyestr koordinata
+  /// bermagan, hujjat rejimi, umuman hech narsa yo'q) — ha.
+  bool get needsManualLocation => !locationSource.isTrustworthy;
 
   /// Baholash maqsadi — drives the reconciliation weighting on the backend.
   ValuationPurpose purpose;
@@ -103,7 +151,14 @@ class AiBaholashBundle {
   final List<String> passportPaths;
   final List<String> smetaPaths;
 
-  Map<String, dynamic> toJson() => {
+  /// Yuboriladigan payload (`POST /ai-valuations`).
+  ///
+  /// [forDraft] — qoralamani saqlash uchun: backend SXEMASIDA BO'LMAGAN,
+  /// faqat ilovaning o'ziga kerak maydonlar ham qo'shiladi (`parcel_center`).
+  /// Yaratish so'roviga ular QO'SHILMAYDI: Pydantic notanish maydonni jimgina
+  /// tashlab yuborsa ham, e'lon qilinmagan maydonni wire'ga chiqarish
+  /// shartnomani sudrab o'zgartirish bo'lardi.
+  Map<String, dynamic> toJson({bool forDraft = false}) => {
         'kadastr': {
           // Skip qilinganda cadastre_number bo'sh bo'lishi mumkin; backend uni
           // MAJBURIY (XX:XX:XX:XX:XX:XXXX format) deb tekshiradi → bo'sh bo'lsa
@@ -134,6 +189,10 @@ class AiBaholashBundle {
         if (kadastrKeys.isNotEmpty) 'kadastr_keys': kadastrKeys,
         if (passportKeys.isNotEmpty) 'passport_keys': passportKeys,
         if (smetaKeys.isNotEmpty) 'smeta_keys': smetaKeys,
+        if (forDraft && parcelCenter != null)
+          'parcel_center': parcelCenter!.toJson(),
+        if (forDraft) 'location_source': locationSource.wire,
+        if (forDraft) 'cadastre_resolution': cadastreResolution.wire,
       };
 
   /// Draft `request_payload`'dan bundle qayta tiklash (resume). `draftId` —
@@ -168,6 +227,16 @@ class AiBaholashBundle {
     if (loc is Map) {
       bundle.location = AiLocationInfo.fromJson(loc.cast<String, dynamic>());
     }
+    final parcel = j['parcel_center'];
+    if (parcel is Map) {
+      bundle.parcelCenter = AiParcelPoint.fromJson(
+        parcel.cast<String, dynamic>(),
+      );
+    }
+    bundle.locationSource = AiLocationSource.fromWire(j['location_source']);
+    bundle.cadastreResolution = AiCadastreResolution.fromWire(
+      j['cadastre_resolution'],
+    );
     bundle.purposeBasis = j['purpose_text'] as String?;
     bundle.addressee = j['addressee'] as String?;
     return bundle;
@@ -317,6 +386,91 @@ class AiClientInfo {
     'stir': stir,
     'phone': phone,
     'email': email,
+  };
+}
+
+/// Tasdiqlangan joylashuvning MANBAI — [AiBaholashBundle.locationSource].
+///
+/// Qurilma GPS'i bu ro'yxatda ATAYLAB YO'Q: u xaritani suradi, lekin hech
+/// qachon obyektning joyi bo'lmaydi. Foydalanuvchi «mening joylashuvim» ni
+/// bosib, keyin pinni TASDIQLASA — bu [manualMap], ya'ni uning ongli tanlovi.
+enum AiLocationSource {
+  /// Hali hech narsa tanlanmagan (yoki faqat sukut nuqtasi turibdi).
+  none('none'),
+
+  /// Geoportalda tanlangan uchastkaning markazi — eng ishonchlisi.
+  parcel('parcel'),
+
+  /// Reyestr (davreestr) javobidagi koordinata.
+  ///
+  /// ⚠️ BUGUNGI KUNDA ISHLATILMAYDI: davreestr javobi koordinata QAYTARMAYDI
+  /// (`CadastreLookupResult` da lat/lng maydoni yo'q). Qiymat shu yerda
+  /// turibdi, chunki marshrut qoidasi undan xabardor bo'lishi kerak — reyestr
+  /// koordinata bera boshlasa, qo'lda xarita qadami o'zi yo'qoladi.
+  cadastreLookup('cadastre_lookup'),
+
+  /// Foydalanuvchi qo'lda xaritada belgilagan nuqta.
+  manualMap('manual_map');
+
+  const AiLocationSource(this.wire);
+
+  final String wire;
+
+  /// Shu manbadan kelgan nuqta obyektning joyi deb ISHONILADIMI.
+  bool get isTrustworthy => this != AiLocationSource.none;
+
+  static AiLocationSource fromWire(Object? v) => AiLocationSource.values
+      .firstWhere((e) => e.wire == v, orElse: () => AiLocationSource.none);
+}
+
+/// Reyestr tekshiruvining yakuni — [AiBaholashBundle.cadastreResolution].
+enum AiCadastreResolution {
+  /// Reyestrdan foydali ma'lumot olindi (odatdagi yo'l).
+  resolved('resolved'),
+
+  /// Olinmadi; foydalanuvchi «hujjat bilan davom etish» ni tanladi.
+  documentRequired('document_required');
+
+  const AiCadastreResolution(this.wire);
+
+  final String wire;
+
+  static AiCadastreResolution fromWire(Object? v) => AiCadastreResolution.values
+      .firstWhere(
+        (e) => e.wire == v,
+        orElse: () => AiCadastreResolution.resolved,
+      );
+}
+
+/// Geoportal uchastkasining markazi — [AiBaholashBundle.parcelCenter].
+///
+/// Ataylab [AiLocationInfo] DAN alohida tur: o'sha turdan foydalanilsa ikkala
+/// tushuncha bir-biriga tasodifan tayinlanib ketishi hech gap emas edi, bu
+/// yerda esa tur tizimi buni to'xtatadi.
+class AiParcelPoint {
+  const AiParcelPoint({
+    required this.lat,
+    required this.lng,
+    this.cadastreNumber,
+  });
+
+  factory AiParcelPoint.fromJson(Map<String, dynamic> j) => AiParcelPoint(
+    lat: (j['lat'] as num?)?.toDouble() ?? 0,
+    lng: (j['lng'] as num?)?.toDouble() ?? 0,
+    cadastreNumber: j['cadastre_number'] as String?,
+  );
+
+  final double lat;
+  final double lng;
+
+  /// Qaysi uchastkaniki — raqam qo'lda o'zgartirilsa markaz eskirganini
+  /// bilish uchun.
+  final String? cadastreNumber;
+
+  Map<String, dynamic> toJson() => {
+    'lat': lat,
+    'lng': lng,
+    if (cadastreNumber != null) 'cadastre_number': cadastreNumber,
   };
 }
 

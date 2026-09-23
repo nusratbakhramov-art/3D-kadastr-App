@@ -30,6 +30,44 @@ class SupportInfo {
   String get callNumber =>
       (callCenter?.isNotEmpty == true) ? callCenter! : phone;
 
+  // ── Qaysi aloqa usuli KO'RSATILADI ────────────────────────────────────
+  //
+  // Qoida bitta joyda turadi, chunki uni ikki ekran o'qiydi ("Yordam"
+  // sahifasi va bosh sahifadagi qo'llab-quvvatlash varag'i). Ilgari har biri
+  // o'z shartini yozardi va ular allaqachon ajralib ketgan edi: biri
+  // email'ni `trim` qilardi, ikkinchisi telegramni qilmasdi.
+  //
+  // ⚠️ KO'RINISH — ADMINKANING QARORI, ILOVANIKI EMAS. Mijoz «email kerak
+  // emas» desa, javob kodda `emailVisible = false` emas: adminkada maydonni
+  // bo'shatish. Shuning uchun bu yerda faqat «qiymat bormi» tekshiriladi.
+  // Faqat probeldan iborat qiymat ham YO'Q deb hisoblanadi — adminkada
+  // maydonni "tozalash" ko'pincha probel qoldiradi.
+
+  /// Bo'sh yoki faqat probeldan iborat bo'lmasa — qirqilgan qiymat.
+  static String? _clean(String? v) {
+    final t = v?.trim();
+    return (t == null || t.isEmpty) ? null : t;
+  }
+
+  /// Telegram — qirqilgan, bo'sh bo'lsa `null`.
+  String? get telegramOrNull => _clean(telegram);
+
+  /// Email — qirqilgan, bo'sh bo'lsa `null`.
+  String? get emailOrNull => _clean(email);
+
+  /// Ish vaqti — qirqilgan, bo'sh bo'lsa `null`.
+  String? get workingHoursOrNull => _clean(workingHours);
+
+  /// Qo'ng'iroq raqami — qirqilgan, bo'sh bo'lsa `null`.
+  ///
+  /// Amalda deyarli hech qachon `null` bo'lmaydi: backendda `phone` MAJBURIY
+  /// (`nullable=False`), ilova esa tarmoqsiz birinchi ochilishda
+  /// [SupportService.fallbackPhone] ga tushadi — qo'llab-quvvatlash bilan
+  /// bog'lanish yo'li butunlay yo'qolmasligi kerak. Shart baribir bor:
+  /// bo'sh qiymat qatorni chizib, hech qayerga olib bormasligidan ko'ra
+  /// qatorni umuman ko'rsatmagan yaxshi.
+  String? get callNumberOrNull => _clean(callNumber);
+
   factory SupportInfo.fromJson(Map<String, dynamic> json) => SupportInfo(
     phone: (json['phone'] as String?)?.trim().isNotEmpty == true
         ? (json['phone'] as String).trim()

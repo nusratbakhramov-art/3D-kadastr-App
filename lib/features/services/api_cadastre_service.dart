@@ -54,6 +54,16 @@ class CadastreLookupResult {
   /// Ta'qiq yozuvlari — [hasRestrictions] `true` bo'lganda to'ladi.
   final List<CadastreRestriction> restrictions;
 
+  /// Baholanadigan maydon (m²) — bino bo'lsa foydali maydon, yer uchastkasi
+  /// bo'lsa yer maydoni.
+  ///
+  /// ⚠️ NEGA KERAK. Reyestr «Yer uchastkasi» yozuvida `Umumiy foydali
+  /// maydoni` katakchasi umuman bo'lmaydi: maydon `Hujjat bo'yicha umumiy yer
+  /// maydoni` da keladi, ya'ni [landArea] da. Ekranlar faqat [totalArea] ni
+  /// o'qiganda har bir yer uchastkasi «maydon yo'q» deb ko'rsatilardi va
+  /// «Davom etish» bloklanardi — reyestr maydonni bergan bo'lsa ham.
+  double? get effectiveArea => totalArea ?? landArea;
+
   /// Draft payload'dan qayta tiklash (resume). `bundle.toJson()['kadastr']`ga mos.
   factory CadastreLookupResult.fromJson(Map<String, dynamic> j) =>
       CadastreLookupResult(

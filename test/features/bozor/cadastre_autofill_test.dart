@@ -12,6 +12,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kadastr/features/bozor/data/cadastre_autofill.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/services/api_cadastre_service.dart';
+import 'param_schema_fixture.dart';
 
 /// Yakka tartibdagi uy — jonli davreestr javobidagi raqamlar
 /// (`10:06:44:02:02:0514`).
@@ -36,6 +37,9 @@ const _flat = CadastreLookupResult(
 );
 
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   group('maydon birligi', () {
     test('uyda yer maydoni SOTIXGA o\'giriladi, uy maydoni m² qoladi', () {
       final plan = buildCadastreAutofill(

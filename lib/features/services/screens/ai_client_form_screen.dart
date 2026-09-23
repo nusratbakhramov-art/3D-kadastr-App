@@ -15,10 +15,12 @@ import '../../../theme/app_colors.dart';
 import '../../home/user_profile.dart';
 import '../ai_draft_saver.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../models/ai_wizard_steps.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
 import '../widgets/wizard_nav_bar.dart';
 import 'ai_location_screen.dart';
+import 'ai_purpose_screen.dart';
 
 class AiClientFormScreen extends StatefulWidget {
   const AiClientFormScreen({super.key, required this.bundle});
@@ -119,12 +121,27 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
     }
     HapticFeedback.lightImpact();
     _captureToBundle();
+
+    // «Joylashuv» qadami SHARTLI.
+    //
+    // Obyektning ishonchli nuqtasi allaqachon bo'lsa (geoportalda uchastka
+    // tanlangan — yoki kelajakda reyestr koordinata bersa) uni QAYTA
+    // so'ramaymiz: mijozning shikoyati aynan shu edi — bir xil uyni ikki
+    // marta xaritada belgilash.
+    //
+    // ⚠️ Qaror KOORDINATA BORLIGIGA emas, uning MANBAIGA qarab qabul
+    // qilinadi (`AiBaholashBundle.locationSource`): Toshkent sukuti ham,
+    // qurilma GPS'i ham koordinata, lekin ikkalasi ham obyektning joyi emas.
+    final skipLocation = !widget.bundle.needsManualLocation;
+    final next = skipLocation ? 'purpose' : 'location';
     // Fon rejimida saqlash — sekin backend navigatsiyani muzlatmasin.
-    saveAiDraftStepInBackground(widget.bundle, 'location');
+    saveAiDraftStepInBackground(widget.bundle, next);
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        settings: const RouteSettings(name: 'ai/location'),
-        builder: (_) => AiLocationScreen(bundle: widget.bundle),
+        settings: RouteSettings(name: 'ai/$next'),
+        builder: (_) => skipLocation
+            ? AiPurposeScreen(bundle: widget.bundle)
+            : AiLocationScreen(bundle: widget.bundle),
       ),
     );
   }
@@ -171,13 +188,16 @@ class _AiClientFormScreenState extends State<AiClientFormScreen> {
                         subtitle: _ClientFormStrings.subtitle(l),
                         // Bu tugma butun oqimni yopadi — bitta qadam
                         // orqaga EMAS. Qadamma-qadam qaytish pastda.
-                        onBack: () => closeAiWizard(context),
+                        onBack: () => confirmCloseAiWizard(context),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: StepProgressBar(count: 7, activeIndex: 1),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: StepProgressBar(
+                        count: widget.bundle.aiStepCount,
+                        activeIndex: widget.bundle.aiStepIndex(AiStep.client),
+                      ),
                     ),
                     Expanded(
                       child: ListView(

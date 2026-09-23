@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kadastr/features/bozor/data/bozor_draft_codec.dart';
 import 'package:kadastr/features/bozor/data/regions_repository.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/screens/bozor_address_step_screen.dart';
 import 'package:kadastr/features/services/widgets/wizard_nav_bar.dart';
+import 'param_schema_fixture.dart';
 
 /// 2-qadam qoralamadan/e'londan TIKLANISHI kerak.
 ///
@@ -20,6 +22,9 @@ import 'package:kadastr/features/services/widgets/wizard_nav_bar.dart';
 /// tugmani bosish esa navigatsiya va fon saqlashni ishga tushirib testni
 /// mo'rt qilardi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   BozorDraft filledDraft() {
     final d = BozorDraft(
       deal: DealType.rent,
@@ -64,7 +69,6 @@ void main() {
     await pump(tester, filledDraft());
 
     expect(find.text('Amir Temur shoh koʻchasi 12'), findsOneWidget);
-    expect(find.text('Metro yonida'), findsOneWidget);
     expect(find.text('45'), findsOneWidget);
     expect(find.text('3'), findsOneWidget);
     expect(find.text('9'), findsOneWidget);
@@ -72,6 +76,53 @@ void main() {
     // Viloyat/tuman ilgari ham ko'rinardi — ular `_a` dan to'g'ridan o'qiladi.
     expect(find.text('Toshkent shahri'), findsOneWidget);
     expect(find.text("Mirzo Ulug'bek tumani"), findsOneWidget);
+  });
+
+  testWidgets('«Mo\'ljal» qatori formada YO\'Q, lekin qiymat yo\'qolmaydi', (
+    tester,
+  ) async {
+    final d = filledDraft();
+    await pump(tester, d);
+
+    expect(
+      find.text('Metro yonida'),
+      findsNothing,
+      reason: 'maydon mijoz talabi bilan olib tashlandi (MARKET-02)',
+    );
+    expect(
+      d.address.landmark,
+      'Metro yonida',
+      reason: 'qator ko\'rinmasa ham eski e\'londagi qiymat saqlanib qolishi '
+          'kerak — backendda maydon hali bor va PATCH uni tozalab '
+          'yubormasligi shart',
+    );
+  });
+
+  /// MARKET-02 ning YUBORISH tomoni.
+  ///
+  /// Qator formadan olib tashlandi, lekin maydonning o'zi modelda, kodekda va
+  /// API'da QOLDI. Ikkita kafolat kerak:
+  ///   1. yangi e'londa `landmark` kaliti payload'ga UMUMAN tushmaydi —
+  ///      backendda u `str | None = None`, ya'ni bo'sh satr ham, o'ylab
+  ///      topilgan qiymat ham yubormaymiz;
+  ///   2. tahrirlanayotgan eski e'londa qiymat bor bo'lsa — u yuboriladi,
+  ///      aks holda `PATCH` reyestrdagi mo'ljalni jimgina o'chirardi.
+  ///
+  /// `draftToPayload` yaratish, qoralama saqlash va `PATCH` — uchalasining
+  /// yagona manbai (`draftToUpdatePayload` `address` ni o'zgarishsiz oladi),
+  /// shuning uchun shu bitta funksiyani tekshirish yetarli.
+  group('MARKET-02 — `landmark` serializatsiyasi', () {
+    Map<String, Object?> addressOf(BozorDraft d) =>
+        draftToPayload(d, const [])['address']! as Map<String, Object?>;
+
+    test('bo\'sh mo\'ljal payload\'ga YOZILMAYDI', () {
+      final d = filledDraft()..address.landmark = '';
+      expect(addressOf(d).containsKey('landmark'), isFalse);
+    });
+
+    test('eski e\'londagi mo\'ljal payload\'da SAQLANADI', () {
+      expect(addressOf(filledDraft())['landmark'], 'Metro yonida');
+    });
   });
 
   testWidgets('to\'ldirilgan qoralamada «Keyingisi» DARHOL yoniq', (

@@ -582,7 +582,15 @@ class _BozorAddressStepScreenState extends State<BozorAddressStepScreen> {
                         subtitle:
                             '${widget.draft.stepNumber(WizardStep.address)}'
                             '/${widget.draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: widget.draft.stepIndex(WizardStep.address) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: widget.draft.stepIndex(WizardStep.address) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),

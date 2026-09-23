@@ -589,7 +589,15 @@ class _BozorDescriptionStepScreenState
                         subtitle:
                             '${draft.stepNumber(WizardStep.description)}'
                             '/${draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.description) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.description) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -635,6 +643,13 @@ class _BozorDescriptionStepScreenState
                           MediaUploadRow(
                             label: _S.addPhoto(l),
                             iconAsset: 'assets/icons/upload-photo.svg',
+                            // Muqovani FOYDALANUVCHI tanlaydi; tanlamasa
+                            // birinchi rasm (`DescriptionDraft.coverPhoto`).
+                            coverLabel: _S.coverBadge(l),
+                            makeCoverLabel: _S.makeCover(l),
+                            coverIndex: _d.coverPhotoIndex,
+                            onSetCover: (i) =>
+                                setState(() => _d.coverPhoto = _d.photos[i]),
                             paths: _d.photos,
                             onAdd: () => _pick(_d.photos, multiple: true),
                             onRemove: (i) =>
@@ -747,6 +762,10 @@ class _S {
   static String textHint(Locale l) => tr(l, 'bozor.desc.hint');
   static String addPlan(Locale l) => tr(l, 'bozor.desc.add_plan');
   static String addPhoto(Locale l) => tr(l, 'bozor.desc.add_photo');
+
+  static String coverBadge(Locale l) => tr(l, 'bozor.media.cover_badge');
+
+  static String makeCover(Locale l) => tr(l, 'bozor.media.make_cover');
   static String add360(Locale l) => tr(l, 'bozor.desc.add_360');
   static String youtube(Locale l) => tr(l, 'bozor.desc.youtube');
   static String youtubeHint(Locale l) => tr(l, 'bozor.desc.youtube_hint');

@@ -1,16 +1,21 @@
-/// 3-qadam (`Параметры`) sxemasi.
+/// 3-qadam (`Параметры`) sxemasi — BACKENDDAN keladi.
 ///
-/// Beshta mulk turida butunlay boshqa maydonlar to'plami bor, ustiga har
-/// biriga "Barcha parametrlar" to'liq ekrani. Ularni beshta ekran qilib
-/// yozish o'rniga BITTA jadval + bitta renderer: yangi maydon qo'shish =
-/// shu faylga bitta qator qo'shish.
+/// ⚠️ ILGARI SHU YERDA QOTIB YOZILGAN JADVAL TURARDI (~520 qator) va uning
+/// aynan nusxasi backendda ham bor edi (`listing_param_schema.py`). Maydon
+/// qo'shilsa ikkalasiga qo'shish kerak edi; unutilsa foydalanuvchi yetti
+/// qadamni to'ldirib, oxirida tushunarsiz 400 olardi — 2026-09-10 da prodda
+/// aynan shunday bo'ldi. Nusxani ikki tomonlama "parity" testi qo'riqlardi,
+/// ya'ni muammo ma'lum edi, lekin yechilmagan: yangi mulk turi yoki maydon
+/// HAR DOIM ilovaning yangi versiyasini talab qilardi.
 ///
-/// Har bir maydon [ParamField]. `inStep` — 3/7 ekranida ham ko'rinadimi;
-/// qolganlari faqat "Barcha parametrlar" ekranida. `visibleWhen` — boshqa
-/// maydon qiymatiga bog'liq qatorlar (pristroyka, uchastka, biznes-markaz,
-/// garaj bloki).
+/// 2026-09-23 dan beri manba bitta — `GET /api/v1/listings/schema`. Jadval
+/// ilovada YO'Q; bu yerda faqat uni o'qiydigan model qoldi.
+///
+/// Yuklash tartibi [ListingParamSchema] da: ilova ichidagi nusxa (tarmoqsiz
+/// birinchi ochilish uchun) → keshlangan javob → yangi javob.
 library;
 
+import '../data/listing_param_schema_store.dart';
 import 'bozor_draft.dart';
 
 enum ParamControl { number, integer, text, select, multiSelect, toggle }
@@ -19,6 +24,28 @@ enum ParamControl { number, integer, text, select, multiSelect, toggle }
 enum ParamSection { main, extra }
 
 typedef ParamValues = Map<String, Object?>;
+
+/// Boshqa maydon qiymatiga bog'liq ko'rinish.
+///
+/// Ilgari bu Dart funksiyasi edi (`(v) => v['parking'] == 'garage'`), ya'ni
+/// shartni faqat kod bilan yozish mumkin edi. Endi u MA'LUMOT: backend
+/// `{"key": "parking", "value": "garage"}` yuboradi.
+class ParamCondition {
+  const ParamCondition({required this.key, required this.value});
+
+  factory ParamCondition.fromJson(Map<String, dynamic> j) =>
+      ParamCondition(key: j['key'] as String, value: j['value']);
+
+  final String key;
+  final Object? value;
+
+  /// ⚠️ KOD bo'yicha solishtiriladi, YORLIQ bo'yicha emas. Ilgari bir joyda
+  /// `== 'Garaj'` turardi va u faqat o'zbek tilida ishlardi: boshqa tilda
+  /// qiymat boshqa matn bo'lgani uchun garaj bloki jimgina ochilmay qolardi.
+  bool matches(ParamValues values) => values[key] == value;
+
+  Map<String, dynamic> toJson() => {'key': key, 'value': value};
+}
 
 class ParamField {
   const ParamField({
@@ -29,14 +56,34 @@ class ParamField {
     this.inStep = false,
     this.section = ParamSection.main,
     this.optionsKey,
-    this.visibleWhen,
+    this.condition,
   });
+
+  factory ParamField.fromJson(Map<String, dynamic> j) => ParamField(
+    key: j['key'] as String,
+    control: _controlFromWire(j['control'] as String?),
+    unit: j['unit'] as String?,
+    // Backend sukuti — «ixtiyoriy». Noma'lum maydonni MAJBURIY deb
+    // hisoblasak, eski ilova yangi maydon tufayli qulflanib qolardi.
+    optional: j['optional'] as bool? ?? true,
+    inStep: j['in_step'] as bool? ?? false,
+    section: j['section'] == 'extra' ? ParamSection.extra : ParamSection.main,
+    optionsKey: j['options'] as String?,
+    condition: j['visible_when'] == null
+        ? null
+        : ParamCondition.fromJson(
+            Map<String, dynamic>.from(j['visible_when'] as Map),
+          ),
+  );
 
   /// Qoralamadagi kalit va tarjima kaliti asosi: `bozor.param.<key>`.
   final String key;
   final ParamControl control;
 
   /// Maydon ichidagi o'lchov birligi (`m²`, `sot.`, `m`, `y`). Faqat ko'rinish.
+  ///
+  /// (TUR, MAYDON) juftiga tegishli, maydonning o'ziga emas: `land_area`
+  /// uyda `sot.`, yer uchastkasida esa `m²`.
   final String? unit;
 
   /// Dizaynda `(по желанию)` bilan belgilangan — bizda `*` qo'yilmaydi.
@@ -50,468 +97,55 @@ class ParamField {
   /// `ParamOptions` dagi ro'yxat kaliti. select/multiSelect uchun shart.
   final String? optionsKey;
 
-  /// Boshqa maydonga bog'liq ko'rinish. `null` — doim ko'rinadi.
-  final bool Function(ParamValues values)? visibleWhen;
+  final ParamCondition? condition;
 
   String get labelKey => 'bozor.param.$key';
+
+  bool isVisible(ParamValues values) => condition?.matches(values) ?? true;
 }
 
-// ── Shartlar ────────────────────────────────────────────────────────────────
-bool _on(ParamValues v, String key) => v[key] == true;
+/// Noma'lum `control` — matn maydoni. Ilova yiqilmaydi: backend yangi
+/// kontrol turini qo'shsa, eski ilova uni hech bo'lmasa ko'rsatadi.
+ParamControl _controlFromWire(String? wire) => switch (wire) {
+  'number' => ParamControl.number,
+  'integer' => ParamControl.integer,
+  'select' => ParamControl.select,
+  'multi_select' => ParamControl.multiSelect,
+  'toggle' => ParamControl.toggle,
+  _ => ParamControl.text,
+};
 
-/// Garaj kichik bloki kvartira varag'ida `Парковка = Гараж` bo'lgandagina
-/// chiqadi.
-///
-/// ⚠️ KOD bo'yicha solishtiriladi, YORLIQ bo'yicha emas. Ilgari bu yerda
-/// `== 'Garaj'` turardi va u faqat o'zbek tilida ishlardi: boshqa tilda
-/// qiymat boshqa matn bo'lgani uchun garaj bloki jimgina ochilmay qolardi.
-/// Kodlar backenddagi `app/schemas/listing_options.py` bilan bir xil.
-bool _garageParking(ParamValues v) => v['parking'] == 'garage';
+/// Mulk turi (kod) → maydonlar.
+class ListingParamSchemaDoc {
+  const ListingParamSchemaDoc({required this.version, required this.types});
 
-bool _businessCentre(ParamValues v) => v['building_type'] == 'business_center';
+  factory ListingParamSchemaDoc.fromJson(Map<String, dynamic> j) {
+    final types = <String, List<ParamField>>{};
+    final raw = Map<String, dynamic>.from(j['types'] as Map? ?? const {});
+    for (final e in raw.entries) {
+      types[e.key] = [
+        for (final f in (e.value as List))
+          ParamField.fromJson(Map<String, dynamic>.from(f as Map)),
+      ];
+    }
+    return ListingParamSchemaDoc(
+      version: (j['version'] as num?)?.toInt() ?? 0,
+      types: types,
+    );
+  }
 
-// ── Umumiy maydonlar (bir nechta turda takrorlanadi) ────────────────────────
-const _electricity = ParamField(
-  key: 'electricity',
-  control: ParamControl.toggle,
-);
-const _water = ParamField(key: 'water_supply', control: ParamControl.toggle);
-const _gas = ParamField(key: 'gas', control: ParamControl.toggle);
-const _sewerage = ParamField(key: 'sewerage', control: ParamControl.toggle);
+  final int version;
+  final Map<String, List<ParamField>> types;
 
-const _security = ParamField(
-  key: 'security',
-  control: ParamControl.multiSelect,
-  optional: true,
-  section: ParamSection.extra,
-  optionsKey: 'security',
-);
-const _amenities = ParamField(
-  key: 'amenities',
-  control: ParamControl.multiSelect,
-  optional: true,
-  section: ParamSection.extra,
-  optionsKey: 'amenities',
-);
-const _yard = ParamField(
-  key: 'yard_improvements',
-  control: ParamControl.multiSelect,
-  optional: true,
-  section: ParamSection.extra,
-  optionsKey: 'yard_improvements',
-);
-const _infrastructure = ParamField(
-  key: 'infrastructure',
-  control: ParamControl.multiSelect,
-  optional: true,
-  section: ParamSection.extra,
-  optionsKey: 'infrastructure',
-);
-
-// ── Kvartira ────────────────────────────────────────────────────────────────
-const _apartment = <ParamField>[
-  ParamField(
-    key: 'rooms_count',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'rooms_count',
-  ),
-  ParamField(
-    key: 'total_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    inStep: true,
-  ),
-  ParamField(key: 'living_area', control: ParamControl.number, unit: 'm²'),
-  ParamField(
-    key: 'kitchen_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    optional: true,
-  ),
-  ParamField(
-    key: 'ceiling_height',
-    control: ParamControl.number,
-    unit: 'm',
-    optional: true,
-  ),
-  ParamField(
-    key: 'bathroom',
-    control: ParamControl.select,
-    optional: true,
-    optionsKey: 'bathroom',
-  ),
-  ParamField(
-    key: 'balcony',
-    control: ParamControl.select,
-    optional: true,
-    optionsKey: 'balcony',
-  ),
-  ParamField(
-    key: 'renovation',
-    control: ParamControl.select,
-    optional: true,
-    optionsKey: 'renovation',
-  ),
-  ParamField(
-    key: 'window_view',
-    control: ParamControl.multiSelect,
-    optional: true,
-    optionsKey: 'window_view',
-  ),
-  ParamField(
-    key: 'build_year',
-    control: ParamControl.integer,
-    unit: 'y',
-    optional: true,
-  ),
-  ParamField(
-    key: 'elevator',
-    control: ParamControl.select,
-    optional: true,
-    optionsKey: 'elevator',
-  ),
-  ParamField(key: 'freight_elevator', control: ParamControl.toggle),
-  _gas,
-  // Dополнительные
-  ParamField(
-    key: 'parking',
-    control: ParamControl.select,
-    section: ParamSection.extra,
-    optionsKey: 'parking',
-  ),
-  // Garaj kichik bloki — faqat `Парковка = Гараж` bo'lganda.
-  ParamField(
-    key: 'garage_ceiling_height',
-    control: ParamControl.number,
-    unit: 'm',
-    optional: true,
-    section: ParamSection.extra,
-    visibleWhen: _garageParking,
-  ),
-  ParamField(
-    key: 'garage_material',
-    control: ParamControl.multiSelect,
-    optional: true,
-    section: ParamSection.extra,
-    optionsKey: 'garage_material',
-    visibleWhen: _garageParking,
-  ),
-  ParamField(
-    key: 'garage_status',
-    control: ParamControl.multiSelect,
-    optional: true,
-    section: ParamSection.extra,
-    optionsKey: 'garage_status',
-    visibleWhen: _garageParking,
-  ),
-  ParamField(
-    key: 'gsk_name',
-    control: ParamControl.text,
-    optional: true,
-    section: ParamSection.extra,
-    visibleWhen: _garageParking,
-  ),
-  ParamField(
-    key: 'garage_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    section: ParamSection.extra,
-    visibleWhen: _garageParking,
-  ),
-  ParamField(
-    key: 'garage_security',
-    control: ParamControl.multiSelect,
-    section: ParamSection.extra,
-    optionsKey: 'garage_security',
-    visibleWhen: _garageParking,
-  ),
-  ParamField(
-    key: 'garage_amenities',
-    control: ParamControl.multiSelect,
-    section: ParamSection.extra,
-    optionsKey: 'garage_amenities',
-    visibleWhen: _garageParking,
-  ),
-  _security,
-  _amenities,
-  _yard,
-  _infrastructure,
-];
-
-// ── Uy ──────────────────────────────────────────────────────────────────────
-const _house = <ParamField>[
-  ParamField(
-    key: 'land_area',
-    control: ParamControl.number,
-    unit: 'sot.',
-    inStep: true,
-  ),
-  ParamField(
-    key: 'land_type',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'land_type',
-  ),
-  ParamField(key: 'electricity', control: ParamControl.toggle, inStep: true),
-  ParamField(key: 'water_supply', control: ParamControl.toggle, inStep: true),
-  ParamField(key: 'gas', control: ParamControl.toggle, inStep: true),
-  ParamField(key: 'sewerage', control: ParamControl.toggle, inStep: true),
-  ParamField(
-    key: 'house_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    inStep: true,
-  ),
-  ParamField(
-    key: 'rooms_count',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'rooms_count',
-  ),
-  ParamField(
-    key: 'house_type',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'house_type',
-  ),
-  ParamField(
-    key: 'irrigated_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    optional: true,
-  ),
-  ParamField(
-    key: 'built_up_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    optional: true,
-  ),
-  ParamField(
-    key: 'living_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    optional: true,
-  ),
-  ParamField(
-    key: 'ceiling_height',
-    control: ParamControl.number,
-    unit: 'm',
-    optional: true,
-  ),
-  ParamField(
-    key: 'bathroom_location',
-    control: ParamControl.select,
-    optional: true,
-    optionsKey: 'bathroom_location',
-  ),
-  ParamField(
-    key: 'bathroom_type',
-    control: ParamControl.select,
-    optionsKey: 'bathroom',
-  ),
-  ParamField(
-    key: 'renovation',
-    control: ParamControl.select,
-    optional: true,
-    optionsKey: 'renovation',
-  ),
-  _security,
-  _amenities,
-  _yard,
-  _infrastructure,
-];
-
-// ── Yer uchastkasi ──────────────────────────────────────────────────────────
-const _land = <ParamField>[
-  ParamField(
-    key: 'land_area',
-    control: ParamControl.number,
-    unit: 'sot.',
-    inStep: true,
-  ),
-  ParamField(
-    key: 'land_type',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'land_type',
-  ),
-  ParamField(key: 'has_annex', control: ParamControl.toggle, inStep: true),
-  ParamField(
-    key: 'annex_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    inStep: true,
-    visibleWhen: _hasAnnex,
-  ),
-  ParamField(
-    key: 'rooms_count',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'rooms_count',
-  ),
-  _electricity,
-  _water,
-  _gas,
-  _sewerage,
-  _amenities,
-  _infrastructure,
-];
-
-bool _hasAnnex(ParamValues v) => _on(v, 'has_annex');
-bool _withLand(ParamValues v) => _on(v, 'with_land');
-
-// ── Tijorat obyekti ─────────────────────────────────────────────────────────
-const _commercial = <ParamField>[
-  ParamField(
-    key: 'purpose',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'purpose',
-  ),
-  ParamField(
-    key: 'building_type',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'building_type',
-  ),
-  ParamField(
-    key: 'premises_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    inStep: true,
-  ),
-  ParamField(key: 'with_land', control: ParamControl.toggle, inStep: true),
-  ParamField(
-    key: 'land_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    inStep: true,
-    visibleWhen: _withLand,
-  ),
-  ParamField(
-    key: 'business_center_name',
-    control: ParamControl.text,
-    visibleWhen: _businessCentre,
-  ),
-  ParamField(key: 'building_floors', control: ParamControl.integer),
-  ParamField(key: 'whole_building', control: ParamControl.toggle),
-  ParamField(key: 'floor', control: ParamControl.integer),
-  ParamField(
-    key: 'possible_purpose',
-    control: ParamControl.select,
-    optionsKey: 'purpose',
-  ),
-  ParamField(
-    key: 'rooms_count',
-    control: ParamControl.select,
-    optionsKey: 'rooms_count',
-  ),
-  ParamField(
-    key: 'entrance_kind',
-    control: ParamControl.select,
-    optionsKey: 'entrance_kind',
-  ),
-  ParamField(
-    key: 'renovation',
-    control: ParamControl.select,
-    optionsKey: 'renovation',
-  ),
-  _electricity,
-  _water,
-  _gas,
-  _sewerage,
-  ParamField(
-    key: 'bathrooms_count',
-    control: ParamControl.select,
-    optional: true,
-    optionsKey: 'rooms_count',
-  ),
-  _security,
-  _amenities,
-  _infrastructure,
-];
-
-// ── Garaj / parkovka ────────────────────────────────────────────────────────
-// DIQQAT: bu turda "Barcha parametrlar" varag'i dizaynda YO'Q — hamma maydon
-// 3/7 ekranining o'zida. Shu sababli `inStep: true` va navigatsiya qatori
-// chizilmaydi ([PropertyTypeParamsX.hasAllParamsScreen]).
-const _garage = <ParamField>[
-  ParamField(
-    key: 'garage_kind',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'garage_kind',
-  ),
-  ParamField(
-    key: 'parking_type',
-    control: ParamControl.select,
-    inStep: true,
-    optionsKey: 'parking_type',
-  ),
-  ParamField(
-    key: 'garage_ceiling_height',
-    control: ParamControl.number,
-    unit: 'm',
-    inStep: true,
-  ),
-  ParamField(
-    key: 'garage_material',
-    control: ParamControl.multiSelect,
-    optional: true,
-    inStep: true,
-    optionsKey: 'garage_material',
-  ),
-  ParamField(
-    key: 'garage_status',
-    control: ParamControl.multiSelect,
-    optional: true,
-    inStep: true,
-    optionsKey: 'garage_status',
-  ),
-  ParamField(
-    key: 'gsk_name',
-    control: ParamControl.text,
-    optional: true,
-    inStep: true,
-  ),
-  ParamField(
-    key: 'garage_area',
-    control: ParamControl.number,
-    unit: 'm²',
-    inStep: true,
-  ),
-  ParamField(
-    key: 'garage_security',
-    control: ParamControl.multiSelect,
-    inStep: true,
-    optionsKey: 'garage_security',
-  ),
-  ParamField(
-    key: 'garage_amenities',
-    control: ParamControl.multiSelect,
-    inStep: true,
-    optionsKey: 'garage_amenities',
-  ),
-];
+  /// Noma'lum tur — bo'sh ro'yxat, ya'ni «parametrlar qadami yo'q».
+  List<ParamField> fieldsFor(String? typeCode) =>
+      typeCode == null ? const [] : (types[typeCode] ?? const []);
+}
 
 extension PropertyTypeParamsX on PropertyType {
   /// Shu turdagi BARCHA parametrlar, chizish tartibida.
-  List<ParamField> get paramFields => switch (this) {
-    // Yangi bino kvartirasi — hozircha AYNAN oddiy kvartira maydonlari.
-    // Dizaynda bu turning «Все параметры» jadvali ochilmagan (`1297-23722`
-    // freymida oddiy kvartira maydonlari turibdi), ya'ni maxsus maydonlar
-    // (застройщик, срок сдачи, очередь, тип отделки) TASDIQLANMAGAN.
-    // Backend ham shu nusxani ishlatadi (`listing_param_schema.py`) — farq
-    // kelganda ikkala tarafda ham faqat shu qator o'zgaradi.
-    PropertyType.apartment || PropertyType.newBuildingApartment => _apartment,
-    PropertyType.house => _house,
-    PropertyType.land => _land,
-    PropertyType.commercial => _commercial,
-    PropertyType.garage => _garage,
-    // "Boshqa noturar joy" da bu qadam umuman yo'q.
-    PropertyType.otherNonResidential => const [],
-  };
+  List<ParamField> get paramFields =>
+      ListingParamSchema.instance.fieldsFor(code);
 
   /// 3/7 ekranida ko'rinadigan qisqa ro'yxat.
   List<ParamField> get stepParamFields =>
@@ -525,4 +159,6 @@ extension PropertyTypeParamsX on PropertyType {
 
 /// Ko'rinadigan maydonlarni filtrlaydi (shartlarni hisobga olib).
 List<ParamField> visibleParams(List<ParamField> fields, ParamValues values) =>
-    fields.where((f) => f.visibleWhen?.call(values) ?? true).toList();
+    fields.where((f) => f.isVisible(values)).toList();
+
+

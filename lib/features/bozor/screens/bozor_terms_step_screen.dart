@@ -280,7 +280,15 @@ class _BozorTermsStepScreenState extends State<BozorTermsStepScreen> {
                         subtitle:
                             '${draft.stepNumber(WizardStep.terms)}'
                             '/${draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.terms) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.terms) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),

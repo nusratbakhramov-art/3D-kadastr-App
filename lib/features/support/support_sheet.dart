@@ -48,13 +48,14 @@ class _SupportSheet extends StatelessWidget {
   }
 
   Uri? _telegramUri() {
-    final raw = info.telegram?.trim();
-    if (raw == null || raw.isEmpty) return null;
+    final raw = info.telegramOrNull;
+    if (raw == null) return null;
     if (raw.startsWith('http://') || raw.startsWith('https://')) {
       return Uri.tryParse(raw);
     }
-    final handle = raw.replaceFirst(RegExp(r'^@'), '');
-    return Uri.parse('https://t.me/$handle');
+    final handle = raw.replaceFirst(RegExp(r'^@'), '').trim();
+    if (handle.isEmpty) return null;
+    return Uri.tryParse('https://t.me/$handle');
   }
 
   @override
@@ -63,32 +64,41 @@ class _SupportSheet extends StatelessWidget {
     final titleColor = ColorTokens.primaryText(context);
     final handleColor = ColorTokens.divider(context);
 
+    // Qaysi qator ko'rinishi — adminkadagi qiymatlarga qarab. Shart
+    // `SupportInfo` da, «Yordam» sahifasi bilan bir xil (izohni o'sha yerda
+    // ko'ring). Bu yerda `info.phone` EMAS, `callNumberOrNull` ishlatiladi:
+    // qo'ng'iroq qiladigan raqam aloqa markazi bo'lsa, ko'rsatiladigani ham
+    // o'sha bo'lishi kerak — ilgari qator `phone` ni chizib, bosilganda
+    // BOSHQA raqamga qo'ng'iroq qilardi.
     final telegramUri = _telegramUri();
-    final email = info.email?.trim();
-    final hours = info.workingHours?.trim();
+    final telegram = info.telegramOrNull;
+    final email = info.emailOrNull;
+    final hours = info.workingHoursOrNull;
+    final phone = info.callNumberOrNull;
 
     final rows = <Widget>[
-      _SupportRow(
-        icon: Icons.call_rounded,
-        label: tr(locale, 'support.call'),
-        value: info.phone,
-        onTap: () => _launch(context, Uri(scheme: 'tel', path: info.phone)),
-      ),
-      if (telegramUri != null)
+      if (phone != null)
+        _SupportRow(
+          icon: Icons.call_rounded,
+          label: tr(locale, 'support.call'),
+          value: phone,
+          onTap: () => _launch(context, Uri(scheme: 'tel', path: phone)),
+        ),
+      if (telegramUri != null && telegram != null)
         _SupportRow(
           icon: Icons.send_rounded,
           label: 'Telegram',
-          value: info.telegram!.trim(),
+          value: telegram,
           onTap: () => _launch(context, telegramUri),
         ),
-      if (email != null && email.isNotEmpty)
+      if (email != null)
         _SupportRow(
           icon: Icons.mail_outline_rounded,
           label: tr(locale, 'support.email'),
           value: email,
           onTap: () => _launch(context, Uri(scheme: 'mailto', path: email)),
         ),
-      if (hours != null && hours.isNotEmpty)
+      if (hours != null)
         _SupportRow(
           icon: Icons.schedule_rounded,
           label: tr(locale, 'support.hours'),

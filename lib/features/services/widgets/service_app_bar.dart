@@ -10,11 +10,24 @@ class ServiceAppBar extends StatelessWidget {
     required this.title,
     this.subtitle,
     this.onBack,
+    this.onClose,
+    this.closeTooltip,
   });
 
   final String title;
   final String? subtitle;
   final VoidCallback? onBack;
+
+  /// O'ng tarafdagi «chiqish» tugmasi — berilsagina chiziladi.
+  ///
+  /// Chap tarafdagi ← OQIMNI TARK ETMAYDI, u bitta qadam orqaga qaytaradi.
+  /// Oqimdan butunlay chiqish ALOHIDA, ataylab bosiladigan amal bo'lishi
+  /// kerak: ilgari ikkalasi bitta tugma edi va 6/8 dagi «Ortga» foydalanuvchini
+  /// bosh sahifaga otib yuborardi.
+  final VoidCallback? onClose;
+
+  /// Ekran o'quvchisi uchun tugma nomi (`Semantics`), matn ko'rinmaydi.
+  final String? closeTooltip;
 
   @override
   Widget build(BuildContext context) {
@@ -66,7 +79,57 @@ class ServiceAppBar extends StatelessWidget {
               child: _CircleBackButton(onBack: onBack),
             ),
           ),
+          if (onClose != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: _CircleCloseButton(
+                  onClose: onClose!,
+                  tooltip: closeTooltip,
+                ),
+              ),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _CircleCloseButton extends StatelessWidget {
+  const _CircleCloseButton({required this.onClose, this.tooltip});
+
+  final VoidCallback onClose;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bg = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final fg = isDark ? Colors.white : AppColors.textBlack;
+    return Semantics(
+      button: true,
+      label: tooltip,
+      child: Material(
+        color: bg,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: hapticTap(onClose),
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: SvgPicture.asset(
+                'assets/icons/close.svg',
+                width: 16,
+                height: 16,
+                colorFilter: ColorFilter.mode(fg, BlendMode.srcIn),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

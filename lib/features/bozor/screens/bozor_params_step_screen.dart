@@ -149,7 +149,15 @@ class _BozorParamsStepScreenState extends State<BozorParamsStepScreen> {
                         subtitle:
                             '${widget.draft.stepNumber(WizardStep.params)}'
                             '/${widget.draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: widget.draft.stepIndex(WizardStep.params) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: widget.draft.stepIndex(WizardStep.params) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),

@@ -20,6 +20,7 @@ import 'features/home/user_profile.dart';
 import 'features/notifications/notification_model.dart';
 import 'features/onboarding/onboarding_screen.dart';
 import 'features/onboarding/onboarding_storage.dart';
+import 'features/bozor/data/listing_param_schema_store.dart';
 import 'features/chat/data/chat_suggestions_store.dart';
 import 'features/market/data/market_regions_store.dart';
 import 'features/services/data/calculator_pricing_store.dart';
@@ -291,6 +292,12 @@ class _AppRootState extends State<_AppRoot> with WidgetsBindingObserver {
     // Yordamchi bot "tez savol" chiplari — xuddi tarjimalar kabi keshdan o'qib,
     // fonda versiya bo'yicha yangilaymiz (chat ekrani ochilishini kutmaymiz).
     unawaited(ChatSuggestionsStore.instance.loadCachedThenRefresh());
+
+    // E'lon sehrgarining 3-qadam sxemasi. Tarjimalardan FARQI: bu KUTILADI.
+    // `type.paramFields` sinxron o'qiladi va sehrgar ochilganda bo'sh
+    // qaytsa, 3-qadam maydonsiz chiqardi. O'qish ilova ichidagi nusxadan
+    // yoki keshdan bo'ladi — tarmoq kutilmaydi.
+    unawaited(ListingParamSchema.instance.load());
 
     // Ilova yangilanishi — sovuq startda bir marta. Keshdan darhol o'qiydi,
     // so'ng backendni so'raydi (throttle: 6 soat). Tarmoq yo'q bo'lsa jim

@@ -23,6 +23,7 @@ import '../../../widgets/app_toast.dart';
 import '../ai_draft_saver.dart';
 import '../data/geocoder_client.dart';
 import '../models/ai_baholash_bundle.dart';
+import '../models/ai_wizard_steps.dart';
 import '../widgets/map_zoom_controls.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -68,6 +69,16 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
   // Current-location (geolocator) state.
   bool _locating = false;
 
+  /// Pin hozir QAYERDAN kelgan.
+  ///
+  /// ⚠️ NEGA KERAK. Ilgari "haqiqiy joy tanlandimi" degan savolga
+  /// `_addressText != null || _center != _defaultCenter` javob berardi. Kadastr
+  /// manzili geokodlanmasa pin Toshkent markazida qolar, reverse-geokod esa
+  /// o'sha markazning manzil matnini qo'yar edi — shart bajarilib, TEGILMAGAN
+  /// sukut nuqtasi obyektning joylashuvi sifatida saqlanardi. Matn emas,
+  /// nuqtaning KELIB CHIQISHI hal qilishi kerak.
+  _PinSource _pinSource = _PinSource.none;
+
   @override
   void initState() {
     super.initState();
@@ -81,6 +92,7 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     if (saved != null && (saved.lat != 0 || saved.lng != 0)) {
       _center = LatLng(saved.lat, saved.lng);
       _addressText = saved.addressText;
+      _pinSource = _PinSource.saved;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         try {
@@ -93,10 +105,34 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
       });
       return;
     }
-    // First visit: auto-place the pin at the property's real location (geocoded
-    // from the davreestr cadastre address) once the map is laid out. Otherwise
-    // the user is left on the Tashkent default and can submit the wrong spot —
-    // which pulls comps from the wrong area and badly skews the valuation.
+    // First visit, and the user already picked the parcel on the geoportal map
+    // (step 1): use THAT centre. It is the registry polygon's own centre, so it
+    // beats any geocode of the address text — and it means the user is not made
+    // to mark the same property on a map twice.
+    //
+    // ⚠️ Bu QURILMANING GPS'i EMAS. GPS faqat «mening joylashuvim» tugmasi
+    // bosilganda ishlaydi va hech qachon obyektning joylashuvi sifatida
+    // saqlanmaydi.
+    final parcel = widget.bundle.parcelCenter;
+    if (parcel != null && (parcel.lat != 0 || parcel.lng != 0)) {
+      _center = LatLng(parcel.lat, parcel.lng);
+      _pinSource = _PinSource.parcel;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        try {
+          _mapController.move(_center, 17);
+        } catch (_) {
+          // Map not attached yet — the next build picks up _center.
+        }
+        _scheduleReverse();
+      });
+      return;
+    }
+    // No parcel picked (the number was typed by hand): auto-place the pin at
+    // the property's real location (geocoded from the davreestr cadastre
+    // address) once the map is laid out. Otherwise the user is left on the
+    // Tashkent default and can submit the wrong spot — which pulls comps from
+    // the wrong area and badly skews the valuation.
     // Deferred to post-frame so the MapController is attached before we move it.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _initFromCadastreAddress();
@@ -145,6 +181,7 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
             _center = LatLng(s.lat, s.lng);
             // Keep the authoritative davreestr address as the confirmed text.
             _addressText = address;
+            _pinSource = _PinSource.cadastreAddress;
             _resolving = false;
           });
           try {
@@ -239,6 +276,7 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
     setState(() {
       _suggestions = const [];
       _center = LatLng(s.lat, s.lng);
+      _pinSource = _PinSource.search;
       _addressText = s.description.isEmpty
           ? s.name
           : '${s.name}, ${s.description}';
@@ -262,7 +300,10 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
       if (c.latitude == _center.latitude && c.longitude == _center.longitude) {
         return;
       }
-      setState(() => _center = c);
+      setState(() {
+        _center = c;
+        _pinSource = _PinSource.userPan;
+      });
       _scheduleReverse();
     }
   }
@@ -319,8 +360,11 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
       final pos = await Geolocator.getCurrentPosition();
       if (!mounted) return;
       final here = LatLng(pos.latitude, pos.longitude);
+      // Foydalanuvchi TUGMANI o'zi bosdi — bu ongli tanlov, shuning uchun pin
+      // shu yerga ko'chadi. Avtomatik ravishda HECH QACHON bunday bo'lmaydi.
       setState(() {
         _center = here;
+        _pinSource = _PinSource.userPan;
         _locating = false;
       });
       _mapController.move(here, 17);
@@ -348,17 +392,27 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
   }
 
   /// Joriy tanlangan joyni bundle'ga yozadi (oldinga ham, Orqaga ham).
+  ///
+  /// Nuqta bilan birga uning MANBAI ham yoziladi. Bu ekranga kelingan ekan,
+  /// foydalanuvchi pinni o'zi tasdiqlaydi — shu sababli manba
+  /// [AiLocationSource.manualMap]. Yagona istisno: pin uchastka markazidan
+  /// kelgan va foydalanuvchi unga TEGMAGAN bo'lsa, manba `parcel` bo'lib
+  /// qoladi (aniqroq va ishonchliroq belgi).
   void _captureToBundle() {
     widget.bundle.location = AiLocationInfo(
       lat: _center.latitude,
       lng: _center.longitude,
       addressText: _addressText,
     );
+    widget.bundle.locationSource = switch (_pinSource) {
+      _PinSource.none => AiLocationSource.none,
+      _PinSource.parcel => AiLocationSource.parcel,
+      _ => AiLocationSource.manualMap,
+    };
   }
 
   /// Haqiqiy joy aniqlanganmi — Toshkent default'ini draftga yozmaslik uchun.
-  bool get _hasResolvedLocation =>
-      _addressText != null || _center != _defaultCenter;
+  bool get _hasResolvedLocation => _pinSource != _PinSource.none;
 
   // ── Build ────────────────────────────────────────────────────────────
 
@@ -380,13 +434,16 @@ class _AiLocationScreenState extends State<AiLocationScreen> {
                 subtitle: _AiLocationStrings.appBarSubtitle(l),
                 // Bu tugma butun oqimni yopadi — bitta qadam
                 // orqaga EMAS. Qadamma-qadam qaytish pastda.
-                onBack: () => closeAiWizard(context),
+                onBack: () => confirmCloseAiWizard(context),
               ),
             ),
             const SizedBox(height: 8),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: StepProgressBar(count: 7, activeIndex: 2),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: StepProgressBar(
+                count: widget.bundle.aiStepCount,
+                activeIndex: widget.bundle.aiStepIndex(AiStep.location),
+              ),
             ),
             const SizedBox(height: 12),
             Padding(
@@ -846,6 +903,27 @@ class _AddressBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Xaritadagi pin qayerdan kelgani — [_AiLocationScreenState._pinSource].
+enum _PinSource {
+  /// Hech narsa tanlanmagan: pin hali ham Toshkent sukuti.
+  none,
+
+  /// Qoralamadan tiklangan (foydalanuvchi ilgari tasdiqlagan).
+  saved,
+
+  /// Geoportalda tanlangan uchastkaning markazi.
+  parcel,
+
+  /// Kadastr manzili matnidan geokodlangan.
+  cadastreAddress,
+
+  /// Qidiruv taklifidan tanlangan.
+  search,
+
+  /// Foydalanuvchi xaritani o'zi surgan (yoki «mening joylashuvim» bosgan).
+  userPan,
 }
 
 class _AiLocationStrings {

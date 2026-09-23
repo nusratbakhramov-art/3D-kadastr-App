@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import '../../../core/haptics.dart';
 import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
+import '../../../widgets/exit_wizard_sheet.dart';
 import '../../../widgets/pressable_scale.dart';
 import '../../market/widgets/listing_cta_button.dart';
 
@@ -34,6 +35,28 @@ void closeAiWizard(BuildContext context) {
     final name = route.settings.name;
     return name == null || !name.startsWith('ai/');
   });
+}
+
+/// Oqimdan chiqishni TASDIQLATADI va tasdiqlansa butun oqimni yopadi.
+///
+/// NEGA TASDIQ. Yuqoridagi ← bitta qadam emas, BUTUN sehrgarni yopadi. Tasdiq
+/// so'ralmaganda bir teginish yetti qadamlik ishni ekrandan olib ketardi —
+/// qoralama saqlanib qolsa ham, bu kutilmagan hodisa.
+///
+/// Oyna Bozor AI dagi bilan AYNAN BIR XIL ([confirmLeaveWizard]) — bir xil
+/// savolning ikki ko'rinishi bo'lmasligi uchun.
+Future<bool> confirmCloseAiWizard(BuildContext context) async {
+  final l = Localizations.localeOf(context);
+  final leave = await confirmLeaveWizard(
+    context,
+    title: tr(l, 'services.ai.exit.title'),
+    body: tr(l, 'services.ai.exit.body'),
+    stayLabel: tr(l, 'services.ai.exit.stay'),
+    leaveLabel: tr(l, 'services.ai.exit.leave'),
+  );
+  if (!leave || !context.mounted) return false;
+  closeAiWizard(context);
+  return true;
 }
 
 /// Qadamning pastki navigatsiyasi: chapda "Ortga", o'ngda asosiy

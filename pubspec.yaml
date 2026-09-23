@@ -71,6 +71,10 @@ flutter:
 
   assets:
     - assets/i18n/
+    # E'lon sehrgarining 3-qadam sxemasi — backenddagi
+    # `app/data/listing_param_schema.json` NUSXASI. Tarmoqsiz birinchi
+    # ochilishda shu ishlatiladi, keyin `GET /listings/schema` yangilaydi.
+    - assets/listing_param_schema.json
     - .env
     - assets/3d/
     - assets/3d/lib/

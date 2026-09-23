@@ -7,6 +7,7 @@ import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/models/bozor_validation.dart';
 import 'package:kadastr/features/bozor/screens/bozor_deal_step_screen.dart';
 import 'package:kadastr/features/bozor/widgets/select_field.dart';
+import 'param_schema_fixture.dart';
 
 /// Sotuv oqimi (reja M3): 8 qadam, «Сделка» va sotuv narx shakli.
 ///
@@ -17,6 +18,9 @@ import 'package:kadastr/features/bozor/widgets/select_field.dart';
 /// Yorliqlar bu yerda kalitning O'ZI bo'lib chiqadi (`bozor.transaction.*`):
 /// `tr()` bundle yuklanmagan holatda kalitni qaytaradi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   BozorDraft draft({
     DealType deal = DealType.sale,
     PropertyType type = PropertyType.apartment,

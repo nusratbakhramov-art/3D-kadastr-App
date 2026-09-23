@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:kadastr/features/bozor/data/pano_submit_gate.dart';
 import 'package:kadastr/features/bozor/models/bozor_draft.dart';
 import 'package:kadastr/features/bozor/models/tour_link.dart';
+import 'param_schema_fixture.dart';
 
 /// E'lonni panorama tayyor bo'lmasdan yuborib bo'lmasin.
 ///
@@ -10,6 +11,9 @@ import 'package:kadastr/features/bozor/models/tour_link.dart';
 /// unda bo'lmaydi. Foydalanuvchi 30 nishonni aylanib chiqqan mehnati
 /// yo'qoladi va buni hech kim sezmaydi.
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   _localGate();
   DescriptionDraft draft({
     List<String> panoramas = const [],

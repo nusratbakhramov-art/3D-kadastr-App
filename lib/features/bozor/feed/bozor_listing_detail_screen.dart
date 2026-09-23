@@ -1071,6 +1071,7 @@ PropertyType? _propertyTypeOf(String code) => switch (code) {
   'land' => PropertyType.land,
   'commercial' => PropertyType.commercial,
   'garage' => PropertyType.garage,
+  'basement' => PropertyType.basement,
   'other_non_residential' => PropertyType.otherNonResidential,
   _ => null,
 };

@@ -19,6 +19,7 @@ import 'package:kadastr/features/panorama/screens/pano_capture_flow.dart';
 import 'package:kadastr/features/services/models/ai_baholash_bundle.dart';
 import 'package:kadastr/widgets/app_toast.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'param_schema_fixture.dart';
 
 enum _Ending { uploaded, stitchFailed, uploadFailed, cancelled }
 
@@ -31,6 +32,9 @@ const _uploadedUrl =
     'https://storage.test/$_uploaded?signature=a%2Bb&name=room%20one';
 
 void main() {
+  // Sxema backenddan keladi — testda uni qo'lda yuklaymiz.
+  setUpAll(loadRealParamSchema);
+
   setUpAll(() {
     appTranslationsNotifier.value = AppTranslations.fromJson(
       jsonDecode(File('assets/i18n/bundle.json').readAsStringSync())

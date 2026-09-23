@@ -77,6 +77,7 @@ class _Kind {
   static const network = 'network';
   static const timeout = 'timeout';
   static const captchaExhausted = 'captcha_exhausted';
+  static const noArea = 'no_area';
   static const unknown = 'unknown';
 }
 
@@ -341,6 +342,23 @@ class DavreestrClient {
   /// ~99.94 %. Matches the Python original.
   static const int maxCaptchaRetries = 8;
 
+  /// «bazaga so'rovlar soni oshib ketdi» necha marta QAYTA uriniladi.
+  ///
+  /// ⚠️ NEGA UMUMAN QAYTA URINAMIZ. davreestr shu matnni HAQIQIY limitda ham,
+  /// oddiy rad etishda ham (noto'g'ri captcha, eskirgan sessiya) bir xil
+  /// flash qiladi — javobning o'zi `302 → /uz`, ya'ni ikkalasi bir xil
+  /// ko'rinadi. Ilgari bu darhol `throw` edi: 8 ta captcha urinishidan 7 tasi
+  /// ishlatilmay qolar, foydalanuvchi esa qo'lda 2-3 marta qayta bosardi.
+  /// Prod loglarida 2026-09-18 dagi 8 ta `rate_limited` yozuvining HAMMASI
+  /// `attempt=1` — ya'ni birorta ham qayta urinish bo'lmagan.
+  ///
+  /// Qiymat ataylab kichik: limit HAQIQIY bo'lsa, saytni urib turmaymiz —
+  /// ikki qayta urinishdan keyin foydalanuvchi o'sha xabarni ko'radi.
+  static const int maxRateLimitRetries = 2;
+
+  /// Rad etishlar orasidagi kutish (1-qayta urinish 2s, 2-si 4s).
+  static const Duration _rateLimitBackoff = Duration(seconds: 2);
+
   static const Duration _timeout = Duration(seconds: 30);
 
   static const _userAgent =
@@ -459,6 +477,9 @@ class DavreestrClient {
       }
 
       String? lastError;
+      // Nechta urinish «so'rovlar soni oshib ketdi» bilan rad etildi.
+      // Sabab [maxRateLimitRetries] izohida.
+      var rateLimitHits = 0;
 
       for (var attempt = 1; attempt <= maxCaptchaRetries; attempt++) {
         attemptNo = attempt;
@@ -611,12 +632,24 @@ class DavreestrClient {
         );
 
         if (_anyContains(lower, _rateLimitPatterns)) {
+          rateLimitHits++;
           logSearch(
             _Kind.rateLimited,
             "bazaga so'rovlar soni oshib ketdi (yoki sayt shu xabarni har "
             "qanday rad etishda ko'rsatadi — javob tanasiga qarab ayirish "
-            "kerak)",
+            "kerak) — urinish $rateLimitHits/$maxRateLimitRetries",
           );
+          // Sabab [maxRateLimitRetries] da: bu xabar haqiqiy limitni ham,
+          // oddiy rad etishni ham bildiradi, shuning uchun darhol taslim
+          // bo'lmaymiz — yangi captcha bilan sanoqli marta qayta uriniladi.
+          if (rateLimitHits <= maxRateLimitRetries &&
+              attempt < maxCaptchaRetries) {
+            lastError = "So'rov rad etildi (rate-limit xabari)";
+            await Future<void>.delayed(_rateLimitBackoff * rateLimitHits);
+            final refreshed = _extractCsrf(searchBody);
+            if (refreshed != null) token = refreshed;
+            continue;
+          }
           throw const DavreestrLookupException(
             "davreestr.uz: bazaga so'rovlar soni oshib ketdi, "
             "biroz keyinroq urinib ko'ring",
@@ -654,6 +687,26 @@ class DavreestrClient {
         final parsed = _parseResultHtml(searchBody, cadastreNumber);
         if (parsed.hasUsableData) {
           delivered = true;
+          // MAYDONSIZ NATIJA — XOM HTML BILAN LOGLAYMIZ.
+          //
+          // Reyestr yozuvi topildi (manzil/tur bor), lekin maydon katakchasi
+          // biror label'ga ham tushmadi. Ikki sabab bir xil ko'rinadi:
+          //   * yozuvda maydon rostdan yo'q;
+          //   * o'sha TUR uchun sahifa tuzilishi boshqacha va parser label'lari
+          //     mos kelmayapti (yer uchastkasida kvartiradagi «Umumiy foydali
+          //     maydoni» katakchasi umuman bo'lmaydi).
+          // Ikkinchisini faqat XOM javobdan ajratish mumkin, muvaffaqiyatli
+          // lookup esa hech narsa loglamaydi — shuning uchun aynan shu
+          // holatni loglaymiz. Foydalanuvchi uchun oqim o'zgarmaydi.
+          if (parsed.totalArea == null && parsed.landArea == null) {
+            logSearch(
+              _Kind.noArea,
+              'Natija keldi (tur: ${parsed.objectTypeHint ?? "?"}), lekin '
+              "birorta maydon katakchasi o'qilmadi",
+              atStage: _Stage.parse,
+            );
+            unawaited(_reportFailure(report));
+          }
         } else {
           // The user sees "Ma'lumot olib bo'lmadi" for this, and until now it
           // left no trace at all. Two very different causes look identical
@@ -674,6 +727,29 @@ class DavreestrClient {
             // A rejected form never reached the parser; an empty 200 did.
             atStage: search.isRedirect ? _Stage.search : _Stage.parse,
           );
+          // ⚠️ NATIJA SAHIFASI EMAS — QAYTA URINAMIZ.
+          // Bo'sh javobning ikki xil sababi bor va ular bir xil ko'rinadi:
+          //   * javob umuman natija sahifasi emas (rad etilgan forma, yoki
+          //     sessiya eskirib bosh sahifa qaytgan) — bu QAYTA URINSA o'tadi;
+          //   * parser eskirgan — qayta urinish yordam bermaydi.
+          // Farqi: natija sahifasida [_successHintPatterns] dan kamida bittasi
+          // bo'ladi. Bittasi ham bo'lmasa — sahifa natija sahifasi emas, ya'ni
+          // urinish behuda sarflangan. Ilgari bunda BO'SH natija qaytarilardi
+          // va foydalanuvchi «Ma'lumot olib bo'lmadi» ni ko'rib, qo'lda qayta
+          // bosardi (prod: 2026-09-17, `parse_empty`, `attempt=1`, javob tanasi
+          // — davreestr BOSH sahifasi).
+          //
+          // Reyestrda yo'q raqam bu yerga tushmaydi: uni yuqoridagi
+          // `topilmadi` shoxi ushlaydi.
+          if (attempt < maxCaptchaRetries &&
+              !_anyContains(lower, _successHintPatterns)) {
+            lastError = search.isRedirect
+                ? 'Forma rad etildi'
+                : "Javob natija sahifasi emas";
+            final refreshed = _extractCsrf(searchBody);
+            if (refreshed != null) token = refreshed;
+            continue;
+          }
         }
         // Cache for next time (fire-and-forget — never block/fail on this).
         // On a forced refresh we deliberately don't write the cache either: the

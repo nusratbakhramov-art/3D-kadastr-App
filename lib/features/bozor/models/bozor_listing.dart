@@ -336,6 +336,7 @@ class BozorListing {
     'land' => PropertyType.land.label(l),
     'commercial' => PropertyType.commercial.label(l),
     'garage' => PropertyType.garage.label(l),
+    'basement' => PropertyType.basement.label(l),
     'other_non_residential' => PropertyType.otherNonResidential.label(l),
     // Server yangi tur qo'shsa xom kod ko'rinadi — greplanadi, ilova tirik.
     _ => propertyType,

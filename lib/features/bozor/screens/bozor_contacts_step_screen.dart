@@ -144,7 +144,15 @@ class _BozorContactsStepScreenState extends State<BozorContactsStepScreen> {
                         subtitle:
                             '${draft.stepNumber(WizardStep.contacts)}'
                             '/${draft.stepCount}',
-                        onBack: () => closeBozorWizard(context),
+                        onBack: bozorStepBack(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.contacts) == 0,
+                        ),
+                        onClose: bozorStepClose(
+                          context,
+                          isFirstStep: draft.stepIndex(WizardStep.contacts) == 0,
+                        ),
+                        closeTooltip: tr(l, 'bozor.exit.title'),
                       ),
                     ),
                     const SizedBox(height: 8),
