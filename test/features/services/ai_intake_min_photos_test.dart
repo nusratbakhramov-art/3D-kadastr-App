@@ -11,7 +11,8 @@ import 'package:kadastr/features/services/widgets/wizard_nav_bar.dart';
 /// tekshiramiz, shunda konstantani o'zgartirib, ishlatilishini unutib
 /// qoldirish mumkin bo'lmaydi.
 void main() {
-  AiBaholashBundle bundleWith(int photos) => AiBaholashBundle(
+  AiBaholashBundle bundleWith(int photos, {int panoramas = 0}) =>
+      AiBaholashBundle(
     kadastr: const CadastreLookupResult(
       cadastreNumber: '10:01:01:01:01:0001',
       address: 'Toshkent, Amir Temur 12',
@@ -20,6 +21,7 @@ void main() {
     floor: 5,
     totalFloors: 9,
     imageKeys: [for (var i = 0; i < photos; i++) 'photo-$i'],
+    panoramaKeys: [for (var i = 0; i < panoramas; i++) 'pano-$i.jpg'],
     kadastrKeys: const ['kadastr-1'],
     passportKeys: const ['passport-1'],
   );
@@ -43,10 +45,18 @@ void main() {
     addTearDown(() => FlutterError.onError = previous);
   }
 
-  Future<bool> continueEnabled(WidgetTester tester, int photos) async {
+  Future<bool> continueEnabled(
+    WidgetTester tester,
+    int photos, {
+    int panoramas = 0,
+  }) async {
     ignoreOverflowErrors();
     await tester.pumpWidget(
-      MaterialApp(home: AiIntakeScreen(bundle: bundleWith(photos))),
+      MaterialApp(
+        home: AiIntakeScreen(
+          bundle: bundleWith(photos, panoramas: panoramas),
+        ),
+      ),
     );
     await tester.pump();
     final nav = tester.widget<WizardNavBar>(find.byType(WizardNavBar));
@@ -67,5 +77,18 @@ void main() {
 
   testWidgets('4 tadan ko\'p rasm ham o\'tadi', (tester) async {
     expect(await continueEnabled(tester, 7), isTrue);
+  });
+
+  // 4+ rasm YOKI 1+ 360° — ikkalasi birga shart emas (mijoz, 2026-09-23).
+  testWidgets('rasmsiz, 1 ta 360° — «Hisoblash» yonadi', (tester) async {
+    expect(await continueEnabled(tester, 0, panoramas: 1), isTrue);
+  });
+
+  testWidgets('2 ta rasm + 1 ta 360° — o\'tadi', (tester) async {
+    expect(await continueEnabled(tester, 2, panoramas: 1), isTrue);
+  });
+
+  testWidgets('rasm ham, 360° ham yo\'q — bosilmaydi', (tester) async {
+    expect(await continueEnabled(tester, 0), isFalse);
   });
 }

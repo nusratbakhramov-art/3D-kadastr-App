@@ -90,6 +90,7 @@ enum UploadCategory {
   passport('passport'),
   document('document'),
   smeta('smeta'), // SMETA (qurilish smetasi) hujjatlari — smeta qadamida
+  panorama('panorama'), // 360° xona — telefonda tikilgan tayyor equirect JPEG
   scan3d('scan_3d'),
   scanModel('scan_model'), // teksturali 3D model (GLB asosiy, USDZ orqaga moslik)
   scanBundle('scan_bundle'); // to'liq skan to'plami (rasmlar, glb, usdz, mesh, geo…)
