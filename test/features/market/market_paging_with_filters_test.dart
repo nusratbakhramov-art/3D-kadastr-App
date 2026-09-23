@@ -120,6 +120,7 @@ void main() {
   });
 
   _controllerTests();
+  _regionTests();
 }
 
 /// Kontroller darajasi: BIRINCHI sahifa ham to'liq filtrlanib ketishi mumkin.
@@ -185,6 +186,67 @@ void _controllerTests() {
       reason: 'ilova filtri serverdagi sahifalash ustidan ishlaydi — birinchi '
           'sahifa bo\'sh chiqsa, ro\'yxat chizilmaydi va aylantirish '
           'bo\'lmaydi, ya\'ni `loadMore` hech qachon chaqirilmaydi',
+    );
+  });
+}
+
+/// Hudud filtri SERVERGA uzatiladi (bitta hudud tanlanganda).
+///
+/// `GET /marketplace/` `region` ni qo'llab-quvvatlaydi va uni
+/// `MarketModel.region` bilan tenglik bo'yicha solishtiradi — ya'ni
+/// ilovadagi `MarketFilters.matches` bilan BIR XIL. Ilgari ilova uni
+/// yubormasdi va hududni o'zi saralardi: natijada «jami» soni noto'g'ri
+/// chiqardi va faqat yuklangan sahifalar ichidan qidirilardi.
+///
+/// Test SO'ROV parametrini tekshiradi — natijani sanash buni ushlamaydi,
+/// chunki ikkala yo'l ham bir xil to'plamni beradi.
+void _regionTests() {
+  const size = 12;
+
+  Future<List<String?>> regionParams(MarketFilters filters) async {
+    final seen = <String?>[];
+    final client = MockClient((req) async {
+      seen.add(req.url.queryParameters['region']);
+      return http.Response(
+        jsonEncode({'items': [], 'total': 0, 'page': 1, 'size': size}),
+        200,
+        headers: {'content-type': 'application/json; charset=utf-8'},
+      );
+    });
+    final repo = ApiMarketRepository(
+      service: MarketplaceApiService(
+        client: client,
+        baseUrl: 'https://test.local/api/v1',
+        locale: 'uz',
+      ),
+    );
+    await repo.fetchPage(
+      query: '',
+      categoryId: 'all',
+      offset: 0,
+      limit: size,
+      filters: filters,
+    );
+    return seen;
+  }
+
+  test('bitta hudud — so\'rovga `region` qo\'shiladi', () async {
+    expect(
+      await regionParams(const MarketFilters(districts: {'Nukus shahri'})),
+      ['Nukus shahri'],
+    );
+  });
+
+  test('hudud tanlanmagan — `region` YUBORILMAYDI', () async {
+    expect(await regionParams(MarketFilters.empty), [null]);
+  });
+
+  test('bir nechta hudud — server bitta satr oladi, ilovada saralanadi', () async {
+    expect(
+      await regionParams(
+        const MarketFilters(districts: {'Nukus shahri', 'Navoiy shahri'}),
+      ),
+      [null],
     );
   });
 }
