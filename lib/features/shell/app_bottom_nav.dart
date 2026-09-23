@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../core/haptics.dart';
@@ -76,8 +78,13 @@ class AppBottomNav extends StatelessWidget {
   /// bar's full height (system inset included), so the page already knows how
   /// much is covered. Adding the constants on top double-counted it: the
   /// support buttons ended up 67pt above the slab with dead background between.
+  ///
+  /// ⚠️ MANFIY BO'LMAYDI. Klaviatura ochilganda `padding.bottom` nolga tushadi
+  /// va ayirma −10 bo'lardi; bu qiymat sahifada `EdgeInsets` ga tushgani uchun
+  /// `padding.isNonNegative` tasdiqlashi yiqilib, butun ekran qizil xatoga
+  /// aylanardi (iOS simulyatorida kirish ekranida ko'rildi).
   static double contentInset(BuildContext context) =>
-      MediaQuery.of(context).padding.bottom - _fadeOverlap;
+      math.max(0, MediaQuery.of(context).padding.bottom - _fadeOverlap);
 
   /// How far a page's last row may reach INTO the fade band. The top of that
   /// band is fully transparent, so this much overlap costs nothing visually and
