@@ -92,6 +92,19 @@ class AppBottomNav extends StatelessWidget {
       _gapBelowBar +
       MediaQuery.of(context).padding.bottom * 0.4;
 
+  /// Plitaning tepasi — shu nuqtagacha gradient umuman ko'rinmaydi.
+  static const double _slabTop = _fadeHeight + _gapAboveBar;
+
+  /// Aralashuv boshlanadigan nuqta — plitaning O'RTASI (0..1).
+  static double _blendStart(BuildContext context) =>
+      (_slabTop + barHeight / 2) / totalHeight(context);
+
+  /// To'liq fonga aylanadigan nuqta — plitaning pastki cheti (0..1).
+  /// Undan pastda faqat bo'shliq va tizim qatori qoladi, ya'ni kontent
+  /// ko'rinib qolmasligi kerak.
+  static double _blendEnd(BuildContext context) =>
+      (_slabTop + barHeight) / totalHeight(context);
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -108,13 +121,22 @@ class AppBottomNav extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
+          // ⚠️ ARALASHUV PLITANING O'RTASIDAN boshlanadi, tepasidan EMAS.
+          //
+          // Ilgari gradient eng tepadan ochilardi va plita ustidagi 22pt
+          // to'liq bo'yalardi. Kontent u yergacha yetmaydigan ekranlarda
+          // (`SafeArea(bottom: true)`) o'sha yo'lak bo'sh fonda yotardi va
+          // sahifadan bir oz TO'QROQ yaxlit chiziq bo'lib ko'rinardi
+          // (o'lchandi: sahifa 244, yo'lak 233…242 — farqni plitaning
+          // soyasi beradi). Endi plita yarmigacha shaffof: kontent
+          // plitaning o'z chetigacha ko'rinadi, pastda esa fon berkitadi.
           colors: [
             pageColor.withValues(alpha: 0),
-            pageColor.withValues(alpha: 0.75),
+            pageColor.withValues(alpha: 0),
             pageColor,
             pageColor,
           ],
-          stops: const [0.0, 0.22, 0.42, 1.0],
+          stops: [0.0, _blendStart(context), _blendEnd(context), 1.0],
         ),
       ),
       child: Padding(

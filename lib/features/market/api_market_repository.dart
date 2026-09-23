@@ -33,7 +33,14 @@ class ApiMarketRepository implements MarketRepository {
         ? result.items
         : result.items.where(filters.matches).toList(growable: false);
 
-    final consumed = offset + filtered.length;
+    // ⚠️ KURSOR SERVER QAYTARGAN SONGA SURILADI, ko'rsatilgan songa EMAS.
+    //
+    // Sahifa raqami shu offsetdan hisoblanadi (`offset ~/ size + 1`), filtr
+    // esa yozuvlarni ILOVADA tashlab yuboradi. Ilgari offset filtrlangan
+    // songa surilardi, ya'ni tashlangan har bir yozuv kursorni ORQAGA
+    // tortardi: filtr yoqilganda 1-sahifa qayta-qayta so'ralar, ro'yxat
+    // esa umuman o'smasdi (cheksiz aylanish).
+    final consumed = offset + result.items.length;
     return MarketPage(
       items: filtered,
       hasMore: result.hasMore,

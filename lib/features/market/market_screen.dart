@@ -9,6 +9,7 @@ import '../../core/i18n/app_translations.dart';
 import '../../core/network_error_handler.dart';
 import '../../theme/app_colors.dart';
 import '../settings/settings_state.dart';
+import '../shell/app_bottom_nav.dart';
 import 'listing_detail_screen.dart';
 import 'market_controller.dart';
 import 'models/market_filters.dart';
@@ -59,6 +60,7 @@ class _MarketScreenState extends State<MarketScreen> {
     _searchText = TextEditingController(text: _controller.searchInput);
     _controller.addListener(_syncSearchText);
     _controller.addListener(_handleControllerError);
+    _controller.addListener(_topUpAfterBuild);
     _headerDelegate = _StickyHeaderDelegate(
       height: 60,
       scrolled: _headerScrolled,
@@ -82,12 +84,14 @@ class _MarketScreenState extends State<MarketScreen> {
     // yangisini qurishdan oldin eskisini `dispose` qiladi.
     _controller
       ..removeListener(_syncSearchText)
-      ..removeListener(_handleControllerError);
+      ..removeListener(_handleControllerError)
+      ..removeListener(_topUpAfterBuild);
     _controllerLocale = code;
     final next = sharedMarketController(locale: code);
     _controller = next
       ..addListener(_syncSearchText)
-      ..addListener(_handleControllerError);
+      ..addListener(_handleControllerError)
+      ..addListener(_topUpAfterBuild);
     _headerDelegate = _StickyHeaderDelegate(
       height: 60,
       scrolled: _headerScrolled,
@@ -116,6 +120,26 @@ class _MarketScreenState extends State<MarketScreen> {
       text: next,
       selection: TextSelection.collapsed(offset: next.length),
     );
+  }
+
+  /// Ro'yxat O'SGANDAN KEYIN pastki chegara yana tekshiriladi.
+  ///
+  /// ⚠️ NEGA KERAK. `_onScroll` faqat AYLANTIRISH hodisasida chaqiriladi.
+  /// Ikkita holatda hodisa umuman bo'lmaydi va yuklash to'xtab qoladi:
+  ///   * birinchi sahifa ekranni to'ldirmasa — aylantirishga joy yo'q;
+  ///   * foydalanuvchi eng pastda turganda yangi yozuvlar qo'shilsa —
+  ///     `maxScrollExtent` o'zgaradi, `pixels` esa o'zgarmaydi, ya'ni
+  ///     `ScrollController` xabar BERMAYDI.
+  /// Ikkalasida ham foydalanuvchi uchun bu «aylantirish ishlamayapti».
+  ///
+  /// Kadr chizilgandan keyin tekshiramiz: o'lchamlar shundan oldin
+  /// yangilanmaydi. `loadMore` o'zi qayta kirishdan himoyalangan.
+  void _topUpAfterBuild() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _onScroll();
+    });
   }
 
   void _onScroll() {
@@ -206,6 +230,7 @@ class _MarketScreenState extends State<MarketScreen> {
     // so data persists across tab switches.
     _controller.removeListener(_syncSearchText);
     _controller.removeListener(_handleControllerError);
+    _controller.removeListener(_topUpAfterBuild);
     _scroll
       ..removeListener(_onScroll)
       ..dispose();
@@ -274,13 +299,24 @@ class _MarketScreenState extends State<MarketScreen> {
                     SliverToBoxAdapter(
                       child: _TailSliver(controller: _controller),
                     ),
-                    const SliverToBoxAdapter(child: SizedBox(height: 28)),
+                    // Oxirgi qator suzuvchi panel ostida qolmasin.
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: AppBottomNav.contentInset(context) + 28,
+                      ),
+                    ),
                   ],
                 ),
               ),
+              // ⚠️ SUZUVCHI PASTKI PANEL USTIDA. Qobiq `extendBody: true`
+              // bilan ishlaydi, ya'ni bu ekran panelning TAGIGA ham cho'ziladi.
+              // `bottom: 16` da tugma panel plitasi ostida qolib ketardi —
+              // foydalanuvchi uni umuman ko'rmasdi. Bo'sh joyni `home_screen`
+              // kabi MediaQuery'dan o'qiymiz (panel hujjatiga qarang:
+              // konstantalarni qo'shib hisoblash ikki marta sanaydi).
               Positioned(
                 right: 16,
-                bottom: 16,
+                bottom: AppBottomNav.contentInset(context) + 16,
                 child: ValueListenableBuilder<bool>(
                   valueListenable: _showScrollTop,
                   builder: (context, visible, _) {
@@ -442,17 +478,19 @@ class _TailSliver extends StatelessWidget {
       builder: (context, _) {
         final c = controller;
         if (c.isLoadingMore) {
+          // Kelayotgan yozuvlar O'RNIDA skeleton — 22pt spinner masonry
+          // setkaning tagida yo'qolib ketardi va foydalanuvchi ro'yxat
+          // tugagan deb o'ylardi. Ikkita karta = setkaning bitta qatori,
+          // ya'ni «yana keladi» degani ko'rinib turadi.
           return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 20),
-            child: Center(
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  color: AppColors.splashGreen,
-                ),
-              ),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: ListingSkeletonCard()),
+                SizedBox(width: 12),
+                Expanded(child: ListingSkeletonCard()),
+              ],
             ),
           );
         }
