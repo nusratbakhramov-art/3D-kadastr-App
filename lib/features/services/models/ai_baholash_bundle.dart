@@ -8,6 +8,7 @@ library;
 import 'dart:ui' show Locale;
 
 import '../../../core/i18n/app_translations.dart';
+import '../../bozor/models/tour_link.dart';
 import '../api_cadastre_service.dart';
 import 'ai_scan_result.dart';
 
@@ -34,7 +35,15 @@ class AiBaholashBundle {
     List<String>? kadastrPaths,
     List<String>? passportPaths,
     List<String>? smetaPaths,
+    List<String>? panoramaKeys,
+    Map<String, String>? panoramaPaths,
+    Map<String, String>? panoramaNames,
+    List<TourLink>? tourLinks,
   }) : rooms = rooms ?? <AiRoom>[],
+       panoramaKeys = panoramaKeys ?? <String>[],
+       panoramaPaths = panoramaPaths ?? <String, String>{},
+       panoramaNames = panoramaNames ?? <String, String>{},
+       tourLinks = tourLinks ?? <TourLink>[],
        imageKeys = imageKeys ?? <String>[],
        kadastrKeys = kadastrKeys ?? <String>[],
        passportKeys = passportKeys ?? <String>[],
@@ -151,6 +160,22 @@ class AiBaholashBundle {
   final List<String> passportPaths;
   final List<String> smetaPaths;
 
+  /// 360° xonalar — Bozor bilan bir xil capture (telefonda tikiladi),
+  /// `panorama` kategoriyasida yuklangan tayyor equirect JPEG kalitlari.
+  /// Hujjatlar qadami 4+ rasm YOKI 1+ 360° bilan o'tadi.
+  final List<String> panoramaKeys;
+
+  /// Kalit → telefondagi nusxa (`ai_pano/…jpg`). Eskiz va tur shu fayldan
+  /// ochiladi. Faqat QORALAMAGA yoziladi (boshqa qurilmada fayl yo'q —
+  /// o'shanda xona «yuklangan» bo'lib ko'rinadi, turda qatnashmaydi).
+  final Map<String, String> panoramaPaths;
+
+  /// Kalit → xona nomi («Oshxona»). Yo'q bo'lsa «Xona N».
+  final Map<String, String> panoramaNames;
+
+  /// Xonalarni bog'laydigan tur tugmalari (`from`/`to` — kalitlar).
+  final List<TourLink> tourLinks;
+
   /// Yuboriladigan payload (`POST /ai-valuations`).
   ///
   /// [forDraft] — qoralamani saqlash uchun: backend SXEMASIDA BO'LMAGAN,
@@ -189,6 +214,20 @@ class AiBaholashBundle {
         if (kadastrKeys.isNotEmpty) 'kadastr_keys': kadastrKeys,
         if (passportKeys.isNotEmpty) 'passport_keys': passportKeys,
         if (smetaKeys.isNotEmpty) 'smeta_keys': smetaKeys,
+        if (panoramaKeys.isNotEmpty) ...{
+          'panorama_keys': panoramaKeys,
+          'panorama_names': {
+            for (final k in panoramaKeys)
+              if (panoramaNames[k] != null) k: panoramaNames[k],
+          },
+          'tour_links': resolveTourLinks(
+            tourLinks,
+            uploaded: const <String, String>{},
+            allowedKeys: panoramaKeys.toSet(),
+          ),
+        },
+        if (forDraft && panoramaPaths.isNotEmpty)
+          'panorama_paths': panoramaPaths,
         if (forDraft && parcelCenter != null)
           'parcel_center': parcelCenter!.toJson(),
         if (forDraft) 'location_source': locationSource.wire,
@@ -218,6 +257,16 @@ class AiBaholashBundle {
           ((j['passport_keys'] as List?) ?? const []).map((e) => '$e').toList(),
       smetaKeys:
           ((j['smeta_keys'] as List?) ?? const []).map((e) => '$e').toList(),
+      panoramaKeys: ((j['panorama_keys'] as List?) ?? const [])
+          .map((e) => '$e')
+          .toList(),
+      panoramaPaths: _stringMap(j['panorama_paths']),
+      panoramaNames: _stringMap(j['panorama_names']),
+      tourLinks: ((j['tour_links'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => TourLink.fromJson(e.cast<String, Object?>()))
+          .where((l) => l.from.isNotEmpty && l.to.isNotEmpty)
+          .toList(),
     );
     final c = j['client'];
     if (c is Map) {
@@ -241,6 +290,12 @@ class AiBaholashBundle {
     bundle.addressee = j['addressee'] as String?;
     return bundle;
   }
+
+  static Map<String, String> _stringMap(Object? raw) => <String, String>{
+    if (raw is Map)
+      for (final e in raw.entries)
+        if (e.value != null && '${e.value}'.isNotEmpty) '${e.key}': '${e.value}',
+  };
 }
 
 /// Baholash maqsadi — mirrors backend `ValuationPurpose`.

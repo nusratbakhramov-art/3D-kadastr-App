@@ -101,6 +101,16 @@ class _AiReviewScreenState extends State<AiReviewScreen> {
                         paths: bundle.imagePaths,
                         onEdit: () => _edit(context, 'ai/intake'),
                       ),
+                      if (bundle.panoramaKeys.isNotEmpty)
+                        _UploadReviewCard(
+                          title: _S.panoramas(l),
+                          paths: [
+                            for (final k in bundle.panoramaKeys)
+                              if (bundle.panoramaPaths[k] != null)
+                                bundle.panoramaPaths[k]!,
+                          ],
+                          onEdit: () => _edit(context, 'ai/intake'),
+                        ),
                       _UploadReviewCard(
                         title: _S.docs(l),
                         paths: bundle.kadastrPaths,
@@ -391,6 +401,8 @@ class _S {
   static String subtitle(Locale l) => tr(l, 'services.ai.review.subtitle');
 
   static String photos(Locale l) => tr(l, 'services.ai.review.photos');
+
+  static String panoramas(Locale l) => tr(l, 'services.ai.review.panoramas');
 
   static String docs(Locale l) => tr(l, 'services.ai.review.docs');
 

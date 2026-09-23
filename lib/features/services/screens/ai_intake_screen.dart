@@ -1,14 +1,16 @@
 /// AI Baholash wizard — intake step.
 ///
 /// One scrollable screen with four sections:
-///   • Property photos (inside + exterior)     → vision condition
+///   • Obyekt tasviri — one card, Rasmlar | 360° xona switch:
+///       photos (inside + exterior)            → vision condition
+///       360° rooms (Bozor's capture flow)     → vision condition + tour
 ///   • Kadastr documents (1-20)                → AI fact extraction
 ///   • Passport / ID (optional)                → owner for the report
 ///   • Rooms (optional)                        → dynamic breakdown
 ///
 /// Files are uploaded to S3 the moment they're picked; the returned keys are
-/// stored on the bundle. Photos (at least 4 in total — see [_minPhotos]),
-/// kadastr documents, and the floor numbers are required to enable
+/// stored on the bundle. Photos (at least 4 — see [_minPhotos]) OR at least
+/// one 360° room, kadastr documents, and the floor numbers are required to enable
 /// "Hisoblash"; passport and rooms are optional. Tapping the still-disabled
 /// button surfaces what's missing (no permanent banner).
 library;
@@ -30,6 +32,7 @@ import '../ai_draft_saver.dart';
 import '../api_ai_upload_service.dart';
 import '../models/ai_baholash_bundle.dart';
 import '../models/ai_wizard_steps.dart';
+import '../widgets/ai_pano_section.dart';
 import '../widgets/file_preview_gallery.dart';
 import '../widgets/service_app_bar.dart';
 import '../widgets/step_progress_bar.dart';
@@ -138,12 +141,28 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
   // How many photos we require before "Hisoblash" unlocks.
   int get _requiredPhotos => _minPhotos;
 
+  // Photos OR 360° (owner spec 2026-09-23): 4+ ordinary photos, or at least one
+  // 360° room — either alone is enough, both are never required. The pipeline
+  // cuts every 360° into flat views for the condition grade, so one room gives
+  // the vision model more than four photos would.
+  bool get _photosOk =>
+      widget.bundle.imageKeys.length >= _requiredPhotos ||
+      widget.bundle.panoramaKeys.isNotEmpty;
+
+  // Which side of the «Obyekt tasviri» switch is showing. 360° opens first —
+  // it is the one we want owners to try — unless they already chose photos
+  // (a resumed draft with photos and no rooms).
+  late _MediaTab _mediaTab =
+      widget.bundle.imageKeys.isNotEmpty && widget.bundle.panoramaKeys.isEmpty
+      ? _MediaTab.photos
+      : _MediaTab.rooms;
+
   // ── Required-fields gate ──────────────────────────────────────────────
-  // Photos (min count), kadastr docs, the owner certificate, and both floor
-  // numbers are mandatory. Rooms stay optional.
+  // Photos (min count) or a 360°, kadastr docs, the owner certificate, and
+  // both floor numbers are mandatory. Rooms stay optional.
   bool get _ready =>
       !_anyUploading &&
-      widget.bundle.imageKeys.length >= _requiredPhotos &&
+      _photosOk &&
       widget.bundle.kadastrKeys.isNotEmpty &&
       widget.bundle.passportKeys.isNotEmpty &&
       widget.bundle.floor != null &&
@@ -158,9 +177,12 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
     if (_ready) return null;
     final l = localeNotifier.value;
     if (_anyUploading) return _Strings.uploadingFiles(l);
-    final havePhotos = widget.bundle.imageKeys.length;
-    if (havePhotos < _requiredPhotos) {
-      return _Strings.minPhotosNeeded(l, _requiredPhotos, havePhotos);
+    if (!_photosOk) {
+      return _Strings.minPhotosOrPano(
+        l,
+        _requiredPhotos,
+        widget.bundle.imageKeys.length,
+      );
     }
     final missing = <String>[];
     if (widget.bundle.kadastrKeys.isEmpty) {
@@ -179,6 +201,16 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
       return _Strings.floorExceeds(l);
     }
     return _Strings.requiredSuffix(l, missing.join(', '));
+  }
+
+  // A 360° room was added/removed or the tour changed. Save the draft right
+  // away: the 360° capture is the slowest thing on this step, losing it to an
+  // app kill would be the worst place to lose work.
+  void _onPanoramasChanged() {
+    setState(() {});
+    if (widget.bundle.draftId != null) {
+      saveAiDraftStepInBackground(widget.bundle, 'intake');
+    }
   }
 
   void _setFloor(String raw) {
@@ -485,25 +517,40 @@ class _AiIntakeScreenState extends State<AiIntakeScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     children: [
-                      _UploadCard(
-                        title: _Strings.objectPhotos(l),
-                        hint: _Strings.objectPhotosHint(l),
-                        bullets: _Strings.objectPhotosBullets(l),
-                        requiredMark: true,
-                        icon: Icons.photo_camera_outlined,
-                        emptyIcon: Icons.add_photo_alternate_outlined,
-                        actionLabel: _Strings.addPhotosCta(l),
-                        items: _photoItems,
-                        maxFiles: _maxPhotos,
-                        onAdd: _addPhotos,
-                        onRetry: (it) => _retry(
-                          it,
-                          UploadCategory.propertyPhoto,
-                          _syncPhotoKeys,
+                      _ObjectMediaCard(
+                        tab: _mediaTab,
+                        onTab: (t) {
+                          HapticFeedback.selectionClick();
+                          setState(() => _mediaTab = t);
+                        },
+                        photoCount: b.imageKeys.length,
+                        roomCount: b.panoramaKeys.length,
+                        ready: _photosOk,
+                        photoBullets: _Strings.objectPhotosBullets(l),
+                        photos: _UploadItemsBody(
+                          emptyIcon: Icons.add_photo_alternate_outlined,
+                          actionLabel: _Strings.addPhotosCta(l),
+                          items: _photoItems,
+                          maxFiles: _maxPhotos,
+                          onAdd: _addPhotos,
+                          onRetry: (it) => _retry(
+                            it,
+                            UploadCategory.propertyPhoto,
+                            _syncPhotoKeys,
+                          ),
+                          onRemove: (it) =>
+                              _removeItem(_photoItems, it, _syncPhotoKeys),
+                          onPreview: (it) => _openPreview(_photoItems, it),
                         ),
-                        onRemove: (it) =>
-                            _removeItem(_photoItems, it, _syncPhotoKeys),
-                        onPreview: (it) => _openPreview(_photoItems, it),
+                        rooms: AiPanoRooms(
+                          bundle: b,
+                          onChanged: _onPanoramasChanged,
+                          emptyBuilder: (onAdd) => _EmptyDropZone(
+                            label: _Strings.panoAdd(l),
+                            icon: Icons.threesixty_rounded,
+                            onTap: onAdd,
+                          ),
+                        ),
                       ),
                       const SizedBox(height: 12),
                       _UploadCard(
@@ -626,16 +673,10 @@ class _UploadCard extends StatelessWidget {
     required this.onRetry,
     required this.onRemove,
     required this.onPreview,
-    this.bullets,
-    this.requiredMark = false,
   });
 
   final String title;
   final String hint;
-  // When set, the subtitle renders as bullet lines instead of [hint]; the first
-  // line gets a red "required" mark if [requiredMark] is true.
-  final List<String>? bullets;
-  final bool requiredMark;
   final IconData icon;
   final IconData emptyIcon;
   final String actionLabel;
@@ -655,7 +696,6 @@ class _UploadCard extends StatelessWidget {
     final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
 
     final doneCount = items.where((i) => i.status == _UpStatus.done).length;
-    final canAdd = items.length < maxFiles;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -714,74 +754,367 @@ class _UploadCard extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    if (bullets != null)
-                      _BulletHint(
-                        lines: bullets!,
-                        requiredMark: requiredMark,
+                    Text(
+                      hint,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontSize: 12,
+                        height: 1.3,
                         color: muted,
-                      )
-                    else
-                      Text(
-                        hint,
-                        style: TextStyle(
-                          fontFamily: 'MTSCompact',
-                          fontSize: 12,
-                          height: 1.3,
-                          color: muted,
-                        ),
                       ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          if (items.isEmpty)
-            // First upload: a full-width, inviting drop zone (not a tiny square).
-            _EmptyDropZone(label: actionLabel, icon: emptyIcon, onTap: onAdd)
-          else
-            // Once a file exists: one horizontal swipeable row, "+" pinned first.
-            SizedBox(
-              height: _UploadTile.outerSize,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.zero,
-                children: [
-                  if (canAdd) ...[
-                    _AddTile(onTap: onAdd),
-                    const SizedBox(width: 8),
-                  ],
-                  for (int i = 0; i < items.length; i++) ...[
-                    if (i > 0) const SizedBox(width: 8),
-                    _UploadTile(
-                      item: items[i],
-                      onRetry: () => onRetry(items[i]),
-                      onRemove: () => onRemove(items[i]),
-                      onPreview: () => onPreview(items[i]),
-                    ),
-                  ],
-                ],
-              ),
-            ),
+          _UploadItemsBody(
+            emptyIcon: emptyIcon,
+            actionLabel: actionLabel,
+            items: items,
+            maxFiles: maxFiles,
+            onAdd: onAdd,
+            onRetry: onRetry,
+            onRemove: onRemove,
+            onPreview: onPreview,
+          ),
         ],
       ),
     );
   }
 }
 
-// Bulleted subtitle for an upload card. The first line can carry a red
-// "required" mark (the photos card uses it for the min-count rule).
-class _BulletHint extends StatelessWidget {
-  const _BulletHint({
-    required this.lines,
-    required this.color,
-    this.requiredMark = false,
+// ── «Obyekt tasviri»: photos OR 360° rooms behind one switch ─────────
+enum _MediaTab { photos, rooms }
+
+// One card for the photo rule (4+ photos OR 1+ 360° room), with a
+// Rasmlar | 360° xona switch. Both tab bodies stay mounted (only the visible
+// one is shown) so a 360° capture in progress, or a photo still uploading,
+// survives a tab switch. Each tab shows its own count, so an owner who filled
+// one side can see it from the other.
+class _ObjectMediaCard extends StatelessWidget {
+  const _ObjectMediaCard({
+    required this.tab,
+    required this.onTab,
+    required this.photoCount,
+    required this.roomCount,
+    required this.ready,
+    required this.photoBullets,
+    required this.photos,
+    required this.rooms,
   });
+
+  final _MediaTab tab;
+  final ValueChanged<_MediaTab> onTab;
+  final int photoCount;
+  final int roomCount;
+  final bool ready;
+  final List<String> photoBullets;
+  final Widget photos;
+  final Widget rooms;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surface = isDark ? const Color(0xFF1F2426) : Colors.white;
+    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final textColor = isDark ? Colors.white : AppColors.textBlack;
+    final muted = isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.photo_camera_outlined,
+                size: 26,
+                color: AppColors.splashGreen,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _Strings.mediaTitle(l),
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: textColor,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text.rich(
+                      TextSpan(
+                        style: TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontSize: 12.5,
+                          height: 1.3,
+                          fontWeight: FontWeight.w600,
+                          color: muted,
+                        ),
+                        children: [
+                          TextSpan(text: _Strings.mediaRule(l)),
+                          if (!ready)
+                            const WidgetSpan(
+                              alignment: PlaceholderAlignment.middle,
+                              child: Padding(
+                                padding: EdgeInsets.only(left: 5),
+                                child: Icon(
+                                  Icons.error,
+                                  size: 14,
+                                  color: Color(0xFFE5484D),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _MediaSwitch(
+            tab: tab,
+            onTab: onTab,
+            photoCount: photoCount,
+            roomCount: roomCount,
+          ),
+          const SizedBox(height: 10),
+          if (tab == _MediaTab.photos)
+            _BulletHint(lines: photoBullets, color: muted)
+          else
+            Text(
+              _Strings.panoHint(l),
+              style: TextStyle(
+                fontFamily: 'MTSCompact',
+                fontSize: 12,
+                height: 1.35,
+                color: muted,
+              ),
+            ),
+          const SizedBox(height: 12),
+          Offstage(offstage: tab != _MediaTab.photos, child: photos),
+          Offstage(offstage: tab != _MediaTab.rooms, child: rooms),
+        ],
+      ),
+    );
+  }
+}
+
+// Two-way pill switch, the iOS segmented-control shape the app's filters use.
+class _MediaSwitch extends StatelessWidget {
+  const _MediaSwitch({
+    required this.tab,
+    required this.onTab,
+    required this.photoCount,
+    required this.roomCount,
+  });
+
+  final _MediaTab tab;
+  final ValueChanged<_MediaTab> onTab;
+  final int photoCount;
+  final int roomCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final l = Localizations.localeOf(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final track = isDark ? const Color(0xFF14181A) : const Color(0xFFEEF0F1);
+
+    Widget segment(_MediaTab t, IconData icon, String label, int count) {
+      final on = tab == t;
+      final fg = on
+          ? (isDark ? Colors.white : AppColors.textBlack)
+          : (isDark ? const Color(0xFF9BA1A6) : const Color(0xFF6C7278));
+      return Expanded(
+        child: Semantics(
+          button: true,
+          selected: on,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => onTab(t),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              height: 38,
+              decoration: BoxDecoration(
+                color: on
+                    ? (isDark ? const Color(0xFF2A2F32) : Colors.white)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: on && !isDark
+                    ? const [
+                        BoxShadow(
+                          color: Color(0x14000000),
+                          blurRadius: 3,
+                          offset: Offset(0, 1),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 17, color: fg),
+                  const SizedBox(width: 6),
+                  Flexible(
+                    child: Text(
+                      label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'MTSCompact',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: fg,
+                      ),
+                    ),
+                  ),
+                  if (count > 0) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.splashGreen.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '$count',
+                        style: const TextStyle(
+                          fontFamily: 'MTSCompact',
+                          fontWeight: FontWeight.w700,
+                          fontSize: 11.5,
+                          color: Color(0xFF0A8A2A),
+                        ),
+                      ),
+                    ),
+                  ] else if (t == _MediaTab.rooms) ...[
+                    // «New» dot until the owner has a room — 360° is new.
+                    const SizedBox(width: 5),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: AppColors.splashGreen,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: track,
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Row(
+        children: [
+          segment(
+            _MediaTab.photos,
+            Icons.image_outlined,
+            _Strings.tabPhotos(l),
+            photoCount,
+          ),
+          segment(
+            _MediaTab.rooms,
+            Icons.threesixty_rounded,
+            _Strings.tabRooms(l),
+            roomCount,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// The file area of an upload card: a full-width drop zone until the first
+// file, then one horizontal swipeable row with the "+" pinned first. Shared by
+// [_UploadCard] and the photos tab of [_ObjectMediaCard].
+class _UploadItemsBody extends StatelessWidget {
+  const _UploadItemsBody({
+    required this.emptyIcon,
+    required this.actionLabel,
+    required this.items,
+    required this.maxFiles,
+    required this.onAdd,
+    required this.onRetry,
+    required this.onRemove,
+    required this.onPreview,
+  });
+
+  final IconData emptyIcon;
+  final String actionLabel;
+  final List<_UploadItem> items;
+  final int maxFiles;
+  final VoidCallback onAdd;
+  final ValueChanged<_UploadItem> onRetry;
+  final ValueChanged<_UploadItem> onRemove;
+  final ValueChanged<_UploadItem> onPreview;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return _EmptyDropZone(label: actionLabel, icon: emptyIcon, onTap: onAdd);
+    }
+    final canAdd = items.length < maxFiles;
+    return SizedBox(
+      height: _UploadTile.outerSize,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        physics: const BouncingScrollPhysics(),
+        padding: EdgeInsets.zero,
+        children: [
+          if (canAdd) ...[
+            _AddTile(onTap: onAdd),
+            const SizedBox(width: 8),
+          ],
+          for (int i = 0; i < items.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
+            _UploadTile(
+              item: items[i],
+              onRetry: () => onRetry(items[i]),
+              onRemove: () => onRemove(items[i]),
+              onPreview: () => onPreview(items[i]),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+// Bulleted hint under the photos tab (admin-editable lines). The red
+// "required" mark lives on the card's rule line now, since photos are only
+// one of two ways to satisfy it.
+class _BulletHint extends StatelessWidget {
+  const _BulletHint({required this.lines, required this.color});
 
   final List<String> lines;
   final Color color;
-  final bool requiredMark;
 
   @override
   Widget build(BuildContext context) {
@@ -809,27 +1142,7 @@ class _BulletHint extends StatelessWidget {
               children: [
                 Text('•  ', style: i == 0 ? firstStyle : style),
                 Expanded(
-                  child: (requiredMark && i == 0)
-                      ? Text.rich(
-                          TextSpan(
-                            style: firstStyle,
-                            children: [
-                              TextSpan(text: lines[i]),
-                              const WidgetSpan(
-                                alignment: PlaceholderAlignment.middle,
-                                child: Padding(
-                                  padding: EdgeInsets.only(left: 5),
-                                  child: Icon(
-                                    Icons.error,
-                                    size: 14,
-                                    color: Color(0xFFE5484D),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : Text(lines[i], style: i == 0 ? firstStyle : style),
+                  child: Text(lines[i], style: i == 0 ? firstStyle : style),
                 ),
               ],
             ),
@@ -1788,11 +2101,17 @@ class _Strings {
 
   static String continueLabel(Locale l) => tr(l, 'services.ai.common.continue');
 
-  static String objectPhotos(Locale l) =>
-      tr(l, 'services.ai.intake.object_photos');
+  static String mediaTitle(Locale l) => tr(l, 'services.ai.intake.media_title');
 
-  static String objectPhotosHint(Locale l) =>
-      tr(l, 'services.ai.intake.object_photos_hint');
+  static String mediaRule(Locale l) => tr(l, 'services.ai.intake.media_rule');
+
+  static String tabPhotos(Locale l) => tr(l, 'services.ai.intake.tab_photos');
+
+  static String tabRooms(Locale l) => tr(l, 'services.ai.intake.tab_rooms');
+
+  static String panoHint(Locale l) => tr(l, 'services.ai.intake.pano_hint');
+
+  static String panoAdd(Locale l) => tr(l, 'services.ai.intake.pano_add');
 
   static List<String> objectPhotosBullets(Locale l) => [
     tr(l, 'services.ai.intake.object_photos_bullet1'),
@@ -1885,9 +2204,9 @@ class _Strings {
   static String addFilesCta(Locale l) =>
       tr(l, 'services.ai.intake.add_files_cta');
 
-  // "Need at least N photos (M added)" — shown while below the minimum.
-  static String minPhotosNeeded(Locale l, int need, int have) =>
-      tr(l, 'services.ai.intake.min_photos_needed')
+  // "Need N photos or one 360° (M photos added)" — photos-or-360 gate.
+  static String minPhotosOrPano(Locale l, int need, int have) =>
+      tr(l, 'services.ai.intake.min_photos_or_pano')
           .replaceAll(r'$need', '$need')
           .replaceAll(r'$have', '$have');
 
