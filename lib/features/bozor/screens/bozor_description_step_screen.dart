@@ -652,8 +652,17 @@ class _BozorDescriptionStepScreenState
                                 setState(() => _d.coverPhoto = _d.photos[i]),
                             paths: _d.photos,
                             onAdd: () => _pick(_d.photos, multiple: true),
-                            onRemove: (i) =>
-                                setState(() => _d.photos.removeAt(i)),
+                            // Muqova o'chirilsa havola O'LIK qolardi:
+                            // `coverPhotoIndex` baribir 0 ga tushadi, lekin
+                            // qoralamada mavjud bo'lmagan yo'l saqlanib
+                            // qolardi va o'sha fayl qayta tanlansa muqova
+                            // kutilmaganda unga qaytardi.
+                            onRemove: (i) => setState(() {
+                              final removed = _d.photos.removeAt(i);
+                              if (_d.coverPhoto == removed) {
+                                _d.coverPhoto = null;
+                              }
+                            }),
                           ),
                           // Existing rooms stay accessible even when capture
                           // is unavailable; viewer capability is independent.
