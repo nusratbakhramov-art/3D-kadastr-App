@@ -48,23 +48,35 @@ struct Options {
     ///
     /// This is the mark a viewer sees UNDERFOOT when it looks straight down in
     /// the finished 360 — the only branding in the viewing experience (the
-    /// Dart/native tour chrome carries no logo of its own). Since 2026-09-23
-    /// the artwork is the app icon itself on a transparent square; before that
-    /// it was a filled green disc with "3D kadastr" lettering.
+    /// Dart/native tour chrome carries no logo of its own). The artwork is the
+    /// app icon with the "3D kadastr" wordmark tucked under it, on a
+    /// transparent square; before 2026-09-23 it was a filled green disc.
     ///
     /// ⚠️ Only the INSCRIBED CIRCLE of the image is sampled — corners are never
     /// read — and the opaque area must reach `nadirCutDeg / nadirLogoDeg` of
     /// the radius or the cut hole shows through the logo's own transparency.
     ///
-    /// 28° → 20° on 2026-09-22 at the client's request: the disc read as
-    /// oversized, swallowing most of the floor. 20° still covers the 12°
-    /// `nadirCutDeg` hole and its mirror-filled ring with margin.
+    /// 28° → 20° on 2026-09-22 (read as oversized), 20° → 18° on 2026-09-24,
+    /// then 18° → 19° the same day: at 18° the wordmark had to shrink so far
+    /// to stay inside the circle that it was barely legible on the floor.
     ///
-    /// ⚠️ FLOOR ~12°. Below `nadirCutDeg` the cut hole itself would show.
+    /// ⚠️ THIS ANGLE AND THE ARTWORK ARE ONE DECISION, not two. The icon has
+    /// to stay opaque out to `nadirCutDeg / nadirLogoDeg` or the cut hole
+    /// shows through it, and the wordmark sits BELOW the icon, so the bigger
+    /// the wordmark the further its corners reach — past 1.0 of the radius
+    /// they leave the sampled circle and are silently cut off. Shrinking the
+    /// angle tightens both ends at once. Measured for the current lockup:
+    ///
+    ///     18°  wordmark 75 % of the icon's width
+    ///     19°  wordmark 85 %   <- here: icon opaque to 0.635 (needs 0.632),
+    ///                             farthest ink 0.961
+    ///     20°  wordmark 95 %
+    ///
+    /// Regenerate the asset, do not just change this number.
+    ///
     /// Between 20° and 25° a tripod or the photographer's feet may peek out
-    /// past the rim on a low capture — that is the trade the client asked
-    /// for, and it is why this did not go lower.
-    float nadirLogoDeg = 20.f;
+    /// past the rim on a low capture — the trade the client asked for.
+    float nadirLogoDeg = 19.f;
     int seamWidth = 1024;      // seam finder resolution (1536 → 1024: −60 % graph-cut time, no visible change)
     int refineSmallWidth = 1000;
     int alignMaxSide = 1024;

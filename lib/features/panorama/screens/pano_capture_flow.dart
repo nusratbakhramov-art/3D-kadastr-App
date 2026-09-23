@@ -172,14 +172,24 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
   /// Nadir (oyoq osti) suratga OLINMAYDI — o'rniga shu logo bosiladi
   /// (`PanoCapture.swift` nishon to'ri, yadro `nadirLogoPath`).
   ///
-  /// Rasmning O'ZI — ilovaning rasmiy ikonkasi (`assets/branding/appicon.png`
-  /// dan yasalgan), atrofi shaffof. 2026-09-23 gacha bu yerda «3D kadastr»
-  /// yozuvi bor katta yashil disk turardi — mijoz uni xunuk deb topdi.
+  /// Rasmning O'ZI — ilova ikonkasi va uning ostida «3D kadastr» yozuvi
+  /// (mijoz bergan `design/nadir-lockup-source.png` dan yig'ilgan — manba
+  /// ATAYLAB `assets/` dan tashqarida, aks holda 300 KB ortiqcha yuk bo'lib
+  /// ilovaga tushardi),
+  /// atrofi shaffof. 2026-09-23 gacha bu yerda katta yashil disk turardi.
   ///
-  /// ⚠️ Faylni almashtirganda: yadro rasmning ICHKI AYLANASINI oladi (burchaklar
-  /// umuman o'qilmaydi) va `nadirCutDeg` (12°) teshigini yopish uchun
-  /// `nadirCutDeg / nadirLogoDeg = 0.6` radiusgacha shaffof bo'lmagan joy
-  /// kerak. Hozirgi ikonka o'qlar bo'ylab 0.705 gacha to'la qoplaydi.
+  /// ⚠️ Faylni almashtirganda ikkita o'lchov bor, ikkalasi ham majburiy:
+  ///   * yadro rasmning ICHKI AYLANASINI oladi — burchaklar umuman
+  ///     o'qilmaydi, aylanadan chiqqan bo'yoq jimgina qirqiladi;
+  ///   * `nadirCutDeg` (12°) teshigini yopish uchun
+  ///     `nadirCutDeg / nadirLogoDeg = 12/19 = 0.632` radiusgacha shaffof
+  ///     BO'LMAGAN joy kerak.
+  /// Hozirgi yig'ma: ikonka o'qlar bo'ylab 0.635 gacha to'la qoplaydi,
+  /// yozuvning tashqi burchagi esa 0.961 da.
+  ///
+  /// Rasm va `nadirLogoDeg` — BITTA qaror: yozuvni kattalashtirsangiz
+  /// burchaklari aylanadan chiqib qirqiladi, burchakni kichraytirsangiz
+  /// teshik ochiladi. O'lchangan juftliklar `uy360_stitch.hpp` da.
   static const String kNadirLogoAsset = 'assets/branding/nadir_logo.png';
 
   static Future<PanoStitchResult> _defaultStitch({
