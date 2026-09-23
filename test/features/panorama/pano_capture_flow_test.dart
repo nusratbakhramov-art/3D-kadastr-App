@@ -114,6 +114,7 @@ void main() {
     String? resumeDir,
     void Function(String dir)? onCaptured,
     void Function(String dir)? onDiscarded,
+    PanoUploadFn? upload,
   }) async {
     PanoOutcome? outcome;
     var popped = false;
@@ -130,6 +131,7 @@ void main() {
                     onCaptured: onCaptured,
                     onDiscarded: onDiscarded,
                     api: api,
+                    upload: upload,
                     capture: capture,
                     stitch: stitch,
                     preview:
@@ -148,6 +150,57 @@ void main() {
     await pumpUntil(tester, () => popped);
     return outcome;
   }
+
+  testWidgetsAsync(
+    'custom upload (AI Baholash): o\'zining yo\'li ishlatiladi, Bozor API emas',
+    (tester) async {
+      final dir = shotDir();
+      final rec = recorder();
+      final uploaded = <String>[];
+
+      final out = await pump(
+        tester,
+        capture: (_) async => PanoCaptureResult(dir: dir.path, frames: 1),
+        stitch: stitcher().fn,
+        api: rec.api,
+        upload: (path) async {
+          uploaded.add(path);
+          return (key: 'ai-baholash/panorama/7/x/pano.jpg', url: '/local/copy.jpg');
+        },
+      );
+
+      expect(uploaded, ['${dir.path}/pano.jpg'], reason: 'tayyor pano.jpg yuklanadi');
+      expect(rec.uploads, isEmpty, reason: 'Bozor /listings/media chaqirilmaydi');
+      final up = out! as PanoUploaded;
+      expect(up.storageKey, 'ai-baholash/panorama/7/x/pano.jpg');
+      expect(up.url, '/local/copy.jpg');
+      expect(dir.existsSync(), isFalse, reason: 'yuklangach tozalanadi');
+    },
+  );
+
+  testWidgetsAsync(
+    'custom upload null qaytarsa — kadrlar va pano.jpg qoladi, xato ekrani',
+    (tester) async {
+      final dir = shotDir();
+      addTearDown(() {
+        if (dir.existsSync()) dir.deleteSync(recursive: true);
+      });
+      final rec = recorder();
+
+      await pump(
+        tester,
+        capture: (_) async => PanoCaptureResult(dir: dir.path, frames: 1),
+        stitch: stitcher().fn,
+        api: rec.api,
+        upload: (_) async => null,
+      );
+
+      expect(dir.existsSync(), isTrue, reason: 'yuklanmagan tushirish yo\'qolmaydi');
+      expect(File('${dir.path}/pano.jpg').existsSync(), isTrue);
+      expect(find.byType(FilledButton), findsOneWidget, reason: 'qayta urinish');
+      expect(rec.uploads, isEmpty);
+    },
+  );
 
   testWidgetsAsync(
     'happy path: bitta fayl yuklanadi, kalit qaytadi, katalog o\'chadi',

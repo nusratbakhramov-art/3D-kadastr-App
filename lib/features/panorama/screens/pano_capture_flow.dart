@@ -68,20 +68,32 @@ class PanoSaved extends PanoOutcome {
 /// chaqiruvchi shu zahoti qoralamaga yozadi — ilova tikish paytida o'lsa ham
 /// kadrlar egasiz qolmasin. [onDiscarded] — qayta tushirish uchun eski
 /// katalog tashlanganda, yangi capture ochilishidan OLDIN chaqiriladi.
+///
+/// [upload] — tayyor `pano.jpg` ni qayerga yuklash. Sukut bo'yicha Bozor
+/// (`POST /listings/media`, role=panorama); AI Baholash o'zining
+/// `/ai-valuations/upload` (category=panorama) yo'lini beradi.
 Future<PanoOutcome?> openPanoCapture(
   BuildContext context, {
   String? resumeDir,
   void Function(String dir)? onCaptured,
   void Function(String dir)? onDiscarded,
+  PanoUploadFn? upload,
 }) => Navigator.of(context).push<PanoOutcome>(
   MaterialPageRoute<PanoOutcome>(
     builder: (_) => PanoCaptureFlow(
       resumeDir: resumeDir,
       onCaptured: onCaptured,
       onDiscarded: onDiscarded,
+      upload: upload,
     ),
   ),
 );
+
+/// Yuklash natijasi: saqlash kaliti + ko'rsatish manzili (URL yoki lokal yo'l).
+typedef PanoUploadResult = ({String key, String url});
+
+/// Tayyor panoramani yuklaydi. `null` yoki bo'sh kalit — xato ekrani.
+typedef PanoUploadFn = Future<PanoUploadResult?> Function(String panoPath);
 
 typedef PanoCaptureOpener =
     Future<PanoOutcome?> Function(
@@ -115,10 +127,14 @@ class PanoCaptureFlow extends StatefulWidget {
     this.onCaptured,
     this.onDiscarded,
     this.api,
+    this.upload,
     this.capture,
     this.stitch,
     this.preview,
   });
+
+  /// Yuklash yo'li — [openPanoCapture] izohi. `null` — Bozor ([api]).
+  final PanoUploadFn? upload;
 
   /// Saqlangan tushirish katalogi — capture o'tkazib yuboriladi.
   final String? resumeDir;
@@ -370,18 +386,24 @@ class PanoCaptureFlowState extends State<PanoCaptureFlow> {
       _progress = 0;
       _note = '';
     });
-    final uploaded = await _api.uploadMedia(
-      role: 'panorama',
-      paths: [pano.path],
-    );
+    final PanoUploadResult? m;
+    final upload = widget.upload;
+    if (upload != null) {
+      m = await upload(pano.path);
+    } else {
+      final uploaded = await _api.uploadMedia(
+        role: 'panorama',
+        paths: [pano.path],
+      );
+      m = uploaded.isEmpty
+          ? null
+          : (key: uploaded.first.key, url: uploaded.first.url);
+    }
     if (!mounted) return;
-    if (uploaded.isEmpty ||
-        uploaded.first.key.trim().isEmpty ||
-        uploaded.first.url.trim().isEmpty) {
+    if (m == null || m.key.trim().isEmpty || m.url.trim().isEmpty) {
       _fail(StateError('server kalit qaytarmadi'));
       return;
     }
-    final m = uploaded.first;
 
     // Panorama SERVERDA — kadrlar ham, `pano.jpg` ham endi kerak emas
     // Yuklash MUVAFFAQIYATLI bo'lgandan keyin: ilgariroq o'chirsak qayta
