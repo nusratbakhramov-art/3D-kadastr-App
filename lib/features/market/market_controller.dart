@@ -170,18 +170,8 @@ class MarketController extends ChangeNotifier {
 
     final token = ++_requestToken;
     try {
-      final page = await _repository.fetchPage(
-        query: _searchQuery,
-        categoryId: _categoryId,
-        offset: _offset,
-        limit: _pageSize,
-        filters: _filters,
-      );
-      if (_disposed || token != _requestToken) return;
-      _items.addAll(page.items);
-      _offset = page.nextOffset;
-      _hasMore = page.hasMore;
-      _totalCount = page.totalCount;
+      final ok = await _appendPages(token);
+      if (!ok) return;
       _isLoadingMore = false;
       _notify();
     } catch (e) {
@@ -206,20 +196,8 @@ class MarketController extends ChangeNotifier {
     _notify();
 
     try {
-      final page = await _repository.fetchPage(
-        query: _searchQuery,
-        categoryId: _categoryId,
-        offset: 0,
-        limit: _pageSize,
-        filters: _filters,
-      );
-      if (_disposed || token != _requestToken) return;
-      _items
-        ..clear()
-        ..addAll(page.items);
-      _offset = page.nextOffset;
-      _hasMore = page.hasMore;
-      _totalCount = page.totalCount;
+      final ok = await _appendPages(token);
+      if (!ok) return;
       _status = MarketStatus.success;
       _notify();
     } catch (e) {
@@ -229,6 +207,40 @@ class MarketController extends ChangeNotifier {
       _lastErrorObject = e;
       _notify();
     }
+  }
+
+  /// `_offset` dan boshlab, KAMIDA BITTA yozuv to'plangunicha (yoki ro'yxat
+  /// tugagunicha) sahifalarni ketma-ket oladi. `false` — natija eskirgan
+  /// (boshqa so'rov boshlangan yoki kontroller yopilgan), chaqiruvchi
+  /// hech narsa qilmasligi kerak.
+  ///
+  /// ⚠️ NEGA SIKL KERAK. Maydon/narx/qavat/hudud filtri SERVERDA emas,
+  /// ILOVADA qo'llanadi (`GET /marketplace/` bu parametrlarni bilmaydi).
+  /// Ya'ni butun bir sahifa filtrdan o'tmay qolishi mumkin. Unda ro'yxat
+  /// o'smaydi, yangi aylantirish hodisasi bo'lmaydi va `_onScroll` bizni
+  /// boshqa chaqirmaydi — foydalanuvchi uchun bu «aylantirish ishlamayapti»
+  /// yoki «hech narsa topilmadi» bo'lib ko'rinadi.
+  ///
+  /// Chegara ataylab: mos yozuv umuman bo'lmasa ham butun bazani bitta
+  /// harakatda so'rab chiqmaymiz.
+  Future<bool> _appendPages(int token) async {
+    const maxPagesPerStep = 5;
+    for (var i = 0; i < maxPagesPerStep; i++) {
+      final page = await _repository.fetchPage(
+        query: _searchQuery,
+        categoryId: _categoryId,
+        offset: _offset,
+        limit: _pageSize,
+        filters: _filters,
+      );
+      if (_disposed || token != _requestToken) return false;
+      _items.addAll(page.items);
+      _offset = page.nextOffset;
+      _hasMore = page.hasMore;
+      _totalCount = page.totalCount;
+      if (page.items.isNotEmpty || !_hasMore) break;
+    }
+    return true;
   }
 
   void _notify() {

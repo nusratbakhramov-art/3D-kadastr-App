@@ -19,6 +19,10 @@ import '../../../core/haptics.dart';
 import '../../../theme/app_colors.dart';
 import '../../services/widgets/file_preview_gallery.dart';
 
+/// Eskiz tomoni. 72 → 96 (2026-09-23): muqova nishoni 72pt da 9pt shriftga
+/// siqilib, o'qilmasdi va mijoz «Asosiy qilish» ni topa olmasdi.
+const double _thumbSize = 96;
+
 class MediaUploadRow extends StatelessWidget {
   const MediaUploadRow({
     super.key,
@@ -153,19 +157,21 @@ class MediaUploadRow extends StatelessWidget {
         if (paths.isNotEmpty) ...[
           const SizedBox(height: 8),
           SizedBox(
-            height: 72,
+            height: _thumbSize,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               itemCount: paths.length,
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, i) => _Thumb(
                 path: paths[i],
-                // Bitta rasm bo'lsa tanlovning ma'nosi yo'q — nishon ham,
-                // tugma ham chizilmaydi.
-                coverLabel: paths.length > 1 ? coverLabel : null,
-                makeCoverLabel: makeCoverLabel,
+                coverLabel: coverLabel,
+                // Bitta rasm bo'lsa TANLASH ma'nosiz (u allaqachon muqova) —
+                // nishon ko'rinadi, «Asosiy qilish» tugmasi esa yo'q.
+                makeCoverLabel: paths.length > 1 ? makeCoverLabel : null,
                 isCover: i == coverIndex,
-                onSetCover: onSetCover == null ? null : () => onSetCover!(i),
+                onSetCover: (onSetCover == null || paths.length < 2)
+                    ? null
+                    : () => onSetCover!(i),
                 url: urlOf?.call(paths[i]),
                 file: fileOf?.call(paths[i]),
                 status: statusOf?.call(paths[i]) ?? MediaItemStatus.ready,
@@ -178,8 +184,19 @@ class MediaUploadRow extends StatelessWidget {
                   }
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) =>
-                          FilePreviewGallery(paths: paths, initialIndex: i),
+                      builder: (_) => FilePreviewGallery(
+                        paths: paths,
+                        initialIndex: i,
+                        // KATTA rasmda ham muqova ko'rinadi va shu yerdan
+                        // almashtiriladi — tasmadagi 96pt eskiz bilan
+                        // cheklanib qolmaslik uchun.
+                        coverIndex: coverIndex,
+                        coverLabel: coverLabel,
+                        makeCoverLabel: paths.length > 1
+                            ? makeCoverLabel
+                            : null,
+                        onSetCover: paths.length < 2 ? null : onSetCover,
+                      ),
                     ),
                   );
                 },
@@ -243,12 +260,16 @@ class _Thumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final border = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    final idle = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
+    // Muqova eskizi YASHIL HALQA bilan ajralib turadi: nishonning o'zi past
+    // yo'lakda, kichkina — bir qarashda qaysi rasm asosiy ekani ko'rinsin.
+    final showRing = coverLabel != null && isCover;
+    final border = showRing ? AppColors.splashGreen : idle;
     final radius = BorderRadius.circular(12);
 
     return SizedBox(
-      width: 72,
-      height: 72,
+      width: _thumbSize,
+      height: _thumbSize,
       child: Stack(
         children: [
           Positioned.fill(
@@ -259,7 +280,10 @@ class _Thumb extends StatelessWidget {
                 child: Container(
                   decoration: BoxDecoration(
                     borderRadius: radius,
-                    border: Border.all(color: border),
+                    border: Border.all(
+                      color: border,
+                      width: showRing ? 2 : 1,
+                    ),
                   ),
                   child: switch (status) {
                     MediaItemStatus.pending => _Placeholder(
@@ -350,13 +374,13 @@ class _Thumb extends StatelessWidget {
           // Qolganlarida — yarim shaffof «Asosiy qilish» tugmasi. Ya'ni
           // tanlov KO'RINIB turadi: ilgari muqova jimgina birinchi rasm
           // bo'lardi va foydalanuvchi uni o'zgartira olmasdi.
-          if (coverLabel != null)
+          if (coverLabel != null && (isCover || makeCoverLabel != null))
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: _CoverStrip(
-                label: isCover ? coverLabel! : (makeCoverLabel ?? coverLabel!),
+                label: isCover ? coverLabel! : makeCoverLabel!,
                 isCover: isCover,
                 radius: radius.bottomLeft.x,
                 onTap: isCover ? null : onSetCover,
@@ -412,22 +436,37 @@ class _CoverStrip extends StatelessWidget {
   Widget build(BuildContext context) {
     final strip = Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
       color: isCover
           ? AppColors.splashGreen
-          : Colors.black.withValues(alpha: 0.55),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        textAlign: TextAlign.center,
-        style: const TextStyle(
-          fontFamily: 'MTSCompact',
-          fontWeight: FontWeight.w700,
-          fontSize: 9,
-          height: 1.1,
-          color: Colors.white,
-        ),
+          : Colors.black.withValues(alpha: 0.62),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Belgi matnni takrorlamaydi, uni O'QIMASDAN farqlash uchun:
+          // ✓ — shu rasm muqova, ⊕ — bosilsa muqova bo'ladi.
+          Icon(
+            isCover ? Icons.check_circle_rounded : Icons.add_circle_outline,
+            size: 11,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 3),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'MTSCompact',
+                fontWeight: FontWeight.w700,
+                fontSize: 10,
+                height: 1.1,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
       ),
     );
 

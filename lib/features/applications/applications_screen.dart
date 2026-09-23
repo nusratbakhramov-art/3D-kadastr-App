@@ -19,6 +19,7 @@ import '../services/api_calculator_order_service.dart';
 import '../services/api_design_order_service.dart';
 import '../services/api_kadastr_3d_job_service.dart';
 import '../services/api_photogrammetry_service.dart';
+import '../shell/app_bottom_nav.dart';
 import 'application_detail_screen.dart';
 import '../market/models/market_listing.dart' show MarketCategory;
 import '../market/widgets/category_chips.dart';
@@ -925,7 +926,13 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
 
     return Scaffold(
       backgroundColor: ColorTokens.scaffoldBg(context),
+      // Pastki chetni SafeArea EMAS, ro'yxatning o'z to'ldirishi hal qiladi:
+      // qobiq `extendBody: true` bilan ishlaydi, ya'ni kontent suzuvchi panel
+      // OSTIGA o'tishi va uning gradientida erishi kerak. `bottom: true` da
+      // ro'yxat panel tepasida keskin qirqilardi (Market va Asosiy ekran
+      // allaqachon shunday).
       body: SafeArea(
+        bottom: false,
         child: Stack(
           children: [
             CustomScrollView(
@@ -1005,7 +1012,12 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                     )
                   else if (_initialized)
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        0,
+                        16,
+                        24 + AppBottomNav.contentInset(context),
+                      ),
                       sliver: SliverList(
                         delegate: SliverChildBuilderDelegate((context, index) {
                           if (index >= _items.length) {
@@ -1042,9 +1054,11 @@ class _ApplicationsScreenState extends State<ApplicationsScreen>
                     const SliverToBoxAdapter(child: SizedBox.shrink()),
                 ],
               ),
+            // Panel OSTIGA tushib ketmasin: `SafeArea(bottom: false)` dan
+            // keyin bu Stack panelning tagigacha cho'ziladi.
             Positioned(
               right: 16,
-              bottom: 16,
+              bottom: AppBottomNav.contentInset(context) + 16,
               child: ValueListenableBuilder<bool>(
                 valueListenable: _showScrollTop,
                 builder: (context, visible, _) {

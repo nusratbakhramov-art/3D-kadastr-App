@@ -46,9 +46,15 @@ struct Options {
     std::string nadirLogoPath;
     /// Angular radius of the disc, in degrees from the nadir.
     ///
-    /// This is the "3D kadastr" mark a viewer sees UNDERFOOT when it looks
-    /// straight down in the finished 360 — the only branding in the viewing
-    /// experience (the Dart/native tour chrome carries no logo of its own).
+    /// This is the mark a viewer sees UNDERFOOT when it looks straight down in
+    /// the finished 360 — the only branding in the viewing experience (the
+    /// Dart/native tour chrome carries no logo of its own). Since 2026-09-23
+    /// the artwork is the app icon itself on a transparent square; before that
+    /// it was a filled green disc with "3D kadastr" lettering.
+    ///
+    /// ⚠️ Only the INSCRIBED CIRCLE of the image is sampled — corners are never
+    /// read — and the opaque area must reach `nadirCutDeg / nadirLogoDeg` of
+    /// the radius or the cut hole shows through the logo's own transparency.
     ///
     /// 28° → 20° on 2026-09-22 at the client's request: the disc read as
     /// oversized, swallowing most of the floor. 20° still covers the 12°

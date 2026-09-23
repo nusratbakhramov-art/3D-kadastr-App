@@ -10,6 +10,7 @@ import '../../widgets/app_reveal.dart';
 import '../home/user_profile.dart';
 import '../market/widgets/listing_cta_button.dart';
 import '../onboarding/onboarding_page_data.dart';
+import '../shell/app_bottom_nav.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
@@ -125,7 +126,11 @@ class _ProfileScreenState extends State<ProfileScreen>
         fit: StackFit.expand,
         children: [
           const AppGlowBackground(),
+          // Pastki chet — ro'yxatning to'ldirishida (`extendBody: true`):
+          // kontent suzuvchi panel ostiga o'tib, uning gradientida erishi
+          // kerak, aks holda panel tepasida keskin qirqim qoladi.
           SafeArea(
+            bottom: false,
             child: ValueListenableBuilder<UserProfile?>(
               valueListenable: userProfileNotifier,
               builder: (context, profile, _) {
@@ -137,7 +142,12 @@ class _ProfileScreenState extends State<ProfileScreen>
                   valueListenable: notificationUnreadNotifier,
                   builder: (context, unread, _) {
                     return SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      padding: EdgeInsets.fromLTRB(
+                        16,
+                        8,
+                        16,
+                        24 + AppBottomNav.contentInset(context),
+                      ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
