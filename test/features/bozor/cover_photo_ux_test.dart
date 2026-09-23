@@ -11,15 +11,15 @@ import 'package:kadastr/features/bozor/widgets/media_upload_row.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'param_schema_fixture.dart';
 
-/// Muqova tanlovi KO'RINIB turishi kerak (mijoz sharhi, 2026-09-23).
+/// MUQOVA SAHNASI (mijoz tanlagan dizayn, 2026-09-24).
 ///
-/// Funksiyaning o'zi bor edi, lekin 72pt eskiz ostidagi 9pt yo'lakni hech
-/// kim topmasdi — mijoz «juda yashirin» dedi. Bu yerda TEKSHIRILADIGAN
-/// narsa mana shu xulq, piksel emas:
-///   * har doim AYNAN BITTA rasm «Asosiy rasm» deb belgilangan;
-///   * qolganlarida bosiladigan «Asosiy qilish» bor;
-///   * bosilganda belgi DARHOL yangisiga ko'chadi va eskisidan ketadi;
-///   * muqova o'chirilsa qoralamada O'LIK havola qolmaydi.
+/// Yo'lakdagi yozuvlar olib tashlandi: tanlangan rasm endi yuqorida KATTA
+/// ko'rsatiladi, eskizni bosish esa uni muqova qiladi. Tekshiriladigan
+/// xulq:
+///   * sahna har doim AYNAN BITTA — hozirgi muqovani ko'rsatadi;
+///   * eskizni bosish muqovani DARHOL almashtiradi;
+///   * muqova o'chirilsa qoralamada O'LIK havola qolmaydi;
+///   * boshqa rasm o'chsa muqova joyida qoladi.
 ///
 /// `cover_photo_choice_test.dart` esa modelning o'zini (havola/indeks
 /// qoidasi, qoralamaga saqlanishi) tekshiradi — ikkisi bir-birini
@@ -42,7 +42,7 @@ void main() {
   // ⚠️ `setUpAll` DAN KEYIN o'qiladi: `main()` tanasida chaqirilsa bundle
   // hali yuklanmagan bo'ladi va `tr` kalitning O'ZINI qaytaradi.
   String coverBadge() => tr(locale, 'bozor.media.cover_badge');
-  String makeCover() => tr(locale, 'bozor.media.make_cover');
+  String coverHint() => tr(locale, 'bozor.media.cover_hint');
 
   /// Rasm eskizi `Image.file` bilan chiziladi — fayl bo'lishi kerak, mazmuni
   /// esa ahamiyatsiz (rasm ochilmasa `errorBuilder` ikonka beradi).
@@ -94,58 +94,72 @@ void main() {
       .widgetList<MediaUploadRow>(find.byType(MediaUploadRow))
       .firstWhere((r) => r.coverLabel != null);
 
-  testWidgets('AYNAN BITTA rasm muqova deb belgilanadi', (tester) async {
-    await pump(tester, 3);
+  /// Foto qatoridagi [i]-eskiz.
+  ///
+  /// ⚠️ Aynan TASMA (`ListView`) ichidan izlaymiz. Qatorning o'zidan
+  /// izlansa birinchi topilgan narsa SAHNA bo'lib chiqadi (u ham bosiladi)
+  /// va hamma indeks bittaga suriladi. Har eskizda ikkita bosish nishoni
+  /// bor: rasmning o'zi va o'chirish tugmasi — shuning uchun `i * 2`.
+  Finder thumbAt(WidgetTester tester, int i) => find
+      .descendant(
+        of: find.descendant(
+          of: find.byWidget(photoRow(tester)),
+          matching: find.byType(ListView),
+        ),
+        matching: find.byType(GestureDetector),
+      )
+      .at(i * 2);
 
-    expect(find.text(coverBadge()), findsOneWidget);
-    expect(
-      find.text(makeCover()),
-      findsNWidgets(2),
-      reason: 'qolgan har bir rasmda tanlash tugmasi bo\'lishi kerak',
-    );
-  });
+  /// Sahna — muqovani KATTA ko'rsatadigan blok. Uni o'z nishoni bo'yicha
+  /// topamiz: «Asosiy rasm» yozuvi endi FAQAT shu yerda bo'ladi.
+  Finder stage() => find.text(coverBadge());
 
-  testWidgets('bitta rasmda nishon bor, tugma YO\'Q', (tester) async {
-    await pump(tester, 1);
+  /// Sahnadagi rasm — foto qatoridagi eng birinchi `Image.file`.
+  String stagePath(WidgetTester tester) {
+    final img = tester.widgetList<Image>(find.byType(Image)).first;
+    return ((img.image) as FileImage).file.path;
+  }
 
-    expect(
-      find.text(coverBadge()),
-      findsOneWidget,
-      reason: 'holat har doim ko\'rinsin — bitta rasm ham muqova',
-    );
-    expect(
-      find.text(makeCover()),
-      findsNothing,
-      reason: 'almashtiradigan narsa yo\'q',
-    );
-  });
-
-  testWidgets('«Asosiy qilish» bosilsa belgi DARHOL ko\'chadi', (tester) async {
+  testWidgets('sahna AYNAN BITTA va hozirgi muqovani ko\'rsatadi', (
+    tester,
+  ) async {
     final draft = await pump(tester, 3);
-    final photos = draft.description.photos;
 
-    // Oxirgi eskiz — ro'yxatdagi 3-rasm.
-    await tester.tap(find.text(makeCover()).last);
+    expect(stage(), findsOneWidget);
+    expect(find.text(coverHint()), findsOneWidget);
+    expect(stagePath(tester), draft.description.photos.first);
+  });
+
+  testWidgets('bitta rasmda ham sahna bor', (tester) async {
+    await pump(tester, 1);
+    expect(stage(), findsOneWidget);
+  });
+
+  testWidgets('eskizni bosish muqovani DARHOL almashtiradi', (tester) async {
+    final draft = await pump(tester, 3);
+    final photos = List<String>.from(draft.description.photos);
+
+    await tester.tap(thumbAt(tester, 2));
     await tester.pump();
 
     expect(draft.description.coverPhoto, photos[2]);
     expect(draft.description.coverPhotoIndex, 2);
     expect(
-      find.text(coverBadge()),
-      findsOneWidget,
-      reason: 'eski muqova nishonini YO\'QOTISHI shart — ikkita «Asosiy '
-          'rasm» bo\'lsa foydalanuvchi qaysi biri chiqishini bilmasdi',
+      stagePath(tester),
+      photos[2],
+      reason: 'sahna tanlovni darhol ko\'rsatmasa, dizaynning butun ma\'nosi '
+          'yo\'qoladi — u aynan natijani ko\'rsatish uchun qo\'yilgan',
     );
-    expect(find.text(makeCover()), findsNWidgets(2));
+    expect(stage(), findsOneWidget, reason: 'nishon faqat sahnada bo\'lsin');
   });
 
-  testWidgets('muqova o\'chirilsa havola tozalanadi va belgi birinchisiga qaytadi', (
+  testWidgets('muqova o\'chirilsa havola tozalanadi va birinchisiga qaytadi', (
     tester,
   ) async {
     final draft = await pump(tester, 3);
     final photos = List<String>.from(draft.description.photos);
 
-    await tester.tap(find.text(makeCover()).last);
+    await tester.tap(thumbAt(tester, 2));
     await tester.pump();
     expect(draft.description.coverPhoto, photos[2]);
 
@@ -159,20 +173,20 @@ void main() {
           'tanlanganda muqova kutilmaganda unga qaytardi',
     );
     expect(draft.description.coverPhotoIndex, 0);
-    expect(find.text(coverBadge()), findsOneWidget);
+    expect(stagePath(tester), photos[0]);
   });
 
   testWidgets('BOSHQA rasm o\'chsa muqova o\'z joyida qoladi', (tester) async {
     final draft = await pump(tester, 3);
     final photos = List<String>.from(draft.description.photos);
 
-    await tester.tap(find.text(makeCover()).last);
+    await tester.tap(thumbAt(tester, 2));
     await tester.pump();
 
     photoRow(tester).onRemove(0);
     await tester.pump();
 
     expect(draft.description.coverPhoto, photos[2]);
-    expect(find.text(coverBadge()), findsOneWidget);
+    expect(stagePath(tester), photos[2]);
   });
 }

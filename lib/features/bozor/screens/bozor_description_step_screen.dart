@@ -646,6 +646,7 @@ class _BozorDescriptionStepScreenState
                             // Muqovani FOYDALANUVCHI tanlaydi; tanlamasa
                             // birinchi rasm (`DescriptionDraft.coverPhoto`).
                             coverLabel: _S.coverBadge(l),
+                            coverHint: _S.coverHint(l),
                             makeCoverLabel: _S.makeCover(l),
                             coverIndex: _d.coverPhotoIndex,
                             onSetCover: (i) =>
@@ -773,6 +774,8 @@ class _S {
   static String addPhoto(Locale l) => tr(l, 'bozor.desc.add_photo');
 
   static String coverBadge(Locale l) => tr(l, 'bozor.media.cover_badge');
+
+  static String coverHint(Locale l) => tr(l, 'bozor.media.cover_hint');
 
   static String makeCover(Locale l) => tr(l, 'bozor.media.make_cover');
   static String add360(Locale l) => tr(l, 'bozor.desc.add_360');

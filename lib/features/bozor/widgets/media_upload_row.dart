@@ -36,14 +36,19 @@ class MediaUploadRow extends StatelessWidget {
     this.fileOf,
     this.statusOf,
     this.coverLabel,
+    this.coverHint,
     this.makeCoverLabel,
     this.coverIndex,
     this.onSetCover,
   });
 
-  /// Muqova eskizidagi nishon matni («Asosiy rasm»). `null` — muqova
-  /// tushunchasi bu qatorda umuman yo'q (planirovka, 360°).
+  /// Muqova sahnasidagi nishon matni («Asosiy rasm»). `null` — muqova
+  /// tushunchasi bu qatorda umuman yo'q (planirovka, 360°), ya'ni sahna ham
+  /// chizilmaydi va eskizlar oddiy ko'rish tugmasi bo'lib qoladi.
   final String? coverLabel;
+
+  /// Sahna ostidagi bir qatorlik izoh («E'lon ro'yxatida shu rasm chiqadi»).
+  final String? coverHint;
 
   /// Qolgan eskizlardagi tugma matni («Asosiy qilish»).
   final String? makeCoverLabel;
@@ -155,6 +160,23 @@ class MediaUploadRow extends StatelessWidget {
           ),
         ),
         if (paths.isNotEmpty) ...[
+          // MUQOVA SAHNASI — faqat muqova tushunchasi bor qatorda (foto).
+          //
+          // Tanlangan rasm KATTA ko'rsatiladi, e'lon kartasidagi kabi 4:3
+          // qirqim bilan. Sabab: sotuvchi «qaysi rasm asosiy» degan mavhum
+          // savolga emas, «xaridor nimani ko'radi» degan savolga javob
+          // izlaydi — buni yozuv bilan tushuntirgandan ko'ra KO'RSATGAN
+          // yaxshi. Shu sababli eskizlarda endi hech qanday yozuv yo'q.
+          if (coverLabel != null) ...[
+            const SizedBox(height: 10),
+            _CoverStage(
+              path: paths[_coverAt],
+              label: coverLabel!,
+              hint: coverHint,
+              url: urlOf?.call(paths[_coverAt]),
+              onOpen: () => _openGallery(context, _coverAt),
+            ),
+          ],
           const SizedBox(height: 8),
           SizedBox(
             height: _thumbSize,
@@ -164,47 +186,55 @@ class MediaUploadRow extends StatelessWidget {
               separatorBuilder: (_, _) => const SizedBox(width: 8),
               itemBuilder: (context, i) => _Thumb(
                 path: paths[i],
-                coverLabel: coverLabel,
-                // Bitta rasm bo'lsa TANLASH ma'nosiz (u allaqachon muqova) —
-                // nishon ko'rinadi, «Asosiy qilish» tugmasi esa yo'q.
-                makeCoverLabel: paths.length > 1 ? makeCoverLabel : null,
-                isCover: i == coverIndex,
-                onSetCover: (onSetCover == null || paths.length < 2)
+                // Sahna bor joyda eskiz — TANLASH tugmasi: bosilsa muqova
+                // bo'ladi va yuqorida darhol ko'rinadi. Kattalashtirib
+                // ko'rish sahnaning o'zidan (u yerda hamma rasmni surib
+                // chiqish mumkin), shuning uchun eskiz ikki vazifani
+                // birdan bajarmaydi.
+                selectable: coverLabel != null,
+                isCover: coverLabel != null && i == _coverAt,
+                onSetCover: (onSetCover == null || coverLabel == null)
                     ? null
                     : () => onSetCover!(i),
                 url: urlOf?.call(paths[i]),
                 file: fileOf?.call(paths[i]),
                 status: statusOf?.call(paths[i]) ?? MediaItemStatus.ready,
                 onRemove: () => onRemove(i),
-                onOpen: () {
-                  final ValueChanged<int>? open = onOpen;
-                  if (open != null) {
-                    open(i);
-                    return;
-                  }
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => FilePreviewGallery(
-                        paths: paths,
-                        initialIndex: i,
-                        // KATTA rasmda ham muqova ko'rinadi va shu yerdan
-                        // almashtiriladi — tasmadagi 96pt eskiz bilan
-                        // cheklanib qolmaslik uchun.
-                        coverIndex: coverIndex,
-                        coverLabel: coverLabel,
-                        makeCoverLabel: paths.length > 1
-                            ? makeCoverLabel
-                            : null,
-                        onSetCover: paths.length < 2 ? null : onSetCover,
-                      ),
-                    ),
-                  );
-                },
+                onOpen: () => _openGallery(context, i),
               ),
             ),
           ),
         ],
       ],
+    );
+  }
+
+  /// Muqovaning o'rni — belgilanmagan bo'lsa birinchisi.
+  int get _coverAt {
+    final i = coverIndex ?? 0;
+    return (i >= 0 && i < paths.length) ? i : 0;
+  }
+
+  void _openGallery(BuildContext context, int index) {
+    final ValueChanged<int>? open = onOpen;
+    if (open != null) {
+      open(index);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FilePreviewGallery(
+          paths: paths,
+          initialIndex: index,
+          // KATTA rasmda ham muqova ko'rinadi va shu yerdan almashtiriladi.
+          // Sahna faqat muqovani ko'rsatadi, qolgan rasmlarni esa aynan shu
+          // yerda surib chiqish mumkin — ya'ni hech bir rasm «yo'qolmaydi».
+          coverIndex: _coverAt,
+          coverLabel: coverLabel,
+          makeCoverLabel: paths.length > 1 ? makeCoverLabel : null,
+          onSetCover: paths.length < 2 ? null : onSetCover,
+        ),
+      ),
     );
   }
 }
@@ -234,15 +264,14 @@ class _Thumb extends StatelessWidget {
     required this.status,
     this.url,
     this.file,
-    this.coverLabel,
-    this.makeCoverLabel,
+    this.selectable = false,
     this.isCover = false,
     this.onSetCover,
   });
 
-  /// Bo'sh bo'lmasa — eskiz ostida muqova yo'lagi chiziladi.
-  final String? coverLabel;
-  final String? makeCoverLabel;
+  /// Eskiz MUQOVA TANLASH tugmasimi. `false` — bosilsa galereya ochiladi
+  /// (planirovka, 360° qatorlari shunday qoladi).
+  final bool selectable;
   final bool isCover;
   final VoidCallback? onSetCover;
 
@@ -261,9 +290,10 @@ class _Thumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final idle = isDark ? const Color(0xFF2C3133) : const Color(0xFFE3E5E8);
-    // Muqova eskizi YASHIL HALQA bilan ajralib turadi: nishonning o'zi past
-    // yo'lakda, kichkina — bir qarashda qaysi rasm asosiy ekani ko'rinsin.
-    final showRing = coverLabel != null && isCover;
+    // Tanlangani YASHIL HALQA bilan ajralib turadi. Yozuv yo'q: qaysi rasm
+    // muqova ekanini yuqoridagi sahna ko'rsatib turibdi, halqa esa tasmada
+    // qaysi biri ekanini bildiradi.
+    final showRing = selectable && isCover;
     final border = showRing ? AppColors.splashGreen : idle;
     final radius = BorderRadius.circular(12);
 
@@ -274,7 +304,11 @@ class _Thumb extends StatelessWidget {
         children: [
           Positioned.fill(
             child: GestureDetector(
-              onTap: hapticTap(onOpen),
+              // Tanlanadigan qatorda bosish = MUQOVA QILISH. Allaqachon
+              // muqova bo'lsa yoki tanlash o'chirilgan bo'lsa — galereya.
+              onTap: (selectable && !isCover && onSetCover != null)
+                  ? hapticSelect(onSetCover!)
+                  : hapticTap(onOpen),
               child: ClipRRect(
                 borderRadius: radius,
                 child: Container(
@@ -370,20 +404,25 @@ class _Thumb extends StatelessWidget {
           // «o'chirish» tugmasi egallagan, ikkisi bir joyda bo'lsa bosishga
           // xalaqit berardi.
           //
-          // Muqovada — to'q yashil nishon (bosilmaydi, u allaqachon muqova).
-          // Qolganlarida — yarim shaffof «Asosiy qilish» tugmasi. Ya'ni
-          // tanlov KO'RINIB turadi: ilgari muqova jimgina birinchi rasm
-          // bo'lardi va foydalanuvchi uni o'zgartira olmasdi.
-          if (coverLabel != null && (isCover || makeCoverLabel != null))
+          // Tanlanganida — kichik yashil belgi. Matn YO'Q: 96pt eskizdagi
+          // 10pt yozuvni hech kim o'qimasdi, aynan shu sababli bu dizayn
+          // almashtirildi.
+          if (showRing)
             Positioned(
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: _CoverStrip(
-                label: isCover ? coverLabel! : makeCoverLabel!,
-                isCover: isCover,
-                radius: radius.bottomLeft.x,
-                onTap: isCover ? null : onSetCover,
+              right: 3,
+              bottom: 3,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: const BoxDecoration(
+                  color: AppColors.splashGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.check_rounded,
+                  size: 14,
+                  color: Color(0xFF011606),
+                ),
               ),
             ),
           Positioned(
@@ -418,72 +457,6 @@ Widget _fallbackIcon(bool isDark) => Icon(
 );
 
 /// Eskiz o'rnidagi belgi — hali rasm yo'q (tayyorlanmoqda yoki yiqilgan).
-/// Eskiz ostidagi muqova yo'lagi — nishon ham, tugma ham shu.
-class _CoverStrip extends StatelessWidget {
-  const _CoverStrip({
-    required this.label,
-    required this.isCover,
-    required this.radius,
-    this.onTap,
-  });
-
-  final String label;
-  final bool isCover;
-  final double radius;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final strip = Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      color: isCover
-          ? AppColors.splashGreen
-          : Colors.black.withValues(alpha: 0.62),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Belgi matnni takrorlamaydi, uni O'QIMASDAN farqlash uchun:
-          // ✓ — shu rasm muqova, ⊕ — bosilsa muqova bo'ladi.
-          Icon(
-            isCover ? Icons.check_circle_rounded : Icons.add_circle_outline,
-            size: 11,
-            color: Colors.white,
-          ),
-          const SizedBox(width: 3),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontFamily: 'MTSCompact',
-                fontWeight: FontWeight.w700,
-                fontSize: 10,
-                height: 1.1,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-
-    return ClipRRect(
-      borderRadius: BorderRadius.vertical(bottom: Radius.circular(radius)),
-      // Muqovaning o'zida bosish yo'q — bosilsa hech narsa o'zgarmasdi,
-      // lekin tugmadek ko'rinib turardi.
-      child: onTap == null
-          ? IgnorePointer(child: strip)
-          : Material(
-              color: Colors.transparent,
-              child: InkWell(onTap: hapticSelect(onTap!), child: strip),
-            ),
-    );
-  }
-}
-
 class _Placeholder extends StatelessWidget {
   const _Placeholder({
     required this.isDark,
@@ -502,4 +475,116 @@ class _Placeholder extends StatelessWidget {
     ),
     child: Center(child: child),
   );
+}
+
+/// MUQOVA SAHNASI — tanlangan rasm, e'lon kartasidagi qirqim bilan.
+///
+/// Nima uchun katta: sotuvchi «qaysi biri asosiy» degan mavhum savolga emas,
+/// «xaridor nimani ko'radi» degan savolga javob izlaydi. Kartaning o'zi 4:3
+/// qirqim ishlatadi (`listing_card.dart`), shuning uchun bu yerda ham aynan
+/// shu nisbat — ya'ni sahna va'da qilgan narsa haqiqatan chiqadi.
+///
+/// Bosilsa galereya ochiladi: barcha rasmlarni surib chiqish mumkin, ya'ni
+/// eskiz bosish «tanlash» ga aylangani bilan hech bir rasm yo'qolmaydi.
+class _CoverStage extends StatelessWidget {
+  const _CoverStage({
+    required this.path,
+    required this.label,
+    required this.onOpen,
+    this.hint,
+    this.url,
+  });
+
+  final String path;
+  final String label;
+  final String? hint;
+  final String? url;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final radius = BorderRadius.circular(16);
+    final net = url != null && url!.isNotEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: hapticTap(onOpen),
+          child: ClipRRect(
+            borderRadius: radius,
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (net)
+                    Image.network(
+                      url!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _fallbackIcon(isDark),
+                    )
+                  else
+                    Image.file(
+                      File(path),
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => _fallbackIcon(isDark),
+                    ),
+                  Positioned(
+                    left: 10,
+                    top: 10,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.splashGreen,
+                        borderRadius: BorderRadius.circular(9),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.check_circle_rounded,
+                            size: 13,
+                            color: Color(0xFF011606),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            label,
+                            style: const TextStyle(
+                              fontFamily: 'MTSCompact',
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                              height: 1.2,
+                              color: Color(0xFF011606),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (hint != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            hint!,
+            style: TextStyle(
+              fontFamily: 'MTSCompact',
+              fontWeight: FontWeight.w500,
+              fontSize: 12.5,
+              height: 1.25,
+              color: isDark ? const Color(0xFFB0B5BB) : const Color(0xFF6E7480),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
