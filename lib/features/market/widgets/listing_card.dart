@@ -119,18 +119,28 @@ class ListingCard extends StatelessWidget {
                         color: titleColor,
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    _MetaRow(
-                      iconAsset: 'assets/icons/map.svg',
-                      text: listing.district,
-                      color: metaColor,
-                    ),
-                    const SizedBox(height: 2),
-                    _MetaRow(
-                      iconAsset: 'assets/icons/ruler-triangle.svg',
-                      text: '${listing.areaM2} m²',
-                      color: metaColor,
-                    ),
+                    // Hudud va maydon PROD'da ko'pincha to'ldirilmagan
+                    // (2026-09-23: 265 ta modeldan 245 tasida hudud, 213
+                    // tasida maydon yo'q). Ilgari qator baribir chizilardi:
+                    // xarita ikonkasi yonida BO'SH joy, o'lchagich yonida
+                    // esa «0 m²» — ya'ni noto'g'ri fakt. Ulashish matni va
+                    // karusel allaqachon shu qoidada.
+                    if (listing.district.trim().isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      _MetaRow(
+                        iconAsset: 'assets/icons/map.svg',
+                        text: listing.district.trim(),
+                        color: metaColor,
+                      ),
+                    ],
+                    if (listing.areaM2 > 0) ...[
+                      const SizedBox(height: 2),
+                      _MetaRow(
+                        iconAsset: 'assets/icons/ruler-triangle.svg',
+                        text: '${listing.areaM2} ${tr(locale, 'bozor.unit.m²')}',
+                        color: metaColor,
+                      ),
+                    ],
                     const SizedBox(height: 10),
                     _BatafsilButton(
                       locale: locale,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../core/i18n/app_translations.dart';
 import '../../../theme/app_colors.dart';
 
 class ListingMetaPills extends StatelessWidget {
@@ -15,17 +16,24 @@ class ListingMetaPills extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: [
-        ListingMetaPill(iconAsset: 'assets/icons/map.svg', text: district),
+    final locale = Localizations.localeOf(context);
+    // BO'SH qiymat nishon yasamaydi — «Bozor AI» e'loni va ulashish matni
+    // shu qoidada. Aks holda prod'dagi ko'p modelda bo'sh xarita nishoni va
+    // «0 m²» chiqardi (hudud 245/265, maydon 213/265 da yo'q, 2026-09-23).
+    final pills = <Widget>[
+      if (district.trim().isNotEmpty)
+        ListingMetaPill(
+          iconAsset: 'assets/icons/map.svg',
+          text: district.trim(),
+        ),
+      if (areaM2 > 0)
         ListingMetaPill(
           iconAsset: 'assets/icons/ruler-triangle.svg',
-          text: '$areaM2 m²',
+          text: '$areaM2 ${tr(locale, 'bozor.unit.m²')}',
         ),
-      ],
-    );
+    ];
+    if (pills.isEmpty) return const SizedBox.shrink();
+    return Wrap(spacing: 8, runSpacing: 8, children: pills);
   }
 }
 

@@ -221,8 +221,10 @@ class _GlassPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final locale = Localizations.localeOf(context);
     final meta = <String>[
-      if (listing.areaM2 > 0) '${listing.areaM2} m²',
+      if (listing.areaM2 > 0)
+        '${listing.areaM2} ${tr(locale, 'bozor.unit.m²')}',
       if (listing.district.isNotEmpty) listing.district,
     ].join('  •  ');
 

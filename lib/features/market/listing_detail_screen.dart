@@ -219,7 +219,7 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
     // " · 0 m²" bo'lib chiqadi, shuning uchun faqat mavjudlarini yig'amiz.
     final meta = [
       if (l.district.trim().isNotEmpty) l.district.trim(),
-      if (l.areaM2 > 0) '${l.areaM2} m²',
+      if (l.areaM2 > 0) '${l.areaM2} ${tr(locale, 'bozor.unit.m²')}',
       if (l.isFree)
         tr(locale, 'market.listing.free')
       else if (l.priceUzs > 0)
@@ -601,14 +601,18 @@ class _ListingDetailScreenState extends State<ListingDetailScreen>
                 onShare: _share,
               ),
             ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: ListingMetaPills(
-                district: listing.district,
-                areaM2: listing.areaM2,
+            // Ikkala fakt ham bo'lmasa (prod'da tez-tez) qator UMUMAN
+            // chizilmaydi — bo'sh nishonlar ham, ular atrofidagi oraliq ham.
+            if (listing.district.trim().isNotEmpty || listing.areaM2 > 0) ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ListingMetaPills(
+                  district: listing.district,
+                  areaM2: listing.areaM2,
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
