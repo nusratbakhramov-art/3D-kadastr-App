@@ -46,7 +46,12 @@ Result stitchMVS(const std::vector<FrameInput>& frames, const Options& opt, cons
             if (popt.sensorPoses) {
                 baOpt.width = popt.ba.width;
                 baOpt.sensorTranslationInit = popt.ba.sensorTranslationInit;
+                baOpt.stableMatching = popt.ba.stableMatching;
                 baOpt.iterations = std::max(popt.ba.iterations, 40);
+                baOpt.rotationGraph = popt.ba.rotationGraph;
+                baOpt.rotationGraphPriorWeight = popt.ba.rotationGraphPriorWeight;
+                baOpt.rotationGraphMinInliers = popt.ba.rotationGraphMinInliers;
+                baOpt.rotationGraphThresholdDeg = popt.ba.rotationGraphThresholdDeg;
             }
             poses = bundleAdjustPoses(frames, baOpt,
                                       [&](float p, const std::string& m) {
@@ -84,6 +89,13 @@ Result stitchMVS(const std::vector<FrameInput>& frames, const Options& opt, cons
             "unconstrained sensor cameras " + std::to_string(st.ba.constrainedCameras) + "/" + std::to_string(frames.size());
         // Retain well-supported BA rotations, never its guessed translations.
         for (auto& pose : poses) pose.p = cv::Vec3f(0, 0, 0);
+        // The joint solve fitted each rotation together with a translation that is about to be
+        // discarded, so those rotations no longer describe the pure pivot this stitch assumes.
+        // When the caller asked for it, use the rotations solved rotation-only instead.
+        if (popt.ba.rotationGraph && st.ba.rotationGraphRotations.size() == frames.size()) {
+            for (size_t i = 0; i < poses.size(); ++i) poses[i].R = st.ba.rotationGraphRotations[i];
+            st.fallbackReason += " (rotation graph)";
+        }
     }
     st.baSeconds = secondsSince(t0);
 

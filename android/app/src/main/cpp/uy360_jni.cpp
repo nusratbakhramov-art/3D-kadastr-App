@@ -14,6 +14,7 @@
 // The progress callback is invoked from OpenCV worker threads: those are not attached to the
 // JVM, so every call attaches (if needed), invokes the callback and detaches again.
 #include "uy360_pipeline.hpp"
+#include "uy360_ba_diagnostics.hpp"
 #include "uy360_stitch.hpp"
 #include "uy360_types.hpp"
 
@@ -87,6 +88,13 @@ std::string resultJson(const uy360::Result& r, const uy360::PipelineStats* st, c
     std::string out = buf;
     out += std::string("\"gainCompensation\":\"") + (preservePhotometry ? "locked-capture" : "overlap") + "\",";
     if (st) {
+        out += "\"baGeometry\":" + uy360::baGeometryJson(st->ba) + ",";
+        out += "\"mvsConfidenceFractions\":[";
+        for (size_t i = 0; i < st->mvs.confFraction.size(); ++i) {
+            if (i) out += ",";
+            out += std::isfinite(st->mvs.confFraction[i]) ? std::to_string(st->mvs.confFraction[i]) : "null";
+        }
+        out += "],";
         out += "\"baConstrainedCameras\":" + std::to_string(st->ba.constrainedCameras) + ",";
         out += "\"baPoints\":" + std::to_string(st->ba.points) + ",";
         out += "\"baCameraObservations\":[";
@@ -252,6 +260,11 @@ Java_uz_kadastr_kadastr_pano_NativeStitcher_stitch(JNIEnv* env, jobject, jobject
             // ARCore captures (6-DoF, metric) use the same accurate-pose priors as iOS.
             popt.sensorPoses = sensorPoses == JNI_TRUE;
             popt.requireAllSensorCameras = popt.sensorPoses;
+            // Sensor captures end up rotation-only whenever translation support fails, and the
+            // jointly solved rotations were fitted together with the translation that is then
+            // discarded. Solve the rotations on their own as well and use those for the
+            // rotation-only stitch. Measured-pose (ARCore/iOS) paths are untouched.
+            popt.ba.rotationGraph = popt.sensorPoses;
             // Match the existing missing/feet cap; do not overwrite another 16° of photographed floor.
             if (popt.sensorPoses) opt.nadirLogoDeg = opt.nadirCutDeg;
             r = uy360::stitchMVS(frames, opt, popt, pano, preview, prog, &st);

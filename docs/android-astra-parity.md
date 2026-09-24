@@ -83,3 +83,63 @@ The marketing version/build number and existing AAB are not updated by this port
   Physical camera-lock, JNI pixel and saved-capture replay tests are included
   and compile, but were not run on the device during this port.
 - `git diff --check` passed. No version bump, commit, push or store upload.
+
+---
+
+# Second port — 2026-09-24 (rotation-only BA for sensor captures)
+
+Compared mobile at `ea4b272` with the standalone **working tree** (branch
+`astra-android`, HEAD still `62887a5`). Mobile matched standalone's committed
+core byte-for-byte, so everything below came from standalone's UNCOMMITTED
+work — that is what "stale" meant here, not a missed commit.
+
+## Ported
+
+| Change | Files |
+|---|---|
+| Rotation-only camera graph: per-pair RANSAC rotation consensus over unit bearings, synchronised across the graph, solved separately from the joint BA | `uy360_ba.hpp`, `uy360_ba.cpp` |
+| Pipeline passes the rotation-graph options through and uses those rotations when the stitch is rotation-only | `uy360_pipeline.cpp` |
+| `BAOptions::stableMatching` — isolates randomized matching from caller RNG history | `uy360_ba.hpp`, `uy360_ba.cpp` |
+| BA geometry / MVS confidence diagnostics in the native result JSON | `uy360_ba_diagnostics.hpp` (new), `uy360_jni.cpp` |
+| Android opt-in: `popt.ba.rotationGraph = popt.sensorPoses` | `uy360_jni.cpp` |
+
+Why it matters here: Android's production ultra-wide capture is a sensor
+(gyro/accelerometer) capture with no measured translation. The joint solve
+fitted every rotation together with a translation that the rotation-only
+stitch then throws away, so the rotations it kept no longer described a pure
+pivot. The graph solves rotations on their own.
+
+The four core files are byte-identical to standalone again. `rotationGraph`
+and `stableMatching` default to `false`, and only the Android JNI turns them
+on, so **iOS processing is unchanged** — the same rule the first port followed.
+
+## Deliberately NOT ported
+
+The rest of standalone's uncommitted work is the dense-capture experiment and
+its instrumentation, which `ANDROID_360_AGENT_HANDOFF.md` records as unvalidated
+and requires to stay isolated:
+
+- `UltraWideCaptureMode`, the 29-shot `TargetGrid.ultraWideDense()` grid, the
+  `ultrawide_dense` pose mode, its settings entry, strings and routing;
+- the `denseExperiment` JNI/`NativeStitcher` parameter and
+  `PanoStorage.isDenseExperiment` (mobile keeps its 17-shot signature);
+- `CapturePoseHistory.exposureTrace`, `captureMode` / `expectedTargetCount` /
+  `exposurePoseTrace` metadata, the ARCore rig-transform and exposure-timing
+  probes, and the research markdown.
+
+Mobile therefore still ships exactly the 17-shot production grid.
+
+## Validation for this port
+
+- `:app:externalNativeBuildDebug` — BUILD SUCCESSFUL; `uy360_ba.cpp.o` rebuilt
+  for arm64-v8a, armeabi-v7a and x86_64, `libuy360.so` relinked.
+- `:app:testDebugUnitTest` — 39 tests, 0 failures.
+- iOS `RunnerTests/StitchingTests` on the 16e simulator — 14 tests, 0
+  failures, including standalone's own new diagnostics test, ported here
+  (`testBAGeometryDiagnosticsSerializeGraphsAndUnscaledPositions`). It is
+  the ONLY iOS-side change in this port: the shared core compiles on both
+  platforms, so a broken diagnostics format must fail on both.
+- NOT verified: a real room capture on hardware. The rotation graph is new in
+  standalone too and has no regression test there; standalone's own handoff
+  says its quality target is unverified. Treat the visual result as unproven
+  until an S23 capture is compared against one from the previous build.

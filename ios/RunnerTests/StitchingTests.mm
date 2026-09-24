@@ -1,5 +1,6 @@
 // OpenCV must precede the Apple headers (the Objective-C YES/NO macros conflict with OpenCV).
 #include "../Runner/PanoCore/uy360_pipeline.hpp"
+#include "../Runner/PanoCore/uy360_ba_diagnostics.hpp"
 #include <opencv2/imgproc.hpp>
 #include <cmath>
 #import <XCTest/XCTest.h>
@@ -101,6 +102,28 @@ static NSArray *frameDictionaries(const std::vector<uy360::FrameInput>& frames) 
 @end
 
 @implementation StitchingTests
+// Android natijasi JSON ichida shu diagnostikani qaytaradi; u umumiy `core` da
+// yashaydi, shuning uchun sinov shu yerda — iOS ham o'sha faylni kompilyatsiya
+// qiladi va buzilgan format ikkala platformada ham bir xil sinadi.
+- (void)testBAGeometryDiagnosticsSerializeGraphsAndUnscaledPositions {
+    uy360::BAStats stats;
+    stats.frameCount = 3;
+    stats.acceptedPairEdges = {{0, 1}, {1, 2}};
+    stats.triangulatedEdges = {{0, 1}};
+    stats.cameraObservations = {12, 12, 0};
+    stats.optimizedPositions = {{0, 0, 0}, {0.25f, 0, 0}, {0, 0, 0}};
+    std::string encoded = uy360::baGeometryJson(stats);
+    NSData *data = [NSData dataWithBytes:encoded.data() length:encoded.size()];
+    NSError *error = nil;
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+    XCTAssertNil(error);
+    XCTAssertEqualObjects(json[@"frameCount"], @3);
+    XCTAssertEqualObjects(json[@"acceptedPairEdges"], (@[@[@0, @1], @[@1, @2]]));
+    XCTAssertEqualObjects(json[@"triangulatedEdges"], (@[@[@0, @1]]));
+    XCTAssertEqualObjects(json[@"cameraObservations"], (@[@12, @12, @0]));
+    XCTAssertEqualObjects(json[@"optimizedPositionsSolvedUnits"][1], (@[@0.25, @0, @0]));
+}
+
 - (void)testSavedCoreMotionMetadataEntersHighQualityBAAndMVS {
     NSString *dir = [NSTemporaryDirectory() stringByAppendingPathComponent:NSUUID.UUID.UUIDString];
     [[NSFileManager defaultManager] createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];

@@ -15,6 +15,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <limits>
 #include <mutex>
 #include <set>
 #include <unordered_map>
@@ -27,6 +28,21 @@ namespace {
 bool debugOn() { static const bool on = std::getenv("UY360_BA_DEBUG") != nullptr; return on; }
 
 constexpr int kMinObsPerCamera = 10;  // fewer → the camera keeps its ARKit pose
+
+// OpenCV's FLANN indexes use the executing thread's RNG. Scope and restore it so
+// prior captures and parallel scheduling cannot select different feature matches.
+class ScopedMatchingRng {
+public:
+    ScopedMatchingRng(bool enabled, uint64_t seed) : enabled_(enabled), state_(cv::theRNG().state) {
+        if (enabled_) cv::theRNG().state = seed;
+    }
+    ~ScopedMatchingRng() { if (enabled_) cv::theRNG().state = state_; }
+    ScopedMatchingRng(const ScopedMatchingRng&) = delete;
+    ScopedMatchingRng& operator=(const ScopedMatchingRng&) = delete;
+private:
+    bool enabled_;
+    uint64_t state_;
+};
 
 using cv::Matx33d;
 using cv::Vec3d;
@@ -72,6 +88,158 @@ Matx33d orthonormalize(const Matx33d& M) {
     cv::SVD::compute(A, w, u, vt, cv::SVD::FULL_UV);
     cv::Mat R = u * vt;
     return Matx33d(R);
+}
+
+// ------------------------------------------------------- rotation-only camera graph (opt-in)
+// A panorama stitched rotation-only cannot use rotations that were optimized jointly with a
+// translation and then had that translation zeroed: the pair of them fitted the images
+// together, and half of that fit is thrown away. These helpers solve the rotations on their
+// own, from unit bearings, so the result is valid for a pure pivot.
+Matx33d projectSO3(const Matx33d& M) {
+    cv::Mat w, u, vt;
+    cv::SVD::compute(cv::Mat(M), w, u, vt, cv::SVD::FULL_UV);
+    cv::Mat R = u * vt;
+    if (cv::determinant(R) < 0) {  // reflection: flip the least-significant axis
+        cv::Mat d = cv::Mat::eye(3, 3, CV_64F);
+        d.at<double>(2, 2) = -1;
+        R = u * d * vt;
+    }
+    return Matx33d(R);
+}
+
+// R minimizing the angle between R·a_k and b_k (Kabsch on unit vectors).
+Matx33d kabschSO3(const std::vector<Vec3d>& a, const std::vector<Vec3d>& b,
+                  const std::vector<int>& use) {
+    Matx33d M = Matx33d::zeros();
+    for (int k : use)
+        for (int r = 0; r < 3; ++r)
+            for (int c = 0; c < 3; ++c) M(r, c) += b[k][r] * a[k][c];
+    return projectSO3(M);
+}
+
+double angleBetweenDeg(const Vec3d& a, const Vec3d& b) {
+    return std::acos(std::max(-1.0, std::min(1.0, a.dot(b)))) * 180.0 / M_PI;
+}
+
+/// RANSAC rotation consensus for one pair. `prior` is the relative sensor rotation; the
+/// correction is bounded (maxDeltaDeg) so a wrong but self-consistent set of repeated
+/// architectural features cannot rotate a camera away from the sensor. Returns the inliers.
+int rotationConsensus(const std::vector<Vec3d>& a, const std::vector<Vec3d>& b,
+                      const Matx33d& prior, uint64_t seed, Matx33d& out,
+                      double thresholdDeg = 0.5, double maxDeltaDeg = 12.0) {
+    out = prior;
+    const int m = (int)a.size();
+    if (m < 3) return 0;
+    cv::RNG rng(seed);
+    std::vector<int> best, sample(3), ok;
+    double bestScore = std::numeric_limits<double>::max();
+    for (int it = 0; it < 600; ++it) {
+        for (int s = 0; s < 3; ++s) sample[s] = rng.uniform(0, m);
+        if (sample[0] == sample[1] || sample[1] == sample[2] || sample[0] == sample[2]) continue;
+        // Three nearly collinear or tightly clustered bearings do not determine a rotation.
+        Matx33d S;
+        for (int s = 0; s < 3; ++s)
+            for (int c = 0; c < 3; ++c) S(s, c) = a[sample[s]][c];
+        cv::Mat sv;
+        cv::SVD::compute(cv::Mat(S), sv, cv::noArray(), cv::noArray(), cv::SVD::NO_UV);
+        if (sv.at<double>(2) < 0.015) continue;
+        Matx33d R = kabschSO3(a, b, sample);
+        if (angleDeg(R, prior) > maxDeltaDeg) continue;
+        ok.clear();
+        std::vector<double> errs;
+        for (int k = 0; k < m; ++k) {
+            double e = angleBetweenDeg(R * a[k], b[k]);
+            if (e < thresholdDeg) { ok.push_back(k); errs.push_back(e); }
+        }
+        if (ok.empty()) continue;
+        std::nth_element(errs.begin(), errs.begin() + errs.size() / 2, errs.end());
+        const double score = errs[errs.size() / 2];
+        if (ok.size() > best.size() || (ok.size() == best.size() && score < bestScore)) {
+            best = ok;
+            bestScore = score;
+        }
+    }
+    if ((int)best.size() < 3) return (int)best.size();
+    Matx33d R = kabschSO3(a, b, best);
+    for (int r = 0; r < 3; ++r) {
+        ok.clear();
+        for (int k = 0; k < m; ++k)
+            if (angleBetweenDeg(R * a[k], b[k]) < thresholdDeg) ok.push_back(k);
+        if ((int)ok.size() < 3) break;
+        Matx33d cand = kabschSO3(a, b, ok);
+        if (angleDeg(cand, prior) > maxDeltaDeg) break;
+        R = cand;
+        best = ok;
+    }
+    out = R;
+    return (int)best.size();
+}
+
+struct RotationEdge {
+    int i = 0, j = 0;
+    Matx33d Rji;                 // R_jᵀ R_i from the consensus
+    double weight = 0;           // capped inlier count
+    std::vector<Vec3d> a, b;     // inlier bearings in camera axes
+};
+
+/// Synchronise the relative rotations over the graph, then refine directly on the bearings.
+/// `soft` carries only the relative *sensor* rotation and is applied one-sidedly, to cameras
+/// with no accepted edge: without it they keep the absolute sensor gauge while their
+/// neighbours move several degrees, which tears the join along an untextured ceiling.
+std::vector<Matx33d> solveRotationGraph(const std::vector<Matx33d>& R0,
+                                        const std::vector<RotationEdge>& edges,
+                                        const std::vector<RotationEdge>& soft,
+                                        double priorWeight, double thresholdDeg) {
+    const int n = (int)R0.size();
+    std::vector<Matx33d> R = R0;
+    std::vector<char> supported(n, 0);
+    for (const auto& e : edges) { supported[e.i] = 1; supported[e.j] = 1; }
+    auto addSoft = [&](int i, Matx33d& total) {
+        if (supported[i] || priorWeight <= 0) return;
+        for (const auto& l : soft) {
+            // Links between two unsupported cameras still matter: they hold an untextured
+            // region together while the cameras next to a solved one pull it into place.
+            if (l.i == i) total += priorWeight * (R[l.j] * l.Rji);
+            else if (l.j == i) total += priorWeight * (R[l.i] * l.Rji.t());
+        }
+    };
+    for (int sweep = 0; sweep < 60; ++sweep)
+        for (int i = 0; i < n; ++i) {
+            Matx33d total = 2.0 * R0[i];
+            for (const auto& e : edges) {
+                if (e.i == i) total += e.weight * (R[e.j] * e.Rji);
+                else if (e.j == i) total += e.weight * (R[e.i] * e.Rji.t());
+            }
+            addSoft(i, total);
+            R[i] = projectSO3(total);
+        }
+    for (int sweep = 0; sweep < 50; ++sweep)
+        for (int i = 0; i < n; ++i) {
+            Matx33d total = 0.1 * R0[i];
+            for (const auto& e : edges) {
+                const bool first = e.i == i;
+                if (!first && e.j != i) continue;
+                const int j = first ? e.j : e.i;
+                const std::vector<Vec3d>& a = first ? e.a : e.b;
+                const std::vector<Vec3d>& b = first ? e.b : e.a;
+                const double scale = e.weight / std::max<size_t>(1, a.size());
+                for (size_t k = 0; k < a.size(); ++k) {
+                    const Vec3d target = R[j] * b[k], current = R[i] * a[k];
+                    const double err = angleBetweenDeg(current, target) / std::max(0.1, thresholdDeg);
+                    const double w = scale / (1.0 + err * err);
+                    for (int r = 0; r < 3; ++r)
+                        for (int c = 0; c < 3; ++c) total(r, c) += w * target[r] * a[k][c];
+                }
+            }
+            addSoft(i, total);
+            R[i] = projectSO3(total);
+        }
+    // Restore the global sensor orientation (gauge). Individual tilts stay as solved.
+    Matx33d g = Matx33d::zeros();
+    for (int i = 0; i < n; ++i) g += R0[i] * R[i].t();
+    const Matx33d gauge = projectSO3(g);
+    for (int i = 0; i < n; ++i) R[i] = gauge * R[i];
+    return R;
 }
 
 // -------------------------------------------------------------------- per-frame data
@@ -800,7 +968,7 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
         out[i].R = cv::Matx33f(cams[i].R0);
         out[i].p = cv::Vec3f((float)t[12], (float)t[13], (float)t[14]);
     }
-    if (stats) *stats = BAStats();
+    if (stats) { *stats = BAStats(); stats->frameCount = n; stats->minCameraObservations = kMinObsPerCamera; }
     if (n < 2) return out;
 
     // Sensor poses carry no translation (all positions equal, typically 0). Seed them with the
@@ -875,8 +1043,10 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
     std::vector<cv::Ptr<cv::flann::Index>> flannIdx(n);
     cv::parallel_for_(cv::Range(0, n), [&](const cv::Range& rg) {
         for (int i = rg.start; i < rg.end; ++i)
-            if (!cams[i].desc.empty())
+            if (!cams[i].desc.empty()) {
+                ScopedMatchingRng rng(opt.stableMatching, 0xffffffffULL + uint64_t(i) * 7919ULL);
                 flannIdx[i] = cv::makePtr<cv::flann::Index>(cams[i].desc, cv::flann::KDTreeIndexParams(4), cvflann::FLANN_DIST_L2);
+            }
     });
     const int minInliers = 25;       // for a hypothesis whose rotation may differ from the prior
     const int minInliersKnownR = 14; // when the essential geometry agrees with the prior rotation (< 8°):
@@ -900,6 +1070,7 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
     auto runPairs = [&](bool onlyFailed) {
         cv::parallel_for_(cv::Range(0, (int)pairs.size()), [&](const cv::Range& rg) {
             for (int pi = rg.start; pi < rg.end; ++pi) {
+                ScopedMatchingRng rng(opt.stableMatching, 1234567ULL + uint64_t(pi) * 7919ULL);
                 PairResult& pr = results[pi];
                 if (onlyFailed && pr.ok) continue;
                 const int i = pairs[pi].first, j = pairs[pi].second;
@@ -992,6 +1163,108 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
     };
     runPairs(false);
 
+    // -------------------------------------------------- 2b. rotation-only graph (opt-in)
+    // Independent of the joint solve below: same features, but matched reciprocally and fitted
+    // as a pure rotation. Nothing here changes cams[].R0, the pairs, the gates or the LM.
+    if (opt.rotationGraph && stats) {
+        const double t0rg = elapsed();
+        report(0.75f, "BA: rotation graph");
+        std::vector<Matx33d> R0(n);
+        for (int c = 0; c < n; ++c) R0[c] = cams[c].R0;
+        // One keypoint per cell, so a densely textured corner cannot outvote the rest of the
+        // overlap. 12 px at the 2000 px working width the offline study used.
+        const double cellPx = std::max(3.0, width / 160.0);
+        std::vector<RotationEdge> edges, soft;
+        std::vector<std::vector<cv::DMatch>> reverse(pairs.size());
+        cv::parallel_for_(cv::Range(0, (int)pairs.size()), [&](const cv::Range& rg) {
+            for (int pi = rg.start; pi < rg.end; ++pi) {
+                const int i = pairs[pi].first;
+                if (!flannIdx[i] || cams[pairs[pi].second].desc.empty()) continue;
+                ScopedMatchingRng rng(opt.stableMatching, 0x5eedULL + uint64_t(pi) * 7919ULL);
+                cv::Mat idx, dist;
+                flannIdx[i]->knnSearch(cams[pairs[pi].second].desc, idx, dist, 2, cv::flann::SearchParams(48));
+                for (int q = 0; q < idx.rows; ++q) {
+                    const float d0 = std::sqrt(std::max(dist.at<float>(q, 0), 0.f));
+                    const float d1 = std::sqrt(std::max(dist.at<float>(q, 1), 0.f));
+                    if (idx.at<int>(q, 1) >= 0 && d0 < 0.7f * d1)
+                        reverse[pi].emplace_back(q, idx.at<int>(q, 0), d0);
+                }
+            }
+        });
+        for (size_t pi = 0; pi < pairs.size(); ++pi) {
+            const int i = pairs[pi].first, j = pairs[pi].second;
+            RotationEdge e;
+            e.i = i;
+            e.j = j;
+            e.Rji = R0[j].t() * R0[i];
+            std::unordered_map<int, int> back;   // keypoint in j → its best keypoint in i
+            for (const auto& m : reverse[pi]) back[m.queryIdx] = m.trainIdx;
+            std::vector<cv::DMatch> forward = goodMatches[pi];
+            std::sort(forward.begin(), forward.end(),
+                      [](const cv::DMatch& x, const cv::DMatch& y) { return x.distance < y.distance; });
+            std::set<std::pair<int, int>> cells;
+            std::vector<Vec3d> A, B;
+            for (const auto& m : forward) {
+                auto it = back.find(m.trainIdx);
+                if (it == back.end() || it->second != m.queryIdx) continue;   // not reciprocal
+                const cv::Point2f& pa = cams[i].kps[m.queryIdx];
+                const cv::Point2f& pb = cams[j].kps[m.trainIdx];
+                Vec3d a((pa.x - cams[i].cx) / cams[i].fx, -(pa.y - cams[i].cy) / cams[i].fy, -1);
+                Vec3d b((pb.x - cams[j].cx) / cams[j].fx, -(pb.y - cams[j].cy) / cams[j].fy, -1);
+                a *= 1.0 / cv::norm(a);
+                b *= 1.0 / cv::norm(b);
+                // A match the sensor pose cannot explain at all is a mismatch, not a correction.
+                if (angleBetweenDeg(R0[i] * a, R0[j] * b) > 15.0) continue;
+                const std::pair<int, int> cell{int(pa.x / cellPx), int(pa.y / cellPx)};
+                if (!cells.insert(cell).second) continue;
+                A.push_back(a);
+                B.push_back(b);
+            }
+            const int kMinRotMatches = 12;
+            const int kMinRotInliers = std::max(10, opt.rotationGraphMinInliers);
+            Matx33d R = e.Rji;
+            int inliers = 0;
+            if ((int)A.size() >= kMinRotMatches)
+                inliers = rotationConsensus(A, B, e.Rji, 721 + uint64_t(i) * 31 + j, R,
+                                            std::max(0.1f, opt.rotationGraphThresholdDeg));
+            if (inliers < kMinRotInliers) {
+                soft.push_back(e);   // overlapping, but no rotation evidence of its own
+                continue;
+            }
+            for (size_t k = 0; k < A.size(); ++k)
+                if (angleBetweenDeg(R * A[k], B[k]) < opt.rotationGraphThresholdDeg) { e.a.push_back(A[k]); e.b.push_back(B[k]); }
+            e.Rji = R;
+            e.weight = std::min<size_t>(e.a.size(), 40);
+            edges.push_back(std::move(e));
+        }
+        const std::vector<Matx33d> Rg = solveRotationGraph(R0, edges, soft, opt.rotationGraphPriorWeight,
+                                                          opt.rotationGraphThresholdDeg);
+        std::vector<char> supported(n, 0);
+        for (const auto& e : edges) { supported[e.i] = 1; supported[e.j] = 1; }
+        stats->rotationGraphRotations.resize(n);
+        double moved = 0;
+        for (int c = 0; c < n; ++c) {
+            stats->rotationGraphRotations[c] = cv::Matx33f(Rg[c]);
+            moved = std::max(moved, angleDeg(Rg[c], R0[c]));
+            stats->rotationGraphSupportedCameras += supported[c] ? 1 : 0;
+        }
+        stats->rotationGraphPairs = (int)edges.size();
+        if (debugOn()) {
+            std::fprintf(stderr, "rotation graph: %zu edges, %d/%d cameras supported, max %.2f deg, %.2fs\n",
+                         edges.size(), stats->rotationGraphSupportedCameras, n, moved, elapsed() - t0rg);
+            for (const auto& e : edges)
+                std::fprintf(stderr, "  rg edge %d,%d: %zu inliers, %.2f deg from sensor\n", e.i, e.j, e.a.size(),
+                             angleDeg(e.Rji, R0[e.j].t() * R0[e.i]));
+            for (int c = 0; c < n; ++c) {
+                std::fprintf(stderr, "  rg cam %d: %s, %.2f deg\n", c, supported[c] ? "solved" : "FOLLOWS",
+                             angleDeg(Rg[c], R0[c]));
+                std::fprintf(stderr, "  rgR %d", c);
+                for (int r = 0; r < 3; ++r) for (int k = 0; k < 3; ++k) std::fprintf(stderr, " %.9f", Rg[c](r, k));
+                std::fprintf(stderr, "\n");
+            }
+        }
+    }
+
     // Sensor poses (gyro fusion) can be several degrees off the true relative rotation — badly
     // timed samples, magnetometer-free heading drift. The essential matrices of the accepted
     // pairs carry the true relative rotations; when they disagree with the prior by more than
@@ -1083,6 +1356,7 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
     for (size_t pi = 0; pi < pairs.size(); ++pi) {
         if (!results[pi].ok) continue;
         ++nPairs;
+        if (stats) stats->acceptedPairEdges.push_back({pairs[pi].first, pairs[pi].second});
         for (const auto& c : results[pi].corr) uf.unite(key(pairs[pi].first, c.first), key(pairs[pi].second, c.second));
     }
     std::unordered_map<int64_t, std::vector<int64_t>> groups;
@@ -1186,7 +1460,18 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
         std::snprintf(buf, sizeof buf, "BA: %d pairs, %zu tracks, %d points, %d observations", nPairs, tracks.size(), npts, nobs);
         report(0.8f, buf);
     }
-    if (stats) { stats->points = npts; stats->observations = nobs; }
+    if (stats) {
+        stats->points = npts; stats->observations = nobs;
+        stats->featureTracks = (int)tracks.size();
+        std::set<std::array<int, 2>> edges;
+        for (const auto& track : prob.ptObs) {
+            for (size_t i = 0; i < track.size(); ++i) for (size_t j = i + 1; j < track.size(); ++j) {
+                int a = prob.obs[track[i]].cam, b = prob.obs[track[j]].cam;
+                edges.insert({std::min(a, b), std::max(a, b)});
+            }
+        }
+        stats->triangulatedEdges.assign(edges.begin(), edges.end());
+    }
     // A camera with only a handful of observations is under-determined in 6 DoF and, the ARKit
     // prior being Cauchy-robustified, a single observation could drag it by a degree: hold such
     // cameras at their ARKit pose (their observations still constrain the points).
@@ -1250,6 +1535,10 @@ std::vector<Pose> bundleAdjustPoses(const std::vector<FrameInput>& frames, const
         if (!progressed) break;
     }
     double medAfter = prob.medianReproj();
+    if (stats) {
+        stats->optimized = true;
+        for (const auto& p : prob.p) stats->optimizedPositions.emplace_back(p);
+    }
     {
         std::vector<double> depths;
         for (const Obs& o : prob.obs) {

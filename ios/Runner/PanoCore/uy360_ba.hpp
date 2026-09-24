@@ -31,6 +31,9 @@
 namespace uy360 {
 
 struct BAOptions {
+    // Android opt-in: isolate randomized matching from worker/caller RNG history.
+    // Default remains false to preserve the existing iOS processing path.
+    bool stableMatching = false;
     bool sensorTranslationInit = true; // initialize unknown positions from image baselines
     int width = 1008;          // feature extraction width (px)
     float posSigmaM = 0.03f;   // ARKit position prior σ (m)
@@ -47,6 +50,26 @@ struct BAOptions {
     /// prior; 0 = same as rotSigmaDeg. Gyro/accelerometer fusion knows tilt (gravity) to ~0.5°
     /// but yaw only up to a slow drift, so sensor poses use a tight tilt σ and a loose yaw σ.
     float yawSigmaDeg = 0.f;
+
+    /// Opt-in rotation-only camera graph, for captures that will be stitched rotation-only.
+    /// The joint solve optimizes each rotation together with a translation; zeroing those
+    /// translations afterwards leaves rotations that no longer describe a pure pivot. When
+    /// this is on, the rotations are additionally solved on their own from per-pair RANSAC
+    /// rotation consensus over unit bearings (no essential matrix, no parallax) synchronised
+    /// across the graph, and reported in BAStats. The joint solve and every existing gate are
+    /// untouched; only a caller that asks for these rotations uses them.
+    bool rotationGraph = false;
+    /// Weight of the relative-sensor link that lets a camera with no accepted pair follow its
+    /// solved neighbours. Applied one-sidedly: a camera the graph measured is never pulled.
+    /// The solution is insensitive to this between roughly 1 and 12.
+    float rotationGraphPriorWeight = 4.f;
+    /// Inliers a pair must reach before its rotation is allowed to move a camera. A thin edge
+    /// over a weakly textured ceiling can swing one frame several degrees while its neighbours
+    /// have no evidence to follow it, which shows up as a step along the beam.
+    int rotationGraphMinInliers = 10;
+    /// Angular inlier threshold of the per-pair rotation consensus. Weak, low-texture pairs
+    /// (upper ring, zenith) need a looser one to reach the inlier count at all.
+    float rotationGraphThresholdDeg = 0.5f;
 
     /// Preset for poses from a phone's gyro/accelerometer (no ARCore/ARKit): positions unknown
     /// (pivot model or zero, σ 15 cm), tilt 0.5°, yaw 3°, consecutive relative rotation 0.3°.
@@ -68,6 +91,16 @@ struct BAStats {
     float depth10 = 0, depth95 = 0, medianDepth = 0; // positive sparse depths, in the solved scale
     int constrainedCameras = 0; // cameras with enough triangulated observations for 6-DoF
     std::vector<int> cameraObservations; // same order as the input frames
+    // Read-only experiment diagnostics; no effect on matching/optimization/depth gates.
+    int frameCount = 0, featureTracks = 0, minCameraObservations = 10;
+    bool optimized = false;
+    std::vector<std::array<int, 2>> acceptedPairEdges, triangulatedEdges;
+    std::vector<cv::Vec3f> optimizedPositions; // before pivot fill; solved units, not metric for sensors
+    /// Filled only when BAOptions::rotationGraph is set: camera→world rotations solved
+    /// rotation-only. Empty otherwise; never used by this solver's own optimization.
+    std::vector<cv::Matx33f> rotationGraphRotations;
+    int rotationGraphPairs = 0;             // pairs that produced an accepted rotation edge
+    int rotationGraphSupportedCameras = 0;  // cameras with at least one such edge
     double seconds = 0;
 };
 
